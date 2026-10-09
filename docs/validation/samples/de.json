@@ -1,0 +1,62 @@
+{
+  "annotations": [],
+  "createdAt": 1791556783261,
+  "glossary": [
+    {
+      "headword": "Hund",
+      "meaning": "dog",
+      "selected": "Hund",
+      "usedForms": [
+        "Hund"
+      ]
+    },
+    {
+      "headword": "Haus",
+      "meaning": "house; in 'nach Hause', home",
+      "selected": "Haus",
+      "usedForms": [
+        "Haus",
+        "Hause"
+      ]
+    },
+    {
+      "headword": "Wasser",
+      "meaning": "water to drink",
+      "selected": "Wasser",
+      "usedForms": [
+        "Wasser"
+      ]
+    },
+    {
+      "headword": "Brot",
+      "meaning": "bread",
+      "selected": "Brot",
+      "usedForms": [
+        "Brot"
+      ]
+    },
+    {
+      "headword": "Freund",
+      "meaning": "male friend",
+      "selected": "Freund",
+      "usedForms": [
+        "Freund"
+      ]
+    }
+  ],
+  "id": "5a619d13-81ea-4265-a743-782439efc6bf",
+  "language": "GERMAN",
+  "model": "gpt-6.1-sol",
+  "promptVersion": "2026-10-09.1",
+  "text": "Heute ist Samstag. Mein Freund Max kommt zu mir. Er hat einen Hund. Der Hund heißt Leo und ist sehr lieb. Ich wohne in einem kleinen Haus. Vor dem Haus steht eine Bank. Max und ich sitzen auf der Bank. Wir essen Brot mit Käse und trinken Wasser. Leo hat auch Durst. Ich hole eine Schüssel und gebe ihm Wasser. Dann gehen wir zusammen in den Park. Max wirft einen Ball. Leo läuft schnell und bringt den Ball zurück. Wir lachen und spielen mit Leo. Am Mittag gehen wir nach Hause. Wir essen Suppe und Brot in der Küche. Danach hören wir Musik. Am Abend gehen Max und Leo nach Hause. Der Tag mit meinem Freund ist schön.",
+  "title": "Ein Tag mit Max",
+  "titleAnnotations": [],
+  "topic": "A day with a friend",
+  "vocabulary": [
+    "Hund",
+    "Haus",
+    "Wasser",
+    "Brot",
+    "Freund"
+  ]
+}

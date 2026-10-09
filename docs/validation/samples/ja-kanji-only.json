@@ -1,0 +1,213 @@
+{
+  "annotations": [
+    {
+      "end": 2,
+      "reading": "きょう",
+      "start": 0
+    },
+    {
+      "end": 5,
+      "reading": "ともだち",
+      "start": 3
+    },
+    {
+      "end": 13,
+      "reading": "がっこう",
+      "start": 11
+    },
+    {
+      "end": 15,
+      "reading": "い",
+      "start": 14
+    },
+    {
+      "end": 21,
+      "reading": "がっこう",
+      "start": 19
+    },
+    {
+      "end": 28,
+      "reading": "ほん",
+      "start": 27
+    },
+    {
+      "end": 30,
+      "reading": "よ",
+      "start": 29
+    },
+    {
+      "end": 37,
+      "reading": "ほん",
+      "start": 36
+    },
+    {
+      "end": 39,
+      "reading": "ねこ",
+      "start": 38
+    },
+    {
+      "end": 41,
+      "reading": "ほん",
+      "start": 40
+    },
+    {
+      "end": 50,
+      "reading": "ねこ",
+      "start": 49
+    },
+    {
+      "end": 52,
+      "reading": "す",
+      "start": 51
+    },
+    {
+      "end": 58,
+      "reading": "がっこう",
+      "start": 56
+    },
+    {
+      "end": 65,
+      "reading": "こうえん",
+      "start": 63
+    },
+    {
+      "end": 67,
+      "reading": "い",
+      "start": 66
+    },
+    {
+      "end": 73,
+      "reading": "こうえん",
+      "start": 71
+    },
+    {
+      "end": 75,
+      "reading": "ちい",
+      "start": 74
+    },
+    {
+      "end": 78,
+      "reading": "ねこ",
+      "start": 77
+    },
+    {
+      "end": 84,
+      "reading": "ねこ",
+      "start": 83
+    },
+    {
+      "end": 86,
+      "reading": "き",
+      "start": 85
+    },
+    {
+      "end": 88,
+      "reading": "した",
+      "start": 87
+    },
+    {
+      "end": 103,
+      "reading": "みず",
+      "start": 102
+    },
+    {
+      "end": 105,
+      "reading": "の",
+      "start": 104
+    },
+    {
+      "end": 119,
+      "reading": "はな",
+      "start": 118
+    },
+    {
+      "end": 125,
+      "reading": "きょう",
+      "start": 123
+    },
+    {
+      "end": 127,
+      "reading": "たの",
+      "start": 126
+    },
+    {
+      "end": 131,
+      "reading": "いちにち",
+      "start": 129
+    }
+  ],
+  "createdAt": 1791558061278,
+  "glossary": [
+    {
+      "headword": "学校",
+      "meaning": "school",
+      "reading": "がっこう",
+      "selected": "学校",
+      "usedForms": [
+        "学校"
+      ]
+    },
+    {
+      "headword": "友達",
+      "meaning": "friend",
+      "reading": "ともだち",
+      "selected": "友達",
+      "usedForms": [
+        "友達"
+      ]
+    },
+    {
+      "headword": "本",
+      "meaning": "book",
+      "reading": "ほん",
+      "selected": "本",
+      "usedForms": [
+        "本"
+      ]
+    },
+    {
+      "headword": "水",
+      "meaning": "water to drink",
+      "reading": "みず",
+      "selected": "水",
+      "usedForms": [
+        "水"
+      ]
+    },
+    {
+      "headword": "猫",
+      "meaning": "cat",
+      "reading": "ねこ",
+      "selected": "猫",
+      "usedForms": [
+        "猫"
+      ]
+    }
+  ],
+  "id": "ffb96dec-f6f5-484a-b9ee-6f97ad116251",
+  "language": "JAPANESE",
+  "model": "gpt-6.1-sol",
+  "promptVersion": "2026-10-09.2",
+  "text": "今日は友達のゆきさんと学校へ行きます。学校でゆきさんと本を読みます。その本は猫の本です。ゆきさんは猫が好きです。学校のあとで、公園へ行きます。公園に小さい猫がいます。猫は木の下にいます。わたしたちはそこで水を飲みます。ゆきさんとたくさん話します。今日は楽しい一日です。",
+  "title": "友達と一日",
+  "titleAnnotations": [
+    {
+      "end": 2,
+      "reading": "ともだち",
+      "start": 0
+    },
+    {
+      "end": 5,
+      "reading": "いちにち",
+      "start": 3
+    }
+  ],
+  "topic": "A day with a friend",
+  "vocabulary": [
+    "学校",
+    "友達",
+    "本",
+    "水",
+    "猫"
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "annotations": [],
+  "createdAt": 1791556735745,
+  "glossary": [
+    {
+      "headword": "casa",
+      "meaning": "house; the narrator’s home",
+      "selected": "casa",
+      "usedForms": [
+        "casa"
+      ]
+    },
+    {
+      "headword": "perro",
+      "meaning": "dog; the narrator’s pet Nico",
+      "selected": "perro",
+      "usedForms": [
+        "perro"
+      ]
+    },
+    {
+      "headword": "agua",
+      "meaning": "water to drink",
+      "selected": "agua",
+      "usedForms": [
+        "agua"
+      ]
+    },
+    {
+      "headword": "pan",
+      "meaning": "bread eaten with cheese",
+      "selected": "pan",
+      "usedForms": [
+        "pan"
+      ]
+    },
+    {
+      "headword": "amigo",
+      "meaning": "friend; Pablo",
+      "selected": "amigo",
+      "usedForms": [
+        "amigo"
+      ]
+    }
+  ],
+  "id": "a0aae03b-e0ad-41e9-9380-3132daf504a4",
+  "language": "SPANISH",
+  "model": "gpt-6.1-sol",
+  "promptVersion": "2026-10-09.1",
+  "text": "Hoy mi amigo Pablo viene a mi casa. Es sábado y hace sol. Primero comemos pan con queso en la cocina. Pablo bebe agua y yo también. Mi perro, Nico, está cerca de la mesa. Quiere comer, pero su comida está en otro plato. Después salimos con Nico al parque. Pablo lleva una botella de agua y yo llevo una pelota. En el parque, Nico corre detrás de la pelota. Nosotros caminamos y hablamos de la escuela. Luego descansamos bajo un árbol. A las dos volvemos a casa. Tenemos hambre y preparamos una ensalada. Por la tarde escuchamos música. Nico duerme junto a nosotros. Pablo está contento y yo también. Es un día sencillo y bonito con mi amigo.",
+  "title": "Un día con mi amigo",
+  "titleAnnotations": [],
+  "topic": "A day with a friend",
+  "vocabulary": [
+    "casa",
+    "perro",
+    "agua",
+    "pan",
+    "amigo"
+  ]
+}
