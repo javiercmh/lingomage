@@ -64,3 +64,41 @@ The existing `SPANISH` enum identifier remains stable so saved stories still
 decode. Legacy `es` preferences resolve to Spanish (Chile); new preferences and
 story records use `es-CL`. Old story text and prompt versions remain unchanged:
 their earlier generation is not retroactively evidence of Chilean usage.
+
+### Japanese text consistency — prompt 2026-10-09.3
+
+Japanese generation now omits duplicate `text` and `title` fields. Canonical
+story and title text are concatenated from `segments` and `titleSegments`,
+preserving every character and deriving annotation offsets from that same
+source. This removes a redundant model-generated copy that could disagree.
+Length, sentence count, vocabulary, glossary and furigana checks still apply.
+Legacy responses containing explicit text must still match their segments
+exactly; stored stories are unchanged. This is an engineering reliability
+decision, not a new learning-effectiveness claim.
+
+## App-owned kanji segmentation — 2026-10-09.5
+
+A device read of the reported error confirmed the surface segment was
+`ホテルは駅`: the detector correctly found the kanji 駅, but the model grouped
+it with kana and omitted its reading. Stronger one-pass prompt instructions
+did not eliminate this failure.
+
+Japanese generation now has two sequential stages: generate canonical title,
+text and glossary, then request contextual readings for app-extracted kanji
+spans. The app scans Unicode code points using the Han script property, keeps
+contiguous kanji compounds together, and preserves kana, punctuation and
+okurigana as plain text. Each span has a unique id, section and UTF-16 offsets
+plus context; repeated spellings receive separate ids to allow contextual
+pronunciations. `ja-readings.txt` is versioned together with `ja.json`. The
+model supplies readings, never annotation boundaries or rewritten story text.
+
+The app requires exactly one valid kana reading per id, rejects missing,
+duplicate or unknown ids, and constructs segments whose text exactly reproduces
+the canonical source. The existing final validator checks length, vocabulary,
+glossary, script and annotations before saving. Cancellation applies to both
+stages; a failed stage is not automatically retried and no partial story is
+saved. Japanese generation uses two inference calls when kanji are present,
+which adds latency and usage. Kana-only text needs no reading call.
+
+This removes model-controlled segmentation and kana/kanji classification. It
+does not certify that a supplied kana pronunciation is linguistically correct.

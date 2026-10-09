@@ -67,6 +67,27 @@ class StoryValidatorTest {
         val story = read()
         assertEquals(2, story.annotations.first().end)
         assertEquals("がっこう", story.annotations.first().reading)
+        val first = root.getAsJsonArray("segments")[0].asJsonObject
+        first.addProperty("reading", "  か\u3099っこう\n")
+        assertEquals("がっこう", read().annotations.first().reading)
+        first.add("reading", JsonNull.INSTANCE)
+        try { read(); fail("Expected missing-reading rejection") } catch (e: StoryFailure) {
+            assertTrue(e.message!!.contains("A kana reading is missing"))
+            assertTrue(e.message!!.contains("学校"))
+        }
+        first.addProperty("reading", "学校")
+        try { read(); fail("Expected non-kana rejection") } catch (e: StoryFailure) {
+            assertTrue(e.message!!.contains("must contain only kana"))
+        }
+        first.addProperty("reading", "がっこう")
+        root.remove("title")
+        root.remove("text")
+        assertEquals(sentence.repeat(8), read().text)
+        assertEquals("学校", read().title)
+        assertEquals(story.annotations, read().annotations)
+        root.addProperty("text", sentence.repeat(8) + "違う")
+        fails { read() }
+        root.remove("text")
         root.getAsJsonArray("segments")[0].asJsonObject.addProperty("reading", "gakkou")
         fails { read() }
         root.getAsJsonArray("segments")[0].asJsonObject.addProperty("reading", "がっこう")

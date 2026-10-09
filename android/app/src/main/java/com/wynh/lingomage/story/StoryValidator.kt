@@ -5,6 +5,7 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.wynh.lingomage.model.TargetLanguage
 import java.util.UUID
+import java.text.Normalizer
 
 object StoryValidator {
     fun suggestions(raw: String, language: TargetLanguage): List<String> = checked {
@@ -17,8 +18,8 @@ object StoryValidator {
     fun story(raw: String, language: TargetLanguage, words: List<String>, topic: String, model: String, version: String): Story = checked {
         Vocabulary.validate(words, language)
         val root = JsonParser.parseString(raw).asJsonObject
-        val title = root.string("title", 120)
-        val text = root.string("text", 6_000)
+        val title = canonical(root, "title", "titleSegments", 120, language)
+        val text = canonical(root, "text", "segments", 6_000, language)
         ScriptRules.validate(title, language)
         ScriptRules.validate(text, language)
         if (language == TargetLanguage.JAPANESE) {
@@ -48,13 +49,28 @@ object StoryValidator {
         }
         if (glossary.size != words.size || glossary.map { it.selected }.toSet() != words.toSet())
             throw StoryFailure("The glossary did not cover every selected word exactly once. Your words are preserved; try again.")
-        val annotations = annotations(text, root.getAsJsonArray("segments"), language)
-        val titleAnnotations = annotations(title, root.getAsJsonArray("titleSegments"), language)
+        val annotations = annotations(text, root.getAsJsonArray("segments"), language, "story")
+        val titleAnnotations = annotations(title, root.getAsJsonArray("titleSegments"), language, "title")
         Story(UUID.randomUUID().toString(), language, title, text, glossary, words.toList(), topic,
             annotations, titleAnnotations, model, version, System.currentTimeMillis())
     }
 
-    private fun annotations(canonical: String, segments: JsonArray?, language: TargetLanguage): List<Furigana> {
+    private fun canonical(root: JsonObject, field: String, segmentField: String, max: Int, language: TargetLanguage): String {
+        // Legacy responses may include both fields; their equality is still checked below.
+        if (language != TargetLanguage.JAPANESE || root.has(field)) return root.string(field, max)
+        val segments = root.getAsJsonArray(segmentField)
+            ?: throw StoryFailure("Japanese reading annotations were missing. Please try again.")
+        if (segments.size() !in 1..2_000) throw StoryFailure("Japanese reading annotations were missing. Please try again.")
+        val text = StringBuilder()
+        segments.forEach {
+            text.append(it.asJsonObject.string("text", 1_000, allowWhitespace = true))
+            if (text.length > max) throw StoryFailure("The generated story contained an invalid field. Please try again.")
+        }
+        if (text.isBlank()) throw StoryFailure("The generated story contained an invalid field. Please try again.")
+        return text.toString()
+    }
+
+    private fun annotations(canonical: String, segments: JsonArray?, language: TargetLanguage, location: String): List<Furigana> {
         if (language != TargetLanguage.JAPANESE) {
             if (segments == null || segments.size() != 0) throw StoryFailure("Unexpected reading annotations. Please try again.")
             return emptyList()
@@ -66,14 +82,21 @@ object StoryValidator {
         segments.forEach { value ->
             val item = value.asJsonObject
             val text = item.string("text", 1_000, allowWhitespace = true)
-            val reading = item.get("reading")?.takeUnless { it.isJsonNull }?.asString
+            val readingValue = item.get("reading")?.takeUnless { it.isJsonNull }
+            val reading = readingValue?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
+                ?.asString?.trim()?.let { Normalizer.normalize(it, Normalizer.Form.NFC) }
             val start = reconstructed.length
             reconstructed.append(text)
             if (ScriptRules.hasKanji(text)) {
-                if (text.length > 20 || reading == null || reading.length > 60 || !ScriptRules.kana(reading))
-                    throw StoryFailure("Japanese kanji need kana readings grouped by word or compound. Please try again.")
+                val label = text.take(24)
+                if (text.length > 20)
+                    throw StoryFailure("A Japanese $location segment is too long to annotate: “$label”. Please try again.")
+                if (reading == null || reading.isEmpty())
+                    throw StoryFailure("A kana reading is missing for “$label” in the Japanese $location. Your vocabulary is preserved; try again.")
+                if (reading.length > 60 || !ScriptRules.kana(reading))
+                    throw StoryFailure("The reading for “$label” must contain only kana. Your vocabulary is preserved; try again.")
                 result.add(Furigana(start, reconstructed.length, reading))
-            } else if (reading != null) throw StoryFailure("Unexpected reading above kana-only text. Please try again.")
+            } else if (readingValue != null) throw StoryFailure("Unexpected reading above kana-only text. Please try again.")
         }
         if (reconstructed.toString() != canonical) throw StoryFailure("Japanese annotations did not match the story text. Please try again.")
         return FuriganaPlacement.normalize(canonical, result)

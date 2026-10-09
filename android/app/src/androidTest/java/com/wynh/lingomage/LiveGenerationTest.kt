@@ -14,6 +14,7 @@ import com.google.gson.GsonBuilder
 class LiveGenerationTest {
     @Test fun germanStory() = generate(TargetLanguage.GERMAN, listOf("Hund", "Haus", "Wasser", "Brot", "Freund"))
     @Test fun japaneseStory() = generate(TargetLanguage.JAPANESE, listOf("学校", "友達", "本", "水", "猫"))
+    @Test fun japaneseTripStory() = generate(TargetLanguage.JAPANESE, listOf("旅行", "日本", "電車", "駅", "友達"), "A trip to Japan")
     @Test fun russianStory() = generate(TargetLanguage.RUSSIAN, listOf("дом", "собака", "вода", "хлеб", "друг"))
     @Test fun spanishStory() = generate(TargetLanguage.SPANISH, listOf("casa", "perro", "agua", "pan", "amigo"))
     @Test fun vocabularySuggestions() {
@@ -41,12 +42,12 @@ class LiveGenerationTest {
         val directory = File(app.cacheDir, "sample-stories").apply { check(isDirectory || mkdirs()) }
         File(directory, "${story.language.tag}.json").writeText(GsonBuilder().setPrettyPrinting().create().toJson(story))
     }
-    private fun generate(language: TargetLanguage, words: List<String>) {
+    private fun generate(language: TargetLanguage, words: List<String>, topic: String = "A day with a friend") {
         assumeTrue(InstrumentationRegistry.getArguments().getString("live_generation") == "true")
         runBlocking {
             val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as LingoMageApplication
             val model = app.inference.models().first().slug
-            val story: Story = app.generation.generate(language, words, "A day with a friend", model)
+            val story: Story = app.generation.generate(language, words, topic, model)
             app.library.save(story)
             export(app, story)
         }
