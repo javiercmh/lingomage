@@ -19,6 +19,7 @@ data class ProbeState(
     val busy: Boolean = false,
     val models: List<ModelChoice> = emptyList(),
     val selectedModel: String? = null,
+    val reasoning: String? = null,
     val response: String? = null,
     val error: String? = null
 )
@@ -43,16 +44,35 @@ class AuthenticationViewModel(val auth: AuthenticationRepository, private val in
         val choices = inference.models()
         val account = auth.state.value.activeClientId
         val saved = account?.let { settings?.model(it) }
-        mutableProbe.update { it.copy(models = choices, selectedModel = choices.firstOrNull { choice -> choice.slug == saved }?.slug ?: choices.first().slug) }
+        val model = choices.firstOrNull { it.slug == saved } ?: choices.first()
+        val reasoning = account?.let { settings?.reasoning(it, model.slug) }?.takeIf { it in model.reasoningLevels }
+        mutableProbe.update { it.copy(models = choices, selectedModel = model.slug, reasoning = reasoning) }
     }
 
     fun chooseModel(model: String) {
         if (mutableProbe.value.models.none { it.slug == model }) return
-        mutableProbe.update { it.copy(selectedModel = model, response = null) }
+        mutableProbe.update { it.copy(selectedModel = model, reasoning = null, response = null) }
         auth.state.value.activeClientId?.let { account -> viewModelScope.launch {
-            try { settings?.setModel(account, model) }
+            try {
+                settings?.setModel(account, model)
+                val saved = settings?.reasoning(account, model)?.takeIf { effort -> effort in mutableProbe.value.models.first { it.slug == model }.reasoningLevels }
+                if (mutableProbe.value.selectedModel == model) mutableProbe.update { it.copy(reasoning = saved) }
+            }
             catch (_: Exception) { mutableProbe.update { it.copy(error = "The model preference could not be saved. Your selection works for this session.") } }
         } }
+    }
+
+    fun chooseReasoning(effort: String?) {
+        val current = mutableProbe.value
+        val model = current.models.firstOrNull { it.slug == current.selectedModel } ?: return
+        if (effort != null && effort !in model.reasoningLevels) return
+        val account = auth.state.value.activeClientId ?: return
+        viewModelScope.launch {
+            try {
+                settings?.setReasoning(account, model.slug, effort)
+                if (mutableProbe.value.selectedModel == model.slug) mutableProbe.update { it.copy(reasoning = effort, response = null) }
+            } catch (_: Exception) { mutableProbe.update { it.copy(error = "The reasoning preference could not be saved. Please try again.") } }
+        }
     }
 
     fun checkInference() = operation {

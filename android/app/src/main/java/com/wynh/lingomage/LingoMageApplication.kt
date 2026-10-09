@@ -33,9 +33,9 @@ class LingoMageApplication : Application() {
         super.onCreate()
         val http = HttpGateway()
         auth = AuthRepository(EncryptedCredentialStore(this), OpenAiOAuthApi(http), IdTokenValidator(), applicationScope)
-        inference = OpenAiInferenceRepository(http, auth)
-        library = RoomLibraryRepository(StoryDatabase.create(this).stories())
         settings = AppSettings(this)
+        inference = OpenAiInferenceRepository(http, auth, settings)
+        library = RoomLibraryRepository(StoryDatabase.create(this).stories())
         generation = OpenAiGenerationRepository(inference, PromptStore(this))
     }
 }

@@ -12,6 +12,23 @@ import com.google.gson.GsonBuilder
 
 /** Explicit opt-in only: uses the saved account inside the app, never exports tokens. */
 class LiveGenerationTest {
+    @Test fun reasoningPreferenceAndInference() {
+        assumeTrue(InstrumentationRegistry.getArguments().getString("live_reasoning") == "true")
+        runBlocking {
+            val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as LingoMageApplication
+            val account = app.auth.activeRegistration().clientId
+            val model = app.inference.models().first { it.reasoningLevels.isNotEmpty() }
+            val previous = app.settings.reasoning(account, model.slug)
+            val effort = model.reasoningLevels.first()
+            try {
+                app.settings.setReasoning(account, model.slug, effort)
+                org.junit.Assert.assertEquals(effort, app.settings.reasoning(account, model.slug))
+                org.junit.Assert.assertNull(app.settings.reasoning("isolated-test-account", model.slug))
+                org.junit.Assert.assertNull(app.settings.reasoning(account, "isolated-test-model"))
+                org.junit.Assert.assertTrue(app.inference.check(model.slug).contains("Hello"))
+            } finally { app.settings.setReasoning(account, model.slug, previous) }
+        }
+    }
     @Test fun germanStory() = generate(TargetLanguage.GERMAN, listOf("Hund", "Haus", "Wasser", "Brot", "Freund"))
     @Test fun japaneseStory() = generate(TargetLanguage.JAPANESE, listOf("学校", "友達", "本", "水", "猫"))
     @Test fun japaneseTripStory() = generate(TargetLanguage.JAPANESE, listOf("旅行", "日本", "電車", "駅", "友達"), "A trip to Japan")

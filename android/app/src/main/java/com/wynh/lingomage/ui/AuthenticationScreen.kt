@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -41,7 +44,8 @@ fun AuthenticationScreen(
     onCheck: () -> Unit,
     onCancelCheck: () -> Unit,
     onSignOut: () -> Unit,
-    onReset: () -> Unit
+    onReset: () -> Unit,
+    onChooseReasoning: (String?) -> Unit = {}
 ) {
     var confirmReset by remember { mutableStateOf(false) }
     val idle = auth.phase == AuthPhase.IDLE && !probe.busy
@@ -102,6 +106,23 @@ fun AuthenticationScreen(
                                     onClick = { onChooseModel(model.slug) }, enabled = idle)
                                 Text(model.displayName, Modifier.padding(top = 12.dp))
                             }
+                        }
+                        probe.models.firstOrNull { it.slug == probe.selectedModel }?.let { model ->
+                            var expanded by remember(model.slug) { mutableStateOf(false) }
+                            Text("Reasoning level", style = MaterialTheme.typography.titleMedium)
+                            Box {
+                                OutlinedButton(onClick = { expanded = true }, enabled = idle && model.reasoningLevels.isNotEmpty()) {
+                                    Text(probe.reasoning?.replaceFirstChar { it.uppercase() } ?: "Model default")
+                                }
+                                DropdownMenu(expanded, { expanded = false }) {
+                                    DropdownMenuItem(text = { Text("Model default") }, onClick = { onChooseReasoning(null); expanded = false })
+                                    model.reasoningLevels.forEach { effort ->
+                                        DropdownMenuItem(text = { Text(effort.replaceFirstChar { it.uppercase() }) },
+                                            onClick = { onChooseReasoning(effort); expanded = false })
+                                    }
+                                }
+                            }
+                            Text(if (model.reasoningLevels.isEmpty()) "This model uses its default reasoning." else "Higher levels may take longer and use more of your plan.")
                         }
                         Button(onClick = onCheck, enabled = idle && probe.selectedModel != null) { Text("Run inference check") }
                         if (probe.busy) {

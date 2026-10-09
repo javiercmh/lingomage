@@ -1,5 +1,6 @@
 package com.wynh.lingomage.ui
 
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -43,7 +44,7 @@ fun LearningScreen(auth: AuthState, probe: ProbeState, authentication: Authentic
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             val ruby = if (entry.reading != null && ScriptRules.hasKanji(entry.headword)) listOf(Furigana(0, entry.headword.length, entry.reading)) else emptyList()
                             FuriganaText(entry.headword, ruby, MaterialTheme.typography.titleMedium)
-                            Text(entry.meaning)
+                            SelectionContainer { Text(entry.meaning) }
                             if (story.language == TargetLanguage.JAPANESE) {
                                 Text("In the story:", style = MaterialTheme.typography.bodySmall)
                                 entry.usedForms.forEach { form ->
@@ -53,7 +54,7 @@ fun LearningScreen(auth: AuthState, probe: ProbeState, authentication: Authentic
                                     val end = maxOf(offset + form.length, overlapping.maxOfOrNull { it.end } ?: offset + form.length)
                                     FuriganaText(story.text.substring(start, end), overlapping.map { it.copy(start = it.start - start, end = it.end - start) }, MaterialTheme.typography.bodyMedium)
                                 }
-                            } else Text("In the story: ${entry.usedForms.joinToString(", ")}", style = MaterialTheme.typography.bodySmall)
+                            } else SelectionContainer { Text("In the story: ${entry.usedForms.joinToString(", ")}", style = MaterialTheme.typography.bodySmall) }
                         }
                     }
                 }
@@ -61,10 +62,10 @@ fun LearningScreen(auth: AuthState, probe: ProbeState, authentication: Authentic
                 Text("Difficulty is an estimate. Generated text can contain mistakes; learning effectiveness has not been established.", style = MaterialTheme.typography.bodySmall)
             }
         } else if (tab == 2) {
-            Box(Modifier.fillMaxSize().padding(padding)) { AuthenticationScreen(auth, probe, authentication::signIn, authentication.auth::cancelSignIn,
+            Box(Modifier.fillMaxSize().padding(padding)) { AuthenticationScreen(auth, probe.copy(busy = probe.busy || busy), authentication::signIn, authentication.auth::cancelSignIn,
                 authentication::selectAccount, authentication::loadModels, authentication::chooseModel,
                 authentication::checkInference, authentication::cancelProbe, authentication::signOut,
-                authentication::resetCredentials) }
+                authentication::resetCredentials, authentication::chooseReasoning) }
         } else {
             Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)) {

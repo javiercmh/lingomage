@@ -1,5 +1,7 @@
 package com.wynh.lingomage.ui
 
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +32,11 @@ import com.wynh.lingomage.story.FuriganaPlacement
 /** Canonical text stays separate from readings. Each compound is one inline layout unit. */
 @Composable
 fun FuriganaText(canonical: String, annotations: List<Furigana>, style: TextStyle, modifier: Modifier = Modifier) {
+    SelectionContainer { SelectableFuriganaText(canonical, annotations, style, modifier) }
+}
+
+@Composable
+private fun SelectableFuriganaText(canonical: String, annotations: List<Furigana>, style: TextStyle, modifier: Modifier) {
     if (annotations.isEmpty()) { Text(canonical, modifier, style = style); return }
     val placed = FuriganaPlacement.display(canonical, annotations)
     val resolvedStyle = style.copy(color = if (style.color == Color.Unspecified) LocalContentColor.current else style.color)
@@ -55,10 +62,10 @@ fun FuriganaText(canonical: String, annotations: List<Furigana>, style: TextStyl
                 val id = "ruby_$index"
                 appendInlineContent(id, surface)
                 content[id] = InlineTextContent(Placeholder(with(density) { width.toSp() }, with(density) { height.toSp() }, PlaceholderVerticalAlign.TextBottom)) {
-                    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    DisableSelection { Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(annotation.reading, style = readingStyle)
                         Text(surface, style = baseStyle)
-                    }
+                    } }
                 }
                 offset = annotation.end
             }

@@ -55,3 +55,8 @@ authentication workarounds.
 
 Audio, images, quizzes, spaced repetition, cloud sync, formal learning trials,
 additional languages, and higher difficulty levels.
+
+Story and glossary text can be selected and copied. Japanese copying excludes
+furigana. Settings offer model-specific reasoning levels, including a model-default
+option, saved independently for each account and model. Higher levels may increase
+request latency and plan usage.

@@ -35,3 +35,5 @@ Do not label planned checks as completed validation.
 
 Changes to generation prompts, reading aids, or difficulty rules should update
 the affected language decisions and evidence records in the same change.
+
+- [Text selection and reasoning preferences](architecture/selection-and-reasoning.md)
