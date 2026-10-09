@@ -1,0 +1,25 @@
+# macOS and IDE state
+.DS_Store
+*.iml
+.idea/
+
+# Local Android SDK paths and generated build files
+local.properties
+.gradle/
+.kotlin/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Signing credentials and local secrets
+*.jks
+*.keystore
+keystore.properties
+.env
+.env.*
+!.env.example
+
+# Packaged build outputs
+*.apk
+*.aab
