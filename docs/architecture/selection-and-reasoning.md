@@ -25,5 +25,18 @@ removes the preference. Account switching reloads model choices and preferences.
 Higher effort can increase latency and usage; it does not certify language or
 learning quality. Reasoning controls are disabled during story requests.
 
+## Current App² reader selection
+
+The full-screen reader keeps semantic ruby visible by default and offers a
+learner-controlled furigana toggle. Its app-owned selection toolbar offers
+Explain and Copy while retaining browser/WebView selection handles. Selection
+offsets and copy text exclude `rt` reading nodes and use canonical chapter text.
+Explain includes a contextual English translation and a brief profile-relative
+difficulty estimate; it is not a proficiency judgment. App² Android selection
+and native clipboard behavior remain pending device validation. See
+[PED-002](../pedagogy/PED-002-contextual-reading-support.md).
+
 API references: [OpenAI reasoning guide](https://developers.openai.com/api/docs/guides/reasoning)
 and [SIWC inference contract](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference).
+
+Canonical offsets handle both text-node boundaries and child-index boundaries on ruby or other elements. Reading nodes contribute no characters. Pointer interaction with the selection toolbar preserves the captured passage while focus changes. Automated boundary and request-recovery checks run with `node tests/reader-regression.cjs`; the harness uses isolated DOM and AI stubs, not an Android WebView.

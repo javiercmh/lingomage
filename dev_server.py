@@ -187,9 +187,19 @@ class Handler(SimpleHTTPRequestHandler):
             if self.server.requests:
                 return fail('request_in_progress', 'A request is running or awaiting acknowledgement')
             request_id = 'mock-' + uuid.uuid4().hex
+            try:
+                request_data = json.loads(data.get('input', '{}'))
+            except (TypeError, ValueError):
+                request_data = {}
+            if request_data.get('kind') in {'explain', 'translate'}:
+                passage = str(request_data.get('passage', ''))
+                explanation = f"Development example: consider how {passage!r} works in this sentence. The difficulty estimate is only a mock and is not a proficiency assessment."
+                response_text = json.dumps({'translation': f"Development translation: {passage}", 'explanation': explanation, 'moreDetail': f"More detail about {passage}: inspect its meaning in context and notice how its form relates to the surrounding words."}, ensure_ascii=False)
+            else:
+                response_text = self.mock_story(data.get('input', ''))
             self.server.requests[request_id] = {
                 'ready': time.monotonic() + 1.5,
-                'text': self.mock_story(data.get('input', '')),
+                'text': response_text,
             }
             return self.reply(request_id)
         request_id = command.get('requestId')
@@ -226,9 +236,15 @@ class Handler(SimpleHTTPRequestHandler):
         title, story = samples.get(code, samples['de'])
         glossary = [{'word': word, 'meaning': f'Development example for {word}', 'forms': [word]} for word in words]
         if code == 'ja':
+            story_segments = [
+                {'text':'今日','reading':'きょう'}, {'text':'はミアが'}, {'text':'町','reading':'まち'}, {'text':'へ'}, {'text':'行','reading':'い'}, {'text':'きます。\n'},
+                {'text':'店','reading':'みせ'}, {'text':'でパンを'}, {'text':'買','reading':'か'}, {'text':'います。友だちと'}, {'text':'公園','reading':'こうえん'}, {'text':'で'}, {'text':'話','reading':'はな'}, {'text':'します。\n'},
+                {'text':'空','reading':'そら'}, {'text':'は'}, {'text':'青','reading':'あお'}, {'text':'く、'}, {'text':'風','reading':'かぜ'}, {'text':'はやさしいです。\n'},
+                {'text':'二人','reading':'ふたり'}, {'text':'は'}, {'text':'笑','reading':'わら'}, {'text':'って'}, {'text':'家','reading':'いえ'}, {'text':'へ'}, {'text':'帰','reading':'かえ'}, {'text':'ります。'}
+            ]
             return json.dumps({'title': title, 'story': story,
                                'titleSegments': [{'text': '小', 'reading': 'ちい'}, {'text': 'さな一日', 'reading': ''}],
-                               'storySegments': [{'text': story, 'reading': ''}], 'glossary': glossary}, ensure_ascii=False)
+                               'storySegments': story_segments, 'glossary': glossary}, ensure_ascii=False)
         return json.dumps({'title': title, 'story': story,
                            'titleSegments': [{'text': title}],
                            'storySegments': [{'text': story}], 'glossary': glossary}, ensure_ascii=False)

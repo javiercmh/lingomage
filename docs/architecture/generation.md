@@ -1,5 +1,7 @@
 # Story generation and local library
 
+> The current App² continuation, rewrite and explanation behavior is summarized in [App² runtime](app2-runtime.md) and [PED-002](../pedagogy/PED-002-contextual-reading-support.md). The Android implementation below is historical.
+
 > The Android architecture below records the earlier native implementation. The current App² behavior and its reduced validation coverage are documented in [App² runtime migration](app2-runtime.md).
 
 Implemented after physical-device authentication and completed inference passed.
@@ -100,3 +102,7 @@ which adds latency and usage. Kana-only text needs no reading call.
 
 This removes model-controlled segmentation and kana/kanji classification. It
 does not certify that a supplied kana pronunciation is linguistically correct.
+
+## App² reader request recovery
+
+Continuation appends at the end using every active chapter as context; its source version is the final chapter's captured version. Rewriting targets only the captured current chapter. Completed responses are saved to the original story even if the reader navigates elsewhere. Persistence failures retain the result for explicit saving without a new inference call. Acknowledgement failures leave durable content intact and retry only release.

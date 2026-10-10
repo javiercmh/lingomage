@@ -81,3 +81,8 @@ which adds latency and usage. Kana-only text needs no reading call.
 
 This removes model-controlled segmentation and kana/kanji classification. It
 does not certify that a supplied kana pronunciation is linguistically correct.
+
+
+## Current App² selection behavior
+
+App² keeps canonical Japanese in text nodes and uses semantic `ruby` annotations for readings. Reading text is excluded from canonical selection offsets and copy; learners may hide readings with a reader preference, but selection support does not depend on hiding them. Android WebView selection with visible furigana still requires device verification. If ruby prevents reliable base-text selection, use visual reading overlays outside the selectable canonical text.

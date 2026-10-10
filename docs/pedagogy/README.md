@@ -5,6 +5,7 @@ Start here before changing learner profiles, story difficulty, prompts, or readi
 | ID | Decision | Status | Evidence |
 | --- | --- | --- | --- |
 | [PED-001](PED-001-learner-self-report.md) | Revisable reading profiles and English examples of concrete abilities | Implemented; exact instrument unvalidated | [Self-assessment review](../research/self-assessment.md) |
+| [PED-002](PED-002-contextual-reading-support.md) | Optional contextual explanations and learner-relative difficulty estimates | Implemented; feature quality unvalidated | [Self-assessment](../research/self-assessment.md); [reading and glossing](../research/reading-and-glossing.md) |
 
 ## Maintenance
 
