@@ -1,7 +1,8 @@
 # LingoMage documentation
 
-This directory lives alongside `android/` so product rationale and learning
-evidence can evolve independently of Android implementation details.
+This directory contains product rationale, language decisions, research and
+validation. The current App² workspace is at the repository root; the earlier
+native Android implementation remains in `android/`.
 
 ## Product and learning design
 
@@ -12,6 +13,7 @@ evidence can evolve independently of Android implementation details.
 - [Japanese furigana discovery](research/japanese-furigana.md): Preliminary evidence and verification gaps.
 - [Authentication architecture](architecture/authentication.md): Verified sign-in and inference components.
 - [Generation and local storage](architecture/generation.md): Prompts, validation, persistence and failure behavior.
+- [App² runtime migration](architecture/app2-runtime.md): Current runtime, workspace data and validation limits.
 - [Furigana rendering](architecture/furigana.md): Annotation structure, layout and accessibility.
 - [Physical-device checklist](validation/device-checklist.md): Authentication gate and remaining manual checks.
 - [Story implementation checks](validation/2026-10-09-stories.md): Build, device and generation outcomes.

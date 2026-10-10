@@ -1,5 +1,7 @@
 # Story generation and local library
 
+> The Android architecture below records the earlier native implementation. The current App² behavior and its reduced validation coverage are documented in [App² runtime migration](app2-runtime.md).
+
 Implemented after physical-device authentication and completed inference passed.
 
 ## Boundaries

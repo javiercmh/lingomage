@@ -1,24 +1,27 @@
-# LingoMage contributor instructions
+# LingoMage App² contributor instructions
 
-## Product and documentation
+## Product and content
 
+- The current product is a plain HTML, CSS and JavaScript App² workspace at the repository root. `android/` retains the earlier native Android implementation.
 - Keep the interface and glossary explanations in English. Current targets are German, Japanese, Russian and Spanish (Chile).
-- Keep implementation in `android/` and rationale, research, language decisions and validation in `docs/`.
-- Update affected documentation when prompts or learning behavior change. Increment prompt versions and preserve saved-story provenance.
+- Keep workspace domain data in inspectable JSON files under `data/`. Keep rationale, research, language decisions and validation records in `docs/`.
+- Update affected documentation when prompts or learning behavior change. Increment `PROMPT_VERSION` in `js/app.js` and preserve saved-story provenance.
 - Label product assumptions and evidence limitations; do not claim certified CEFR alignment or proven learning effectiveness.
-- Preserve canonical Japanese text separately from furigana. Copied Japanese text must omit readings. Russian uses Cyrillic without Latin transliteration.
+- Preserve canonical Japanese text separately from furigana annotations. Copied Japanese text must omit readings. Russian uses Cyrillic without Latin transliteration.
 
-## Debugging the app
+## App² platform
 
-Use the provided Android VM first. Only request a smartphone connection when the VM cannot validate the behavior.
+- Follow the plain-file starter structure: `index.html`, `css/style.css`, `js/app.js`, `js/bridge.js`, `manifest.json`, and `data/`.
+- Keep the host API calls in `js/bridge.js`; app logic uses its exported wrappers. Keep the project dependency-free and do not add a build step.
+- Keep `manifest.json`'s `main` and `files` entries current. Domain records and preferences belong in `data/stories.json` and `data/settings.json`, not opaque host preferences.
+- Use the App² managed `ai` bridge. Connect and choose models only through App² library Settings → AI. Never store credentials or request headers in the workspace.
+- Save completed story data before acknowledging an AI request. Do not silently retry inference.
+- Respect edge-to-edge safe-area variables, provide touch targets of at least 44px, and do not use system `alert()` or `confirm()` dialogs.
+- Keep user-generated text rendered with `textContent` or text nodes.
 
-Start it with `~/Library/Android/sdk/emulator/emulator -avd Medium_Phone_API_37.0`, optionally with `-no-window`.
-Use `~/Library/Android/sdk/platform-tools/adb devices` to find it, and specify `-s <serial>` in every device command when multiple devices are available.
+## Development and verification
 
-Build from `android/` using Android Studio's bundled JDK if the shell JDK is incompatible. Run debug build, unit tests, lint and instrumentation checks relevant to the change. Record only checks actually run.
-
-Install debug APKs with `adb install -r` to preserve local stories and sign-in data. On a signed-in physical installation, install the test APK and invoke `am instrument` directly: Gradle connected-test cleanup can uninstall the app and erase credentials.
-
-Live inference tests require explicit opt-in arguments and consume ChatGPT plan usage. Prefer mocked tests for routine verification. Never export credentials or log tokens, browser callback URLs or account identifiers. Restrict diagnostics to relevant app content, and remove temporary device diagnostic files afterward.
-
-Do not bypass a phone lock screen. Use the VM for UI checks when a physical device is locked. Keep pending physical-device or qualified language-review checks clearly marked in validation records.
+- Run the local workspace with `python3 dev_server.py --mock-ai`; open `http://localhost:8888`. The development mock is deterministic and makes no external requests.
+- Use the development server for browser checks. Native AI, alarms, Android insets and install shortcuts require App² on Android and should be marked pending unless actually verified there.
+- Record only checks actually run. Do not export credentials or log tokens, callback URLs or account identifiers.
+- The Python server requires Python 3.9 or newer and no dependencies.

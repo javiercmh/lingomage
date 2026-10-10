@@ -1,6 +1,6 @@
 # Beginner story-reading MVP
 
-Status: initial Android implementation present; device and content validation in progress.
+Status: App² workspace implemented; local preview checks in progress; live generation and language review pending.
 
 ## Confirmed requirements
 
@@ -14,7 +14,7 @@ Status: initial Android implementation present; device and content validation in
 - Offer an optional topic.
 - Save completed stories locally with reopen and delete controls.
 - Support generating another story using the same vocabulary.
-- Use eligible ChatGPT subscription access through documented Sign in with ChatGPT.
+- Use ChatGPT through App²'s managed AI connection; account setup is owned by the App² library.
 - Use language-specific learning and presentation decisions, rather than applying
   one teaching template to all languages. See the [language index](../languages/README.md).
 
@@ -40,16 +40,10 @@ app has proven learning effectiveness.
 
 ## Delivery sequence
 
-1. Establish research notes and language-specific design rationale.
-2. Prove the documented OAuth loopback callback, token validation, and one
-   authenticated inference request on a physical Android device.
-3. Implement vocabulary selection, language-specific generation, the reader,
-   glossary, and local library.
+1. Keep research notes and language-specific design rationale current.
+2. Validate the workspace with App²'s local Python server and mock AI.
+3. Validate real generation through App²'s managed AI connection.
 4. Review content separately in each featured language and record results.
-
-If the documented authentication protocol cannot work on Android, record the
-blocker before proceeding with dependent features. Do not introduce undocumented
-authentication workarounds.
 
 ## Deferred features
 

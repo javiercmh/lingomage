@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#f5f1e8">
+  <title>LingoMage</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand-mark" aria-hidden="true">L</div>
+      <div><p class="eyebrow">YOUR STORY WORKSHOP</p><h1>LingoMage</h1></div>
+      <button id="settings-open" class="round-btn" aria-label="Settings">⚙</button>
+    </header>
+
+    <nav class="tabs" aria-label="Main navigation">
+      <button class="tab active" data-view="create">Create</button>
+      <button class="tab" data-view="library">My stories <span id="story-count">0</span></button>
+    </nav>
+
+    <section id="view-create" class="view active">
+      <div class="intro"><p class="eyebrow">A LITTLE PRACTICE, A LITTLE MAGIC</p><h2>Build a story<br>from your words.</h2><p>Choose a language, collect 5–10 words, then turn them into a short beginner story.</p></div>
+      <form id="story-form" class="panel">
+        <label class="field-label" for="language">I’m learning</label>
+        <select id="language" class="field">
+          <option value="de">German</option><option value="ja">Japanese</option><option value="ru">Russian</option><option value="es-CL">Spanish (Chile)</option>
+        </select>
+        <label class="field-label" for="topic">Story idea <span class="optional">optional</span></label>
+        <input id="topic" class="field" maxlength="120" placeholder="A rainy afternoon at a café">
+        <div class="word-heading"><label class="field-label" for="words">Words to practise</label><span id="word-count" class="count">0 / 10</span></div>
+        <div class="word-entry"><input id="word-input" class="field" maxlength="60" placeholder="Type a word"><button id="add-word" class="add-btn" type="button" aria-label="Add word">+</button></div>
+        <p class="helper">Add 5–10 words. Separate words with commas to add several.</p>
+        <div id="word-list" class="word-list" aria-live="polite"></div>
+        <p id="form-error" class="form-error" role="alert"></p>
+        <button id="generate" class="primary-btn" type="submit">✦ &nbsp; Generate my story</button>
+        <p class="usage-note">Generation uses your connected ChatGPT plan. Connect it in App² → Settings → AI.</p>
+      </form>
+      <section id="result-card" class="panel result-card" hidden>
+        <div class="result-top"><span class="eyebrow">YOUR NEW STORY</span><button id="copy-story" class="small-btn">Copy</button></div>
+        <h2 id="result-title"></h2><div id="result-story" class="story-text"></div>
+        <div class="glossary-title"><span>✧</span> WORD NOTES</div><div id="result-glossary" class="glossary"></div>
+        <div class="result-actions"><button id="save-story" class="primary-btn">Save to my stories</button><button id="new-story" class="secondary-btn">Make another</button></div>
+        <p id="save-note" class="helper"></p>
+      </section>
+      <div id="loading-card" class="panel loading" hidden><div class="sparkle">✦</div><h2>Writing your story…</h2><p id="generation-status">Gathering your words into a little tale.</p><button id="cancel-generation" class="secondary-btn">Cancel</button></div>
+    </section>
+
+    <section id="view-library" class="view">
+      <div class="library-heading"><div><p class="eyebrow">YOUR READING SHELF</p><h2>My stories</h2></div><select id="filter-language" class="filter-select"><option value="all">All languages</option><option value="de">German</option><option value="ja">Japanese</option><option value="ru">Russian</option><option value="es-CL">Spanish (Chile)</option></select></div>
+      <div id="library-list" class="library-list"></div>
+    </section>
+  </main>
+
+  <dialog id="settings-dialog" class="dialog"><form method="dialog" class="dialog-panel"><div class="dialog-head"><div><p class="eyebrow">PREFERENCES</p><h2>Settings</h2></div><button class="round-btn" aria-label="Close settings">×</button></div><label class="field-label" for="model-select">ChatGPT model</label><select id="model-select" class="field" disabled><option>Checking connection…</option></select><label id="reasoning-label" class="field-label" for="reasoning-select" hidden>Reasoning effort</label><select id="reasoning-select" class="field" hidden></select><p id="connection-status" class="helper">Connect ChatGPT in App² → Settings → AI.</p><p class="helper">Model preferences are saved on this device. Saved stories remain available offline.</p><button class="secondary-btn">Done</button></form></dialog>
+  <dialog id="reader-dialog" class="dialog"><article class="dialog-panel reader-panel"><div class="dialog-head"><span class="eyebrow" id="reader-language"></span><button id="reader-close" class="round-btn" aria-label="Close story">×</button></div><h2 id="reader-title"></h2><div id="reader-story" class="story-text"></div><div class="glossary-title"><span>✧</span> WORD NOTES</div><div id="reader-glossary" class="glossary"></div><div class="reader-actions"><button id="reuse-story" class="secondary-btn">Practise these words</button><button id="delete-story" class="danger-btn">Delete story</button></div></article></dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
