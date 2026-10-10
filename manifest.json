@@ -1,7 +1,7 @@
 {
   "name": "LingoMage",
   "short_name": "LingoMage",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "templateVersion": 3,
   "description": "Create AI-powered stories in German, Japanese, Russian, or Spanish, tailored to your level and vocabulary.",
   "main": "index.html",
