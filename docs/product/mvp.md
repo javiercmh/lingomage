@@ -66,3 +66,5 @@ stored in the workspace's `data/settings.json`; they are not
 account-specific. Higher reasoning levels may increase request latency and usage.
 
 Settings also allow a short description of what the learner knows and where they need help. Every story request uses the saved description for that language. This guided self-report is a revisable personalization choice; its exact descriptors and prompt adaptation are not a validated assessment. See [reading self-assessment evidence](../research/self-assessment.md).
+
+When no learning languages are selected, the Create screen offers a dismissible Settings prompt to help learners tailor stories. All target languages remain available and generation stays enabled. Dismissal is saved as `languageSetupDismissed` in `data/settings.json` and persists across reloads. This personalization guidance is a product assumption, not a claim of proven learning results.

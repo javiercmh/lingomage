@@ -36,3 +36,7 @@ predates the latest UI redesign and single-field practice input; those changes
 have not been revalidated. Real generation and Japanese, German, Russian and
 Spanish language review remain pending in App². No CEFR certification or
 learning-effectiveness claim is made.
+
+When no learning languages are selected, the Create screen offers a dismissible Settings prompt to help learners tailor stories. All target languages remain available and generation stays enabled. Dismissal is saved as `languageSetupDismissed` in `data/settings.json` and persists across reloads. This personalization guidance is a product assumption, not a claim of proven learning results.
+
+Navigation follows the App² starter: a fixed bottom bar with icons above Create and My stories labels, an accent-colored active page, safe-area spacing, and keyboard visibility handling. Content and toasts reserve space above the bar.
