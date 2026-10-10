@@ -1,4 +1,4 @@
-import { ai, readFile, writeFile, updates } from './bridge.js';
+import { ai, readFile, writeFile } from './bridge.js';
 
 const LANGUAGES = {de:'German',ja:'Japanese',ru:'Russian','es-CL':'Spanish'};
 const DIFFICULTIES = {beginner:'Beginner',intermediate:'Intermediate',advanced:'Advanced'};
@@ -283,14 +283,12 @@ async function refreshModels() {
     } else { select.innerHTML = '<option>No models available</option>'; }
   } catch { $('ai-setup').hidden = false; $('model-controls').hidden = true; }
 }
-$('settings-open').addEventListener('click', () => $('settings-dialog').showModal());
-$('language-settings-open').addEventListener('click', () => $('settings-dialog').showModal());
+$('language-settings-open').addEventListener('click', () => setView('settings'));
 $('language-setup-dismiss').addEventListener('click', () => {
   state.languageSetupDismissed = true;
   $('language-setup').hidden = true;
   try { persistSettings(); } catch (error) { toast(error.message); }
 });
-$('settings-dialog').addEventListener('click', event => { if (event.target === $('settings-dialog')) $('settings-dialog').close(); });
 $('model-select').addEventListener('change', () => {
   state.model = $('model-select').value; const model = state.models.find(item => item.id === state.model); const select = $('reasoning-select');
   select.textContent = ''; const defaultOption = document.createElement('option'); defaultOption.value = ''; defaultOption.textContent = 'Provider default'; select.append(defaultOption);
@@ -312,11 +310,3 @@ state.learnerProfiles = Object.fromEntries(Object.entries(settings.learnerProfil
 state.languageExpectations = Object.fromEntries(Object.entries(settings.languageExpectations || {}).filter(([code,value]) => STORY_GUIDES[code] && typeof value === 'string').map(([code,value]) => [code,value.slice(0,600)]));
 renderTargetLanguageSettings(); populateTargetPicker();
 updateCount(); refreshModels();
-
-const updateButton = $('update-app');
-updateButton.hidden = !updates.available;
-updateButton.addEventListener('click', async () => {
-  updateButton.disabled = true;
-  try { await updates.open(); } catch (error) { toast(error.message); }
-  finally { updateButton.disabled = false; }
-});
