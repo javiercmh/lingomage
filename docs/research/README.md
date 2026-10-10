@@ -33,7 +33,8 @@ Document AI-generated text quality separately from evidence of learning gains.
 ## Initial literature candidates
 
 Initial records are in [reading and glossing](reading-and-glossing.md) and
-[Japanese furigana](japanese-furigana.md). Their access levels and verification gaps
+[Japanese furigana](japanese-furigana.md), with language-level descriptions in
+[level descriptors](level-descriptors.md) and [reading self-assessment](self-assessment.md). Their access levels and verification gaps
 are recorded explicitly. Starting publications:
 
 - [How do different forms of glossing contribute to L2 vocabulary learning from reading?](https://doi.org/10.1017/S0272263119000688)

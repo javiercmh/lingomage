@@ -3,10 +3,19 @@
   "short_name": "LingoMage",
   "version": "1.0.0",
   "templateVersion": 3,
-  "description": "Create and save beginner language stories with your own vocabulary.",
+  "description": "Create and save language-learning stories with your own vocabulary.",
   "main": "index.html",
   "files": [
-    "index.html", "css/style.css", "js/app.js", "js/bridge.js", "manifest.json",
-    "AGENTS.md", "PACKAGING.md", "dev_server.py", "data/stories.json", "data/settings.json"
+    "index.html",
+    "css/style.css",
+    "js/app.js",
+    "js/bridge.js",
+    "manifest.json",
+    "AGENTS.md",
+    "PACKAGING.md",
+    "dev_server.py",
+    "data/stories.json",
+    "data/settings.json",
+    "data/learning-profiles.json"
   ]
 }

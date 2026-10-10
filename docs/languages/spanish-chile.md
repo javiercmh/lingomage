@@ -44,3 +44,7 @@ conjugation, address consistency, naturalness, glossary meanings and beginner
 readability. The structural validator checks coverage and declared used forms;
 it cannot certify regional usage, inflection or language accuracy. Qualified
 human review remains necessary.
+
+## App² reading self-report — 2026-10-10
+
+Settings offer three reading-task descriptions and an optional knowledge/difficulties description. These guide each story request and are revisable learner reports, not assessed proficiency. Learners can describe familiarity with everyday and Chilean expressions separately. Definitions are in `data/learning-profiles.json`; evidence and limits are in [the self-assessment record](../research/self-assessment.md).

@@ -126,3 +126,7 @@ which adds latency and usage. Kana-only text needs no reading call.
 
 This removes model-controlled segmentation and kana/kanji classification. It
 does not certify that a supplied kana pronunciation is linguistically correct.
+
+## App² reading self-report — 2026-10-10
+
+Settings offer three reading-task descriptions and an optional knowledge/difficulties description. These guide each story request and are revisable learner reports, not assessed proficiency. Japanese assumes hiragana and katakana literacy; kanji familiarity and comprehension can be described separately. Kanji readings remain visible at every level. Definitions are in `data/learning-profiles.json`; evidence and limits are in [the self-assessment record](../research/self-assessment.md).

@@ -1,0 +1,52 @@
+{
+  "version": "2026-10-10.1",
+  "basis": "Reading self-report; app-specific descriptions, not a validated placement instrument.",
+  "languages": {
+    "de": {
+      "beginner": "I am starting out, or I can understand familiar words and short sentences about daily life with help.",
+      "intermediate": "I can follow a short everyday story and connect events, although I still need help with some words and longer sentences.",
+      "advanced": "I can follow detailed stories, viewpoints, and implied meaning, even when the vocabulary or sentence structure is unfamiliar."
+    },
+    "ja": {
+      "beginner": "I can read hiragana and katakana. I am learning basic words and need support to understand short sentences and kanji.",
+      "intermediate": "I can follow a short everyday story in kana and some familiar kanji, using readings or a dictionary for unfamiliar words.",
+      "advanced": "I can follow detailed Japanese stories, viewpoints, and implied meaning, although unfamiliar kanji or expressions may still need support."
+    },
+    "ru": {
+      "beginner": "I can read Cyrillic. I am learning basic words and need support to understand short everyday sentences.",
+      "intermediate": "I can follow a short everyday story in Cyrillic and connect events, although unfamiliar words and changing word endings can slow me down.",
+      "advanced": "I can follow detailed Russian stories, viewpoints, and implied meaning, even when unfamiliar expressions or complex sentences need support."
+    },
+    "es-CL": {
+      "beginner": "I am starting out, or I can understand familiar Spanish words and short sentences about daily life with help.",
+      "intermediate": "I can follow a short everyday story and connect events, although unfamiliar Chilean words and longer sentences can slow me down.",
+      "advanced": "I can follow detailed Spanish stories, viewpoints, and implied meaning, although unfamiliar Chilean expressions may still need support."
+    }
+  },
+  "scriptPrerequisites": {
+    "ja": "Already reads hiragana and katakana.",
+    "ru": "Already reads Cyrillic."
+  },
+  "generationGuides": {
+    "de": {
+      "beginner": "Short, concrete scenes with familiar everyday words and simple present-tense sentences.",
+      "intermediate": "Everyday situations with connected sentences, common past forms, and some subordinate clauses.",
+      "advanced": "Nuanced everyday or cultural situations with varied clause structures, idioms, and precise vocabulary."
+    },
+    "ja": {
+      "beginner": "Short, concrete scenes using common words, basic particles, and simple polite forms; keep kanji limited and provide readings.",
+      "intermediate": "Familiar situations with connected sentences, common kanji with readings, and a mix of polite and plain forms where natural.",
+      "advanced": "Nuanced situations with varied sentence patterns, natural register choices, and broader kanji and vocabulary; provide readings for kanji."
+    },
+    "ru": {
+      "beginner": "Short, concrete scenes with common Cyrillic words and simple sentence patterns; avoid Latin transliteration.",
+      "intermediate": "Familiar situations with connected sentences and common case and verb forms; use Cyrillic without transliteration.",
+      "advanced": "Nuanced situations with varied clause patterns, aspect and case choices, and precise vocabulary; use Cyrillic without transliteration."
+    },
+    "es-CL": {
+      "beginner": "Short, concrete scenes with familiar words and simple present-tense sentences, using natural Chilean Spanish.",
+      "intermediate": "Everyday situations with connected sentences and common past forms, using natural Chilean vocabulary and usage.",
+      "advanced": "Nuanced situations with varied clause structures, idiomatic but broadly understandable Chilean Spanish, and precise vocabulary."
+    }
+  }
+}

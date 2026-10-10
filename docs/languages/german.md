@@ -36,3 +36,7 @@ reading is correct in context. Separate language review remains necessary.
 
 Prompt source: [de.json](../../android/app/src/main/assets/prompts/de.json).
 Update this decision and increment the prompt version when behavior changes.
+
+## App² reading self-report — 2026-10-10
+
+Settings offer three reading-task descriptions and an optional knowledge/difficulties description. These guide each story request and are revisable learner reports, not assessed proficiency. German examples can note familiar sentence patterns, vocabulary, and word-order difficulties. Definitions are in `data/learning-profiles.json`; evidence and limits are in [the self-assessment record](../research/self-assessment.md).

@@ -1,7 +1,11 @@
 {
+  "providerId": "",
   "model": "gpt-6-luna",
   "reasoning": "",
-  "theme": "dark",
-  "providerId": "",
-  "fluentLanguages": []
+  "fluentLanguages": [],
+  "targetLanguages": {
+    "de": "beginner"
+  },
+  "learnerProfiles": {},
+  "theme": "dark"
 }

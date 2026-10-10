@@ -44,3 +44,7 @@ reading is correct in context. Separate language review remains necessary.
 
 Prompt source: [ru.json](../../android/app/src/main/assets/prompts/ru.json).
 Update this decision and increment the prompt version when behavior changes.
+
+## App² reading self-report — 2026-10-10
+
+Settings offer three reading-task descriptions and an optional knowledge/difficulties description. These guide each story request and are revisable learner reports, not assessed proficiency. Russian assumes Cyrillic literacy; vocabulary, word endings, and sentence comprehension can be described separately. Generation uses Cyrillic without transliteration. Definitions are in `data/learning-profiles.json`; evidence and limits are in [the self-assessment record](../research/self-assessment.md).

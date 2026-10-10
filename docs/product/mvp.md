@@ -1,4 +1,4 @@
-# Beginner story-reading MVP
+# Story-reading MVP
 
 Status: App² workspace implemented; local preview checks in progress; live generation and language review pending.
 
@@ -7,7 +7,8 @@ Status: App² workspace implemented; local preview checks in progress; live gene
 - Featured target languages: **German, Japanese, Russian, and Spanish (Chile)**.
 - Interface language: **English** for every target language.
 - Glossary explanations: **English** for every target language.
-- Start with text-only stories aimed at A1 beginners.
+- Let learners enable multiple languages and choose a Beginner, Intermediate or Advanced reading starting point for each. They can override that level for an individual story.
+- Use concise, language-specific reading descriptions as generation guidance; these are product assumptions, not proficiency scores or CEFR claims.
 - Let learners optionally enter freeform vocabulary or concepts such as grammar
   points in one field for the story to consider.
 - Include a story title, story text, and an English glossary.
@@ -51,9 +52,11 @@ app has proven learning effectiveness.
 ## Deferred features
 
 Audio, images, quizzes, spaced repetition, cloud sync, formal learning trials,
-additional languages, and higher difficulty levels.
+and additional languages.
 
 Story and glossary text can be selected and copied. Japanese copying excludes
 furigana. Settings offer model-specific reasoning levels, including a model-default
 option, saved independently for each account and model. Higher levels may increase
 request latency and plan usage.
+
+Settings also save an optional description of what the learner knows and where they need help. Every story request uses that description with the saved reading starting point. This guided self-report is a revisable personalization choice, not a validated assessment. See [the self-assessment evidence record](../research/self-assessment.md).
