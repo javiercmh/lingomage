@@ -1,7 +1,7 @@
 # Language level descriptions for story generation
 
 **Reviewed:** 2026-10-10
-**Question:** What evidence supports short Beginner, Intermediate, and Advanced descriptions for German, Japanese, Russian, and Spanish (Chile), and how strongly may they be presented?
+**Question:** What evidence supports short Beginner, Intermediate, and Advanced descriptions for German, Japanese, Russian, and Spanish, and how strongly may they be presented?
 
 ## Evidence reviewed
 
@@ -12,9 +12,9 @@
 
 ## Decision
 
-Settings offer three practical controls named Beginner, Intermediate, and Advanced. Each language has its own short English description that asks the generator for observable text features (familiarity and concreteness, sentence connection and common forms, or broader structures and more precise vocabulary). Japanese descriptions explicitly account for kana/kanji and readings; Russian preserves Cyrillic; Spanish uses Chilean usage.
+Settings offer three practical controls named Beginner, Intermediate, and Advanced. Each language has its own short English description that asks the generator for observable text features (familiarity and concreteness, sentence connection and common forms, or broader structures and more precise vocabulary). Japanese descriptions explicitly account for kana/kanji and readings; Russian preserves Cyrillic; Spanish uses broadly understandable usage, with regional preference left to the learner.
 
-The descriptors are informed by the general idea of describing observable language tasks, with a language-specific design assumption. Evidence reviewed here does **not** establish that these three bands correspond to validated proficiency levels, predict learner ability, or cause learning gains. Direct evidence is especially limited for Japanese and absent here for Russian and Chilean Spanish. Do not call the labels CEFR-aligned or infer a learner's level from a selected setting. A generation-level override is a writing preference, not an assessment.
+The descriptors are informed by the general idea of describing observable language tasks, with a language-specific design assumption. Evidence reviewed here does **not** establish that these three bands correspond to validated proficiency levels, predict learner ability, or cause learning gains. Direct evidence is especially limited for Japanese and absent here for Russian and Spanish. Do not call the labels CEFR-aligned or infer a learner's level from a selected setting. A generation-level override is a writing preference, not an assessment.
 
 ## Product implications and open questions
 

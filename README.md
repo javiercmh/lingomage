@@ -20,4 +20,6 @@ Import this directory as a workspace in App² or create a subapp from the includ
 
 See [App² runtime and migration notes](docs/architecture/app2-runtime.md), the [MVP](docs/product/mvp.md), [language decisions](docs/languages/README.md), and [evidence limits](docs/research/README.md).
 
+Developers changing learning behavior should start with the [pedagogical decision log](docs/pedagogy/README.md). It links decisions to evidence, implementation and a shared [BibTeX bibliography](docs/research/references.bib).
+
 Generated difficulty is an estimate, not certified CEFR alignment or evidence that LingoMage improves retention. The offline mock is for UI and persistence checks, not language review.

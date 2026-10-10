@@ -3,8 +3,9 @@
 ## Product and content
 
 - The current product is a plain HTML, CSS and JavaScript App² workspace at the repository root. `android/` retains the earlier native Android implementation.
-- Keep the interface and glossary explanations in English. Current targets are German, Japanese, Russian and Spanish (Chile).
+- Keep the interface and glossary explanations in English. Current targets are German, Japanese, Russian and Spanish; let learners request a regional variety in their language preferences.
 - Keep workspace domain data in inspectable JSON files under `data/`. Keep rationale, research, language decisions and validation records in `docs/`.
+- Before changing learning behavior, consult `docs/pedagogy/README.md`. Update the relevant pedagogical decision in the same change; use stable citation keys from `docs/research/references.bib`, and distinguish evidence from product assumptions.
 - Update affected documentation when prompts or learning behavior change. Increment `PROMPT_VERSION` in `js/app.js` and preserve saved-story provenance.
 - Label product assumptions and evidence limitations; do not claim certified CEFR alignment or proven learning effectiveness.
 - Preserve canonical Japanese text separately from furigana annotations. Copied Japanese text must omit readings. Russian uses Cyrillic without Latin transliteration.

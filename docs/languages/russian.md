@@ -1,11 +1,13 @@
 # Russian
 
-Status: initial implementation present; deeper pedagogical review pending.
+Status: design requirements recorded; App² requests Cyrillic; deeper
+pedagogical review pending.
 
 ## Confirmed requirements
 
 - Russian stories with an English interface and English glossary explanations.
-- Beginner stories generated from learner-confirmed vocabulary.
+- Beginner stories may use the learner's optional freeform vocabulary or concept
+  guidance, as described in the current [MVP](../product/mvp.md).
 - Always use **Cyrillic** for Russian story text, vocabulary suggestions, and
   Russian glossary headwords. Do not replace or supplement Russian text with
   Latin transliteration. English explanations remain in English.
@@ -31,7 +33,7 @@ glossary accuracy, beginner readability, and absence of Russian transliteration.
 If stress annotations are introduced,
 include their accuracy in the review criteria.
 
-## Implemented prompt decision — 2026-10-09.1
+## Legacy Android prompt decision — 2026-10-09.1
 
 Write Russian in 100–150 words. All title, text, vocabulary headwords and story forms must use Cyrillic. Never give Latin transliteration or added stress marks. English glossary meanings remain English. Favor short everyday clauses and common present-tense patterns; use cases, number, gender, and verb agreement correctly. Avoid advanced participial constructions. Match selected dictionary forms to actual inflected forms in the glossary.
 
@@ -42,8 +44,8 @@ The validator verifies declared used forms occur in the text; it cannot establis
 that an inflected form is linguistically related to the chosen lemma or that a
 reading is correct in context. Separate language review remains necessary.
 
-Prompt source: [ru.json](../../android/app/src/main/assets/prompts/ru.json).
-Update this decision and increment the prompt version when behavior changes.
+Historical Android prompt source: [ru.json](../../android/app/src/main/assets/prompts/ru.json).
+Current App² prompt status is in [App² runtime](../architecture/app2-runtime.md).
 
 ## App² reading self-report — 2026-10-10
 

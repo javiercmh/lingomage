@@ -55,17 +55,13 @@ or uninstalling the app can lose this local library; no cloud sync is provided.
 
 ## Adding languages and regional variants
 
-Each selectable variant has its own `TargetLanguage` entry, display name, BCP 47
-tag, prompt asset named after that tag, and language decision file. The current
-Spanish option is **Spanish (Chile)** (`es-CL`), with `prompts/es-CL.json` and
-`docs/languages/spanish-chile.md`. A future Spanish (Spain) option can use
-`es-ES` and its own prompt and decision file. Add appropriate script validation
-and review criteria when adding an option.
-
-The existing `SPANISH` enum identifier remains stable so saved stories still
-decode. Legacy `es` preferences resolve to Spanish (Chile); new preferences and
-story records use `es-CL`. Old story text and prompt versions remain unchanged:
-their earlier generation is not retroactively evidence of Chilean usage.
+The App² workspace presents **Spanish** and lets learners request a regional
+variety through per-language expectations. It retains the `es-CL` code so saved
+stories and existing settings continue to load; that code no longer implies a
+Chilean variety for new stories. Existing stories keep their original text and
+prompt provenance. The earlier Android implementation used a separate
+Spanish (Chile) prompt and is documented as historical behavior in
+`docs/languages/spanish-chile.md`.
 
 ### Japanese text consistency — prompt 2026-10-09.3
 

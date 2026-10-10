@@ -7,17 +7,23 @@ The featured target languages are:
 | German | [german.md](german.md) | English |
 | Japanese | [japanese.md](japanese.md) | English |
 | Russian | [russian.md](russian.md) | English |
-| Spanish | [spanish.md](spanish.md) | English |
+| Spanish | [spanish-chile.md](spanish-chile.md) | English |
 
-Each file owns that language's script presentation, vocabulary representation,
+Each file records that language's script presentation, vocabulary representation,
 grammar progression, reading aids, prompt requirements, and content review
-criteria. Shared behavior remains in the [MVP specification](../product/mvp.md).
+criteria. These are design requirements and decisions, not a claim that every rule
+is enforced in the current App² prompt. Current App² behavior and known prompt
+gaps are listed in [App² runtime](../architecture/app2-runtime.md). The prompt
+source links in individual language files refer to the earlier Android
+implementation. Shared behavior remains in the [MVP specification](../product/mvp.md).
 
 Do not copy a learning rule from one language into another without considering
 its applicability. For example, Japanese reading annotation and segmentation
 require different decisions from German noun forms and capitalization.
 
 ## Maintaining a decision
+
+For shared pedagogical choices, use the [decision log and template](../pedagogy/README.md). Keep language-specific details here and link the relevant decision ID rather than duplicating its rationale. Current learner-profile rationale: [PED-001](../pedagogy/PED-001-learner-self-report.md).
 
 Record:
 

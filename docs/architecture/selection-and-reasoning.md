@@ -1,5 +1,8 @@
 # Text selection and reasoning preferences
 
+> This records the earlier native Android implementation. The current App²
+> settings and story-copy behavior are described in [App² runtime](app2-runtime.md).
+
 Story titles, story text, glossary headwords and English explanations support
 direct long-press selection. Japanese inline annotations use canonical surface
 text as their alternate text; visual reading/base children are excluded from

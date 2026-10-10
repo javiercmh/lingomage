@@ -2,10 +2,8 @@
   "providerId": "",
   "model": "gpt-6-luna",
   "reasoning": "",
-  "fluentLanguages": [],
-  "targetLanguages": {
-    "de": "beginner"
-  },
+  "targetLanguages": {},
   "learnerProfiles": {},
+  "languageExpectations": {},
   "theme": "dark"
 }

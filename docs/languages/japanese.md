@@ -1,6 +1,7 @@
 # Japanese
 
-Status: initial requirements recorded; initial implementation present; deeper pedagogical review pending.
+Status: presentation requirements recorded; App² requests readings with the
+current story response; deeper pedagogical review pending.
 
 ## Confirmed presentation requirements
 
@@ -54,13 +55,15 @@ vocabulary coverage, glossary accuracy, beginner grammar, and sentence readabili
 Check multi-character compounds, punctuation, long annotations, wrapping, and
 large font settings on a device. Record reviewer qualifications and unresolved issues.
 
-## Implemented prompt decision — 2026-10-09.2
+## Legacy Android prompt decision — 2026-10-09.2
 
 Write Japanese in exactly 8–12 short sentences ending in 。 or ！ or ？. Favor everyday vocabulary, simple particles and consistent polite です/ます forms. Do not imply equivalence to JLPT N5. Preserve appropriate kanji; use hiragana and katakana for the rest. Never use romaji. Annotate EVERY kanji in BOTH text and title by replacing the empty segments/titleSegments arrays with ordered {"text":"surface","reading":"kana"} segments. Concatenating segment text must EXACTLY reconstruct the canonical text/title, including punctuation and whitespace. Place readings ONLY above kanji runs. Keep compounds made entirely of kanji together, not split mechanically by character. Written kana (including okurigana and prefixes) must be separate segments with reading:null. For example 行きます becomes [{"text":"行","reading":"い"},{"text":"きます","reading":null}], 食べます becomes 食/た + べます/null, and 学校 stays 学校/がっこう. Never annotate 行きます with いきます or duplicate its written kana in the reading. Each segment containing kanji must have its full kana reading. Kana-only and punctuation segments use reading:null. Keep individual kanji-containing segments under 20 characters. In glossary entries whose headword includes kanji, supply the full headword reading in kana. English meanings stay English.
 
 These are product assumptions and linguistic presentation requirements, not a
 validated curriculum. Shared rationale remains in the [reading review](../research/reading-and-glossing.md).
-Prompt source: [ja.json](../../android/app/src/main/assets/prompts/ja.json).
+Historical Android prompt source: [ja.json](../../android/app/src/main/assets/prompts/ja.json).
+If the App² prompt adopts these detailed rules later, record that change in
+[App² runtime](../architecture/app2-runtime.md) and review this decision.
 
 ### Okurigana correction
 
@@ -78,7 +81,7 @@ saved prompt version remain unchanged. An ambiguous legacy annotation retains
 its original display rather than inventing pronunciation. This does not detect
 every wrong kanji reading; human Japanese review remains necessary.
 
-### Japanese text consistency — prompt 2026-10-09.3
+### Legacy Android text consistency — prompt 2026-10-09.3
 
 Japanese generation now omits duplicate `text` and `title` fields. Canonical
 story and title text are concatenated from `segments` and `titleSegments`,
@@ -89,7 +92,7 @@ Legacy responses containing explicit text must still match their segments
 exactly; stored stories are unchanged. This is an engineering reliability
 decision, not a new learning-effectiveness claim.
 
-### Reading completeness — prompt 2026-10-09.4
+### Legacy Android reading completeness — prompt 2026-10-09.4
 
 The prompt now includes complete story-sentence and title examples, requires a
 `reading` field on every segment, and explicitly checks kanji readings before
@@ -100,7 +103,7 @@ messages naming the affected surface text. Genuine missing or invalid readings
 still prevent saving. These changes improve engineering diagnostics; they do
 not establish that all generated readings are linguistically correct.
 
-## App-owned kanji segmentation — 2026-10-09.5
+## Legacy Android app-owned kanji segmentation — 2026-10-09.5
 
 A device read of the reported error confirmed the surface segment was
 `ホテルは駅`: the detector correctly found the kanji 駅, but the model grouped

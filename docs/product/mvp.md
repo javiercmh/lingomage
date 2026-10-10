@@ -1,13 +1,16 @@
 # Story-reading MVP
 
-Status: App² workspace implemented; local preview checks in progress; live generation and language review pending.
+Status: App² workspace implemented. The last documented preview and device import
+checks are dated 2026-10-10 and predate the latest UI and freeform-practice edits.
+Those latest edits have not been revalidated. Live generation and qualified
+language review remain pending.
 
 ## Confirmed requirements
 
-- Featured target languages: **German, Japanese, Russian, and Spanish (Chile)**.
+- Featured target languages: **German, Japanese, Russian, and Spanish**. Learners can specify a regional variety in language preferences.
 - Interface language: **English** for every target language.
 - Glossary explanations: **English** for every target language.
-- Let learners enable multiple languages and choose a Beginner, Intermediate or Advanced reading starting point for each. They can override that level for an individual story.
+- Start with no learning languages selected. Let learners enable any combination, with a Beginner, Intermediate or Advanced **Reading starting point** per selected language. The main **Story difficulty** selector defaults to that starting point and permits a temporary override. If none are enabled, show an inline setup message and Open Settings button, leave the language picker empty, and disable generation. See [PED-001](../pedagogy/PED-001-learner-self-report.md).
 - Use concise, language-specific reading descriptions as generation guidance; these are product assumptions, not proficiency scores or CEFR claims.
 - Let learners optionally enter freeform vocabulary or concepts such as grammar
   points in one field for the story to consider.
@@ -17,7 +20,6 @@ Status: App² workspace implemented; local preview checks in progress; live gene
 - Support generating another story using the same practice text.
 - Use a connected AI provider through App²'s managed AI connection; account setup
   is owned by the App² library.
-- Let learners save which languages they are fluent in as context for explanations.
 - Use language-specific learning and presentation decisions, rather than applying
   one teaching template to all languages. See the [language index](../languages/README.md).
 
@@ -25,18 +27,20 @@ Status: App² workspace implemented; local preview checks in progress; live gene
 
 These are product assumptions, not established optimal learning parameters:
 
-- German, Russian, and Spanish (Chile): approximately 100–150 words per story.
+- German, Russian, and Spanish: approximately 100–150 words per story.
 - Japanese: approximately 8–12 short sentences; do not use whitespace word counts.
-- Request simple grammar, familiar situations, natural reuse of selected words,
-  and consideration of any supplied concepts.
+- Request simple grammar, familiar situations, and consideration of the supplied
+  practice text.
 - Japanese displays furigana above kanji by default; other story text uses
   hiragana and katakana. See [Japanese](../languages/japanese.md).
 - Russian text always uses Cyrillic, without Latin transliteration. English
   explanations remain English. See [Russian](../languages/russian.md).
-- Spanish (Chile) uses South American Latin American Spanish, preferring everyday
-  Chilean vocabulary such as palta, auto, maní and computador when relevant.
-  See [Spanish (Chile)](../languages/spanish-chile.md).
+- Spanish uses broadly understandable Spanish by default. Learners can request a
+  regional variety, register, spelling, or other language preference in Settings.
+  See [Spanish](../languages/spanish-chile.md).
 - No full story translation or romaji in the initial version.
+
+Settings let learners expand each selected language and add a self-assessment and optional expectations or general instructions. Both descriptions guide story generation alongside the selected story level; they are revisable personalization choices, not validated assessments. Existing Spanish stories keep their `es-CL` language code, while new Spanish stories use the generic label and honor the learner's requested variety.
 
 AI-suggested vocabulary and difficulty are estimates. Do not claim certified CEFR
 alignment, map A1 directly to another proficiency framework, or claim that the
@@ -54,9 +58,11 @@ app has proven learning effectiveness.
 Audio, images, quizzes, spaced repetition, cloud sync, formal learning trials,
 and additional languages.
 
-Story and glossary text can be selected and copied. Japanese copying excludes
-furigana. Settings offer model-specific reasoning levels, including a model-default
-option, saved independently for each account and model. Higher levels may increase
-request latency and plan usage.
+The result Copy action includes the canonical title and story plus glossary
+meanings; Japanese furigana is omitted. Settings show model-specific reasoning
+choices where the provider advertises them, plus a provider-default option. The
+selected provider, model, reasoning choice, and target-language defaults are
+stored in the workspace's `data/settings.json`; they are not
+account-specific. Higher reasoning levels may increase request latency and usage.
 
-Settings also save an optional description of what the learner knows and where they need help. Every story request uses that description with the saved reading starting point. This guided self-report is a revisable personalization choice, not a validated assessment. See [the self-assessment evidence record](../research/self-assessment.md).
+Settings also allow a short description of what the learner knows and where they need help. Every story request uses the saved description for that language. This guided self-report is a revisable personalization choice; its exact descriptors and prompt adaptation are not a validated assessment. See [reading self-assessment evidence](../research/self-assessment.md).

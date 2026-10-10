@@ -16,6 +16,8 @@ demonstrated learning effectiveness.
 
 ## Evidence record
 
+Use [references.bib](references.bib) for shared bibliographic metadata and stable citation keys. Link implemented choices from the [pedagogical decision log](../pedagogy/README.md); research reviews retain study findings and access limitations. The bibliography currently covers PED-001, not every historical research candidate.
+
 Add a Markdown record under this directory for each reviewed topic. Include:
 
 - Research question and review date.

@@ -1,5 +1,9 @@
 # Furigana rendering
 
+> This describes the earlier native Android renderer. The App² workspace uses
+> model-provided segments; see [App² runtime](app2-runtime.md) for its current
+> storage and display contract.
+
 The generator returns ordered word/compound segments rather than model-invented
 numeric offsets. Validation reconstructs canonical title/story text exactly and
 requires kana readings for every segment containing kanji. Japanese prompt

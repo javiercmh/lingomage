@@ -1,5 +1,9 @@
 # Physical-device authentication gate
 
+This checklist applies only to the earlier native Android proof of concept. The
+current App² workspace uses the host-managed provider setup in **Settings → AI**;
+it does not use this sign-in flow.
+
 Use the connection-test app before implementing dependent story features.
 Do not record credentials, authorization codes, raw authorization URLs, or token bodies.
 

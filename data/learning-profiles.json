@@ -19,8 +19,8 @@
     },
     "es-CL": {
       "beginner": "I am starting out, or I can understand familiar Spanish words and short sentences about daily life with help.",
-      "intermediate": "I can follow a short everyday story and connect events, although unfamiliar Chilean words and longer sentences can slow me down.",
-      "advanced": "I can follow detailed Spanish stories, viewpoints, and implied meaning, although unfamiliar Chilean expressions may still need support."
+      "intermediate": "I can follow a short everyday story and connect events, although unfamiliar words and longer sentences can slow me down.",
+      "advanced": "I can follow detailed Spanish stories, viewpoints, and implied meaning, although unfamiliar expressions may still need support."
     }
   },
   "scriptPrerequisites": {
@@ -44,9 +44,9 @@
       "advanced": "Nuanced situations with varied clause patterns, aspect and case choices, and precise vocabulary; use Cyrillic without transliteration."
     },
     "es-CL": {
-      "beginner": "Short, concrete scenes with familiar words and simple present-tense sentences, using natural Chilean Spanish.",
-      "intermediate": "Everyday situations with connected sentences and common past forms, using natural Chilean vocabulary and usage.",
-      "advanced": "Nuanced situations with varied clause structures, idiomatic but broadly understandable Chilean Spanish, and precise vocabulary."
+      "beginner": "Short, concrete scenes with familiar words and simple present-tense sentences, using natural Spanish.",
+      "intermediate": "Everyday situations with connected sentences and common past forms, using natural Spanish.",
+      "advanced": "Nuanced situations with varied clause structures, idiomatic and broadly understandable Spanish, and precise vocabulary."
     }
   }
 }

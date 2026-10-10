@@ -141,9 +141,10 @@ button { color: inherit; cursor: pointer; -webkit-tap-highlight-color: transpare
 .language-options label { display: flex; min-height: 44px; align-items: center; gap: 9px; padding: 7px 10px; border: 1px solid rgba(255,255,255,.055); border-radius: 11px; background: rgba(255,255,255,.045); font-size: 13px; }
 .language-options input { width: 18px; height: 18px; accent-color: var(--accent-strong); }
 .target-language-options { display: grid; gap: 10px; margin-top: 12px; }
-.target-language-row { padding: 12px; border: 1px solid rgba(255,255,255,.07); border-radius: 13px; background: rgba(255,255,255,.035); }
+.target-language-row { padding: 8px 12px; border: 1px solid rgba(255,255,255,.07); border-radius: 13px; background: rgba(255,255,255,.035); }
 .target-language-toggle { display: flex; min-height: 44px; align-items: center; gap: 10px; font-size: 14px; font-weight: 650; }
 .target-language-toggle input { width: 20px; height: 20px; accent-color: var(--accent-strong); }
+.target-language-settings { padding: 8px 0 4px 30px; }
 .target-level { height: 44px; margin: 5px 0 0; }
 .target-description { margin-top: 7px; }
 .knowledge-label { margin-top: 14px; }
