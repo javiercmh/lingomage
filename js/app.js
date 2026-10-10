@@ -43,7 +43,6 @@ function storyInput() {
 function populateDifficulty(selected = '') {
   const language = $('language').value, select = $('difficulty');
   select.textContent = '';
-  if (!state.targetLanguages[language]) { select.disabled = true; $('difficulty-description').textContent = ''; return; }
   select.disabled = false;
   Object.entries(DIFFICULTIES).forEach(([value, label]) => { const option = document.createElement('option'); option.value = value; option.textContent = label; select.append(option); });
   select.value = selected || state.targetLanguages[language] || 'beginner';
@@ -54,13 +53,11 @@ function populateTargetPicker(preferred = '') {
   select.textContent = '';
   const allLanguages = Object.keys(LANGUAGES);
   const selectedLanguages = allLanguages.filter(code => state.targetLanguages[code]);
-  // PED-001: require an explicit enabled language; do not silently choose one.
-  const availableLanguages = selectedLanguages;
+  const availableLanguages = selectedLanguages.length ? selectedLanguages : allLanguages;
   availableLanguages.forEach(code => { const option = document.createElement('option'); option.value = code; option.textContent = LANGUAGES[code]; select.append(option); });
   select.value = availableLanguages.includes(previous) ? previous : (select.options[0]?.value || '');
-  select.disabled = !availableLanguages.length;
-  $('language-setup').hidden = Boolean(availableLanguages.length);
-  $('generate').disabled = !availableLanguages.length;
+  select.disabled = false;
+  $('generate').disabled = false;
   populateDifficulty();
 }
 function renderTargetLanguageSettings() {
@@ -117,7 +114,6 @@ function decodeResponse(text, languageCode) {
 
 async function generate(event) {
   event.preventDefault(); $('form-error').textContent = '';
-  if (!state.targetLanguages[$('language').value]) { $('form-error').textContent = 'Enable a language in Settings before generating a story.'; return; }
   if (state.requestId && state.current) { $('form-error').textContent = 'Save this story or choose “Make another” before generating again.'; return; }
   if (!ai.available) { $('form-error').textContent = 'Open App² → Settings → AI and connect a provider, then return here.'; return; }
   try {
@@ -258,7 +254,6 @@ async function refreshModels() {
   } catch { $('ai-setup').hidden = false; $('model-controls').hidden = true; }
 }
 $('settings-open').addEventListener('click', () => $('settings-dialog').showModal());
-$('language-settings-open').addEventListener('click', () => { $('settings-dialog').showModal(); $('target-language-options').querySelector('input')?.focus(); });
 $('settings-dialog').addEventListener('click', event => { if (event.target === $('settings-dialog')) $('settings-dialog').close(); });
 $('model-select').addEventListener('change', () => {
   state.model = $('model-select').value; const model = state.models.find(item => item.id === state.model); const select = $('reasoning-select');

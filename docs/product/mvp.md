@@ -10,7 +10,7 @@ language review remain pending.
 - Featured target languages: **German, Japanese, Russian, and Spanish**. Learners can specify a regional variety in language preferences.
 - Interface language: **English** for every target language.
 - Glossary explanations: **English** for every target language.
-- Start with no learning languages selected. Let learners enable any combination, with a Beginner, Intermediate or Advanced **Reading starting point** per selected language. The main **Story difficulty** selector defaults to that starting point and permits a temporary override. If none are enabled, show an inline setup message and Open Settings button, leave the language picker empty, and disable generation. See [PED-001](../pedagogy/PED-001-learner-self-report.md).
+- Start with no learning languages selected. Let learners enable any combination, with a Beginner, Intermediate or Advanced **Reading starting point** per selected language. The main **Story difficulty** selector defaults to that starting point and permits a temporary override. If none are enabled, the main language picker offers all target languages and stories can be generated at the selected story difficulty. See [PED-001](../pedagogy/PED-001-learner-self-report.md).
 - Use concise, language-specific reading descriptions as generation guidance; these are product assumptions, not proficiency scores or CEFR claims.
 - Let learners optionally enter freeform vocabulary or concepts such as grammar
   points in one field for the story to consider.
