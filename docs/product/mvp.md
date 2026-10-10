@@ -8,13 +8,15 @@ Status: App² workspace implemented; local preview checks in progress; live gene
 - Interface language: **English** for every target language.
 - Glossary explanations: **English** for every target language.
 - Start with text-only stories aimed at A1 beginners.
-- Allow learners to enter vocabulary or edit AI-suggested vocabulary.
-- Require confirmation of 5–10 vocabulary items before generating a story.
+- Let learners optionally enter freeform vocabulary or concepts such as grammar
+  points in one field for the story to consider.
 - Include a story title, story text, and an English glossary.
 - Offer an optional topic.
 - Save completed stories locally with reopen and delete controls.
-- Support generating another story using the same vocabulary.
-- Use ChatGPT through App²'s managed AI connection; account setup is owned by the App² library.
+- Support generating another story using the same practice text.
+- Use a connected AI provider through App²'s managed AI connection; account setup
+  is owned by the App² library.
+- Let learners save which languages they are fluent in as context for explanations.
 - Use language-specific learning and presentation decisions, rather than applying
   one teaching template to all languages. See the [language index](../languages/README.md).
 
@@ -24,7 +26,8 @@ These are product assumptions, not established optimal learning parameters:
 
 - German, Russian, and Spanish (Chile): approximately 100–150 words per story.
 - Japanese: approximately 8–12 short sentences; do not use whitespace word counts.
-- Request simple grammar, familiar situations, and natural reuse of selected words.
+- Request simple grammar, familiar situations, natural reuse of selected words,
+  and consideration of any supplied concepts.
 - Japanese displays furigana above kanji by default; other story text uses
   hiragana and katakana. See [Japanese](../languages/japanese.md).
 - Russian text always uses Cyrillic, without Latin transliteration. English

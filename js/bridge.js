@@ -27,9 +27,9 @@ if (!N && !window.AppAI) {
 }
 if (DEV?.mockAi) {
   const indicator = document.createElement('div');
-  indicator.textContent = 'Development mock AI · offline · no ChatGPT usage';
+  indicator.textContent = 'Development mock AI · offline · no provider usage';
   indicator.setAttribute('role', 'status');
-  indicator.style.cssText = 'padding:8px;text-align:center;background:#fef3c7;color:#713f12';
+  indicator.style.cssText = 'padding:8px;text-align:center;background:#202f2a;color:#b7d9c6';
   document.body.prepend(indicator);
 }
 function devWrite(action, params, body = '') {
