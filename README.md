@@ -1,25 +1,37 @@
-# LingoMage
+# LingoMage — Learn languages through stories
 
-LingoMage creates beginner-oriented stories from selected vocabulary in **German, Japanese, Russian and Spanish (Chile)**. The interface and glossary are in English. Generated stories can be saved locally and read offline.
+**Turn the words and ideas you want to practise into stories you want to read.** LingoMage creates AI stories for learners of German, Japanese, Russian and Spanish, with English explanations and adjustable difficulty.
 
-The current app is an App² workspace implemented with plain HTML, CSS and JavaScript. The earlier Android Studio application remains in [`android/`](android/) as reference source; it is no longer the primary runtime.
+LingoMage is an **[App²](https://github.com/javiercmh/appapp) subapp**: it runs inside App² on Android and uses its shared AI connection.
 
-## Run in a browser
+<img src="docs/images/reading-mode.jpg" width="640" alt="LingoMage reading mode showing a Japanese story with optional furigana and chapter controls">
 
-Python 3.9+ is required; no packages or build step are needed.
+*Japanese reading mode with sample text from the offline browser preview.*
+
+## What you can do
+
+- **Make it personal:** choose a topic, vocabulary, difficulty and language preferences.
+- **Read comfortably:** adjust text size, toggle Japanese furigana and open word notes when needed.
+- **Get contextual help:** select a passage and tap Explain for its English meaning and usage.
+- **Shape the story:** add chapters with follow-up prompts or rewrite a chapter while keeping the original.
+- **Read again offline:** save stories and explanations in your workspace.
+
+## Get started
+
+1. In App², tap **Import** and paste `https://github.com/javiercmh/lingomage`.
+2. Connect an AI provider in the App² library under **Settings → AI**.
+3. Open LingoMage, choose your language and model, and generate a story.
+
+Difficulty and explanations are AI estimates, not certified proficiency assessments.
+
+## For developers
+
+Plain HTML, CSS and JavaScript; no dependencies or build step. Preview with Python 3.9+:
 
 ```sh
 python3 dev_server.py --mock-ai
 ```
 
-Open [http://localhost:8888](http://localhost:8888). The offline mock returns sample stories and does not use ChatGPT. Files in `data/` are read and written by the server.
+Open [localhost:8888](http://localhost:8888). The mock is offline; the server writes workspace files, so use a disposable copy for testing.
 
-## Run in App²
-
-Import this directory as a workspace in App² or create a subapp from the included files. Connect ChatGPT in the App² library under **Settings → AI** to generate live stories. The app discovers available models and saves stories and model preferences in editable JSON files.
-
-See [App² runtime and migration notes](docs/architecture/app2-runtime.md), the [MVP](docs/product/mvp.md), [language decisions](docs/languages/README.md), and [evidence limits](docs/research/README.md).
-
-Developers changing learning behavior should start with the [pedagogical decision log](docs/pedagogy/README.md). It links decisions to evidence, implementation and a shared [BibTeX bibliography](docs/research/references.bib).
-
-Generated difficulty is an estimate, not certified CEFR alignment or evidence that LingoMage improves retention. The offline mock is for UI and persistence checks, not language review.
+See the [runtime guide](docs/architecture/app2-runtime.md) and [pedagogical decisions](docs/pedagogy/README.md). The earlier Android app remains in [`android/`](android/) for reference.
