@@ -1,11 +1,12 @@
 {
   "name": "LingoMage",
   "short_name": "LingoMage",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "templateVersion": 3,
-  "description": "Create and save language-learning stories with your own vocabulary.",
+  "description": "Create AI-powered stories in German, Japanese, Russian, or Spanish, tailored to your level and vocabulary.",
   "main": "index.html",
   "files": [
+    "icon.png",
     "index.html",
     "css/style.css",
     "js/app.js",
@@ -17,5 +18,40 @@
     "data/stories.json",
     "data/settings.json",
     "data/learning-profiles.json"
+  ],
+  "app2Update": {
+    "appId": "com.javiercmh.lingomage",
+    "minimumHostVersionCode": 4,
+    "github": {
+      "owner": "javiercmh",
+      "repository": "lingomage",
+      "branch": "main"
+    },
+    "managedFiles": [
+      "icon.png",
+      "index.html",
+      "css/style.css",
+      "js/app.js",
+      "js/bridge.js",
+      "manifest.json",
+      "data/learning-profiles.json",
+      "AGENTS.md",
+      "PACKAGING.md"
+    ],
+    "seedFiles": [
+      "data/stories.json",
+      "data/settings.json"
+    ],
+    "seedDefaults": {
+      "data/stories.json": [],
+      "data/settings.json": {}
+    }
+  },
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
   ]
 }

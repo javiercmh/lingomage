@@ -26,3 +26,22 @@
 - Use the development server for browser checks. Native AI, alarms, Android insets and install shortcuts require App² on Android and should be marked pending unless actually verified there.
 - Record only checks actually run. Do not export credentials or log tokens, callback URLs or account identifiers.
 - The Python server requires Python 3.9 or newer and no dependencies.
+
+## App updates
+
+App² version code 4 or later supports `updates.available` and `updates.open()` from
+`js/bridge.js`. The Settings button opens native review; installation always needs
+confirmation. Browser previews hide the button. App² follows
+`javiercmh/lingomage` branch `main`, pinned to one commit during download.
+
+`manifest.json.app2Update` declares publisher identity and file ownership.
+`data/stories.json` and `data/settings.json` are user files seeded only when absent.
+`data/learning-profiles.json` is a shipped managed definition and updates with the
+code. All other unowned files remain untouched. Keep these declarations current.
+Existing saved records must remain readable; v1 has no automatic data migration.
+Increment the app version for a published update. Commit and push require explicit
+user instructions; local changes are unavailable to GitHub updates until published.
+
+Package with App²'s `scripts/package_subapp.py`; it uses empty declared seed
+defaults rather than copying local stories or settings. ZIP installation belongs
+to the App² library; Share & Package is export-only.

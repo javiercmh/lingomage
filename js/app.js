@@ -1,4 +1,4 @@
-import { ai, readFile, writeFile } from './bridge.js';
+import { ai, readFile, writeFile, updates } from './bridge.js';
 
 const LANGUAGES = {de:'German',ja:'Japanese',ru:'Russian','es-CL':'Spanish'};
 const DIFFICULTIES = {beginner:'Beginner',intermediate:'Intermediate',advanced:'Advanced'};
@@ -312,3 +312,11 @@ state.learnerProfiles = Object.fromEntries(Object.entries(settings.learnerProfil
 state.languageExpectations = Object.fromEntries(Object.entries(settings.languageExpectations || {}).filter(([code,value]) => STORY_GUIDES[code] && typeof value === 'string').map(([code,value]) => [code,value.slice(0,600)]));
 renderTargetLanguageSettings(); populateTargetPicker();
 updateCount(); refreshModels();
+
+const updateButton = $('update-app');
+updateButton.hidden = !updates.available;
+updateButton.addEventListener('click', async () => {
+  updateButton.disabled = true;
+  try { await updates.open(); } catch (error) { toast(error.message); }
+  finally { updateButton.disabled = false; }
+});
