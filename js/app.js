@@ -11,7 +11,7 @@ const JOURNEY_DESCRIPTIONS = PROFILE_DEFINITIONS.languages;
 const PROMPT_VERSION = '2026-10-11.6';
 const PREFERRED_MODEL = 'gpt-6-luna';
 const $ = id => document.getElementById(id);
-const state = { stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, deleteArmed: false, storySelectionMode: false, selectedStoryIds: new Set(), explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', speechVersionKey: '' };
+const state = { stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, deleteArmed: false, storySelectionMode: false, selectedStoryIds: new Set(), storySelectionFocusId: '', explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', readerHistoryEntry: false, speechVersionKey: '' };
 
 function readJson(path, fallback) {
   try { const text = readFile(path); return text.trim() ? JSON.parse(text) : fallback; }
@@ -259,13 +259,38 @@ async function saveGeneratedStory() {
 function updateCount() { $('story-count').textContent = String(state.stories.length); }
 function pendingDeletionBlocked() { return !!(state.requestId || state.pendingGeneration || state.pendingReaderRequestId || state.pendingReaderResult); }
 function syncStorySelection() {
-  $('select-stories').hidden = state.storySelectionMode;
   $('story-selection-toolbar').hidden = !state.storySelectionMode;
   $('story-selection-count').textContent = `${state.selectedStoryIds.size} selected`;
   $('delete-selected-stories').disabled = !state.selectedStoryIds.size || pendingDeletionBlocked();
+  $('library-list').querySelectorAll('.story-card').forEach(card => {
+    const selected = state.selectedStoryIds.has(card.dataset.storyId);
+    card.classList.toggle('selected-card', selected);
+    const checkbox = card.querySelector('.story-select-checkbox');
+    if (checkbox) checkbox.checked = selected;
+  });
 }
-function leaveStorySelection() { state.storySelectionMode = false; state.selectedStoryIds.clear(); syncStorySelection(); }
-function setStorySelected(id, selected) { if (selected) state.selectedStoryIds.add(id); else state.selectedStoryIds.delete(id); syncStorySelection(); renderLibrary(); }
+function leaveStorySelection(restoreFocus = false) {
+  const focusId = state.storySelectionFocusId || [...state.selectedStoryIds][0];
+  state.storySelectionMode = false; state.selectedStoryIds.clear(); syncStorySelection();
+  const scrollY = window.scrollY;
+  renderLibrary(); window.scrollTo(0, scrollY);
+  if (restoreFocus && focusId) $('library-list').querySelector(`[data-story-id="${CSS.escape(focusId)}"] .card-select-action`)?.focus({ preventScroll: true });
+  state.storySelectionFocusId = '';
+}
+function beginStorySelection(id) {
+  if (!state.storySelectionMode) {
+    state.storySelectionMode = true; state.selectedStoryIds.clear(); state.storySelectionFocusId = id;
+  }
+  state.selectedStoryIds.add(id);
+  const scrollY = window.scrollY;
+  renderLibrary(); window.scrollTo(0, scrollY);
+  $('library-list').querySelector(`[data-story-id="${CSS.escape(id)}"] .story-select-checkbox`)?.focus({ preventScroll: true });
+}
+function toggleStorySelection(id) {
+  if (state.selectedStoryIds.has(id)) state.selectedStoryIds.delete(id); else state.selectedStoryIds.add(id);
+  if (!state.selectedStoryIds.size) { state.storySelectionFocusId = id; leaveStorySelection(true); return; }
+  syncStorySelection();
+}
 function removeSelectedStories(ids) {
   if (!ids.size || pendingDeletionBlocked()) return false;
   const previous=state.stories; state.stories=previous.filter(story=>!ids.has(story.id));
@@ -304,25 +329,34 @@ function wireLongPress(card, onLongPress, onMove, allowStoryOpen = false, ignore
   card.addEventListener('contextmenu', event => { if (origin || completed) event.preventDefault(); clear(); });
 }
 function renderLibrary() {
-  const list = $('library-list'); list.textContent = '';
+  const list = $('library-list'), toolbar = $('story-selection-toolbar'); list.replaceChildren(toolbar); toolbar.hidden = !state.storySelectionMode;
   const filter = $('filter-language').value;
   const stories = state.stories.filter(story => filter === 'all' || story.language === filter);
   if (!stories.length) { const empty = document.createElement('div'); empty.className = 'empty-state'; empty.innerHTML = '<b>Your shelf is waiting.</b>Stories you save will appear here for offline reading.'; list.append(empty); syncStorySelection(); return; }
   stories.forEach(story => {
     const card = document.createElement('article'); card.className = `story-card${state.storySelectionMode?' selecting':''}`;
-    if (state.storySelectionMode) { const check = document.createElement('input'); check.type = 'checkbox'; check.className = 'story-select-checkbox'; check.checked = state.selectedStoryIds.has(story.id); check.setAttribute('aria-label', `Select ${story.title}`); check.addEventListener('change', () => { if (check.checked) state.selectedStoryIds.add(story.id); else state.selectedStoryIds.delete(story.id); syncStorySelection(); }); card.append(check); }
+    card.dataset.storyId = story.id;
+    if (state.storySelectionMode) {
+      card.classList.toggle('selected-card', state.selectedStoryIds.has(story.id));
+      const control = document.createElement('label'); control.className = 'story-check-control';
+      const check = document.createElement('input'); check.type = 'checkbox'; check.className = 'story-select-checkbox'; check.checked = state.selectedStoryIds.has(story.id); check.setAttribute('aria-label', `Select ${story.title}`); check.addEventListener('change', () => toggleStorySelection(story.id));
+      control.append(check); card.append(control);
+    } else {
+      const select = document.createElement('button'); select.type = 'button'; select.className = 'card-select-action'; select.textContent = 'Select story'; select.setAttribute('aria-label', `Select story ${story.title}`);
+      select.addEventListener('click', event => { event.stopPropagation(); beginStorySelection(story.id); }); card.append(select);
+    }
     const open = document.createElement('button'); open.className = 'story-open'; open.type = 'button';
     const lang = document.createElement('span'); lang.className = 'language-tag'; lang.textContent = LANGUAGES[story.language] || story.language;
     const title = document.createElement('h3'); title.textContent = story.title;
     const meta = document.createElement('p'); const date = new Date(story.createdAt); meta.textContent = `${story.practice || (story.words || []).join(' · ') || LANGUAGES[story.language]}  ·  ${date.toLocaleDateString()}`;
-    open.append(lang,title,meta); open.addEventListener('click', () => { if (state.storySelectionMode) setStorySelected(story.id,!state.selectedStoryIds.has(story.id)); else openReader(story); });
+    open.append(lang,title,meta); open.addEventListener('click', () => { if (state.storySelectionMode) toggleStorySelection(story.id); else openReader(story); });
     card.append(open); list.append(card);
-    wireLongPress(card, () => { if (!state.storySelectionMode) { state.storySelectionMode=true; state.selectedStoryIds.clear(); } state.selectedStoryIds.add(story.id); syncStorySelection(); renderLibrary(); }, () => {}, true);
+    card.addEventListener('click', event => { if (event.target === card && state.storySelectionMode) toggleStorySelection(story.id); });
+    wireLongPress(card, () => beginStorySelection(story.id), () => {}, true);
   });
   syncStorySelection();
 }
-$('select-stories').addEventListener('click', () => { state.storySelectionMode=true; state.selectedStoryIds.clear(); syncStorySelection(); renderLibrary(); });
-$('finish-story-selection').addEventListener('click', () => { leaveStorySelection(); renderLibrary(); });
+$('finish-story-selection').addEventListener('click', () => leaveStorySelection(true));
 $('filter-language').addEventListener('change', () => { leaveStorySelection(); renderLibrary(); });
 $('delete-selected-stories').addEventListener('click', () => {
   if (!state.selectedStoryIds.size || pendingDeletionBlocked()) return;
@@ -354,7 +388,6 @@ function updateReader() {
   const speechVersionKey = `${story.id}:${chapter.id}:${version.id}`;
   if (state.speechVersionKey && state.speechVersionKey !== speechVersionKey) stopSpeech();
   state.speechVersionKey = speechVersionKey;
-  $('reader-language').textContent = `${LANGUAGES[story.language] || story.language} · ${DIFFICULTIES[story.difficulty] || ''}`;
   $('reader-title').textContent = version.title || story.title;
   $('reader-title').lang = SPEECH_LANGUAGES[story.language] || 'en';
   const select = $('chapter-select'); select.textContent = '';
@@ -416,9 +449,19 @@ function openReader(story) {
   const position = state.readerPositions[story.id];
   state.readerChapter = Math.max(0, story.chapters.findIndex(chapter => chapter.id === position?.chapterId)); state.deleteArmed = false;
   $('reader-help-section').hidden = true; $('reader-edit-panel').hidden = true; $('reader-prompt').value = '';
-  updateReader(); $('delete-story').textContent = 'Delete story'; $('reader-dialog').showModal(); readerPanel().scrollTop = position?.scrollTop || 0; renderGenerationRecovery();
+  updateReader(); $('delete-story').textContent = 'Delete story';
+  history.pushState({ ...(history.state && typeof history.state === 'object' ? history.state : {}), lingomageReader: story.id }, ''); state.readerHistoryEntry = true;
+  $('reader-dialog').showModal(); readerPanel().scrollTop = position?.scrollTop || 0; renderGenerationRecovery();
 }
-$('reader-dialog').addEventListener('close', () => { stopSpeech(); state.speechVersionKey = ''; closeWordNote(); rememberReaderPosition(); clearExplanationSelection(); setView('library'); });
+$('reader-dialog').addEventListener('close', () => {
+  if (state.readerHistoryEntry) { state.readerHistoryEntry = false; history.back(); }
+  stopSpeech(); state.speechVersionKey = ''; closeWordNote(); rememberReaderPosition(); clearExplanationSelection(); setView('library');
+});
+window.addEventListener('popstate', () => {
+  if (!$('reader-dialog').open) return;
+  state.readerHistoryEntry = false;
+  $('reader-dialog').close();
+});
 readerPanel().addEventListener('scroll', rememberReaderPosition);
 function sentenceContext(text, start, end) {
   const boundary = /[.!?。！？\n]/u;
@@ -903,8 +946,6 @@ $('reader-edit-submit').addEventListener('click', async () => {
   finally { button.disabled = false; button.textContent = mode === 'continue' ? 'Continue' : 'Rewrite'; }
 
 });
-$('reader-close').addEventListener('click', () => $('reader-dialog').close());
-$('reader-close-x').addEventListener('click', () => $('reader-dialog').close());
 $('reader-dialog').addEventListener('click', event => { if (event.target === $('reader-dialog')) $('reader-dialog').close(); });
 $('delete-story').addEventListener('click', () => {
   if (pendingDeletionBlocked()) { toast('Finish or save the current AI response before deleting.'); return; }
