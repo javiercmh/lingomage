@@ -295,3 +295,9 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px
 .create-field-group > .field { margin-bottom: 0; }
 .create-field-group > .helper { margin: 6px 0 0; }
 .create-field-group > textarea.field { padding: 12px 14px; }
+
+.target-language-settings > .target-level { margin-bottom: 0; }
+.target-language-settings > .helper { margin-top: 6px; }
+.target-language-settings > .knowledge-label { margin-top: 22px; }
+
+#story-form > .input-language-note { margin: 0 0 18px; }

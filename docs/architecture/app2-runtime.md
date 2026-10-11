@@ -64,3 +64,5 @@ Initial generation, continuation and rewrite share language, length, difficulty,
 Reader generation has an action-specific cancellable status card bound to its story; editing is locked until completion and failures retain the prompt. Vocabulary popovers offer native Listen for the displayed canonical headword through the existing locale/voice helper. Browser playback remains unavailable. Initial saved story inputs use the request snapshot. Older records and their provenance are unchanged.
 
 The offline mock now returns matching glossary fixtures across all four languages and all story request kinds. Fixed samples do not validate narrative quality, vocabulary selection, requested genre, or open endings.
+
+Prompt `2026-10-11.10` accepts empty/whitespace chapter prompts, trims them to an empty string and preserves that value in provenance. Blank continuation advances naturally; blank rewrite retells the same main events. Settings uses `settingsDescriptions` for concise display copy, while full `languages` descriptions continue to supply generation context and saved self-report snapshots. No migration or saved-story provenance change is needed.

@@ -259,7 +259,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   const detailLoading=loadingContract.createHelpLoading('detail','explain prefixes');
   assert.equal(detailLoading.attributes.role,'status');assert.equal(detailLoading.attributes['aria-live'],'polite');
   assert.ok(detailLoading.textContent.includes('Adding more detail…'));assert.ok(detailLoading.textContent.includes('Answering: explain prefixes'));
-  assert.ok(htmlSource.includes('Changes save automatically on this device. Text fields save when you leave the field.'));
+  assert.ok(htmlSource.includes('Saves on this device. Text saves when you leave the field.'));
   assert.ok(htmlSource.includes('<h3 id="reader-help-title">Explanations</h3>'));
   assert.ok(cssSource.includes('.help-examples { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line);'));
   console.log('PASS settings feedback, single Explanations heading, accessible loading, and in-card example divider');
@@ -406,6 +406,11 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.equal(gen.state.readerEditBusy, false); assert.equal(gen.state.activeChapterRequest, null);
   console.log('PASS continuation includes all active chapters, original topics, shared ending/glossary guidance and fresh notes');
 
+  gen.state.readerChapter=0;gen.$('reader-prompt').value='   ';
+  await submit();assert.equal(story3.chapters.length,5);assert.equal(requested.prompt,'');
+  assert.ok(generationInstructions.includes('If prompt is empty, continue naturally'));
+  assert.equal(story3.chapters[4].versions[0].prompt,'');
+  gen.$('reader-prompt').value='Next';
   const later=JSON.stringify(story3.chapters.slice(1));
   gen.state.readerChapter=0;gen.$('reader-edit-panel').dataset.mode='rewrite';
   await submit();assert.equal(story3.chapters[0].versions.length,2);
@@ -415,6 +420,11 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.equal(requested.practice,'Hiking vocabulary');
   story3.chapters[0].activeVersionId='onev';assert.equal(gen.activeVersion(story3.chapters[0]).story,'Text one');
   console.log('PASS chapter-only rewrite preserves original and all later chapters');
+  gen.$('reader-prompt').value='';await submit();assert.equal(requested.prompt,'');
+  assert.equal(story3.chapters[0].versions.length,3);
+  assert.ok(generationInstructions.includes('preserves the chapter’s main events'));
+  gen.$('reader-prompt').value='Next';
+  console.log('PASS blank and whitespace continuation/rewrite prompts generate with explicit defaults and preserve empty provenance');
   gen.readerAi=async()=>{throw Error('provider failed');};
   await submit();assert.equal(gen.$('reader-prompt').value,'Next');
   assert.equal(gen.state.readerEditBusy,false);assert.equal(gen.state.activeChapterRequest,null);

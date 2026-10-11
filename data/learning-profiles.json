@@ -48,5 +48,27 @@
       "intermediate": "Everyday situations with connected sentences and common past forms, using natural Spanish.",
       "advanced": "Nuanced situations with varied clause structures, idiomatic and broadly understandable Spanish, and precise vocabulary."
     }
+  },
+  "settingsDescriptions": {
+    "de": {
+      "beginner": "Familiar words and short everyday sentences, with help.",
+      "intermediate": "Short everyday stories, with help for unfamiliar words.",
+      "advanced": "Detailed stories, viewpoints, and implied meaning."
+    },
+    "ja": {
+      "beginner": "I read kana; I need help with short sentences and kanji.",
+      "intermediate": "I follow everyday stories with readings for unfamiliar kanji.",
+      "advanced": "I follow detailed stories; unfamiliar kanji may need support."
+    },
+    "ru": {
+      "beginner": "I read Cyrillic; I need help with short everyday sentences.",
+      "intermediate": "I follow everyday stories; unfamiliar words and endings may need help.",
+      "advanced": "Detailed stories, viewpoints, and implied meaning."
+    },
+    "es-CL": {
+      "beginner": "Familiar words and short everyday sentences, with help.",
+      "intermediate": "Short everyday stories, with help for unfamiliar words.",
+      "advanced": "Detailed stories, viewpoints, and implied meaning."
+    }
   }
 }
