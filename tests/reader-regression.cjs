@@ -183,7 +183,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
     const chapter = {id:'C',help:[entry],versions:[version]};
     const story = {id:'S',language:code,chapters:[chapter]};
     let request, instructions, saved = false;
-    const f = sandbox({state:{readerId:'S',providerId:'mock',model:'model'},readerStory:()=>story,normalizeChapters:s=>s.chapters,activeChapter:()=>chapter,activeVersion:()=>version,readerPanel:()=>({scrollTop:0}),persistReaderStory(){saved=true;},readerAi:async(kind,input,prompt)=>{request=input;instructions=prompt;f.state.pendingReaderRequestId='r';saved=false;return JSON.stringify({translation:'',explanation:'Focused detail'});},decodeHelp:JSON.parse,renderSavedHelp(){},ai:{acknowledge:async()=>{assert.equal(saved,true);}}});
+    const f = sandbox({state:{readerId:'S',providerId:'mock',model:'model'},readerStory:()=>story,normalizeChapters:s=>s.chapters,activeChapter:()=>chapter,activeVersion:()=>version,readerPanel:()=>({scrollTop:0}),persistReaderStory(){saved=true;},readerAi:async(kind,input,prompt)=>{request=input;instructions=prompt;f.state.pendingReaderRequestId='r';saved=false;return 'The ending adds a boundary.\n\n「でも」 marks a contrast.';},decodeHelp:text=>({explanation:text}),renderSavedHelp(){},ai:{acknowledge:async()=>{assert.equal(saved,true);}}});
     vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(', "$('selection-explain')"),f);
     const selected = {storyId:'S',chapterId:'C',versionId:'V',helpId:'H',text:'く',start:3,end:4,profile:{}};
     await f.explainSelection('explain','detail','explain prefixes',selected);
@@ -193,10 +193,11 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
     assert.ok(instructions.includes('never recap the profile'));
     assert.equal(entry.followUps.length,2);
     assert.equal(entry.followUps[1].followUp,'explain prefixes');
+    assert.equal(entry.followUps[1].text,'The ending adds a boundary.\n\n「でも」 marks a contrast.');
     assert.equal(entry.followUps[1].promptVersion,'test');
     await f.explainSelection('explain','detail','',selected);
     assert.equal(entry.followUps.length,3);
-    assert.ok(request.previousExplanation.includes('Focused detail'));
+    assert.ok(request.previousExplanation.includes('The ending adds a boundary.'));
   }
   console.log('PASS all languages share focused instructions; steered and blank follow-ups preserve legacy history and save before acknowledgement');
 
@@ -205,10 +206,11 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   const promptContract=sandbox();
   vm.runInContext(section('function savedFollowUps(', 'function selectedPassage('),promptContract);
   const detailPrompt=promptContract.helpInstructions('detail');
-  assert.ok(detailPrompt.includes('Output exactly one valid JSON object with one key named explanation'));
-  assert.ok(detailPrompt.includes('{"explanation":"A clear explanation goes here."}'));
-  assert.ok(detailPrompt.includes('Do not include Markdown fences'));
-  assert.ok(detailPrompt.endsWith('{"explanation":"..."}.'));
+  assert.ok(detailPrompt.includes('Return only the explanation text'));
+  assert.ok(!detailPrompt.includes('JSON'));
+  assert.ok(detailPrompt.includes('Preserve Japanese in Japanese script without romaji'));
+  assert.ok(promptContract.helpInstructions('initial').includes('Return only one JSON object'));
+  assert.ok(promptContract.helpInstructions('examples').includes('Return only one JSON object'));
   const loadingContract=sandbox();
   vm.runInContext(section('function createHelpLoading(', 'function renderSavedHelp('),loadingContract);
   const detailLoading=loadingContract.createHelpLoading('detail','explain prefixes');
@@ -227,7 +229,11 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.throws(()=>contract.decodeHelp('{"explanation":""}'),/invalid/);
   assert.equal(contract.decodeHelp('{"explanation":"Focused."}').explanation,'Focused.');
   assert.equal(contract.decodeHelp('```json\n{"explanation":"Prefixes mark word beginnings."}\n```','detail').explanation,'Prefixes mark word beginnings.');
-  assert.throws(()=>contract.decodeHelp('“Hinaufkle...”','detail'),error=>error.message==='The AI response was not valid JSON.');
+  const plainDetail='「でも」は対比を表します。\\path\n\nIt changes the relationship between the clauses.';
+  assert.equal(contract.decodeHelp(plainDetail,'detail').explanation,plainDetail);
+  assert.equal(contract.decodeHelp('  A general explanation.  ','detail').explanation,'A general explanation.');
+  assert.equal(contract.decodeHelp('“Hinaufkle...”','detail').explanation,'“Hinaufkle...”');
+  assert.throws(()=>contract.decodeHelp('   ','detail'),/invalid/);
   console.log('PASS explanation/example contracts reject malformed counts, ranges, translations and annotations');
 
   const rendered=sandbox({state:{furigana:true,explanationSelectionMode:false,selectedExplanationIds:new Set()},readerStory:()=>({id:'S'}),profileSnapshot:()=>({})});
@@ -267,7 +273,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.deepEqual(Array.from(rendered.$('reader-help').childNodes,node=>node.dataset.helpId),['newer','older']);
   console.log('PASS saved explanations render newest first without changing their stored order');
 
-  const removal=sandbox({state:{stories:[{id:'a'},{id:'b'}],selectedStoryIds:new Set(['a']),storySelectionMode:true},persistStories(){if(removal.fail)throw Error('disk');},updateCount(){},renderLibrary(){},toast(){},fail:false});
+  const removal=sandbox({state:{stories:[{id:'a'},{id:'b'}],selectedStoryIds:new Set(['a']),storySelectionMode:true},persistStories(){if(removal.fail)throw Error('disk');},updateCount(){},renderLibrary(){},syncStorySelection(){},window:{scrollY:0,scrollTo(){}},toast(){},fail:false});
   vm.runInContext(section('function pendingDeletionBlocked(', 'function wireLongPress('),removal);
   assert.equal(removal.removeSelectedStories(new Set(['a'])),true);assert.deepEqual(removal.state.stories.map(x=>x.id),['b']);assert.equal(removal.state.storySelectionMode,false);
   removal.state.stories=[{id:'a'},{id:'b'}];removal.state.selectedStoryIds=new Set(['a']);removal.state.storySelectionMode=true;removal.fail=true;
@@ -309,10 +315,10 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   const chapter=(id)=>({id,activeVersionId:id+'v',versions:[{id:id+'v',title:id,story:'Text '+id}],help:[]});
   const story3={id:'S',language:'ja',chapters:[chapter('one'),chapter('two'),chapter('three')]};
   let requested;
-  const gen=sandbox({state:{readerId:'S',readerChapter:0,model:'mock',providerId:'mock'},readerStory:()=>story3,normalizeChapters:s=>s.chapters,activeVersion:c=>c.versions.find(v=>v.id===c.activeVersionId),activeChapter:()=>story3.chapters[gen.state.readerChapter],profileSnapshot:()=>({}),persistReaderStory(){},decodeResponse:JSON.parse,readerAi:async(kind,input)=>{requested=input;gen.state.pendingReaderRequestId='r';return JSON.stringify({title:'four',story:'Text four',glossary:[]});},readerPanel:()=>({scrollTop:0}),updateReader(){},ai:{acknowledge:async()=>{}}});
+  const gen=sandbox({state:{readerId:'S',readerChapter:0,model:'mock',providerId:'mock'},readerStory:()=>story3,normalizeChapters:s=>s.chapters,activeVersion:c=>c.versions.find(v=>v.id===c.activeVersionId),activeChapter:()=>story3.chapters[gen.state.readerChapter],profileSnapshot:()=>({}),persistReaderStory(){},decodeResponse:JSON.parse,readerAi:async(kind,input)=>{requested=input;gen.state.pendingReaderRequestId='r';return JSON.stringify({title:'four',story:'Text four',glossary:[]});},readerPanel:()=>({scrollTop:0}),updateReader(){},window:{addEventListener(){}},document:{documentElement:{style:{}},querySelectorAll:()=>[]},ai:{acknowledge:async()=>{}}});
   gen.$('reader-edit-submit').addEventListener=(_,fn)=>submit=fn;
   gen.$('reader-prompt').value='Next';gen.$('reader-edit-panel').dataset.mode='continue';
-  vm.runInContext(lifecycle+section("$('reader-edit-submit').addEventListener", "$('reader-close').addEventListener"),gen);
+  vm.runInContext(lifecycle+section("$('reader-edit-submit').addEventListener", "$('reader-dialog').addEventListener"),gen);
   await submit();
   assert.ok(requested.priorActiveChapters.includes('Text three'));assert.equal(requested.currentChapter.title,'three');
   assert.equal(story3.chapters.length,4);assert.equal(story3.chapters[3].basedOnVersionId,'threev');assert.equal(story3.chapters[1].versions.length,1);
@@ -335,7 +341,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   console.log('PASS cancelled request does not stage a completed result');
 
   const panel={scrollTop:321,addEventListener(){}};
-  const pos=sandbox({state:{readerId:'S',readerChapter:2,readerPositions:{}},readerStory:()=>story3,activeChapter:()=>story3.chapters[pos.state.readerChapter],normalizeChapters:s=>s.chapters,updateReader(){},clearExplanationSelection(){}});
+  const pos=sandbox({state:{readerId:'S',readerChapter:2,readerPositions:{}},readerStory:()=>story3,activeChapter:()=>story3.chapters[pos.state.readerChapter],normalizeChapters:s=>s.chapters,updateReader(){},clearExplanationSelection(){},window:{addEventListener(){}},history:{pushState(){}}});
   pos.$('reader-dialog').querySelector=()=>panel;pos.$('reader-dialog').showModal=()=>{};
   vm.runInContext(section('function readerPanel(', 'function sentenceContext('),pos);
   pos.rememberReaderPosition();panel.scrollTop=0;pos.openReader(story3);

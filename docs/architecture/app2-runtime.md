@@ -28,7 +28,7 @@ The development mock is deliberately a fixed sample and may not include requeste
 
 ## Prompt and provenance
 
-The App² prompt version is `2026-10-11.5`. It uses the selected story level, learner self-assessment and optional language expectations to adapt stories. These descriptions guide generation; they are not validated proficiency measures. Spanish is presented generically and has no assumed regional variety; learners can specify one in Settings. Saved records retain the prompt/profile versions and the selected profile snapshot. Existing Android prompt assets and saved-story formats are left intact; migration/import of Android Room records is not implemented.
+The App² prompt version is `2026-10-11.7`. It uses the selected story level, learner self-assessment and optional language expectations to adapt stories. These descriptions guide generation; they are not validated proficiency measures. Spanish is presented generically and has no assumed regional variety; learners can specify one in Settings. Saved records retain the prompt/profile versions and the selected profile snapshot. Reader explanations and examples retain their JSON response contracts; More detail returns plain text, while the decoder also reads legacy JSON detail responses. Existing Android prompt assets and saved-story formats are left intact; migration/import of Android Room records is not implemented.
 
 ## Validation status
 
