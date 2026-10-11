@@ -25,9 +25,11 @@ if (!N && !window.AppAI) {
     if (info.server === 'app2-demo-dev') DEV = info;
   } catch { /* Ordinary browser previews keep their localStorage backend. */ }
 }
-if (DEV?.mockAi) {
+if (DEV?.mockAi || DEV?.liveAi) {
   const indicator = document.createElement('div');
-  indicator.textContent = 'Development mock AI · offline · no provider usage';
+  indicator.textContent = DEV.mockAi
+    ? 'Development mock AI · offline · no provider usage'
+    : 'Development ChatGPT · requests may use your ChatGPT plan';
   indicator.setAttribute('role', 'status');
   indicator.style.cssText = 'padding:8px;text-align:center;background:#202f2a;color:#b7d9c6';
   document.body.prepend(indicator);
@@ -110,8 +112,9 @@ if (AI) {
 
 export const ai = {
   // Channel presence only; discover connection separately via providers().
-  available: !!AI || !!DEV?.mockAi,
+  available: !!AI || !!DEV?.mockAi || !!DEV?.liveAi,
   developmentMock: !AI && !!DEV?.mockAi,
+  developmentLive: !AI && !!DEV?.liveAi,
   // -> {providers:[{id,name,connected}]} without account identifiers.
   providers: () => aiCall('providers'),
   // -> {models:[{id,name,reasoningLevels}]} in account-specific server order.

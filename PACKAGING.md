@@ -13,11 +13,11 @@ This workspace is a plain HTML/CSS/JavaScript subapp. `manifest.json` lists the 
 
 The app imports `ai`, `readFile` and `writeFile` from `js/bridge.js`. It discovers providers and models at runtime, sends a versioned beginner-story instruction and selected words, validates the returned JSON shape and glossary coverage, saves completed stories locally, then acknowledges the completed request. Generation errors do not trigger automatic retries.
 
-Connect ChatGPT through App² library **Settings → AI**. Browser preview uses only the explicitly enabled `--mock-ai` server response, which is a fixed sample and not evidence of translation quality or language pedagogy.
+Connect ChatGPT through App² library **Settings → AI**. Browser preview supports the explicitly enabled offline `--mock-ai` responses. For optional live desktop testing, sign in with `codex login` and run `python3 dev_server.py --chatgpt`; this uses Codex's ChatGPT account and may use plan allowance. The development server keeps no credentials, uses ephemeral threads in a temporary directory and does not retain pending requests across restart. This local development mode is an exception to the App²-only connection rule; released app behavior still uses App²'s managed AI bridge. Mock outputs are fixed examples and do not establish translation quality or learning effectiveness.
 
 ## Local preview
 
-Run `python3 dev_server.py --mock-ai` from this workspace. The server binds to localhost and implements the starter file bridge so JSON data is saved to actual workspace files. Native Android behavior, App² safe-area insets and live inference are not validated by this preview.
+Run `python3 dev_server.py --mock-ai` from this workspace for offline development, or `python3 dev_server.py --chatgpt` after `codex login` for live desktop inference. The server binds to localhost and implements the starter file bridge so JSON data is saved to actual workspace files. Native Android behavior and App² safe-area insets are not validated by this preview.
 
 ## App updates
 

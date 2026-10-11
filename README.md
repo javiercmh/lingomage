@@ -34,4 +34,13 @@ python3 dev_server.py --mock-ai
 
 Open [localhost:8888](http://localhost:8888). The mock is offline; the server writes workspace files, so use a disposable copy for testing.
 
+For live desktop testing, sign in with the Codex CLI and run:
+
+```sh
+codex login
+python3 dev_server.py --chatgpt
+```
+
+This development-only connection uses the model catalog and ChatGPT account managed by Codex. Requests may count against your ChatGPT plan. Codex is required; the Python server stores no credentials. Each request uses a fresh temporary directory and ephemeral Codex thread. Pending requests are lost if the server stops. Use a disposable copy for testing because workspace files are saved by the server.
+
 See the [runtime guide](docs/architecture/app2-runtime.md) and [pedagogical decisions](docs/pedagogy/README.md). The earlier Android app remains in [`android/`](android/) for reference.

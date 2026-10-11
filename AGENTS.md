@@ -19,14 +19,14 @@
 - Follow the plain-file starter structure: `index.html`, `css/style.css`, `js/app.js`, `js/bridge.js`, `manifest.json`, and `data/`.
 - Keep the host API calls in `js/bridge.js`; app logic uses its exported wrappers. Keep the project dependency-free and do not add a build step.
 - Keep `manifest.json`'s `main` and `files` entries current. Domain records and preferences belong in `data/stories.json` and `data/settings.json`, not opaque host preferences.
-- Use the App² managed `ai` bridge. Connect and choose models only through App² library Settings → AI. Never store credentials or request headers in the workspace.
+- Released app behavior uses the App² managed `ai` bridge. Connect and choose models only through App² library Settings → AI. Never store credentials or request headers in the workspace. The local development server may offer an explicit `--chatgpt` mode through the Codex CLI login for desktop testing; this exception must remain development-only.
 - Save completed story data before acknowledging an AI request. Do not silently retry inference.
 - Respect edge-to-edge safe-area variables, provide touch targets of at least 44px, and do not use system `alert()` or `confirm()` dialogs.
 - Keep user-generated text rendered with `textContent` or text nodes.
 
 ## Development and verification
 
-- Run the local workspace with `python3 dev_server.py --mock-ai`; open `http://localhost:8888`. The development mock is deterministic and makes no external requests.
+- Run the local workspace with `python3 dev_server.py --mock-ai`; open `http://localhost:8888`. The development mock is deterministic and makes no external requests. Optional live desktop testing uses `codex login` followed by `python3 dev_server.py --chatgpt`; requests may use ChatGPT plan allowance, and Codex is an optional external dependency.
 - Use the development server for browser checks. Native AI, alarms, Android insets and install shortcuts require App² on Android and should be marked pending unless actually verified there.
 - Record only checks actually run. Do not export credentials or log tokens, callback URLs or account identifiers.
 - The Python server requires Python 3.9 or newer and no dependencies.

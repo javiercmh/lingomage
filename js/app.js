@@ -824,7 +824,13 @@ async function refreshModels() {
     const {providers} = await ai.providers();
     const connected = providers?.filter(provider => provider.connected) || [];
     const provider = connected.find(item => item.id === state.providerId) || connected[0];
-    if (!provider) { $('ai-setup').hidden = false; $('model-controls').hidden = true; return; }
+    if (!provider) {
+      $('ai-setup').hidden = false; $('model-controls').hidden = true;
+      $('ai-setup').querySelector('.helper').textContent = ai.developmentLive
+        ? 'ChatGPT is not connected in Codex. Run `codex login`, then restart the development server with --chatgpt.'
+        : 'Open App² → Settings → AI, then connect a provider. Return here when it’s ready.';
+      return;
+    }
     state.providerId = provider.id; $('ai-setup').hidden = true; $('model-controls').hidden = false;
     const response = await ai.models(provider.id); state.models = response.models || [];
     select.textContent = '';
