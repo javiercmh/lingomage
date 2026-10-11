@@ -1,0 +1,163 @@
+{
+  "ja": {
+    "context": "空は青く、風はやさしいです。",
+    "selection": "く",
+    "explanation": "Here, く replaces the final い of 青い (“blue”), forming 青く. This connects the description of the sky to the following clause: “the sky is blue, and …”.",
+    "detail": "青い → 青く. Remove the final い and replace it with く. Here, this form links the description of the sky to the next clause. The ending く has no separate English translation.",
+    "examples": [
+      {
+        "sentence": "山は高く、道はせまいです。",
+        "translation": "The mountain is tall, and the road is narrow.",
+        "highlight": "く",
+        "segments": [
+          {
+            "text": "山",
+            "reading": "やま"
+          },
+          {
+            "text": "は"
+          },
+          {
+            "text": "高",
+            "reading": "たか"
+          },
+          {
+            "text": "く、"
+          },
+          {
+            "text": "道",
+            "reading": "みち"
+          },
+          {
+            "text": "はせまいです。"
+          }
+        ]
+      },
+      {
+        "sentence": "花は赤く、葉は緑です。",
+        "translation": "The flower is red, and the leaves are green.",
+        "highlight": "く",
+        "segments": [
+          {
+            "text": "花",
+            "reading": "はな"
+          },
+          {
+            "text": "は"
+          },
+          {
+            "text": "赤",
+            "reading": "あか"
+          },
+          {
+            "text": "く、"
+          },
+          {
+            "text": "葉",
+            "reading": "は"
+          },
+          {
+            "text": "は"
+          },
+          {
+            "text": "緑",
+            "reading": "みどり"
+          },
+          {
+            "text": "です。"
+          }
+        ]
+      },
+      {
+        "sentence": "スープは温かく、パンはやわらかいです。",
+        "translation": "The soup is warm, and the bread is soft.",
+        "highlight": "く",
+        "segments": [
+          {
+            "text": "スープは"
+          },
+          {
+            "text": "温",
+            "reading": "あたた"
+          },
+          {
+            "text": "かく、パンはやわらかいです。"
+          }
+        ]
+      }
+    ],
+    "selectionStart": 3
+  },
+  "de": {
+    "context": "Am Morgen gehen Mia und Leo zum Markt.",
+    "selection": "zum",
+    "explanation": "Here, zum combines zu (“to”) with dem, the dative form of the masculine article. Zum Markt means “to the market”.",
+    "detail": "zu + dem → zum. The preposition zu takes the dative case. Markt is masculine, so the article is dem here; the usual contraction is zum.",
+    "examples": [
+      {
+        "sentence": "Wir gehen zum Bahnhof.",
+        "translation": "We are going to the station.",
+        "highlight": "zum"
+      },
+      {
+        "sentence": "Mia geht zum Park.",
+        "translation": "Mia is going to the park.",
+        "highlight": "zum"
+      },
+      {
+        "sentence": "Leo geht zum Supermarkt.",
+        "translation": "Leo is going to the supermarket.",
+        "highlight": "zum"
+      }
+    ],
+    "selectionStart": 28
+  },
+  "ru": {
+    "context": "Потом они гуляют у реки и слушают музыку.",
+    "selection": "у",
+    "explanation": "Here, у means “by” or “near”: у реки places the walk near the river. It is followed by реки, the genitive form of река (“river”).",
+    "detail": "After у, the noun takes the genitive case: река → реки. Here, у marks a location near something; these examples keep that location meaning.",
+    "examples": [
+      {
+        "sentence": "Мы стоим у дома.",
+        "translation": "We are standing near the house.",
+        "highlight": "у"
+      },
+      {
+        "sentence": "Она ждет у школы.",
+        "translation": "She is waiting near the school.",
+        "highlight": "у"
+      },
+      {
+        "sentence": "Они сидят у окна.",
+        "translation": "They are sitting by the window.",
+        "highlight": "у"
+      }
+    ],
+    "selectionStart": 17
+  },
+  "es-CL": {
+    "context": "Sofía sale a caminar por el barrio.",
+    "selection": "por",
+    "explanation": "Here, por describes moving around or through an area. Caminar por el barrio means “to walk around the neighborhood”.",
+    "detail": "Por introduces the area someone moves through or around. Here, the neighborhood is the area of the walk, rather than simply its destination.",
+    "examples": [
+      {
+        "sentence": "Caminamos por el parque.",
+        "translation": "We walk around the park.",
+        "highlight": "por"
+      },
+      {
+        "sentence": "Sofía pasea por la ciudad.",
+        "translation": "Sofía strolls around the city.",
+        "highlight": "por"
+      },
+      {
+        "sentence": "Ellos caminan por el barrio.",
+        "translation": "They walk around the neighborhood.",
+        "highlight": "por"
+      }
+    ],
+    "selectionStart": 21
+  }
+}

@@ -192,9 +192,7 @@ class Handler(SimpleHTTPRequestHandler):
             except (TypeError, ValueError):
                 request_data = {}
             if request_data.get('kind') in {'explain', 'translate'}:
-                passage = str(request_data.get('passage', ''))
-                explanation = f"Development example: consider how {passage!r} works in this sentence. The difficulty estimate is only a mock and is not a proficiency assessment."
-                response_text = json.dumps({'translation': f"Development translation: {passage}", 'explanation': explanation, 'moreDetail': f"More detail about {passage}: inspect its meaning in context and notice how its form relates to the surrounding words."}, ensure_ascii=False)
+                response_text = self.mock_help(request_data)
             else:
                 response_text = self.mock_story(data.get('input', ''))
             self.server.requests[request_id] = {
@@ -216,6 +214,37 @@ class Handler(SimpleHTTPRequestHandler):
             del self.server.requests[request_id]
             return self.reply(True)
         return fail('invalid_request', 'Unknown action')
+
+    def mock_help(self, data):
+        """Render fixed examples of the response contract; never perform inference."""
+        fixtures = json.loads((self.server.workspace / 'data/reader-help-fixtures.json').read_text())
+        fixture = fixtures.get(data.get('languageCode'), fixtures['de'])
+        source = str(data.get('sourceText', ''))
+        passage = str(data.get('passage', ''))
+        action = data.get('action', 'initial')
+        utf16_len = lambda text: len(text.encode('utf-16-le')) // 2
+        context_index = source.find(fixture['context'])
+        expected_start = utf16_len(source[:context_index]) + utf16_len(fixture['context'][:fixture['selectionStart']]) if context_index >= 0 else -1
+        matched = passage == fixture['selection'] and data.get('start') == expected_start and data.get('end') == expected_start + utf16_len(passage)
+        if action in {'detail', 'examples'} and not matched:
+            return json.dumps({'explanation': 'This selection has no dedicated offline follow-up fixture. Connect a model in App² to request help for this passage.'})
+        if action == 'examples':
+            examples = []
+            for sample in fixture['examples']:
+                item = {key: value for key, value in sample.items() if key != 'highlight'}
+                start = sample['sentence'].index(sample['highlight'])
+                item['highlightStart'] = utf16_len(sample['sentence'][:start])
+                item['highlightEnd'] = item['highlightStart'] + utf16_len(sample['highlight'])
+                examples.append(item)
+            return json.dumps({'examples': examples}, ensure_ascii=False)
+        if action == 'detail':
+            return json.dumps({'explanation': fixture['detail']}, ensure_ascii=False)
+        context = fixture['context'] if matched else str(data.get('sentence', passage))
+        start = source.find(context)
+        explanation = fixture['explanation'] if matched else 'This selection has no dedicated offline explanation fixture. Connect a model in App² to request an explanation for this passage.'
+        return json.dumps({'contextStart': utf16_len(source[:start]) if start >= 0 else -1,
+                           'contextEnd': utf16_len(source[:start]) + utf16_len(context) if start >= 0 else -1,
+                           'contextTranslation': '', 'explanation': explanation}, ensure_ascii=False)
 
     @staticmethod
     def mock_story(raw_input):

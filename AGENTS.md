@@ -10,6 +10,10 @@
 - Label product assumptions and evidence limitations; do not claim certified CEFR alignment or proven learning effectiveness.
 - Preserve canonical Japanese text separately from furigana annotations. Copied Japanese text must omit readings. Russian uses Cyrillic without Latin transliteration.
 
+## Interface design
+
+- Follow `DESIGN.md` for shared App² visual rules, reader layout, accessibility and follow-up interaction. Update it when these conventions change.
+
 ## App² platform
 
 - Follow the plain-file starter structure: `index.html`, `css/style.css`, `js/app.js`, `js/bridge.js`, `manifest.json`, and `data/`.
