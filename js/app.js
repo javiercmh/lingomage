@@ -1,7 +1,6 @@
 import { ai, readFile, writeFile, speech } from './bridge.js';
 import { annotatedText, getCanonicalSelection } from './reader-text.js';
 import { saveBeforeAcknowledge } from './request-lifecycle.js';
-import { prepareSpeechOptions } from './reader-speech.js';
 
 const LANGUAGES = {de:'German',ja:'Japanese',ru:'Russian','es-CL':'Spanish'};
 const DIFFICULTIES = {beginner:'Beginner',intermediate:'Intermediate',advanced:'Advanced'};
@@ -12,7 +11,7 @@ const JOURNEY_DESCRIPTIONS = PROFILE_DEFINITIONS.languages;
 const PROMPT_VERSION = '2026-10-11.5';
 const PREFERRED_MODEL = 'gpt-6-luna';
 const $ = id => document.getElementById(id);
-const state = { stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, readerPositions: {}, providerId: '', model: '', reasoning: '', targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, deleteArmed: false, storySelectionMode: false, selectedStoryIds: new Set(), explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', speechRun: 0, speechActive: false, speechVersionKey: '' };
+const state = { stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, readerPositions: {}, providerId: '', model: '', reasoning: '', targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, deleteArmed: false, storySelectionMode: false, selectedStoryIds: new Set(), explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', speechVersionKey: '' };
 
 function readJson(path, fallback) {
   try { const text = readFile(path); return text.trim() ? JSON.parse(text) : fallback; }
@@ -352,7 +351,7 @@ function updateReader() {
   const chapters = normalizeChapters(story); state.readerChapter = Math.min(state.readerChapter, chapters.length - 1);
   const chapter = chapters[state.readerChapter], version = activeVersion(chapter);
   const speechVersionKey = `${story.id}:${chapter.id}:${version.id}`;
-  if (state.speechActive && state.speechVersionKey && state.speechVersionKey !== speechVersionKey) stopSpeech(true);
+  if (state.speechVersionKey && state.speechVersionKey !== speechVersionKey) stopSpeech();
   state.speechVersionKey = speechVersionKey;
   $('reader-language').textContent = `${LANGUAGES[story.language] || story.language} · ${DIFFICULTIES[story.difficulty] || ''}`;
   $('reader-title').textContent = version.title || story.title;
@@ -418,7 +417,7 @@ function openReader(story) {
   $('reader-help').hidden = true; $('reader-edit-panel').hidden = true; $('reader-prompt').value = '';
   updateReader(); $('delete-story').textContent = 'Delete story'; $('reader-dialog').showModal(); readerPanel().scrollTop = position?.scrollTop || 0; renderGenerationRecovery();
 }
-$('reader-dialog').addEventListener('close', () => { stopSpeech(true); closeWordNote(); rememberReaderPosition(); clearExplanationSelection(); setView('library'); });
+$('reader-dialog').addEventListener('close', () => { stopSpeech(); state.speechVersionKey = ''; closeWordNote(); rememberReaderPosition(); clearExplanationSelection(); setView('library'); });
 readerPanel().addEventListener('scroll', rememberReaderPosition);
 function sentenceContext(text, start, end) {
   const boundary = /[.!?。！？\n]/u;
@@ -470,7 +469,7 @@ function selectedPassage() {
 function showSelectionToolbar() {
   const passage = selectedPassage(); const toolbar = $('selection-toolbar');
   if (!passage) { toolbar.hidden = true; state.readerSelection = null; return; }
-  if (!state.readerSelection || passage.text !== state.readerSelection.text) { closeWordNote(); if (state.speechActive) stopSpeech(true); }
+  if (!state.readerSelection || passage.text !== state.readerSelection.text) closeWordNote();
   state.readerSelection = passage; toolbar.hidden = false;
   if (window.innerWidth > 700) {
     const rect = passage.rect; toolbar.classList.add('floating-selection-toolbar');
@@ -481,47 +480,11 @@ function showSelectionToolbar() {
 let selectionTimer;
 document.addEventListener('selectionchange', () => { clearTimeout(selectionTimer); selectionTimer = setTimeout(showSelectionToolbar, 180); });
 $('selection-toolbar').addEventListener('pointerdown', event => { event.preventDefault(); clearTimeout(selectionTimer); });
-$('selection-copy').addEventListener('click', async () => {
-  const passage = state.readerSelection; if (!passage) return;
-  try { await copyCanonicalText(passage.text); toast('Selected text copied'); }
-  catch { toast('Copy is unavailable in this preview'); }
-  $('selection-toolbar').hidden = true;
-});
-const speakButton = $('selection-speak');
-speakButton.disabled = !speech.available;
-speakButton.title = speech.available ? 'Speak the selected text in its source language' : 'Speak is available in the App² runtime.';
-async function stopSpeech(silent = false) {
-  ++state.speechRun; state.speechActive = false;
-  $('selection-stop').hidden = true;
-  if (silent) $('speech-status').textContent = '';
+async function stopSpeech() {
   if (!speech.available) return;
   try { await speech.stop(); }
-  catch (error) { if (!silent) $('speech-status').textContent = error.message; }
+  catch {}
 }
-async function speakCurrentSelection() {
-  const passage = state.readerSelection;
-  if (!passage || !speech.available) return;
-  const run = ++state.speechRun;
-  state.speechActive = true;
-  $('selection-stop').hidden = false;
-  $('speech-status').textContent = 'Preparing speech…';
-  try {
-    const prepared = await prepareSpeechOptions(speech, passage.text, passage.languageTag);
-    if (run !== state.speechRun) return;
-    const locale = prepared.voice?.language || passage.languageTag;
-    $('speech-status').textContent = `Speaking in ${locale}…`;
-    const result = await speech.speak(prepared.options);
-    if (run !== state.speechRun) return;
-    state.speechActive = false; $('selection-stop').hidden = true;
-    $('speech-status').textContent = result.status === 'completed' ? `Finished (${locale}).` : `Stopped (${locale}).`;
-  } catch (error) {
-    if (run !== state.speechRun) return;
-    state.speechActive = false; $('selection-stop').hidden = true;
-    $('speech-status').textContent = error.message || 'Speech could not start.';
-  }
-}
-$('selection-speak').addEventListener('click', speakCurrentSelection);
-$('selection-stop').addEventListener('click', () => stopSpeech());
 $('reader-dialog').addEventListener('pointerdown', event => {
   if (!event.target.closest?.('.gloss-note-trigger') && !event.target.closest?.('#word-note-popover')) closeWordNote();
 });
@@ -533,13 +496,6 @@ document.addEventListener('keydown', event => {
     event.preventDefault(); clearExplanationSelection();
   }
 });
-async function copyCanonicalText(text) {
-  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text);
-  const field = document.createElement('textarea'); field.value = text; field.setAttribute('readonly', ''); field.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
-  document.body.append(field); field.select();
-  const copied = document.execCommand('copy'); field.remove();
-  if (!copied) throw new Error('Copy command was unavailable');
-}
 function renderHighlightedText(container, canonical, segments, highlightStart, highlightEnd, excerptStart = 0, excerptEnd = canonical.length) {
   container.textContent = '';
   container.classList.toggle('hide-furigana', !state.furigana);
@@ -849,10 +805,10 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
   } finally { state.readerHelpBusy = false; }
 }
 $('selection-explain').addEventListener('click', () => explainSelection('explain'));
-$('chapter-select').addEventListener('change', () => { stopSpeech(true); state.readerChapter = Number($('chapter-select').value); state.readerVersion = 0; clearExplanationSelection(); updateReader(); });
-$('version-select').addEventListener('change', () => { stopSpeech(true); closeWordNote(); clearExplanationSelection(); const chapter = activeChapter(); chapter.activeVersionId = $('version-select').value; const story = readerStory(); try { persistReaderStory(story); } catch (error) { toast(error.message); } updateReader(); });
-$('chapter-prev').addEventListener('click', () => { if (state.readerChapter > 0) { stopSpeech(true); state.readerChapter--; clearExplanationSelection(); } updateReader(); });
-$('chapter-next').addEventListener('click', () => { if (state.readerChapter < normalizeChapters(readerStory()).length - 1) { stopSpeech(true); state.readerChapter++; clearExplanationSelection(); } updateReader(); });
+$('chapter-select').addEventListener('change', () => { state.readerChapter = Number($('chapter-select').value); state.readerVersion = 0; clearExplanationSelection(); updateReader(); });
+$('version-select').addEventListener('change', () => { closeWordNote(); clearExplanationSelection(); const chapter = activeChapter(); chapter.activeVersionId = $('version-select').value; const story = readerStory(); try { persistReaderStory(story); } catch (error) { toast(error.message); } updateReader(); });
+$('chapter-prev').addEventListener('click', () => { if (state.readerChapter > 0) { state.readerChapter--; clearExplanationSelection(); } updateReader(); });
+$('chapter-next').addEventListener('click', () => { if (state.readerChapter < normalizeChapters(readerStory()).length - 1) { state.readerChapter++; clearExplanationSelection(); } updateReader(); });
 $('text-smaller').addEventListener('click', () => { state.readerFontSize = Math.max(15, state.readerFontSize - 1); $('reader-story').style.fontSize = `${state.readerFontSize}px`; try { persistSettings(); } catch (error) { toast(error.message); } });
 $('text-larger').addEventListener('click', () => { state.readerFontSize = Math.min(30, state.readerFontSize + 1); $('reader-story').style.fontSize = `${state.readerFontSize}px`; try { persistSettings(); } catch (error) { toast(error.message); } });
 $('furigana-toggle').addEventListener('change', () => { state.furigana = $('furigana-toggle').checked; $('reader-story').classList.toggle('hide-furigana', !state.furigana); document.querySelectorAll('#reader-help .story-text').forEach(node => node.classList.toggle('hide-furigana', !state.furigana)); try { persistSettings(); } catch (error) { toast(error.message); } });

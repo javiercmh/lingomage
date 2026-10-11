@@ -222,8 +222,6 @@ body.kb .tabbar { display: none; }
 .explanation-select-checkbox { width: 20px; height: 20px; margin: 0; accent-color: var(--accent-strong); }
 .card-select-action { position: absolute; top: 8px; right: 8px; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .card-select-action:focus-visible { width: auto; height: 40px; padding: 0 10px; clip: auto; border: 1px solid var(--line); border-radius: 10px; background: #24344e; color: var(--ink); }
-.selection-toolbar { flex-wrap: wrap; }
-.speech-status { flex: 1 0 100%; color: var(--muted); font-size: 12px; text-align: center; }
 .toast { position: fixed; z-index: 5; right: 18px; bottom: calc(var(--tabbar-h) + 20px + var(--sa-bottom)); left: 18px; max-width: 560px; margin: auto; padding: 14px 17px; border: 1px solid rgba(255,255,255,.1); border-radius: 13px; background: #263854; color: white; font-size: 13px; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
 @media (min-width: 600px) { body { padding-top: calc(24px + var(--sa-top)); } .panel { padding: 22px; } }
 @media (max-width: 480px) { .reader-panel { padding-left: max(14px, var(--sa-left)); padding-right: max(14px, var(--sa-right)); } .reader-toolbar { gap: 5px; } .reader-toolbar .filter-select { max-width: 104px; } .reader-toolbar .version-select { max-width: 92px; } .reader-panel h2 { font-size: 23px; } }
