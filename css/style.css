@@ -288,3 +288,10 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px
 .word-note-listen { flex-shrink: 0; }
 
 .reader-chapter-status { margin: 16px 0; }
+
+/* Keep each helper closer to its field than to the next label. */
+.create-field-group { margin-bottom: 22px; }
+.create-field-group > .field-label { margin-top: 0; }
+.create-field-group > .field { margin-bottom: 0; }
+.create-field-group > .helper { margin: 6px 0 0; }
+.create-field-group > textarea.field { padding: 12px 14px; }

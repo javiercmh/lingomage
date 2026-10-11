@@ -27,6 +27,7 @@
 ## Development and verification
 
 - Run the local workspace with `python3 dev_server.py --mock-ai`; open `http://localhost:8888`. The development mock is deterministic and makes no external requests. Optional live desktop testing uses `codex login` followed by `python3 dev_server.py --chatgpt`; requests may use ChatGPT plan allowance, and Codex is an optional external dependency.
+- For every interface or copy change, visually inspect screenshots from the development server at desktop and narrow mobile widths before declaring it complete. Check spacing, wrapping, hierarchy, field/helper grouping, clipping, and touch targets; DOM checks alone do not establish layout quality. Record what was actually inspected.
 - Use the development server for browser checks. Native AI, alarms, Android insets and install shortcuts require App² on Android and should be marked pending unless actually verified there.
 - Record only checks actually run. Do not export credentials or log tokens, callback URLs or account identifiers.
 - The Python server requires Python 3.9 or newer and no dependencies.

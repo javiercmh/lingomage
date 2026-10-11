@@ -32,6 +32,10 @@ More detail reveals a labelled, one-line, optional question field with Cancel an
 
 ## Verification
 
+Every interface or copy change requires a visual screenshot inspection at desktop and narrow mobile widths before completion. Verify spacing, wrapping, hierarchy, clipping and touch targets, including loading/error states when affected. A passing DOM or automated functional check does not verify layout quality. Record the screenshots/layouts actually inspected and any remaining device-only checks.
+
+Keep helper copy concise and visually grouped with its field: a 6px field-to-helper gap and a 22px gap after each complete Create field group. Labels, controls and helpers share a group; generic field bottom margins must not push helpers toward the next label. Textareas need internal vertical padding.
+
 Check desktop and narrow mobile layouts, visible furigana, large reading text, keyboard focus, disclosures and follow-up submission in the deterministic development server. Mock checks establish UI behavior only. Host insets, Android keyboard and selection behavior require App² device verification.
 
 On My stories, swipe a card left at least 60px to reveal an 80px-wide, full-height red delete area with a white trash icon. Slide the entire padded slate reading surface over this area, keeping the card corners clipped; do not move text alone. Recognize horizontal intent only when horizontal movement exceeds vertical movement by 1.5×; preserve vertical scrolling and cancel long press during a swipe. Mouse dragging uses the same gesture. Only one card is revealed; a rightward swipe, outside tap, opening a story, filter change or bulk selection closes it. The trash control opens the app-styled confirmation naming the story and warning that all chapters, versions and explanations are permanently removed. Cancel receives initial focus. Hover and keyboard focus do not reveal the control: this gesture-only discoverability is a product assumption and limits keyboard access to single deletion; keyboard-accessible bulk selection remains available.

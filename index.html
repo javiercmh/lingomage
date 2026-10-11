@@ -17,22 +17,30 @@
     <section id="view-create" class="view active">
       <div class="intro"><h2>Build a story<br>for your practice.</h2><p>Start with a story you’d like to read, then choose what to explore and your reading language.</p></div>
       <form id="story-form" class="panel">
-        <label class="field-label" for="topic">Story idea <span class="optional">optional</span></label>
-        <textarea id="topic" class="field story-brief" maxlength="1200" rows="3" aria-describedby="topic-description" placeholder="A cozy mystery about hikers who discover an abandoned mountain hut"></textarea>
-        <p id="topic-description" class="helper">Describe the premise, genre, tone, or type of story you’d like.</p>
-        <label class="field-label" for="practice-input">Topics to explore <span class="optional">optional</span></label>
-        <input id="practice-input" class="field" maxlength="500" aria-describedby="practice-description" placeholder="Hiking vocabulary, asking for directions, making plans">
-        <p id="practice-description" class="helper">Choose topics or language concepts to weave into the story. Specific expressions and grammar concepts are welcome too.</p>
+        <div class="create-field-group">
+          <label class="field-label" for="topic">Story idea <span class="optional">optional</span></label>
+          <textarea id="topic" class="field story-brief" maxlength="1200" rows="3" aria-describedby="topic-description" placeholder="A cozy mystery in a mountain hut"></textarea>
+          <p id="topic-description" class="helper">Add a genre or tone if you like.</p>
+        </div>
+        <div class="create-field-group">
+          <label class="field-label" for="practice-input">Topics to explore <span class="optional">optional</span></label>
+          <input id="practice-input" class="field" maxlength="500" aria-describedby="practice-description" placeholder="Hiking, travel, directions">
+          <p id="practice-description" class="helper">Topics, situations, or grammar to practise.</p>
+        </div>
         <aside id="language-setup" class="language-setup" aria-label="Learning preferences" hidden>
           <p class="field-label">Make stories fit your practice</p>
           <p class="helper">Choose your learning languages and describe what you know in Settings to help tailor new stories.</p>
           <div class="language-setup-actions"><button id="language-setup-dismiss" class="secondary-btn" type="button">Dismiss</button><button id="language-settings-open" class="primary-btn" type="button">Open Settings</button></div>
         </aside>
-        <label class="field-label" for="language">I’m learning</label>
-        <select id="language" class="field"></select>
-        <label class="field-label" for="difficulty">Reading difficulty</label>
-        <select id="difficulty" class="field" aria-describedby="difficulty-description"></select>
-        <p id="difficulty-description" class="helper difficulty-description"></p>
+        <div class="create-field-group">
+          <label class="field-label" for="language">I’m learning</label>
+          <select id="language" class="field"></select>
+        </div>
+        <div class="create-field-group">
+          <label class="field-label" for="difficulty">Reading difficulty</label>
+          <select id="difficulty" class="field" aria-describedby="difficulty-description"></select>
+          <p id="difficulty-description" class="helper difficulty-description"></p>
+        </div>
         <p id="form-error" class="form-error" role="alert"></p>
         <button id="generate" class="primary-btn" type="submit">✦ &nbsp; Generate my story</button>
         <p class="usage-note">Generation uses your AI provider connected in App².</p>
