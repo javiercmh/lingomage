@@ -554,7 +554,16 @@ class Handler(SimpleHTTPRequestHandler):
             'es-CL': ('Una tarde tranquila', 'Sofía sale a caminar por el barrio. Pasa por una feria y compra pan y palta. Después se junta con una amiga en una plaza. Conversan un rato y miran el cielo. Cuando baja el sol, vuelven a casa contentas.'),
         }
         title, story = samples.get(code, samples['de'])
-        glossary = [{'word': word, 'meaning': f'Development example for {word}', 'forms': [word]} for word in words]
+        notes = {
+            'de': [('Ausflug', 'outing', 'Ausflug'), ('Markt', 'market', 'Markt')],
+            'ja': [('公園', 'park', '公園'), ('買う', 'to buy', '買います')],
+            'ru': [('рынок', 'market', 'рынок'), ('хлеб', 'bread', 'хлеб')],
+            'es-CL': [('feria', 'market', 'feria'), ('palta', 'avocado', 'palta')],
+        }
+        glossary = [{'word': word, 'meaning': meaning, 'forms': [form]}
+                    for word, meaning, form in notes.get(code, notes['de'])]
+        glossary.extend({'word': word, 'meaning': f'Development example for {word}', 'forms': [word]}
+                        for word in words if word in story)
         if code == 'ja':
             story_segments = [
                 {'text':'今日','reading':'きょう'}, {'text':'はミアが'}, {'text':'町','reading':'まち'}, {'text':'へ'}, {'text':'行','reading':'い'}, {'text':'きます。\n'},

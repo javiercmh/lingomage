@@ -41,7 +41,7 @@ export function annotatedText(container, canonical, segments, { glossary = [], l
     const trigger = document.createElement('span');
     trigger.className = 'gloss-note-trigger'; trigger.lang = language; trigger.setAttribute('role', 'button'); trigger.tabIndex = 0;
     trigger.setAttribute('aria-label', `Word note for ${canonical.slice(match.start, match.end)}`);
-    trigger.setAttribute('aria-haspopup', 'tooltip'); trigger.textContent = canonical.slice(start, end);
+    trigger.setAttribute('aria-haspopup', 'dialog'); trigger.textContent = canonical.slice(start, end);
     trigger.addEventListener('click', event => onNote(event, trigger, match.notes));
     trigger.addEventListener('keydown', event => {
       if (event.key !== 'Enter' && event.key !== ' ') return;

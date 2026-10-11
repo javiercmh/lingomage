@@ -13,8 +13,8 @@ function sandbox(extra = {}) {
   const elements = new Map();
   const element = (tag = 'div') => ({tagName:tag,hidden:false,dataset:{},childNodes:[],events:{},attributes:{},
     get textContent(){return this.childNodes.map(node=>node.textContent).join('');},set textContent(value){this.childNodes=value ? [{tagName:'#text',textContent:String(value)}] : [];},
-    append(...nodes){this.childNodes.push(...nodes);},addEventListener(name,fn){this.events[name]=fn;},setAttribute(name,value){this.attributes[name]=value;},focus(){this.focused=true;},remove(){},querySelector(){return null;},querySelectorAll(){return [];},classList:{add(){},remove(){},toggle(){}}});
-  const c = {state:{},console,crypto:{randomUUID:()=> 'help-test'},PROMPT_VERSION:'test',LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},SPEECH_LANGUAGES:{de:'de-DE',ja:'ja-JP',ru:'ru-RU','es-CL':'es-CL'},renderGenerationRecovery(){},readerPanel:()=>({classList:{toggle(){}}}),$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{createElement:element,createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},...extra};
+    append(...nodes){this.childNodes.push(...nodes);},addEventListener(name,fn){this.events[name]=fn;},setAttribute(name,value){this.attributes[name]=value;},focus(){this.focused=true;},scrollIntoView(){},remove(){},querySelector(){return null;},querySelectorAll(){return [];},classList:{add(){},remove(){},toggle(){}}});
+  const c = {state:{},console,crypto:{randomUUID:()=> 'help-test'},PROMPT_VERSION:'test',STORY_GUIDES:{de:{beginner:'Simple sentences'}},renderChapterRequest(){},LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},SPEECH_LANGUAGES:{de:'de-DE',ja:'ja-JP',ru:'ru-RU','es-CL':'es-CL'},renderGenerationRecovery(){},readerPanel:()=>({classList:{toggle(){}}}),$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{createElement:element,createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},...extra};
   vm.createContext(c);
   vm.runInContext(readerTextSource, c);
   vm.runInContext(requestLifecycleSource, c);
@@ -103,6 +103,28 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   await glossary.speakSelection(speechStub,'Hola','es-CL');assert.equal(speechOptions.voiceId,'es-cl-offline');
   const german=await glossary.prepareSpeechOptions(speechStub,'Guten Tag','de-DE');assert.equal(german.options.language,'de-DE');assert.equal(german.options.voiceId,undefined);
   console.log('PASS speech uses explicit source locale and prefers Chilean, then Latin American, then available Spanish voices');
+
+  let heard;
+  const noteUi = sandbox({state:{},readerStory:()=>({language:'ja'}),speech:{available:true,speak:async options=>{heard=options;}},window:{innerWidth:390,innerHeight:800},requestAnimationFrame:fn=>fn()});
+  const popover=noteUi.$('word-note-popover');popover.hidden=true;popover.style={};popover.getBoundingClientRect=()=>({bottom:150});
+  const trigger=noteUi.document.createElement('span');trigger.getAttribute=name=>trigger.attributes[name];trigger.getBoundingClientRect=()=>({left:20,top:80,bottom:100});
+  vm.runInContext(section('function closeWordNote(', 'function readerPanel('), noteUi);
+  noteUi.showWordNote(trigger,[{word:'買う',meaning:'to buy',forms:['買います']}]);
+  const listen=popover.childNodes[0].childNodes[0].childNodes[1];
+  assert.equal(listen.attributes['aria-label'],'Listen to 買う');assert.equal(popover.focused,true);
+  await listen.events.click();assert.equal(heard.text,'買う');assert.equal(heard.language,'ja-JP');
+  noteUi.closeWordNote(true);assert.equal(trigger.focused,true);assert.equal(popover.hidden,true);
+  noteUi.speech.available=false;noteUi.showWordNote(trigger,[{word:'買う',meaning:'to buy'}]);
+  assert.equal(popover.childNodes[0].childNodes[0].childNodes[1].disabled,true);
+  console.log('PASS glossary Listen speaks canonical headword with source locale, restores focus and disables browser playback');
+
+  const chapterStatus=sandbox({state:{readerId:'A',activeChapterRequest:{storyId:'A',loading:{textContent:'Writing…'}}}});
+  vm.runInContext(section('function renderChapterRequest(', 'function closeWordNote('),chapterStatus);
+  chapterStatus.renderChapterRequest();assert.equal(chapterStatus.$('reader-chapter-status').hidden,false);
+  chapterStatus.state.readerId='B';chapterStatus.renderChapterRequest();assert.equal(chapterStatus.$('reader-chapter-status').hidden,true);
+  chapterStatus.state.readerId='A';chapterStatus.renderChapterRequest();assert.equal(chapterStatus.$('reader-chapter-status').hidden,false);
+  chapterStatus.state.activeChapterRequest=null;chapterStatus.renderChapterRequest();assert.equal(chapterStatus.$('reader-chapter-status').hidden,true);
+  console.log('PASS chapter status stays bound to its originating story and clears after completion');
 
   const selectionMode=sandbox({state:{explanationSelectionMode:true,selectedExplanationIds:new Set(['one','two'])},activeChapter(){return {};},activeVersion(){return {};},syncExplanationSelection(){this.synced=true;},renderSavedHelp(){this.rendered=true;}});
   selectionMode.clearExplanationSelection=()=>{selectionMode.state.explanationSelectionMode=false;selectionMode.state.selectedExplanationIds.clear();selectionMode.rendered=true;};
@@ -367,30 +389,45 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   let submit;
   const chapter=(id)=>({id,activeVersionId:id+'v',versions:[{id:id+'v',title:id,story:'Text '+id}],help:[]});
   const story3={id:'S',language:'ja',chapters:[chapter('one'),chapter('two'),chapter('three')]};
-  let requested;
-  const gen=sandbox({state:{readerId:'S',readerChapter:0,model:'mock',providerId:'mock'},readerStory:()=>story3,normalizeChapters:s=>s.chapters,activeVersion:c=>c.versions.find(v=>v.id===c.activeVersionId),activeChapter:()=>story3.chapters[gen.state.readerChapter],profileSnapshot:()=>({}),persistReaderStory(){},decodeResponse:JSON.parse,readerAi:async(kind,input)=>{requested=input;gen.state.pendingReaderRequestId='r';return JSON.stringify({title:'four',story:'Text four',glossary:[]});},readerPanel:()=>({scrollTop:0}),updateReader(){},window:{addEventListener(){}},document:{documentElement:{style:{}},querySelectorAll:()=>[]},ai:{acknowledge:async()=>{}}});
+  let requested, generationInstructions;
+  story3.topic = 'A mountain mystery'; story3.practice = 'Hiking vocabulary'; story3.difficulty = 'beginner'; story3.language = 'de';
+  const gen=sandbox({state:{readerId:'S',readerChapter:0,model:'mock',providerId:'mock'},readerStory:()=>story3,normalizeChapters:s=>s.chapters,activeVersion:c=>c.versions.find(v=>v.id===c.activeVersionId),activeChapter:()=>story3.chapters[gen.state.readerChapter],profileSnapshot:()=>({}),persistReaderStory(){},decodeResponse:JSON.parse,readerAi:async(kind,input,instructions,loading)=>{requested=input;generationInstructions=instructions;assert.ok(loading.textContent.includes(kind === 'continue' ? 'Writing the next chapter' : 'Rewriting this chapter'));gen.state.pendingReaderRequestId='r';return JSON.stringify({title:'four',story:'Text four',glossary:[{word:'four',meaning:'four',forms:['four']}]});},readerPanel:()=>({scrollTop:0}),updateReader(){},window:{addEventListener(){}},document:{documentElement:{style:{}},querySelectorAll:()=>[]},ai:{acknowledge:async()=>{}}});
+  gen.document.createElement = sandbox().document.createElement;
   gen.$('reader-edit-submit').addEventListener=(_,fn)=>submit=fn;
   gen.$('reader-prompt').value='Next';gen.$('reader-edit-panel').dataset.mode='continue';
-  vm.runInContext(lifecycle+section("$('reader-edit-submit').addEventListener", "$('reader-dialog').addEventListener"),gen);
+  vm.runInContext(section('function storyInstructions(', 'function storyInput(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section("$('reader-edit-submit').addEventListener", "$('reader-dialog').addEventListener"),gen);
   await submit();
   assert.ok(requested.priorActiveChapters.includes('Text three'));assert.equal(requested.currentChapter.title,'three');
   assert.equal(story3.chapters.length,4);assert.equal(story3.chapters[3].basedOnVersionId,'threev');assert.equal(story3.chapters[1].versions.length,1);
-  console.log('PASS continuation from earlier chapter includes all active chapters and correct source');
+  assert.equal(requested.topic, 'A mountain mystery'); assert.equal(requested.practice, 'Hiking vocabulary');
+  assert.ok(generationInstructions.includes('Generate fresh glossary notes'));
+  assert.ok(generationInstructions.includes('Do not wrap up the chapter or story unless'));
+  assert.equal(story3.chapters[3].versions[0].glossary[0].word, 'four');
+  assert.equal(gen.state.readerEditBusy, false); assert.equal(gen.state.activeChapterRequest, null);
+  console.log('PASS continuation includes all active chapters, original topics, shared ending/glossary guidance and fresh notes');
 
   const later=JSON.stringify(story3.chapters.slice(1));
   gen.state.readerChapter=0;gen.$('reader-edit-panel').dataset.mode='rewrite';
   await submit();assert.equal(story3.chapters[0].versions.length,2);
   assert.equal(story3.chapters[0].versions[1].sourceVersionId,'onev');
   assert.equal(JSON.stringify(story3.chapters.slice(1)),later);
+  assert.equal(story3.chapters[0].versions[1].glossary[0].word,'four');
+  assert.equal(requested.practice,'Hiking vocabulary');
   story3.chapters[0].activeVersionId='onev';assert.equal(gen.activeVersion(story3.chapters[0]).story,'Text one');
   console.log('PASS chapter-only rewrite preserves original and all later chapters');
+  gen.readerAi=async()=>{throw Error('provider failed');};
+  await submit();assert.equal(gen.$('reader-prompt').value,'Next');
+  assert.equal(gen.state.readerEditBusy,false);assert.equal(gen.state.activeChapterRequest,null);
+  assert.equal(gen.state.readerEditDraft.chapterId,story3.chapters[0].id);
+  assert.ok(gen.$('reader-edit-error').textContent.includes('explicitly retry'));
+  console.log('PASS failed chapter request clears loading and retains an anchored prompt for explicit retry');
 
   let cancelAction, rejectWait, cancelCalls=0;
   const cancelContext=sandbox({state:{models:[{id:'mock'}],model:'mock'},ai:{available:true,start:async()=> 'cancel-id',wait:()=>new Promise((_,reject)=>rejectWait=reject),cancel:async()=>{cancelCalls++;rejectWait(Error('cancelled'));},acknowledge:async()=>{}},document:{createElement:()=>({addEventListener:(_,fn)=>cancelAction=fn,remove(){}})}});
   vm.runInContext(section('async function readerAi(', 'async function acknowledgeReaderResult('),cancelContext);
   const cancellation=cancelContext.readerAi('explain',{},'test');
   await new Promise(resolve=>setImmediate(resolve));await cancelAction();
-  await assert.rejects(cancellation,/cancelled/);assert.equal(cancelCalls,1);assert.equal(cancelContext.state.pendingReaderRequestId,undefined);assert.equal(cancelContext.state.requestId,null);
+  await assert.rejects(cancellation,/Request cancelled/);assert.equal(cancelCalls,1);assert.equal(cancelContext.state.pendingReaderRequestId,undefined);assert.equal(cancelContext.state.requestId,null);
   console.log('PASS cancelled request does not stage a completed result');
 
   const panel={scrollTop:321,addEventListener(){}};
@@ -400,4 +437,9 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   pos.rememberReaderPosition();panel.scrollTop=0;pos.openReader(story3);
   assert.equal(pos.state.readerChapter,2);assert.equal(panel.scrollTop,321);
   console.log('PASS actual scroll panel and chapter restored on reopen');
+  pos.state.readerEditDraft={storyId:'S',chapterId:story3.chapters[0].id,mode:'rewrite',prompt:'Keep a clue',error:'Provider failed'};
+  let restoredMode;pos.showEditPanel=mode=>{restoredMode=mode;};pos.openReader(story3);
+  assert.equal(pos.state.readerChapter,0);assert.equal(restoredMode,'rewrite');
+  assert.equal(pos.$('reader-prompt').value,'Keep a clue');assert.equal(pos.$('reader-edit-error').textContent,'Provider failed');
+  console.log('PASS reopening a failed chapter request restores its original chapter and prompt');
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -43,3 +43,9 @@ More detail asks for a useful contextual explanation in plain English paragraphs
 
 
 Formatting refinement (prompt `2026-10-11.8`): detail responses remain text rather than JSON, with optional bold, italic and inline code for display. The renderer also handles saved and legacy detail text without changing its provenance or stored content. Unsupported syntax stays literal and model HTML is never interpreted. Explanation selection uses a floating bottom bar; partial-selection activation selects all explanations in the displayed version, and full-selection activation clears selection and exits. These are presentation and interaction product assumptions, with no additional evidence of learning effectiveness.
+
+### Story-led creation and chapter support (prompt `2026-10-11.9`)
+
+Create starts with a story brief and topics to explore before language and difficulty. The brief may include genre, tone or format; topics may describe vocabulary domains, situations, grammar concepts or particular expressions. Each generated chapter or rewrite requests its own contextual glossary, carrying forward original topics and learner context. Each output advances the narrative and leaves a natural reason to continue unless the learner explicitly requests closure. Saved chapters remain separate, and old records are unchanged.
+
+Vocabulary notes offer Listen beside the displayed headword through native App² speech, without Japanese readings in canonical spoken text. Continuation and rewrite use cancellable status cards while existing reading content remains available. These are product assumptions about engagement, discoverability and continuity; no cited research validates this design or AI narrative endings. The existing evidence and limitations above (`liZhang2021SelfAssessment`, `tigchelaarEtAl2017CanDoValidity`, and the reading/glossing review) remain applicable; no additional effectiveness claim is made.

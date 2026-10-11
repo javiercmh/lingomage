@@ -282,3 +282,9 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px
 .selection-all-control:focus-within { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
 .help-detail p { white-space: pre-wrap; }
 .help-detail code { font-size: .95em; overflow-wrap: anywhere; }
+
+.story-brief { resize: vertical; min-height: 110px; }
+.word-note-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.word-note-listen { flex-shrink: 0; }
+
+.reader-chapter-status { margin: 16px 0; }

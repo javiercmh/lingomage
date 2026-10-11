@@ -8,7 +8,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from dev_server import DevServer
+from dev_server import DevServer, Handler
 
 
 FAKE_CODEX = r'''#!/usr/bin/env python3
@@ -184,6 +184,20 @@ class DevelopmentServerTests(unittest.TestCase):
             time.sleep(0.05)
         self.assertEqual(status, 400)
         self.assertIn('stopped unexpectedly', result['error']['message'])
+
+
+class MockStoryTests(unittest.TestCase):
+    def test_matching_glossary_in_every_story_request(self):
+        for language in ('de', 'ja', 'ru', 'es-CL'):
+            for kind in ('story', 'continue', 'rewrite'):
+                with self.subTest(language=language, kind=kind):
+                    result = json.loads(Handler.mock_story(json.dumps({
+                        'languageCode': language, 'kind': kind, 'practice': 'Hiking vocabulary',
+                    })))
+                    self.assertTrue(result['glossary'])
+                    for note in result['glossary']:
+                        self.assertTrue(all(form in result['story'] for form in note['forms']))
+                    self.assertEqual(''.join(part['text'] for part in result['storySegments']), result['story'])
 
 
 if __name__ == '__main__':
