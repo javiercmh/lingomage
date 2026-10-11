@@ -106,6 +106,26 @@ class DevelopmentServerTests(unittest.TestCase):
         status, _ = self.post(self.mock_server, '/__bridge/ai', {'action': 'providers'}, headers={'Origin': 'http://evil.example'})
         self.assertEqual(status, 403)
 
+    def test_mock_summary_checkpoint_and_release(self):
+        previous = {key: [] for key in ('characters', 'facts', 'plot', 'unresolved', 'uncertainties', 'situation')}
+        previous['characters'] = ['Mia']
+        status, request_id = self.ai(self.mock_server, 'start', data={
+            'providerId': 'chatgpt', 'model': 'development-mock',
+            'instructions': 'Summarize.', 'input': json.dumps({
+                'kind': 'summary', 'previousMemory': previous, 'chapterChunk': 'Mia finds a key.',
+            }),
+        })
+        self.assertEqual(status, 200)
+        self.mock_server.requests[request_id]['ready'] = 0
+        status, raw = self.ai(self.mock_server, 'result', requestId=request_id)
+        self.assertEqual(status, 200)
+        result = json.loads(raw)
+        self.assertEqual(result['characters'], ['Mia'])
+        self.assertEqual(result['situation'], ['Mia finds a key.'])
+        self.assertLessEqual(len(json.dumps(result)), 12000)
+        self.assertEqual(self.ai(self.mock_server, 'acknowledge', requestId=request_id)[0], 200)
+        self.assertFalse(self.mock_server.requests)
+
     def test_live_account_and_model_discovery(self):
         server = self.start_live()
         status, providers = self.ai(server, 'providers')

@@ -13,8 +13,8 @@ function sandbox(extra = {}) {
   const elements = new Map();
   const element = (tag = 'div') => ({tagName:tag,hidden:false,dataset:{},childNodes:[],events:{},attributes:{},
     get textContent(){return this.childNodes.map(node=>node.textContent).join('');},set textContent(value){this.childNodes=value ? [{tagName:'#text',textContent:String(value)}] : [];},
-    append(...nodes){this.childNodes.push(...nodes);},addEventListener(name,fn){this.events[name]=fn;},setAttribute(name,value){this.attributes[name]=value;},focus(){this.focused=true;},scrollIntoView(){},remove(){},querySelector(){return null;},querySelectorAll(){return [];},classList:{add(){},remove(){},toggle(){}}});
-  const c = {state:{},console,crypto:{randomUUID:()=> 'help-test'},PROMPT_VERSION:'test',STORY_GUIDES:{de:{beginner:'Simple sentences'}},renderChapterRequest(){},LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},SPEECH_LANGUAGES:{de:'de-DE',ja:'ja-JP',ru:'ru-RU','es-CL':'es-CL'},renderGenerationRecovery(){},readerPanel:()=>({classList:{toggle(){}}}),$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{createElement:element,createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},...extra};
+    append(...nodes){this.childNodes.push(...nodes);},addEventListener(name,fn){this.events[name]=fn;},setAttribute(name,value){this.attributes[name]=value;},focus(){this.focused=true;},scrollIntoView(){},remove(){},querySelector(selector){return this.childNodes.find(node=>node.tagName===selector) || this.childNodes.map(node=>node.querySelector?.(selector)).find(Boolean) || null;},querySelectorAll(){return [];},classList:{add(){},remove(){},toggle(){}}});
+  const c = {state:{},console,crypto:{randomUUID:(()=>{let id=0;return ()=>`help-test-${++id}`;})()},PROMPT_VERSION:'test',STORY_GUIDES:{de:{beginner:'Simple sentences'}},renderChapterRequest(){},LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},SPEECH_LANGUAGES:{de:'de-DE',ja:'ja-JP',ru:'ru-RU','es-CL':'es-CL'},renderGenerationRecovery(){},readerPanel:()=>({classList:{toggle(){}}}),$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{createElement:element,createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},...extra};
   vm.createContext(c);
   vm.runInContext(readerTextSource, c);
   vm.runInContext(requestLifecycleSource, c);
@@ -391,20 +391,20 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   const story3={id:'S',language:'ja',chapters:[chapter('one'),chapter('two'),chapter('three')]};
   let requested, generationInstructions;
   story3.topic = 'A mountain mystery'; story3.practice = 'Hiking vocabulary'; story3.difficulty = 'beginner'; story3.language = 'de';
-  const gen=sandbox({state:{readerId:'S',readerChapter:0,model:'mock',providerId:'mock'},readerStory:()=>story3,normalizeChapters:s=>s.chapters,activeVersion:c=>c.versions.find(v=>v.id===c.activeVersionId),activeChapter:()=>story3.chapters[gen.state.readerChapter],profileSnapshot:()=>({}),persistReaderStory(){},decodeResponse:JSON.parse,readerAi:async(kind,input,instructions,loading)=>{requested=input;generationInstructions=instructions;assert.ok(loading.textContent.includes(kind === 'continue' ? 'Writing the next chapter' : 'Rewriting this chapter'));gen.state.pendingReaderRequestId='r';return JSON.stringify({title:'four',story:'Text four',glossary:[{word:'four',meaning:'four',forms:['four']}]});},readerPanel:()=>({scrollTop:0}),updateReader(){},window:{addEventListener(){}},document:{documentElement:{style:{}},querySelectorAll:()=>[]},ai:{acknowledge:async()=>{}}});
+  const gen=sandbox({state:{readerId:'S',readerChapter:0,model:'mock',providerId:'mock'},readerStory:()=>story3,normalizeChapters:s=>s.chapters,activeVersion:c=>c.versions.find(v=>v.id===c.activeVersionId),activeChapter:()=>story3.chapters[gen.state.readerChapter],profileSnapshot:()=>({}),persistReaderStory(){},decodeResponse:JSON.parse,readerAi:async(kind,input,instructions,loading)=>{if(kind==='summary'){gen.state.pendingReaderRequestId='r';return JSON.stringify({...input.previousMemory,plot:[...input.previousMemory.plot,input.chapterChunk]});} requested=input;generationInstructions=instructions;assert.ok(loading.textContent.includes(kind === 'continue' ? 'Writing the next chapter' : 'Rewriting this chapter'));gen.state.pendingReaderRequestId='r';return JSON.stringify({title:'four',story:'Text four',glossary:[{word:'four',meaning:'four',forms:['four']}]});},readerPanel:()=>({scrollTop:0}),updateReader(){},window:{addEventListener(){}},document:{documentElement:{style:{}},querySelectorAll:()=>[]},ai:{acknowledge:async()=>{}}});
   gen.document.createElement = sandbox().document.createElement;
   gen.$('reader-edit-submit').addEventListener=(_,fn)=>submit=fn;
   gen.$('reader-prompt').value='Next';gen.$('reader-edit-panel').dataset.mode='continue';
-  vm.runInContext(section('function storyInstructions(', 'function storyInput(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section("$('reader-edit-submit').addEventListener", "$('reader-dialog').addEventListener"),gen);
+  vm.runInContext(section('function normalizeChapters(', 'function readerStory(')+section('function storyInstructions(', 'function storyInput(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section("$('reader-edit-submit').addEventListener", "$('reader-dialog').addEventListener"),gen);
   await submit();
-  assert.ok(requested.priorActiveChapters.includes('Text three'));assert.equal(requested.currentChapter.title,'three');
+  assert.ok(requested.storyMemory.plot.includes('Text three'));assert.equal(requested.recentProse,'Text three');assert.equal(requested.priorActiveChapters,undefined);assert.equal(requested.precedingChapters,undefined);
   assert.equal(story3.chapters.length,4);assert.equal(story3.chapters[3].basedOnVersionId,'threev');assert.equal(story3.chapters[1].versions.length,1);
   assert.equal(requested.topic, 'A mountain mystery'); assert.equal(requested.practice, 'Hiking vocabulary');
   assert.ok(generationInstructions.includes('Generate fresh glossary notes'));
   assert.ok(generationInstructions.includes('Do not wrap up the chapter or story unless'));
   assert.equal(story3.chapters[3].versions[0].glossary[0].word, 'four');
   assert.equal(gen.state.readerEditBusy, false); assert.equal(gen.state.activeChapterRequest, null);
-  console.log('PASS continuation includes all active chapters, original topics, shared ending/glossary guidance and fresh notes');
+  console.log('PASS continuation uses saved memory and recent prose, original topics, shared ending/glossary guidance and fresh notes');
 
   gen.state.readerChapter=0;gen.$('reader-prompt').value='   ';
   await submit();assert.equal(story3.chapters.length,5);assert.equal(requested.prompt,'');
@@ -418,11 +418,26 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.equal(JSON.stringify(story3.chapters.slice(1)),later);
   assert.equal(story3.chapters[0].versions[1].glossary[0].word,'four');
   assert.equal(requested.practice,'Hiking vocabulary');
-  story3.chapters[0].activeVersionId='onev';assert.equal(gen.activeVersion(story3.chapters[0]).story,'Text one');
+  assert.equal(gen.selectedPath(story3).entries.length,1);assert.equal(requested.storyMemory.plot.length,0);assert.equal(requested.currentChapter.story,'Text one');assert.equal(story3.paths[0].entries.length,5);
   console.log('PASS chapter-only rewrite preserves original and all later chapters');
   gen.$('reader-prompt').value='';await submit();assert.equal(requested.prompt,'');
   assert.equal(story3.chapters[0].versions.length,3);
   assert.ok(generationInstructions.includes('preserves the chapter’s main events'));
+  story3.activePathId='original';gen.state.readerChapter=1;
+  const untouchedOriginal=JSON.stringify(story3.paths[0].entries);
+  await submit();
+  assert.equal(requested.storyMemory.plot.length,1);
+  assert.equal(requested.storyMemory.plot[0],'Text one');
+  assert.equal(requested.recentProse,'Text one');
+  assert.equal(requested.currentChapter.story,'Text two');
+  assert.equal(gen.selectedPath(story3).entries.length,2);
+  assert.equal(JSON.stringify(story3.paths[0].entries),untouchedOriginal);
+  gen.state.readerChapter=0;gen.$('reader-edit-panel').dataset.mode='continue';
+  await submit();assert.equal(gen.selectedPath(story3).entries.length,3);
+  assert.equal(requested.recentProse,'Text four');
+  assert.equal(JSON.stringify(story3.paths[0].entries),untouchedOriginal);
+  console.log('PASS middle rewrite excludes its old events; continuation from earlier reading appends only to selected path');
+  gen.state.readerChapter=0;gen.$('reader-edit-panel').dataset.mode='rewrite';
   gen.$('reader-prompt').value='Next';
   console.log('PASS blank and whitespace continuation/rewrite prompts generate with explicit defaults and preserve empty provenance');
   gen.readerAi=async()=>{throw Error('provider failed');};
@@ -443,7 +458,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   const panel={scrollTop:321,addEventListener(){}};
   const pos=sandbox({state:{readerId:'S',readerChapter:2,readerPositions:{}},readerStory:()=>story3,activeChapter:()=>story3.chapters[pos.state.readerChapter],normalizeChapters:s=>s.chapters,closeStoryReveal(){},updateReader(){},clearExplanationSelection(){},window:{addEventListener(){}},history:{pushState(){}}});
   pos.$('reader-dialog').querySelector=()=>panel;pos.$('reader-dialog').showModal=()=>{};
-  vm.runInContext(section('function readerPanel(', 'function sentenceContext('),pos);
+  vm.runInContext(section('function normalizeChapters(', 'function readerStory(')+section('function readerPanel(', 'function sentenceContext('),pos);story3.activePathId='original';
   pos.rememberReaderPosition();panel.scrollTop=0;pos.openReader(story3);
   assert.equal(pos.state.readerChapter,2);assert.equal(panel.scrollTop,321);
   console.log('PASS actual scroll panel and chapter restored on reopen');

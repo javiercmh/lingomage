@@ -378,7 +378,13 @@ class Handler(SimpleHTTPRequestHandler):
                 request_data = json.loads(data.get('input', '{}'))
             except (TypeError, ValueError):
                 request_data = {}
-            if request_data.get('kind') in {'explain', 'translate'}:
+            if request_data.get('kind') == 'summary':
+                memory = request_data.get('previousMemory', {})
+                memory = {key: list(memory.get(key, [])) for key in ('characters', 'facts', 'plot', 'unresolved', 'uncertainties', 'situation')}
+                memory['plot'] = (memory['plot'] + [request_data.get('chapterChunk', '')[:500]])[-8:]
+                memory['situation'] = [request_data.get('chapterChunk', '')[-500:]]
+                response_text = json.dumps(memory)
+            elif request_data.get('kind') in {'explain', 'translate'}:
                 response_text = self.mock_help(request_data)
             else:
                 response_text = self.mock_story(data.get('input', ''))

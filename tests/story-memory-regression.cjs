@@ -1,0 +1,22 @@
+const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
+const source = fs.readFileSync('js/app.js','utf8');
+const code = source.slice(source.indexOf('function ensureStoryPaths('),source.indexOf('function readerStory('));
+const story = {id:'S',chapters:[{id:'A',activeVersionId:'a2',versions:[{id:'a1',story:'Original'},{id:'a2',sourceVersionId:'a1',story:'Alternate'}]}, {id:'B',basedOnVersionId:'a1',activeVersionId:'b',versions:[{id:'b',sourceVersionId:'a1',story:'Following original'}]}]};
+let calls=0, saves=0, failSave=false, failAck=false;
+const c={state:{providerId:'mock',model:'mock'},PROMPT_VERSION:'test',normalizeChapters:s=>s.chapters,readerStory:()=>story,console};
+vm.createContext(c);vm.runInContext(code,c);
+c.readerAi=async(kind,input)=>{calls++;assert.equal(kind,'summary');assert.ok(input.chapterChunk.length<=8000);return JSON.stringify({...input.previousMemory,plot:[input.chapterChunk.slice(-100)]});};
+c.savePendingReaderResult=async()=>{const p=c.state.pendingReaderResult;if(!p.saved){const undo=p.apply();if(failSave){undo();throw Error('disk');}p.saved=true;saves++;}if(failAck)throw Error('release');c.state.pendingReaderResult=null;};
+const loading={querySelector:()=>({textContent:''})};
+(async()=>{
+ c.ensureStoryPaths(story);assert.equal(story.paths[0].entries[0].versionId,'a1');assert.equal(story.paths[1].entries[0].versionId,'a2');
+ const text='日本語。\n'+'x'.repeat(18000)+'😀';const chunks=c.memoryChunks(text);assert.equal(chunks.join(''),text);assert.ok(chunks.every(x=>x.length<=8000));assert.ok(c.recentProse(text).length<=4000);
+ assert.throws(()=>c.decodeMemory('{}'));assert.throws(()=>c.decodeMemory(JSON.stringify({characters:[],facts:[],plot:['x'.repeat(12000)],unresolved:[],uncertainties:[],situation:[]})));
+ const entries=story.paths[0].entries;await c.prepareStoryMemory(story,entries,loading);assert.equal(calls,2);await c.prepareStoryMemory(story,entries,loading);assert.equal(calls,2);
+ await c.prepareStoryMemory(story,story.paths[1].entries,loading);assert.equal(calls,3);
+ story.chapters[1].versions[0].story=text;story.memories=[];calls=0;await c.prepareStoryMemory(story,entries,loading);assert.equal(calls,4);
+ story.memories=[];failSave=true;await assert.rejects(c.prepareStoryMemory(story,entries,loading),/disk/);assert.equal(story.memories.length,0);failSave=false;await c.savePendingReaderResult();await c.prepareStoryMemory(story,entries,loading);assert.equal(story.memories.length,4);
+ story.memories=[];failAck=true;await assert.rejects(c.prepareStoryMemory(story,entries,loading),/release/);assert.equal(story.memories.length,1);failAck=false;await c.savePendingReaderResult();const before=calls;await c.prepareStoryMemory(story,entries,loading);assert.equal(calls-before,3);
+ story.memories=[];let stages=0;c.readerAi=async()=>{if(++stages===2)throw Error('cancelled');return JSON.stringify({characters:[],facts:[],plot:[],unresolved:[],uncertainties:[],situation:[]});};await assert.rejects(c.prepareStoryMemory(story,entries,loading),/cancelled/);assert.equal(story.memories.length,1);
+ console.log('PASS lineage, bounded chunks, memory validation, shared-cache reuse, save/release recovery and staged cancellation');
+})().catch(e=>{console.error(e);process.exitCode=1;});
