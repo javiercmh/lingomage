@@ -539,6 +539,7 @@ function renderHelpExamples(card, examples, language = 'en') {
 function syncExplanationSelection() {
   const box = $('reader-help');
   const toolbar = box.querySelector('.explanation-selection-toolbar');
+  box.classList.toggle('selection-active', !!toolbar && state.explanationSelectionMode);
   if (toolbar) {
     toolbar.querySelector('.selection-count').textContent = `${state.selectedExplanationIds.size} selected`;
     toolbar.querySelector('.delete-selected-explanations').disabled = !state.selectedExplanationIds.size || pendingDeletionBlocked();

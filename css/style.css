@@ -170,6 +170,7 @@ body.kb .tabbar { display: none; }
 .story-text.hide-furigana ruby rt { display: none; }
 .selectable-story { user-select: text; -webkit-user-select: text; cursor: text; }
 .reader-help { margin: 10px 0 24px; display: grid; gap: 14px; }
+.reader-help.selection-active { margin-top: 18px; row-gap: 6px; }
 .reader-edit-panel { margin: 16px 0; padding: 18px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); }
 .help-card { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); overflow-wrap: anywhere; }
 .help-card { position: relative; touch-action: pan-y; }
