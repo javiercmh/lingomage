@@ -1,14 +1,1 @@
-{
-  "providerId": "chatgpt",
-  "model": "gpt-6-luna",
-  "reasoning": "medium",
-  "targetLanguages": {},
-  "learnerProfiles": {},
-  "languageExpectations": {},
-  "languageSetupDismissed": false,
-  "readingPreferences": {
-    "furigana": true,
-    "fontSize": 19
-  },
-  "theme": "dark"
-}
+{}
