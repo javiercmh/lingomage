@@ -1,1 +1,183 @@
-[]
+[
+  {
+    "id": "dcdced77-a11a-40f4-8523-1e5d3170084e",
+    "language": "de",
+    "difficulty": "beginner",
+    "readingStartingPoint": "beginner",
+    "learnerKnowledge": "",
+    "languageExpectations": "",
+    "readingSelfReport": "I am starting out, or I can understand familiar words and short sentences about daily life with help.",
+    "profileVersion": "2026-10-10.1",
+    "title": "Ein ruhiger Nachmittag in der Bibliothek",
+    "story": "Mia geht am Nachmittag in die Bibliothek. Draußen ist es warm und sonnig. In der Bibliothek ist es ruhig. Mia sucht ein Buch über Tiere. Sie findet ein Buch mit bunten Bildern. Dann setzt sie sich an einen Tisch. Sie liest über kleine Vögel und große Elefanten. Neben ihr sitzt ein Junge und malt ein Bild. Mia lächelt und liest weiter. Später bringt sie das Buch zurück. Auf dem Weg nach Hause denkt sie an die Tiere.",
+    "titleSegments": [
+      {
+        "text": "Ein ruhiger Nachmittag in der Bibliothek"
+      }
+    ],
+    "storySegments": null,
+    "glossary": [
+      {
+        "word": "die Bibliothek",
+        "meaning": "library",
+        "forms": [
+          "in die Bibliothek",
+          "In der Bibliothek"
+        ]
+      },
+      {
+        "word": "suchen",
+        "meaning": "to look for",
+        "forms": [
+          "sucht"
+        ]
+      },
+      {
+        "word": "sich setzen",
+        "meaning": "to sit down",
+        "forms": [
+          "setzt sie sich"
+        ]
+      },
+      {
+        "word": "zurückbringen",
+        "meaning": "to return something",
+        "forms": [
+          "bringt sie das Buch zurück"
+        ]
+      },
+      {
+        "word": "weiterlesen",
+        "meaning": "to keep reading",
+        "forms": [
+          "liest weiter"
+        ]
+      }
+    ],
+    "practice": "",
+    "topic": "A quiet afternoon at the library",
+    "providerId": "chatgpt",
+    "model": "gpt-6-luna",
+    "promptVersion": "2026-10-11.5",
+    "createdAt": "2026-10-11T10:45:39.839Z",
+    "activeVersionId": "ddf6f273-378e-4dd7-ace7-f015955c202a",
+    "chapters": [
+      {
+        "id": "64ff7314-7905-44e1-a9dc-6c55f533c6f1",
+        "activeVersionId": "ddf6f273-378e-4dd7-ace7-f015955c202a",
+        "versions": [
+          {
+            "id": "ddf6f273-378e-4dd7-ace7-f015955c202a",
+            "title": "Ein ruhiger Nachmittag in der Bibliothek",
+            "story": "Mia geht am Nachmittag in die Bibliothek. Draußen ist es warm und sonnig. In der Bibliothek ist es ruhig. Mia sucht ein Buch über Tiere. Sie findet ein Buch mit bunten Bildern. Dann setzt sie sich an einen Tisch. Sie liest über kleine Vögel und große Elefanten. Neben ihr sitzt ein Junge und malt ein Bild. Mia lächelt und liest weiter. Später bringt sie das Buch zurück. Auf dem Weg nach Hause denkt sie an die Tiere.",
+            "titleSegments": [
+              {
+                "text": "Ein ruhiger Nachmittag in der Bibliothek"
+              }
+            ],
+            "storySegments": null,
+            "glossary": [
+              {
+                "word": "die Bibliothek",
+                "meaning": "library",
+                "forms": [
+                  "in die Bibliothek",
+                  "In der Bibliothek"
+                ]
+              },
+              {
+                "word": "suchen",
+                "meaning": "to look for",
+                "forms": [
+                  "sucht"
+                ]
+              },
+              {
+                "word": "sich setzen",
+                "meaning": "to sit down",
+                "forms": [
+                  "setzt sie sich"
+                ]
+              },
+              {
+                "word": "zurückbringen",
+                "meaning": "to return something",
+                "forms": [
+                  "bringt sie das Buch zurück"
+                ]
+              },
+              {
+                "word": "weiterlesen",
+                "meaning": "to keep reading",
+                "forms": [
+                  "liest weiter"
+                ]
+              }
+            ],
+            "createdAt": "2026-10-11T10:45:39.839Z",
+            "promptVersion": "2026-10-11.5",
+            "providerId": "chatgpt",
+            "model": "gpt-6-luna"
+          }
+        ],
+        "prompt": "",
+        "help": [
+          {
+            "id": "5f16a251-4568-431d-9d38-7c26e523bc95",
+            "kind": "explain",
+            "action": "initial",
+            "passage": "in die Bibliothek. ",
+            "start": 23,
+            "end": 42,
+            "chapterId": "64ff7314-7905-44e1-a9dc-6c55f533c6f1",
+            "versionId": "ddf6f273-378e-4dd7-ace7-f015955c202a",
+            "text": "“in die Bibliothek” is a direction phrase: Mia goes into the library. Here, “in” takes “die” because it describes movement toward a place; “die Bibliothek” is the destination.",
+            "followUp": "",
+            "profile": {
+              "language": "de",
+              "readingStartingPoint": "beginner",
+              "readingSelfReport": "I am starting out, or I can understand familiar words and short sentences about daily life with help.",
+              "learnerKnowledge": "",
+              "languageExpectations": "",
+              "profileVersion": "2026-10-10.1"
+            },
+            "createdAt": "2026-10-11T10:49:18.183Z",
+            "providerId": "chatgpt",
+            "model": "gpt-6-luna",
+            "promptVersion": "2026-10-11.5",
+            "contextStart": 0,
+            "contextEnd": 42,
+            "contextTranslation": ""
+          },
+          {
+            "id": "5372e228-82bf-4c97-867f-741096ec5275",
+            "kind": "explain",
+            "action": "initial",
+            "passage": " In der Bibliothek ",
+            "start": 73,
+            "end": 92,
+            "chapterId": "64ff7314-7905-44e1-a9dc-6c55f533c6f1",
+            "versionId": "ddf6f273-378e-4dd7-ace7-f015955c202a",
+            "text": "“In der Bibliothek” means “in the library.” It tells where it is quiet; “der Bibliothek” is the dative form of “die Bibliothek” after “in” for a location.",
+            "followUp": "",
+            "profile": {
+              "language": "de",
+              "readingStartingPoint": "beginner",
+              "readingSelfReport": "I am starting out, or I can understand familiar words and short sentences about daily life with help.",
+              "learnerKnowledge": "",
+              "languageExpectations": "",
+              "profileVersion": "2026-10-10.1"
+            },
+            "createdAt": "2026-10-11T10:49:44.366Z",
+            "providerId": "chatgpt",
+            "model": "gpt-6-luna",
+            "promptVersion": "2026-10-11.5",
+            "contextStart": 52,
+            "contextEnd": 101,
+            "contextTranslation": ""
+          }
+        ]
+      }
+    ]
+  }
+]

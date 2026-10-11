@@ -1,14 +1,18 @@
-import { ai, readFile, writeFile } from './bridge.js';
+import { ai, readFile, writeFile, speech } from './bridge.js';
+import { annotatedText, getCanonicalSelection } from './reader-text.js';
+import { saveBeforeAcknowledge } from './request-lifecycle.js';
+import { prepareSpeechOptions } from './reader-speech.js';
 
 const LANGUAGES = {de:'German',ja:'Japanese',ru:'Russian','es-CL':'Spanish'};
 const DIFFICULTIES = {beginner:'Beginner',intermediate:'Intermediate',advanced:'Advanced'};
+const SPEECH_LANGUAGES = { de: 'de-DE', ja: 'ja-JP', ru: 'ru-RU', 'es-CL': 'es-CL' };
 const PROFILE_DEFINITIONS = readJson('data/learning-profiles.json', {});
 const STORY_GUIDES = PROFILE_DEFINITIONS.generationGuides;
 const JOURNEY_DESCRIPTIONS = PROFILE_DEFINITIONS.languages;
-const PROMPT_VERSION = '2026-10-11.4';
+const PROMPT_VERSION = '2026-10-11.5';
 const PREFERRED_MODEL = 'gpt-6-luna';
 const $ = id => document.getElementById(id);
-const state = { stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingReaderRequestId: null, pendingReaderResult: null, readerPositions: {}, providerId: '', model: '', reasoning: '', targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, deleteArmed: false, storySelectionMode: false, selectedStoryIds: new Set(), explanationSelectionMode: false, selectedExplanationIds: new Set() };
+const state = { stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, readerPositions: {}, providerId: '', model: '', reasoning: '', targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, deleteArmed: false, storySelectionMode: false, selectedStoryIds: new Set(), explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', speechRun: 0, speechActive: false, speechVersionKey: '' };
 
 function readJson(path, fallback) {
   try { const text = readFile(path); return text.trim() ? JSON.parse(text) : fallback; }
@@ -152,7 +156,8 @@ function decodeResponse(text, languageCode) {
 async function generate(event) {
   event.preventDefault(); $('form-error').textContent = '';
   if (state.pendingReaderResult) { $('form-error').textContent = 'Save the completed reader response before generating another story.'; return; }
-  if (state.requestId) { $('form-error').textContent = state.current ? 'Save this story or choose “Make another” before generating again.' : 'Another AI request is running. Wait for it to finish.'; return; }
+  if (state.pendingGeneration) { $('form-error').textContent = 'Finish saving the completed story before generating another.'; return; }
+  if (state.requestId) { $('form-error').textContent = 'Finish the current AI request before generating another story.'; return; }
   if (!ai.available) { $('form-error').textContent = 'Open App² → Settings → AI and connect a provider, then return here.'; return; }
   try {
     const {providers} = await ai.providers();
@@ -178,11 +183,15 @@ async function generate(event) {
     const storyId = crypto.randomUUID?.() || `story-${Date.now()}`;
     const firstVersion = { id: crypto.randomUUID?.() || `version-${Date.now()}`, title: story.title, story: story.story, titleSegments: story.titleSegments || null, storySegments: story.storySegments || null, glossary: story.glossary, createdAt: date, promptVersion: PROMPT_VERSION, providerId: provider.id, model: model.id };
     state.current = { id: storyId, language: languageCode, difficulty, readingStartingPoint: requestProfile.readingStartingPoint, learnerKnowledge: requestProfile.learnerKnowledge, languageExpectations: requestProfile.languageExpectations, readingSelfReport: requestProfile.readingSelfReport, profileVersion: PROFILE_DEFINITIONS.version, title: story.title, story: story.story, titleSegments: story.titleSegments || null, storySegments: story.storySegments || null, glossary: story.glossary, practice: $('practice-input').value.trim(), topic: $('topic').value.trim(), providerId: provider.id, model: model.id, promptVersion: PROMPT_VERSION, createdAt: date, activeVersionId: firstVersion.id, chapters: [{ id: crypto.randomUUID?.() || `chapter-${Date.now()}`, activeVersionId: firstVersion.id, versions: [firstVersion], prompt: '', help: [] }] };
-    showResult(state.current);
+    state.pendingGeneration = { story: state.current, requestId, saved: false, error: '' };
     state.pendingStoryRequestId = requestId;
     try { persistSettings(); } catch (error) { console.warn('Could not save model preference', error); }
+    await saveGeneratedStory();
   } catch (error) {
-    if (state.requestId) { try { await ai.acknowledge(state.requestId); } catch {} state.requestId = null; }
+    if (state.requestId && !state.pendingGeneration) {
+      try { await ai.acknowledge(state.requestId); state.requestId = null; state.pendingStoryRequestId = null; }
+      catch (releaseError) { error.message = `${error.message} The AI result still needs release: ${releaseError.message}`; }
+    }
     $('form-error').textContent = error.message || 'Could not generate a story. Please try again.';
   } finally { $('loading-card').hidden = true; $('story-form').hidden = false; }
 }
@@ -191,60 +200,65 @@ $('language').addEventListener('change', () => populateDifficulty());
 $('difficulty').addEventListener('change', () => { $('difficulty-description').textContent = STORY_GUIDES[$('language').value][$('difficulty').value]; });
 $('cancel-generation').addEventListener('click', async () => { if (!state.requestId) return; try { await ai.cancel(state.requestId); } catch {} state.requestId = null; $('loading-card').hidden = true; $('story-form').hidden = false; toast('Generation cancelled'); });
 
-function annotatedText(container, canonical, segments) {
-  container.textContent = '';
-  if (!Array.isArray(segments) || segments.map(part => part.text).join('') !== canonical) { container.textContent = canonical; return; }
-  segments.forEach(part => {
-    if (part.reading) { const ruby = document.createElement('ruby'); ruby.textContent = part.text; const rt = document.createElement('rt'); rt.textContent = part.reading; ruby.append(rt); container.append(ruby); }
-    else container.append(document.createTextNode(part.text));
+function renderRecoveryPanel(container, pending, savedLabel) {
+  container.textContent = ''; container.hidden = !pending;
+  if (!pending) return;
+  const note = document.createElement('p'); note.className = 'helper';
+  note.textContent = pending.error || (pending.saved ? savedLabel : 'The completed story is waiting to be saved.');
+  const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'secondary-btn';
+  retry.textContent = pending.saved ? 'Finish request' : 'Retry save';
+  retry.addEventListener('click', async () => {
+    retry.disabled = true;
+    if (pending.saved) await finishGeneratedRequest();
+    else await saveGeneratedStory();
+    retry.disabled = false;
   });
+  container.append(note, retry);
 }
-function renderGlossary(container, glossary) {
-  container.textContent = '';
-  glossary.forEach(item => {
-    const row = document.createElement('div'); row.className = 'gloss-item';
-    const word = document.createElement('span'); word.className = 'gloss-word'; word.textContent = item.word || '';
-    const meaning = document.createElement('span'); meaning.className = 'gloss-meaning'; meaning.textContent = item.meaning || '';
-    row.append(word, meaning);
-    if (item.forms?.length) { const forms = document.createElement('span'); forms.className = 'gloss-forms'; forms.textContent = `In the story: ${item.forms.join(', ')}`; row.append(forms); }
-    container.append(row);
-  });
+function renderGenerationRecovery() {
+  const pending = state.pendingGeneration;
+  renderRecoveryPanel($('generation-recovery-create'), pending, 'Story saved. Finish releasing the AI request to continue.');
+  renderRecoveryPanel($('generation-recovery-reader'), pending?.saved ? pending : null, 'Story saved. Finish releasing the AI request to continue.');
 }
-function showResult(story) {
-  $('result-title').textContent = story.title;
-  annotatedText($('result-story'), story.story, story.storySegments);
-  renderGlossary($('result-glossary'), story.glossary);
-  $('result-card').hidden = false; $('save-note').textContent = '';
-  $('result-card').scrollIntoView({behavior:'smooth',block:'start'});
-}
-$('copy-story').addEventListener('click', async () => {
-  if (!state.current) return;
-  const text = `${state.current.title}\n\n${state.current.story}\n\n${state.current.glossary.map(item => `${item.word} — ${item.meaning}`).join('\n')}`;
-  try { await navigator.clipboard.writeText(text); toast('Story copied'); } catch { toast('Copy is unavailable in this preview'); }
-});
-$('save-story').addEventListener('click', async () => {
-  if (!state.current) return;
+async function finishGeneratedRequest() {
+  const pending = state.pendingGeneration;
+  if (!pending?.saved) return false;
   try {
-    persistReaderStory(state.current);
-    updateCount(); $('save-note').textContent = 'Saved on this device. You can read it offline from My stories.'; $('save-story').textContent = 'Saved'; $('save-story').disabled = true;
-    if (state.pendingStoryRequestId) {
-      try { await ai.acknowledge(state.pendingStoryRequestId); if (state.requestId === state.pendingStoryRequestId) state.requestId = null; state.pendingStoryRequestId = null; }
-      catch (error) { $('save-note').textContent = 'Story saved. The AI result is still awaiting release; retry saving if needed.'; console.warn('Could not acknowledge saved generation', error); }
-    }
-  } catch (error) { $('save-note').textContent = error.message; }
-});
-$('new-story').addEventListener('click', async () => {
-  if (state.pendingReaderResult || state.requestId && state.requestId !== state.pendingStoryRequestId) { toast('Finish the reader request first.'); return; }
-  if (state.requestId) {
-    try { await ai.acknowledge(state.requestId); state.requestId = null; }
-    catch (error) { toast('Could not release the last result. Try again.'); return; }
+    await saveBeforeAcknowledge({ saved: true, acknowledge: () => ai.acknowledge(pending.requestId) });
+    if (state.requestId === pending.requestId) state.requestId = null;
+    state.pendingStoryRequestId = null; state.pendingGeneration = null;
+    renderGenerationRecovery(); return true;
+  } catch (error) {
+    pending.error = `Story saved. Could not finish the AI request: ${error.message}`;
+    renderGenerationRecovery(); return false;
   }
-  state.pendingStoryRequestId = null;
-  $('result-card').hidden = true; state.current = null; populateDifficulty(); $('save-story').disabled = false; $('save-story').textContent = 'Save to my stories'; window.scrollTo(0,0);
-});
+}
+async function saveGeneratedStory() {
+  const pending = state.pendingGeneration;
+  if (!pending) return false;
+  try {
+    await saveBeforeAcknowledge({
+      saved: pending.saved,
+      apply: () => () => {},
+      persist: () => persistReaderStory(pending.story),
+      onSaved: () => { pending.saved = true; pending.error = ''; },
+      acknowledge: () => ai.acknowledge(pending.requestId)
+    });
+    if (state.requestId === pending.requestId) state.requestId = null;
+    state.pendingStoryRequestId = null; state.pendingGeneration = null;
+  } catch (error) {
+    pending.error = pending.saved ? `Story saved. Could not finish the AI request: ${error.message}` : `Could not save the story: ${error.message}`;
+  }
+  renderGenerationRecovery();
+  if (!pending.saved) return false;
+  $('generation-recovery-create').hidden = true;
+  openReader(pending.story);
+  renderGenerationRecovery();
+  return !state.pendingGeneration;
+}
 
 function updateCount() { $('story-count').textContent = String(state.stories.length); }
-function pendingDeletionBlocked() { return !!(state.requestId || state.pendingReaderRequestId || state.pendingReaderResult); }
+function pendingDeletionBlocked() { return !!(state.requestId || state.pendingGeneration || state.pendingReaderRequestId || state.pendingReaderResult); }
 function syncStorySelection() {
   $('select-stories').hidden = state.storySelectionMode;
   $('story-selection-toolbar').hidden = !state.storySelectionMode;
@@ -337,8 +351,12 @@ function updateReader() {
   const story = readerStory(); if (!story) return;
   const chapters = normalizeChapters(story); state.readerChapter = Math.min(state.readerChapter, chapters.length - 1);
   const chapter = chapters[state.readerChapter], version = activeVersion(chapter);
+  const speechVersionKey = `${story.id}:${chapter.id}:${version.id}`;
+  if (state.speechActive && state.speechVersionKey && state.speechVersionKey !== speechVersionKey) stopSpeech(true);
+  state.speechVersionKey = speechVersionKey;
   $('reader-language').textContent = `${LANGUAGES[story.language] || story.language} · ${DIFFICULTIES[story.difficulty] || ''}`;
   $('reader-title').textContent = version.title || story.title;
+  $('reader-title').lang = SPEECH_LANGUAGES[story.language] || 'en';
   const select = $('chapter-select'); select.textContent = '';
   chapters.forEach((item, index) => { const option = document.createElement('option'); option.value = String(index); option.textContent = `Chapter ${index + 1}${item.versions.length > 1 ? ` · version ${item.versions.findIndex(v => v.id === item.activeVersionId) + 1}` : ''}`; select.append(option); });
   select.value = String(state.readerChapter);
@@ -348,13 +366,44 @@ function updateReader() {
   $('chapter-prev').disabled = state.readerChapter === 0; $('chapter-next').disabled = state.readerChapter >= chapters.length - 1;
   $('chapter-context-note').hidden = !chapter.basedOnVersionId || state.readerChapter === 0;
   $('chapter-context-note').textContent = chapter.basedOnVersionId && chapters[state.readerChapter - 1]?.activeVersionId !== chapter.basedOnVersionId ? 'This chapter follows an earlier version of the previous chapter.' : '';
-  annotatedText($('reader-story'), version.story, version.storySegments);
+  closeWordNote();
+  annotatedText($('reader-story'), version.story, version.storySegments, {
+    language: SPEECH_LANGUAGES[story.language] || 'en',
+    glossary: version.glossary || story.glossary || [],
+    onNote: (event, trigger, notes) => showWordNote(trigger, notes)
+  });
   $('reader-story').style.fontSize = `${state.readerFontSize}px`;
   $('reader-story').classList.toggle('hide-furigana', story.language === 'ja' && !state.furigana);
   $('furigana-control').hidden = story.language !== 'ja'; $('furigana-toggle').checked = state.furigana;
   renderSavedHelp(chapter, version);
   $('selection-toolbar').hidden = true; state.readerSelection = null;
   renderPendingReaderResult();
+}
+function closeWordNote() {
+  const popover = $('word-note-popover');
+  if (popover.hidden) return;
+  popover.hidden = true;
+  document.querySelectorAll('.gloss-note-trigger[aria-expanded="true"]').forEach(button => { button.removeAttribute('aria-expanded'); button.removeAttribute('aria-describedby'); });
+}
+function showWordNote(trigger, notes) {
+  const popover = $('word-note-popover');
+  if (!popover.hidden && trigger.getAttribute('aria-expanded') === 'true') { closeWordNote(); return; }
+  closeWordNote(); popover.textContent = '';
+  for (const note of notes) {
+    const item = document.createElement('p'); item.className = 'word-note-entry';
+    const word = document.createElement('strong'); word.textContent = note.word || 'Word note';
+    const meaning = document.createElement('span'); meaning.textContent = note.meaning;
+    item.append(word, meaning); popover.append(item);
+  }
+  trigger.setAttribute('aria-expanded', 'true'); trigger.setAttribute('aria-describedby', 'word-note-popover'); popover.hidden = false;
+  const rect = trigger.getBoundingClientRect();
+  const left = Math.max(12, Math.min(window.innerWidth - 292, rect.left));
+  popover.style.left = `${left}px`;
+  popover.style.top = `${Math.min(window.innerHeight - 20, rect.bottom + 8)}px`;
+  requestAnimationFrame(() => {
+    const box = popover.getBoundingClientRect();
+    if (box.bottom > window.innerHeight - 12) popover.style.top = `${Math.max(12, rect.top - box.height - 8)}px`;
+  });
 }
 function readerPanel() { return $('reader-dialog').querySelector('.reader-panel'); }
 function rememberReaderPosition() {
@@ -367,47 +416,10 @@ function openReader(story) {
   const position = state.readerPositions[story.id];
   state.readerChapter = Math.max(0, story.chapters.findIndex(chapter => chapter.id === position?.chapterId)); state.deleteArmed = false;
   $('reader-help').hidden = true; $('reader-edit-panel').hidden = true; $('reader-prompt').value = '';
-  updateReader(); $('delete-story').textContent = 'Delete story'; $('reader-dialog').showModal(); readerPanel().scrollTop = position?.scrollTop || 0;
+  updateReader(); $('delete-story').textContent = 'Delete story'; $('reader-dialog').showModal(); readerPanel().scrollTop = position?.scrollTop || 0; renderGenerationRecovery();
 }
-$('reader-dialog').addEventListener('close', () => { rememberReaderPosition(); clearExplanationSelection(); });
+$('reader-dialog').addEventListener('close', () => { stopSpeech(true); closeWordNote(); rememberReaderPosition(); clearExplanationSelection(); setView('library'); });
 readerPanel().addEventListener('scroll', rememberReaderPosition);
-function getCanonicalSelection(root) {
-  const selection = window.getSelection(); if (!selection || selection.isCollapsed || !root.contains(selection.anchorNode) || !root.contains(selection.focusNode)) return null;
-  const range = selection.getRangeAt(0);
-  const offsetFor = (node, offset) => {
-    // Browsers can put a drag boundary inside a visually unselectable reading.
-    // Its canonical location is after that ruby's base text, regardless of kana offset.
-    const reading = node.nodeType === Node.ELEMENT_NODE ? node.closest('rt') : node.parentElement?.closest('rt');
-    if (reading) { node = reading; offset = 0; }
-    // Range boundaries may be text offsets or child indexes on elements.
-    if (node.nodeType !== Node.TEXT_NODE && (offset < 0 || offset > node.childNodes.length)) return null;
-    let total = 0, found = false;
-    const visit = current => {
-      if (found) return;
-      if (current === node) {
-        if (current.nodeType === Node.TEXT_NODE) total += offset;
-        else for (const child of [...current.childNodes].slice(0, offset)) count(child);
-        found = true; return;
-      }
-      if (current.nodeType === Node.ELEMENT_NODE && current.matches('rt')) return;
-      if (current.nodeType === Node.TEXT_NODE) total += current.nodeValue.length;
-      else for (const child of current.childNodes) visit(child);
-    };
-    const count = current => {
-      if (current.nodeType === Node.ELEMENT_NODE && current.matches('rt')) return;
-      if (current.nodeType === Node.TEXT_NODE) total += current.nodeValue.length;
-      else for (const child of current.childNodes) count(child);
-    };
-    visit(root); return found ? total : null;
-  };
-  let start = offsetFor(range.startContainer, range.startOffset), end = offsetFor(range.endContainer, range.endOffset);
-  if (start === null || end === null || end <= start) return null;
-  const text = [...root.childNodes].map(child => child.textContent).join('');
-  // Derive canonical text from the same tree walk, excluding ruby readings.
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode(node) { return node.parentElement?.closest('rt') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT; } });
-  let canonical = '', node; while ((node = walker.nextNode())) canonical += node.nodeValue;
-  return { start, end, text: canonical.slice(start, end), rootText: text };
-}
 function sentenceContext(text, start, end) {
   const boundary = /[.!?。！？\n]/u;
   let left = Math.min(start, text.length) - 1;
@@ -453,30 +465,73 @@ function selectedPassage() {
   const value = getCanonicalSelection($('reader-story')); if (!value || !value.text.trim()) return null;
   const story = readerStory(), chapter = activeChapter(story), version = activeVersion(chapter);
   const selection = window.getSelection(), range = selection.getRangeAt(0);
-  return { ...value, sentence: sentenceContext(version.story, value.start, value.end), storyId: story.id, chapterId: chapter.id, versionId: version.id, profile: profileSnapshot(story), rect: range.getBoundingClientRect() };
+  return { ...value, sentence: sentenceContext(version.story, value.start, value.end), storyId: story.id, chapterId: chapter.id, versionId: version.id, language: story.language, languageTag: SPEECH_LANGUAGES[story.language] || 'en', profile: profileSnapshot(story), rect: range.getBoundingClientRect() };
 }
 function showSelectionToolbar() {
   const passage = selectedPassage(); const toolbar = $('selection-toolbar');
   if (!passage) { toolbar.hidden = true; state.readerSelection = null; return; }
+  if (!state.readerSelection || passage.text !== state.readerSelection.text) { closeWordNote(); if (state.speechActive) stopSpeech(true); }
   state.readerSelection = passage; toolbar.hidden = false;
   if (window.innerWidth > 700) {
     const rect = passage.rect; toolbar.classList.add('floating-selection-toolbar');
-    toolbar.style.left = `${Math.max(12, Math.min(window.innerWidth - 260, rect.left))}px`;
+    toolbar.style.left = `${Math.max(12, Math.min(window.innerWidth - 390, rect.left))}px`;
     toolbar.style.top = `${Math.max(12, rect.top - 56)}px`;
   } else { toolbar.classList.remove('floating-selection-toolbar'); toolbar.style.left = ''; toolbar.style.top = ''; }
 }
 let selectionTimer;
 document.addEventListener('selectionchange', () => { clearTimeout(selectionTimer); selectionTimer = setTimeout(showSelectionToolbar, 180); });
-$('reader-story').addEventListener('copy', event => {
-  const passage = selectedPassage(); if (!passage) return;
-  event.clipboardData?.setData('text/plain', passage.text); event.preventDefault();
-});
 $('selection-toolbar').addEventListener('pointerdown', event => { event.preventDefault(); clearTimeout(selectionTimer); });
 $('selection-copy').addEventListener('click', async () => {
   const passage = state.readerSelection; if (!passage) return;
   try { await copyCanonicalText(passage.text); toast('Selected text copied'); }
   catch { toast('Copy is unavailable in this preview'); }
   $('selection-toolbar').hidden = true;
+});
+const speakButton = $('selection-speak');
+speakButton.disabled = !speech.available;
+speakButton.title = speech.available ? 'Speak the selected text in its source language' : 'Speak is available in the App² runtime.';
+async function stopSpeech(silent = false) {
+  ++state.speechRun; state.speechActive = false;
+  $('selection-stop').hidden = true;
+  if (silent) $('speech-status').textContent = '';
+  if (!speech.available) return;
+  try { await speech.stop(); }
+  catch (error) { if (!silent) $('speech-status').textContent = error.message; }
+}
+async function speakCurrentSelection() {
+  const passage = state.readerSelection;
+  if (!passage || !speech.available) return;
+  const run = ++state.speechRun;
+  state.speechActive = true;
+  $('selection-stop').hidden = false;
+  $('speech-status').textContent = 'Preparing speech…';
+  try {
+    const prepared = await prepareSpeechOptions(speech, passage.text, passage.languageTag);
+    if (run !== state.speechRun) return;
+    const locale = prepared.voice?.language || passage.languageTag;
+    $('speech-status').textContent = `Speaking in ${locale}…`;
+    const result = await speech.speak(prepared.options);
+    if (run !== state.speechRun) return;
+    state.speechActive = false; $('selection-stop').hidden = true;
+    $('speech-status').textContent = result.status === 'completed' ? `Finished (${locale}).` : `Stopped (${locale}).`;
+  } catch (error) {
+    if (run !== state.speechRun) return;
+    state.speechActive = false; $('selection-stop').hidden = true;
+    $('speech-status').textContent = error.message || 'Speech could not start.';
+  }
+}
+$('selection-speak').addEventListener('click', speakCurrentSelection);
+$('selection-stop').addEventListener('click', () => stopSpeech());
+$('reader-dialog').addEventListener('pointerdown', event => {
+  if (!event.target.closest?.('.gloss-note-trigger') && !event.target.closest?.('#word-note-popover')) closeWordNote();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !$('word-note-popover').hidden) {
+    event.preventDefault(); event.stopPropagation(); closeWordNote(); return;
+  }
+  if (event.key === 'Escape' && state.explanationSelectionMode && $('reader-dialog').open) {
+    event.preventDefault(); clearExplanationSelection();
+  }
 });
 async function copyCanonicalText(text) {
   if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text);
@@ -512,13 +567,13 @@ function renderHighlightedText(container, canonical, segments, highlightStart, h
     event.clipboardData?.setData('text/plain', selection.text); event.preventDefault();
   });
 }
-function renderHelpExamples(card, examples) {
+function renderHelpExamples(card, examples, language = 'en') {
   const section = document.createElement('section'); section.className = 'help-examples';
   const title = document.createElement('h3'); title.textContent = 'Examples';
   const list = document.createElement('ol');
   for (const example of examples) {
     const row = document.createElement('li');
-    const sentence = document.createElement('p'); sentence.className = 'help-example-sentence story-text';
+    const sentence = document.createElement('p'); sentence.className = 'help-example-sentence story-text'; sentence.lang = SPEECH_LANGUAGES[language] || 'en';
     renderHighlightedText(sentence, example.sentence, example.segments, example.highlightStart, example.highlightEnd);
     const translation = document.createElement('p'); translation.className = 'help-context-translation'; translation.textContent = example.translation;
     row.append(sentence, translation); list.append(row);
@@ -526,13 +581,44 @@ function renderHelpExamples(card, examples) {
   section.append(title, list); card.append(section);
 }
 function syncExplanationSelection() {
-  $('select-explanations').hidden = state.explanationSelectionMode || !$('reader-help').childElementCount;
-  $('explanation-selection-toolbar').hidden = !state.explanationSelectionMode;
-  $('explanation-selection-count').textContent = `${state.selectedExplanationIds.size} selected`;
-  $('delete-selected-explanations').disabled = !state.selectedExplanationIds.size || pendingDeletionBlocked();
+  const box = $('reader-help');
+  const toolbar = box.querySelector('.explanation-selection-toolbar');
+  if (toolbar) {
+    toolbar.querySelector('.selection-count').textContent = `${state.selectedExplanationIds.size} selected`;
+    toolbar.querySelector('.delete-selected-explanations').disabled = !state.selectedExplanationIds.size || pendingDeletionBlocked();
+  }
+  box.querySelectorAll('.help-card').forEach(card => {
+    const selected = state.selectedExplanationIds.has(card.dataset.helpId);
+    card.classList.toggle('selected-card', selected);
+    const checkbox = card.querySelector('.explanation-select-checkbox');
+    if (checkbox) checkbox.checked = selected;
+  });
 }
-function clearExplanationSelection() { state.explanationSelectionMode = false; state.selectedExplanationIds.clear(); syncExplanationSelection(); const story=readerStory(); if(story){const chapter=activeChapter(story);renderSavedHelp(chapter,activeVersion(chapter));} }
-function toggleExplanationSelection(id) { if (state.selectedExplanationIds.has(id)) state.selectedExplanationIds.delete(id); else state.selectedExplanationIds.add(id); syncExplanationSelection(); renderSavedHelp(activeChapter(),activeVersion()); }
+function clearExplanationSelection() {
+  const focusId = state.selectionFocusId || [...state.selectedExplanationIds][0];
+  state.explanationSelectionMode = false; state.selectedExplanationIds.clear();
+  const story = readerStory();
+  if (story) {
+    const panel = readerPanel(), scrollTop = panel.scrollTop;
+    const chapter = activeChapter(story); renderSavedHelp(chapter, activeVersion(chapter)); panel.scrollTop = scrollTop;
+    const action = [...$('reader-help').querySelectorAll('.help-card')].find(card => card.dataset.helpId === focusId)?.querySelector('.card-select-action');
+    action?.focus({ preventScroll: true });
+  }
+  state.selectionFocusId = '';
+}
+function beginExplanationSelection(id) {
+  const panel = readerPanel(), scrollTop = panel.scrollTop;
+  state.selectionFocusId = id;
+  state.explanationSelectionMode = true; state.selectedExplanationIds.clear(); state.selectedExplanationIds.add(id);
+  renderSavedHelp(activeChapter(), activeVersion());
+  panel.scrollTop = scrollTop;
+  [...$('reader-help').querySelectorAll('.help-card')].find(card => card.dataset.helpId === id)?.querySelector('.explanation-select-checkbox')?.focus({ preventScroll: true });
+}
+function toggleExplanationSelection(id) {
+  if (state.selectedExplanationIds.has(id)) state.selectedExplanationIds.delete(id); else state.selectedExplanationIds.add(id);
+  if (!state.selectedExplanationIds.size) { state.selectionFocusId = id; clearExplanationSelection(); return; }
+  syncExplanationSelection();
+}
 function removeSelectedExplanations(story,chapter,version,ids) {
   if (!ids.size || pendingDeletionBlocked()) return false;
   const before=chapter.help || []; chapter.help=before.filter(item=>!(item.versionId===version.id&&ids.has(item.id)));
@@ -546,11 +632,30 @@ function renderSavedHelp(chapter, version) {
     if(Number.isFinite(at)!==Number.isFinite(bt)) return Number.isFinite(at)?-1:1;
     return Number.isFinite(at)&&at!==bt ? bt-at : b.index-a.index;
   });
+  if (state.explanationSelectionMode && orderedHelp.length) {
+    const toolbar = document.createElement('div'); toolbar.className = 'explanation-selection-toolbar'; toolbar.setAttribute('role', 'toolbar'); toolbar.setAttribute('aria-label', 'Explanation selection');
+    const count = document.createElement('span'); count.className = 'selection-count'; count.setAttribute('aria-live', 'polite');
+    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'icon-btn danger-icon-btn delete-selected-explanations'; remove.setAttribute('aria-label', 'Delete selected explanations'); remove.title = 'Delete selected explanations';
+    remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3"/></svg>';
+    remove.addEventListener('click', () => removeSelectedExplanations(readerStory(), chapter, version, new Set(state.selectedExplanationIds)));
+    const finish = document.createElement('button'); finish.type = 'button'; finish.className = 'icon-btn selection-finish-btn'; finish.setAttribute('aria-label', 'Finish selection'); finish.title = 'Finish selection';
+    finish.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"/></svg>';
+    finish.addEventListener('click', () => clearExplanationSelection());
+    toolbar.append(count, remove, finish); box.append(toolbar);
+  }
   orderedHelp.forEach(({item}) => {
     const card = document.createElement('article'); card.className = 'help-card'; card.dataset.helpId = item.id;
-    if (state.explanationSelectionMode) { card.classList.toggle('selected-card',state.selectedExplanationIds.has(item.id)); const check=document.createElement('input'); check.type='checkbox'; check.className='explanation-select-checkbox'; check.checked=state.selectedExplanationIds.has(item.id); check.setAttribute('aria-label',`Select explanation for ${item.passage}`); check.addEventListener('change',()=>{if(check.checked)state.selectedExplanationIds.add(item.id);else state.selectedExplanationIds.delete(item.id);syncExplanationSelection();renderSavedHelp(chapter,version);}); card.append(check); }
+    if (state.explanationSelectionMode) {
+      card.classList.toggle('selected-card', state.selectedExplanationIds.has(item.id)); card.classList.add('selecting');
+      const control = document.createElement('label'); control.className = 'explanation-check-control';
+      const check = document.createElement('input'); check.type = 'checkbox'; check.className = 'explanation-select-checkbox'; check.checked = state.selectedExplanationIds.has(item.id); check.setAttribute('aria-label', `Select explanation for ${item.passage}`);
+      check.addEventListener('change', () => toggleExplanationSelection(item.id)); control.append(check); card.append(control);
+    } else {
+      const select = document.createElement('button'); select.type = 'button'; select.className = 'card-select-action'; select.textContent = 'Select explanation';
+      select.addEventListener('click', event => { event.stopPropagation(); beginExplanationSelection(item.id); }); card.append(select);
+    }
     const title = document.createElement('strong'); title.textContent = item.kind === 'translate' ? 'Translation' : 'Explanation';
-    const quote = document.createElement('p'); quote.className = 'help-quote story-text';
+    const quote = document.createElement('p'); quote.className = 'help-quote story-text'; quote.lang = SPEECH_LANGUAGES[readerStory().language] || 'en';
     const hasContext = validTextRange(version.story || '', item.contextStart, item.contextEnd) && item.contextStart <= item.start && item.contextEnd >= item.end;
     if (hasContext) renderHighlightedText(quote, version.story, version.storySegments, item.start, item.end, item.contextStart, item.contextEnd);
     else quote.textContent = item.passage;
@@ -563,7 +668,7 @@ function renderSavedHelp(chapter, version) {
     card.append(body);
     const followUps = savedFollowUps(item);
     for (const followUp of followUps) {
-      if (followUp.action === 'examples') { renderHelpExamples(card, followUp.examples); continue; }
+      if (followUp.action === 'examples') { renderHelpExamples(card, followUp.examples, readerStory().language); continue; }
       if (followUp.followUp) { const question = document.createElement('p'); question.className = 'help-question'; question.textContent = followUp.followUp; card.append(question); }
       const more = document.createElement('p'); more.textContent = followUp.text; card.append(more);
     }
@@ -596,13 +701,12 @@ function renderSavedHelp(chapter, version) {
     }
     if (stale) card.append(status);
     box.append(card);
-    wireLongPress(card,()=>{if(!state.explanationSelectionMode){state.explanationSelectionMode=true;state.selectedExplanationIds.clear();}state.selectedExplanationIds.add(item.id);syncExplanationSelection();renderSavedHelp(chapter,version);},event=>{
+    wireLongPress(card,()=>beginExplanationSelection(item.id),event=>{
       if(!state.explanationSelectionMode||event.target.closest?.('button,input,select,textarea,a,form'))return;
       event.preventDefault();toggleExplanationSelection(item.id);
     });
   });
   box.hidden = !box.childElementCount;
-  $('select-explanations').hidden = !box.childElementCount || state.explanationSelectionMode;
   syncExplanationSelection();
 }
 async function readerAi(kind, input, instructions) {
@@ -635,11 +739,12 @@ async function acknowledgeReaderResult() {
 async function releaseSavedInference() {
   if (state.pendingReaderResult?.saving) throw new Error('The completed response is still being saved.');
   if (state.pendingReaderResult && !state.pendingReaderResult.saved) throw new Error('Save the completed response before starting another request.');
-  if (state.pendingStoryRequestId) {
-    const id = state.pendingStoryRequestId;
-    await ai.acknowledge(id);
-    if (state.requestId === id) state.requestId = null;
-    state.pendingStoryRequestId = null;
+  if (state.pendingGeneration) {
+    if (!state.pendingGeneration.saved) throw new Error('Save the completed story before starting another request.');
+    if (!await finishGeneratedRequest()) throw new Error(state.pendingGeneration?.error || 'Finish the completed story request first.');
+  } else if (state.pendingStoryRequestId) {
+    const id = state.pendingStoryRequestId; await ai.acknowledge(id);
+    if (state.requestId === id) state.requestId = null; state.pendingStoryRequestId = null;
   }
   if (state.pendingReaderResult) await acknowledgeReaderResult();
   else await releaseInvalidReaderResponse();
@@ -653,14 +758,13 @@ async function savePendingReaderResult() {
   if (pending.saving) throw new Error('The completed response is still being saved.');
   pending.saving = true;
   try {
-    if (!pending.saved) {
-      const rollback = pending.apply();
-      try { persistReaderStory(pending.story); }
-      catch (error) { rollback(); throw error; }
-      pending.saved = true;
-    }
-    // Acknowledgement is separate: its failure must never undo durable data.
-    await acknowledgeReaderResult();
+    await saveBeforeAcknowledge({
+      saved: pending.saved,
+      apply: pending.apply,
+      persist: () => persistReaderStory(pending.story),
+      onSaved: () => { pending.saved = true; },
+      acknowledge: acknowledgeReaderResult
+    });
   } finally { pending.saving = false; }
 }
 function renderPendingReaderResult() {
@@ -745,15 +849,10 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
   } finally { state.readerHelpBusy = false; }
 }
 $('selection-explain').addEventListener('click', () => explainSelection('explain'));
-$('chapter-select').addEventListener('change', () => { state.readerChapter = Number($('chapter-select').value); state.readerVersion = 0; clearExplanationSelection(); updateReader(); });
-$('version-select').addEventListener('change', () => { clearExplanationSelection(); const chapter = activeChapter(); chapter.activeVersionId = $('version-select').value; const story = readerStory(); try { persistReaderStory(story); } catch (error) { toast(error.message); } updateReader(); });
-$('chapter-prev').addEventListener('click', () => { if (state.readerChapter > 0) { state.readerChapter--; clearExplanationSelection(); } updateReader(); });
-$('chapter-next').addEventListener('click', () => { if (state.readerChapter < normalizeChapters(readerStory()).length - 1) { state.readerChapter++; clearExplanationSelection(); } updateReader(); });
-$('select-explanations').addEventListener('click', () => { state.explanationSelectionMode=true; state.selectedExplanationIds.clear(); renderSavedHelp(activeChapter(),activeVersion()); });
-$('finish-explanation-selection').addEventListener('click', clearExplanationSelection);
-$('delete-selected-explanations').addEventListener('click', () => {
-  removeSelectedExplanations(readerStory(),activeChapter(),activeVersion(),new Set(state.selectedExplanationIds));
-});
+$('chapter-select').addEventListener('change', () => { stopSpeech(true); state.readerChapter = Number($('chapter-select').value); state.readerVersion = 0; clearExplanationSelection(); updateReader(); });
+$('version-select').addEventListener('change', () => { stopSpeech(true); closeWordNote(); clearExplanationSelection(); const chapter = activeChapter(); chapter.activeVersionId = $('version-select').value; const story = readerStory(); try { persistReaderStory(story); } catch (error) { toast(error.message); } updateReader(); });
+$('chapter-prev').addEventListener('click', () => { if (state.readerChapter > 0) { stopSpeech(true); state.readerChapter--; clearExplanationSelection(); } updateReader(); });
+$('chapter-next').addEventListener('click', () => { if (state.readerChapter < normalizeChapters(readerStory()).length - 1) { stopSpeech(true); state.readerChapter++; clearExplanationSelection(); } updateReader(); });
 $('text-smaller').addEventListener('click', () => { state.readerFontSize = Math.max(15, state.readerFontSize - 1); $('reader-story').style.fontSize = `${state.readerFontSize}px`; try { persistSettings(); } catch (error) { toast(error.message); } });
 $('text-larger').addEventListener('click', () => { state.readerFontSize = Math.min(30, state.readerFontSize + 1); $('reader-story').style.fontSize = `${state.readerFontSize}px`; try { persistSettings(); } catch (error) { toast(error.message); } });
 $('furigana-toggle').addEventListener('change', () => { state.furigana = $('furigana-toggle').checked; $('reader-story').classList.toggle('hide-furigana', !state.furigana); document.querySelectorAll('#reader-help .story-text').forEach(node => node.classList.toggle('hide-furigana', !state.furigana)); try { persistSettings(); } catch (error) { toast(error.message); } });
@@ -808,7 +907,6 @@ $('reader-edit-submit').addEventListener('click', async () => {
 $('reader-close').addEventListener('click', () => $('reader-dialog').close());
 $('reader-close-x').addEventListener('click', () => $('reader-dialog').close());
 $('reader-dialog').addEventListener('click', event => { if (event.target === $('reader-dialog')) $('reader-dialog').close(); });
-$('open-result-reader').addEventListener('click', () => { if (state.current) openReader(state.current); });
 $('delete-story').addEventListener('click', () => {
   if (pendingDeletionBlocked()) { toast('Finish or save the current AI response before deleting.'); return; }
   if (!state.deleteArmed) { state.deleteArmed = true; $('delete-story').textContent = 'Tap again to delete'; return; }

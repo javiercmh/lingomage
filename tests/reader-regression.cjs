@@ -3,14 +3,21 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const source = fs.readFileSync(require('node:path').join(__dirname, '../js/app.js'), 'utf8');
+const readerTextSource = fs.readFileSync(require('node:path').join(__dirname, '../js/reader-text.js'), 'utf8').replaceAll('export function ', 'function ');
+const requestLifecycleSource = fs.readFileSync(require('node:path').join(__dirname, '../js/request-lifecycle.js'), 'utf8').replaceAll('export async function ', 'async function ');
+const speechSource = fs.readFileSync(require('node:path').join(__dirname, '../js/reader-speech.js'), 'utf8').replaceAll('export function ', 'function ').replaceAll('export async function ', 'async function ');
 function section(start, end) { return source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start))); }
 function sandbox(extra = {}) {
   const elements = new Map();
   const element = (tag = 'div') => ({tagName:tag,hidden:false,dataset:{},childNodes:[],events:{},attributes:{},
     get textContent(){return this.childNodes.map(node=>node.textContent).join('');},set textContent(value){this.childNodes=value ? [{tagName:'#text',textContent:String(value)}] : [];},
-    append(...nodes){this.childNodes.push(...nodes);},addEventListener(name,fn){this.events[name]=fn;},setAttribute(name,value){this.attributes[name]=value;},focus(){this.focused=true;},remove(){},classList:{add(){},remove(){},toggle(){}}});
-  const c = {state:{},console,crypto:{randomUUID:()=> 'help-test'},PROMPT_VERSION:'test',LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{createElement:element,createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},...extra};
-  vm.createContext(c); return c;
+    append(...nodes){this.childNodes.push(...nodes);},addEventListener(name,fn){this.events[name]=fn;},setAttribute(name,value){this.attributes[name]=value;},focus(){this.focused=true;},remove(){},querySelector(){return null;},querySelectorAll(){return [];},classList:{add(){},remove(){},toggle(){}}});
+  const c = {state:{},console,crypto:{randomUUID:()=> 'help-test'},PROMPT_VERSION:'test',LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},SPEECH_LANGUAGES:{de:'de-DE',ja:'ja-JP',ru:'ru-RU','es-CL':'es-CL'},renderGenerationRecovery(){},$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{createElement:element,createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},...extra};
+  vm.createContext(c);
+  vm.runInContext(readerTextSource, c);
+  vm.runInContext(requestLifecycleSource, c);
+  vm.runInContext(speechSource, c);
+  return c;
 }
 const lifecycle = section('async function acknowledgeReaderResult(', 'function decodeHelp(');
 (async () => {
@@ -27,6 +34,62 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   pressCard.events.pointerdown(down);expire();assert.equal(holds,1);assert.equal(pointerEvents.size,0);
   let suppressed=0;pressCard.events.click({preventDefault(){suppressed++;},stopPropagation(){}});assert.equal(suppressed,1);
   console.log('PASS long press cancels on leaving, outside release, scrolling, cancellation and movement; completed holds suppress clicks');
+
+  const glossary=sandbox();
+  const matches=glossary.findGlossaryMatches('canto cantó canto',[
+    {word:'canto',meaning:'note one',forms:['canto']},
+    {word:'canto',meaning:'note two',forms:['canto']},
+    {word:'cant',meaning:'short overlap',forms:['cant']},
+    {word:'missing',meaning:'not present',forms:['absent']},
+    {word:'empty',meaning:'empty form',forms:['']}
+  ]);
+  assert.deepEqual(JSON.parse(JSON.stringify(matches.map(item=>[item.start,item.end,item.notes.length]))),[[0,5,2],[12,17,2]]);
+  assert.equal(glossary.findGlossaryMatches('美しい', [{word:'美しい',meaning:'beautiful',forms:['美しい']}])[0].end,3);
+  console.log('PASS exact glossary forms match repeated occurrences, group shared ranges and prefer longer overlaps');
+  const annotated=sandbox(), annotatedRoot=annotated.document.createElement('div');let noteOpened=0;
+  annotated.annotatedText(annotatedRoot,'日本語',[{text:'日',reading:'にち'},{text:'本語',reading:'ほんご'}],{language:'ja-JP',glossary:[{word:'日本語',meaning:'Japanese language',forms:['日本語']}],onNote(){noteOpened++;}});
+  assert.equal(annotatedRoot.lang,'ja-JP');assert.equal(annotatedRoot.childNodes.length,2);
+  assert.equal(annotatedRoot.childNodes[0].tagName,'ruby');assert.equal(annotatedRoot.childNodes[1].tagName,'ruby');
+  assert.equal(annotatedRoot.childNodes[0].childNodes[0].className,'gloss-note-trigger');
+  assert.equal(annotatedRoot.childNodes[1].childNodes[0].className,'gloss-note-trigger');
+  assert.equal(annotatedRoot.childNodes[0].childNodes[1].textContent,'にち');assert.equal(annotatedRoot.childNodes[1].childNodes[1].textContent,'ほんご');
+  let keyPrevented=false;annotatedRoot.childNodes[0].childNodes[0].events.keydown({key:'Enter',preventDefault(){keyPrevented=true;}});
+  assert.equal(noteOpened,1);assert.equal(keyPrevented,true);
+  console.log('PASS cross-annotation glossary notes retain complete Japanese ruby readings and selectable source markup');
+
+  const voices=[
+    {id:'es-mx-net',language:'es-MX',requiresNetwork:true},
+    {id:'es-cl-net',language:'es-CL',requiresNetwork:true},
+    {id:'es-cl-offline',language:'es-CL',requiresNetwork:false},
+    {id:'es-es-offline',language:'es-ES',requiresNetwork:false},
+    {id:'de-offline',language:'de-DE',requiresNetwork:false}
+  ];
+  assert.equal(glossary.chooseSpanishVoice(voices).id,'es-cl-offline');
+  const noChile=voices.filter(voice=>voice.language!=='es-CL');
+  assert.equal(glossary.chooseSpanishVoice(noChile).id,'es-mx-net');
+  assert.equal(glossary.chooseSpanishVoice([{id:'es-419',language:'es-419',requiresNetwork:true}]).id,'es-419');
+  let speechOptions;
+  const speechStub={voices:async()=>({voices}),speak:async options=>{speechOptions=options;return {status:'completed'};}};
+  const prepared=await glossary.prepareSpeechOptions(speechStub,'Hola','es-CL');
+  assert.equal(prepared.voice.language,'es-CL');assert.equal(prepared.options.voiceId,'es-cl-offline');assert.equal(prepared.options.language,'es-CL');
+  await glossary.speakSelection(speechStub,'Hola','es-CL');assert.equal(speechOptions.voiceId,'es-cl-offline');
+  const german=await glossary.prepareSpeechOptions(speechStub,'Guten Tag','de-DE');assert.equal(german.options.language,'de-DE');assert.equal(german.options.voiceId,undefined);
+  console.log('PASS speech uses explicit source locale and prefers Chilean, then Latin American, then available Spanish voices');
+
+  const selectionMode=sandbox({state:{explanationSelectionMode:true,selectedExplanationIds:new Set(['one','two'])},activeChapter(){return {};},activeVersion(){return {};},syncExplanationSelection(){this.synced=true;},renderSavedHelp(){this.rendered=true;}});
+  selectionMode.clearExplanationSelection=()=>{selectionMode.state.explanationSelectionMode=false;selectionMode.state.selectedExplanationIds.clear();selectionMode.rendered=true;};
+  vm.runInContext(section('function toggleExplanationSelection(', 'function removeSelectedExplanations('),selectionMode);
+  selectionMode.toggleExplanationSelection('one');assert.equal(selectionMode.state.explanationSelectionMode,true);assert.equal(selectionMode.state.selectedExplanationIds.size,1);
+  selectionMode.toggleExplanationSelection('two');assert.equal(selectionMode.state.explanationSelectionMode,false);assert.equal(selectionMode.state.selectedExplanationIds.size,0);assert.equal(selectionMode.rendered,true);
+  console.log('PASS explanation selection exits immediately after the last item is deselected');
+
+  const operationOrder=[];let generatedSaved=false,failGeneratedSave=true,failGeneratedAck=true;
+  const saveGeneration=()=>glossary.saveBeforeAcknowledge({saved:generatedSaved,apply:()=>()=>{},persist(){operationOrder.push('save');if(failGeneratedSave)throw Error('disk');},onSaved(){generatedSaved=true;},acknowledge(){operationOrder.push('ack');if(failGeneratedAck)throw Error('ack');}});
+  await assert.rejects(saveGeneration(),/disk/);assert.deepEqual(operationOrder,['save']);assert.equal(generatedSaved,false);
+  failGeneratedSave=false;await assert.rejects(saveGeneration(),/ack/);assert.deepEqual(operationOrder,['save','save','ack']);assert.equal(generatedSaved,true);
+  failGeneratedAck=false;await saveGeneration();assert.deepEqual(operationOrder,['save','save','ack','ack']);
+  console.log('PASS generated story saves before acknowledgement, retains failed saves, and retries release without saving twice');
+
   let failsSave = true, failsAck = false, durable, applied = 0, acked = 0;
   const story={id:'A',value:0};
   const c=sandbox({state:{pendingReaderRequestId:'request',readerId:'A'},persistReaderStory:s=>{if(failsSave) throw Error('disk'); durable=JSON.parse(JSON.stringify(s));},ai:{acknowledge:async()=>{if(failsAck) throw Error('ack');acked++;}}});
@@ -62,7 +125,6 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   const root=element('div',ruby,b);let range;
   function texts(node,out=[]){if(node.nodeType===3)out.push(node);else for(const child of node.childNodes)if(!child.matches?.('rt'))texts(child,out);return out;}
   const selection=sandbox({Node:{TEXT_NODE:3,ELEMENT_NODE:1},NodeFilter:{SHOW_TEXT:4,FILTER_REJECT:2,FILTER_ACCEPT:1},window:{getSelection:()=>({isCollapsed:false,anchorNode:root,focusNode:root,getRangeAt:()=>range})},document:{createTreeWalker:()=>{const list=texts(root);let i=0;return {nextNode:()=>list[i++]||null};}}});
-  vm.runInContext(section('function getCanonicalSelection(', 'function sentenceContext('),selection);
   range={startContainer:root,startOffset:0,endContainer:root,endOffset:2};
   assert.equal(selection.getCanonicalSelection(root).text,'日本。');
   range={startContainer:ruby,startOffset:0,endContainer:b,endOffset:1};
@@ -72,6 +134,12 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   const rt=ruby.childNodes[1];reading.parentElement={closest:()=>rt};
   range={startContainer:reading,startOffset:1,endContainer:b,endOffset:1};
   assert.equal(selection.getCanonicalSelection(root).text,'本');
+  const left=text('日'), leftReading=text('にち'), right=text('本'), rightReading=text('ほん');
+  const leftRuby=element('ruby',left,element('rt',leftReading)), rightRuby=element('ruby',right,element('rt',rightReading));
+  const noted=element('span',leftRuby,rightRuby), crossRoot=element('div',noted);let crossRange;
+  const crossSelection=sandbox({Node:{TEXT_NODE:3,ELEMENT_NODE:1},NodeFilter:{SHOW_TEXT:4,FILTER_REJECT:2,FILTER_ACCEPT:1},window:{getSelection:()=>({isCollapsed:false,anchorNode:left,focusNode:right,getRangeAt:()=>crossRange})},document:{createTreeWalker:()=>{const list=texts(crossRoot);let i=0;return {nextNode:()=>list[i++]||null};}}});
+  crossRange={startContainer:left,startOffset:0,endContainer:right,endOffset:1};
+  assert.equal(crossSelection.getCanonicalSelection(crossRoot).text,'日本');
   console.log('PASS root, ruby, text-node and reading-boundary selections omit readings');
 
   const focused=sandbox();
@@ -241,7 +309,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   const panel={scrollTop:321,addEventListener(){}};
   const pos=sandbox({state:{readerId:'S',readerChapter:2,readerPositions:{}},readerStory:()=>story3,activeChapter:()=>story3.chapters[pos.state.readerChapter],normalizeChapters:s=>s.chapters,updateReader(){},clearExplanationSelection(){}});
   pos.$('reader-dialog').querySelector=()=>panel;pos.$('reader-dialog').showModal=()=>{};
-  vm.runInContext(section('function readerPanel(', 'function getCanonicalSelection('),pos);
+  vm.runInContext(section('function readerPanel(', 'function sentenceContext('),pos);
   pos.rememberReaderPosition();panel.scrollTop=0;pos.openReader(story3);
   assert.equal(pos.state.readerChapter,2);assert.equal(panel.scrollTop,321);
   console.log('PASS actual scroll panel and chapter restored on reopen');
