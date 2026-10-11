@@ -273,3 +273,12 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px
 .help-examples li { padding-left: 4px; }
 .help-example-sentence.story-text { margin: 14px 0 4px; font-size: 18px; line-height: 1.9; }
 .help-example-sentence + .help-context-translation { margin-top: 4px; }
+
+/* Only the reader selection bar floats; the library retains its sticky bar. */
+.reader-panel .explanation-selection-toolbar { position: fixed; top: auto; bottom: calc(12px + var(--sa-bottom)); left: 50%; transform: translateX(-50%); width: min(744px, calc(100% - max(28px, var(--sa-left)) - max(28px, var(--sa-right)))); margin: 0; z-index: 8; }
+.reader-panel.explanation-selection-active { padding-bottom: calc(100px + var(--sa-bottom)); }
+.selection-all-control { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex: 0 0 44px; cursor: pointer; border: 1px solid var(--line); border-radius: 10px; }
+.select-all-explanations { width: 22px; height: 22px; margin: 0; accent-color: var(--accent-strong); }
+.selection-all-control:focus-within { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+.help-detail p { white-space: pre-wrap; }
+.help-detail code { font-size: .95em; overflow-wrap: anywhere; }

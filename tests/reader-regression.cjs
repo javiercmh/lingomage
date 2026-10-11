@@ -14,7 +14,7 @@ function sandbox(extra = {}) {
   const element = (tag = 'div') => ({tagName:tag,hidden:false,dataset:{},childNodes:[],events:{},attributes:{},
     get textContent(){return this.childNodes.map(node=>node.textContent).join('');},set textContent(value){this.childNodes=value ? [{tagName:'#text',textContent:String(value)}] : [];},
     append(...nodes){this.childNodes.push(...nodes);},addEventListener(name,fn){this.events[name]=fn;},setAttribute(name,value){this.attributes[name]=value;},focus(){this.focused=true;},remove(){},querySelector(){return null;},querySelectorAll(){return [];},classList:{add(){},remove(){},toggle(){}}});
-  const c = {state:{},console,crypto:{randomUUID:()=> 'help-test'},PROMPT_VERSION:'test',LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},SPEECH_LANGUAGES:{de:'de-DE',ja:'ja-JP',ru:'ru-RU','es-CL':'es-CL'},renderGenerationRecovery(){},$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{createElement:element,createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},...extra};
+  const c = {state:{},console,crypto:{randomUUID:()=> 'help-test'},PROMPT_VERSION:'test',LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},SPEECH_LANGUAGES:{de:'de-DE',ja:'ja-JP',ru:'ru-RU','es-CL':'es-CL'},renderGenerationRecovery(){},readerPanel:()=>({classList:{toggle(){}}}),$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{createElement:element,createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},...extra};
   vm.createContext(c);
   vm.runInContext(readerTextSource, c);
   vm.runInContext(requestLifecycleSource, c);
@@ -227,7 +227,8 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   vm.runInContext(section('function savedFollowUps(', 'function selectedPassage('),promptContract);
   const detailPrompt=promptContract.helpInstructions('detail');
   assert.ok(detailPrompt.includes('Return only the explanation text'));
-  assert.ok(!detailPrompt.includes('JSON'));
+  assert.ok(detailPrompt.includes('or JSON'));
+  assert.ok(detailPrompt.includes('**bold**'));
   assert.ok(detailPrompt.includes('Preserve Japanese in Japanese script without romaji'));
   assert.ok(promptContract.helpInstructions('initial').includes('Return only one JSON object'));
   assert.ok(promptContract.helpInstructions('examples').includes('Return only one JSON object'));
@@ -258,6 +259,31 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
 
   const rendered=sandbox({state:{furigana:true,explanationSelectionMode:false,selectedExplanationIds:new Set()},readerStory:()=>({id:'S'}),profileSnapshot:()=>({})});
   vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function wireLongPress(', 'function renderLibrary(')+section('function renderHighlightedText(', 'async function readerAi('),rendered);
+  const formatted=rendered.document.createElement('div');
+  rendered.renderDetailText(formatted, 'In “al salir,” **al** contracts **a + el**.\n\nUse **bold with *italic* inside** and `a él`. <img src=x> Unmatched **marker');
+  const flatten = node => [node,...(node.childNodes || []).flatMap(flatten)];
+  assert.equal(formatted.childNodes.length,2);
+  assert.equal(flatten(formatted).filter(n=>n.tagName==='strong').length,3);
+  assert.ok(flatten(formatted).some(n=>n.tagName==='em' && n.textContent==='italic'));
+  assert.ok(flatten(formatted).some(n=>n.tagName==='code' && n.textContent==='a él'));
+  assert.equal(flatten(formatted).some(n=>n.tagName==='img'),false);
+  assert.ok(formatted.textContent.includes('Unmatched **marker'));
+  const selectionCards=[{dataset:{helpId:'one'}},{dataset:{helpId:'two'}}];
+  const bulkSelection=sandbox({state:{selectedExplanationIds:new Set(['one'])},$:()=>({querySelectorAll:()=>selectionCards})});
+  vm.runInContext(section('function toggleAllExplanations(', 'function syncExplanationSelection('),bulkSelection);
+  let synced=0,cleared=0;bulkSelection.syncExplanationSelection=()=>synced++;
+  bulkSelection.clearExplanationSelection=()=>{cleared++;bulkSelection.state.selectedExplanationIds.clear();};
+  bulkSelection.toggleAllExplanations();assert.equal(bulkSelection.state.selectedExplanationIds.size,2);assert.equal(synced,1);
+  bulkSelection.toggleAllExplanations();assert.equal(cleared,1);assert.equal(bulkSelection.state.selectedExplanationIds.size,0);
+  const allBox={setAttribute(name,value){this[name]=value;}}, countBox={}, deleteBox={};
+  const toolbarBox={querySelector:selector=>selector==='.select-all-explanations'?allBox:selector==='.selection-count'?countBox:deleteBox};
+  const selectionBox={classList:{toggle(){}},querySelector:()=>toolbarBox,querySelectorAll:()=>selectionCards};
+  selectionCards.forEach(card=>{card.classList={toggle(){}};card.querySelector=()=>null;});
+  const mixed=sandbox({state:{explanationSelectionMode:true,selectedExplanationIds:new Set(['one'])},$:()=>selectionBox,pendingDeletionBlocked:()=>false});
+  vm.runInContext(section('function syncExplanationSelection(', 'function clearExplanationSelection('),mixed);
+  mixed.syncExplanationSelection();assert.equal(allBox.indeterminate,true);assert.equal(allBox.checked,false);
+  mixed.state.selectedExplanationIds.add('two');mixed.syncExplanationSelection();assert.equal(allBox.indeterminate,false);assert.equal(allBox.checked,true);
+  console.log('PASS safe detail formatting and mixed select-all then clear behavior');
   const sample = {id:'H',kind:'explain',passage:'く',start:3,end:4,contextStart:0,contextEnd:15,text:'Focused.',versionId:'V',profile:{},followUps:[{action:'examples',examples}]};
   const v={id:'V',story:'空は青く、風はやさしいです。',storySegments:[{text:'空',reading:'そら'},{text:'は'},{text:'青',reading:'あお'},{text:'く、'},{text:'風',reading:'かぜ'},{text:'はやさしいです。'}]};
   sample.contextEnd=v.story.length;
