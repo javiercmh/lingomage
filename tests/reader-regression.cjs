@@ -3,6 +3,8 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const source = fs.readFileSync(require('node:path').join(__dirname, '../js/app.js'), 'utf8');
+const htmlSource = fs.readFileSync(require('node:path').join(__dirname, '../index.html'), 'utf8');
+const cssSource = fs.readFileSync(require('node:path').join(__dirname, '../css/style.css'), 'utf8');
 const readerTextSource = fs.readFileSync(require('node:path').join(__dirname, '../js/reader-text.js'), 'utf8').replaceAll('export function ', 'function ');
 const requestLifecycleSource = fs.readFileSync(require('node:path').join(__dirname, '../js/request-lifecycle.js'), 'utf8').replaceAll('export async function ', 'async function ');
 const speechSource = fs.readFileSync(require('node:path').join(__dirname, '../js/reader-speech.js'), 'utf8').replaceAll('export function ', 'function ').replaceAll('export async function ', 'async function ');
@@ -33,7 +35,13 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   }
   pressCard.events.pointerdown(down);expire();assert.equal(holds,1);assert.equal(pointerEvents.size,0);
   let suppressed=0;pressCard.events.click({preventDefault(){suppressed++;},stopPropagation(){}});assert.equal(suppressed,1);
+  const textTarget={closest:selector=>selector==='.help-text-selectable'?{}:null};
+  let textToggles=0;
+  pointer.wireLongPress(pressCard,()=>holds++,event=>{if(event.target.closest?.('.help-text-selectable'))return;textToggles++;},false,event=>!!event.target.closest?.('.help-text-selectable'));
+  pressCard.events.pointerdown({...down,target:textTarget});expire();assert.equal(holds,1);assert.equal(timers.size,0);
+  pressCard.events.click({target:textTarget,preventDefault(){},stopPropagation(){}});assert.equal(textToggles,0);
   console.log('PASS long press cancels on leaving, outside release, scrolling, cancellation and movement; completed holds suppress clicks');
+  console.log('PASS selectable explanation text is excluded from long-press and bulk-toggle handling');
 
   const glossary=sandbox();
   const matches=glossary.findGlossaryMatches('canto cantó canto',[
@@ -110,9 +118,10 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   const original={id:'A',language:'ja',chapters:[{id:'CA',help:[],versions:[{id:'VA',story:'日本'}]}]};
   const other={id:'B',language:'de',chapters:[{id:'CB',help:[],versions:[{id:'VB'}]}]};current=original;
   const help=sandbox({state:{readerId:'A',readerSelection:{storyId:'A',text:'日本',start:0,end:2,chapterId:'CA',versionId:'VA',profile:{}},model:'mock',providerId:'mock'},readerStory:()=>current,normalizeChapters:s=>s.chapters,activeChapter:()=>current.chapters[0],activeVersion:()=>current.chapters[0].versions[0],readerPanel:()=>({scrollTop:150}),persistReaderStory(){},readerAi:()=>{helpRequests++;return new Promise(r=>finish=r);},decodeHelp:JSON.parse,renderSavedHelp(){},ai:{acknowledge:async()=>{}}});
-  vm.runInContext(section('function helpContext(', 'function selectedPassage(')+lifecycle+section('async function explainSelection(',"$('selection-explain')"),help);
+  vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(',"$('selection-explain')"),help);
   const pending=help.explainSelection();await new Promise(r=>setImmediate(r));
   await help.explainSelection();assert.equal(helpRequests,1);
+  assert.equal(help.state.activeHelpRequest.storyId,'A');assert.equal(help.state.activeHelpRequest.chapterId,'CA');assert.equal(help.state.activeHelpRequest.versionId,'VA');assert.equal(help.state.activeHelpRequest.action,'initial');
   current=other;help.state.readerId='B';help.state.model='changed-model';help.state.pendingReaderRequestId='r';
   finish(JSON.stringify({translation:'Japan',explanation:'Meaning'}));await pending;
   assert.equal(original.chapters[0].help.length,1);assert.equal(other.chapters[0].help.length,0);
@@ -175,15 +184,15 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
     const story = {id:'S',language:code,chapters:[chapter]};
     let request, instructions, saved = false;
     const f = sandbox({state:{readerId:'S',providerId:'mock',model:'model'},readerStory:()=>story,normalizeChapters:s=>s.chapters,activeChapter:()=>chapter,activeVersion:()=>version,readerPanel:()=>({scrollTop:0}),persistReaderStory(){saved=true;},readerAi:async(kind,input,prompt)=>{request=input;instructions=prompt;f.state.pendingReaderRequestId='r';saved=false;return JSON.stringify({translation:'',explanation:'Focused detail'});},decodeHelp:JSON.parse,renderSavedHelp(){},ai:{acknowledge:async()=>{assert.equal(saved,true);}}});
-    vm.runInContext(section('function helpContext(', 'function selectedPassage(')+lifecycle+section('async function explainSelection(', "$('selection-explain')"),f);
+    vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(', "$('selection-explain')"),f);
     const selected = {storyId:'S',chapterId:'C',versionId:'V',helpId:'H',text:'く',start:3,end:4,profile:{}};
-    await f.explainSelection('explain','detail','Why this ending?',selected);
-    assert.equal(request.followUp,'Why this ending?');
+    await f.explainSelection('explain','detail','explain prefixes',selected);
+    assert.equal(request.followUp,'explain prefixes');
     assert.equal(request.sentence.slice(request.selectionStart,request.selectionEnd),'く');
     assert.ok(request.previousExplanation.includes('Legacy detail'));
     assert.ok(instructions.includes('never recap the profile'));
     assert.equal(entry.followUps.length,2);
-    assert.equal(entry.followUps[1].followUp,'Why this ending?');
+    assert.equal(entry.followUps[1].followUp,'explain prefixes');
     assert.equal(entry.followUps[1].promptVersion,'test');
     await f.explainSelection('explain','detail','',selected);
     assert.equal(entry.followUps.length,3);
@@ -193,6 +202,22 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
 
   const contract=sandbox();
   vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function decodeHelp(', 'async function explainSelection('), contract);
+  const promptContract=sandbox();
+  vm.runInContext(section('function savedFollowUps(', 'function selectedPassage('),promptContract);
+  const detailPrompt=promptContract.helpInstructions('detail');
+  assert.ok(detailPrompt.includes('Output exactly one valid JSON object with one key named explanation'));
+  assert.ok(detailPrompt.includes('{"explanation":"A clear explanation goes here."}'));
+  assert.ok(detailPrompt.includes('Do not include Markdown fences'));
+  assert.ok(detailPrompt.endsWith('{"explanation":"..."}.'));
+  const loadingContract=sandbox();
+  vm.runInContext(section('function createHelpLoading(', 'function renderSavedHelp('),loadingContract);
+  const detailLoading=loadingContract.createHelpLoading('detail','explain prefixes');
+  assert.equal(detailLoading.attributes.role,'status');assert.equal(detailLoading.attributes['aria-live'],'polite');
+  assert.ok(detailLoading.textContent.includes('Adding more detail…'));assert.ok(detailLoading.textContent.includes('Answering: explain prefixes'));
+  assert.ok(htmlSource.includes('Changes save automatically on this device. Text fields save when you leave the field.'));
+  assert.ok(htmlSource.includes('<h3 id="reader-help-title">Explanations</h3>'));
+  assert.ok(cssSource.includes('.help-examples { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line);'));
+  console.log('PASS settings feedback, single Explanations heading, accessible loading, and in-card example divider');
   const examples = [0,1,2].map(()=>({sentence:'山は高く、道はせまいです。',translation:'The mountain is tall, and the road is narrow.',highlightStart:3,highlightEnd:4,segments:[{text:'山',reading:'やま'},{text:'は高く、道はせまいです。'}]}));
   assert.equal(contract.decodeHelp(JSON.stringify({examples}), 'examples').examples.length,3);
   for (const invalid of [{examples:examples.slice(1)}, {examples:[...examples.slice(0,2),{...examples[2],highlightEnd:999}]}, {examples:[...examples.slice(0,2),{...examples[2],translation:42}]}, {examples:[...examples.slice(0,2),{...examples[2],segments:[{text:'wrong'}]}]}]) {
@@ -201,6 +226,8 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.throws(()=>contract.decodeHelp('null'),/invalid/);
   assert.throws(()=>contract.decodeHelp('{"explanation":""}'),/invalid/);
   assert.equal(contract.decodeHelp('{"explanation":"Focused."}').explanation,'Focused.');
+  assert.equal(contract.decodeHelp('```json\n{"explanation":"Prefixes mark word beginnings."}\n```','detail').explanation,'Prefixes mark word beginnings.');
+  assert.throws(()=>contract.decodeHelp('“Hinaufkle...”','detail'),error=>error.message==='The AI response was not valid JSON.');
   console.log('PASS explanation/example contracts reject malformed counts, ranges, translations and annotations');
 
   const rendered=sandbox({state:{furigana:true,explanationSelectionMode:false,selectedExplanationIds:new Set()},readerStory:()=>({id:'S'}),profileSnapshot:()=>({})});
@@ -212,6 +239,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   const card=rendered.$('reader-help').childNodes[0];
   const descendants = node => [node,...(node.childNodes || []).flatMap(descendants)];
   const nodes=descendants(card);
+  assert.equal(nodes.some(node=>node.tagName==='strong' && node.textContent==='Explanation'),false);
   assert.equal(nodes.find(node=>node.tagName==='mark').textContent,'く');
   assert.equal(nodes.filter(node=>node.tagName==='li').length,3);
   assert.ok(nodes.some(node=>node.tagName==='rt' && node.textContent==='そら'));
@@ -259,7 +287,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   const version={id:'V',story:v.story};const chapter4={id:'C',help:[entry],versions:[version]};const story4={id:'S',language:'ja',chapters:[chapter4]};
   const selected4={storyId:'S',chapterId:'C',versionId:'V',helpId:'H',text:'く',start:3,end:4,profile:{}};
   const examplePending=sandbox({state:{readerId:'S',model:'mock',providerId:'mock'},readerStory:()=>story4,normalizeChapters:s=>s.chapters,activeChapter:()=>chapter4,activeVersion:()=>version,readerPanel:()=>({scrollTop:0}),persistReaderStory(){if(examplePending.state.pendingReaderResult && failExampleSave)throw Error('disk');},readerAi:async(kind,input)=>{callCount++;captured=input;examplePending.state.pendingReaderRequestId='request';return JSON.stringify({examples});},renderSavedHelp(){},ai:{acknowledge:async()=>{assert.ok(entry.followUps?.some(entry=>entry.action==='examples'));if(failExampleAck)throw Error('ack');}}});
-  vm.runInContext(section('function helpContext(', 'function selectedPassage(')+lifecycle+section('function decodeHelp(', "$('selection-explain')"),examplePending);
+  vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('function decodeHelp(', "$('selection-explain')"),examplePending);
   await examplePending.explainSelection('explain','examples','',selected4);
   assert.equal(entry.followUps,undefined);assert.equal(examplePending.state.pendingReaderResult.saved,false);
   assert.equal(captured.sourceText,v.story);assert.equal(captured.action,'examples');
