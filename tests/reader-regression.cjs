@@ -43,6 +43,26 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   console.log('PASS long press cancels on leaving, outside release, scrolling, cancellation and movement; completed holds suppress clicks');
   console.log('PASS selectable explanation text is excluded from long-press and bulk-toggle handling');
 
+  const swipe = sandbox({state:{storySelectionMode:false}, revealStory(card,id){swipe.revealed=id;}, closeStoryReveal(){swipe.revealed=null;}});
+  vm.runInContext(section('function wireStorySwipe(', 'function confirmStoryDeletion('),swipe);
+  const swipeCard={events:{},addEventListener(name,fn){this.events[name]=fn;},setPointerCapture(){}};
+  let cancelledHolds=0;
+  swipe.wireStorySwipe(swipeCard,'a',()=>cancelledHolds++);
+  const gesture=(dx,dy=0,type='touch',cancel=false)=>{
+    const e={pointerId:1,pointerType:type,button:0,clientX:200,clientY:100,target:{closest:()=>null},preventDefault(){}};
+    swipeCard.events.pointerdown(e);
+    swipeCard.events.pointermove({...e,clientX:200+dx,clientY:100+dy});
+    if(cancel)swipeCard.events.pointercancel();else swipeCard.events.pointerup({...e,clientX:200+dx,clientY:100+dy});
+  };
+  gesture(-59);assert.equal(swipe.revealed,undefined);
+  gesture(-60);assert.equal(swipe.revealed,'a');assert.ok(cancelledHolds>0);
+  let clickSuppressed=false;swipeCard.events.click({preventDefault(){clickSuppressed=true;},stopImmediatePropagation(){}});assert.ok(clickSuppressed);
+  gesture(60,0,'mouse');assert.equal(swipe.revealed,null);
+  gesture(-80,70);assert.equal(swipe.revealed,null);
+  gesture(-80,0,'touch',true);assert.equal(swipe.revealed,null);
+  swipe.state.storySelectionMode=true;gesture(-90);assert.equal(swipe.revealed,null);
+  console.log('PASS touch/mouse swipe thresholds, vertical intent, cancellation, click suppression and bulk-selection guard');
+
   const glossary=sandbox();
   const matches=glossary.findGlossaryMatches('canto cantó canto',[
     {word:'canto',meaning:'note one',forms:['canto']},
@@ -278,7 +298,14 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.equal(removal.removeSelectedStories(new Set(['a'])),true);assert.deepEqual(removal.state.stories.map(x=>x.id),['b']);assert.equal(removal.state.storySelectionMode,false);
   removal.state.stories=[{id:'a'},{id:'b'}];removal.state.selectedStoryIds=new Set(['a']);removal.state.storySelectionMode=true;removal.fail=true;
   assert.equal(removal.removeSelectedStories(new Set(['a'])),false);assert.deepEqual(removal.state.stories.map(x=>x.id),['a','b']);assert.deepEqual(Array.from(removal.state.selectedStoryIds),['a']);
-  console.log('PASS confirmed story removal commits in bulk and restores stories plus selection when saving fails');
+  removal.fail=false;removal.state.pendingReaderResult={};
+  assert.equal(removal.removeSelectedStories(new Set(['a'])),false);assert.equal(removal.state.stories.length,2);
+  removal.state.pendingReaderResult=null;
+  removal.$('delete-stories-dialog').showModal=()=>{removal.dialogOpened=true;};
+  removal.confirmStoryDeletion(new Set(['a']),{title:'<b>Title</b>'});
+  assert.ok(removal.dialogOpened);assert.ok(removal.$('delete-stories-message').textContent.includes('<b>Title</b>'));assert.ok(removal.$('cancel-delete-stories').focused);
+  assert.deepEqual(Array.from(removal.state.deleteStoryIds),['a']);
+  console.log('PASS confirmed story removal, save rollback, pending-AI guard and named confirmation with Cancel focused');
 
   const expRemoval=sandbox({state:{selectedExplanationIds:new Set(['v1a','v1b']),explanationSelectionMode:true},pendingDeletionBlocked:()=>false,readerStory:()=>null,persistReaderStory(){if(expRemoval.fail)throw Error('disk');},renderSavedHelp(){},toast(){},fail:false});
   vm.runInContext(section('function syncExplanationSelection(', 'function renderSavedHelp('),expRemoval);
@@ -341,7 +368,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   console.log('PASS cancelled request does not stage a completed result');
 
   const panel={scrollTop:321,addEventListener(){}};
-  const pos=sandbox({state:{readerId:'S',readerChapter:2,readerPositions:{}},readerStory:()=>story3,activeChapter:()=>story3.chapters[pos.state.readerChapter],normalizeChapters:s=>s.chapters,updateReader(){},clearExplanationSelection(){},window:{addEventListener(){}},history:{pushState(){}}});
+  const pos=sandbox({state:{readerId:'S',readerChapter:2,readerPositions:{}},readerStory:()=>story3,activeChapter:()=>story3.chapters[pos.state.readerChapter],normalizeChapters:s=>s.chapters,closeStoryReveal(){},updateReader(){},clearExplanationSelection(){},window:{addEventListener(){}},history:{pushState(){}}});
   pos.$('reader-dialog').querySelector=()=>panel;pos.$('reader-dialog').showModal=()=>{};
   vm.runInContext(section('function readerPanel(', 'function sentenceContext('),pos);
   pos.rememberReaderPosition();panel.scrollTop=0;pos.openReader(story3);

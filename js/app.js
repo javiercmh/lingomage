@@ -11,7 +11,7 @@ const JOURNEY_DESCRIPTIONS = PROFILE_DEFINITIONS.languages;
 const PROMPT_VERSION = '2026-10-11.7';
 const PREFERRED_MODEL = 'gpt-6-luna';
 const $ = id => document.getElementById(id);
-const state = { stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, deleteArmed: false, storySelectionMode: false, selectedStoryIds: new Set(), storySelectionFocusId: '', explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', readerHistoryEntry: false, speechVersionKey: '' };
+const state = { stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, revealedStoryId: null, deleteStoryIds: new Set(), storySelectionMode: false, selectedStoryIds: new Set(), storySelectionFocusId: '', explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', readerHistoryEntry: false, speechVersionKey: '' };
 
 function readJson(path, fallback) {
   try { const text = readFile(path); return text.trim() ? JSON.parse(text) : fallback; }
@@ -278,6 +278,7 @@ function leaveStorySelection(restoreFocus = false) {
   state.storySelectionFocusId = '';
 }
 function beginStorySelection(id) {
+  closeStoryReveal();
   if (!state.storySelectionMode) {
     state.storySelectionMode = true; state.selectedStoryIds.clear(); state.storySelectionFocusId = id;
   }
@@ -296,6 +297,61 @@ function removeSelectedStories(ids) {
   const previous=state.stories; state.stories=previous.filter(story=>!ids.has(story.id));
   try { persistStories(); leaveStorySelection(); updateCount(); renderLibrary(); toast(`${ids.size} ${ids.size===1?'story':'stories'} deleted`); return true; }
   catch(error) { state.stories=previous; toast(error.message); return false; }
+}
+function closeStoryReveal() {
+  state.revealedStoryId = null;
+  document.querySelectorAll('.story-card').forEach(card => {
+    card.classList.remove('swipe-revealed');
+    const trash = card.querySelector('.story-swipe-delete');
+    if (trash) trash.hidden = true;
+  });
+}
+function revealStory(card, id) {
+  closeStoryReveal(); state.revealedStoryId = id;
+  card.classList.add('swipe-revealed');
+  card.querySelector('.story-swipe-delete').hidden = false;
+}
+function wireStorySwipe(card, id, cancelHold) {
+  let origin = null, horizontal = false, suppressClick = false;
+  card.addEventListener('pointerdown', event => {
+    if (state.storySelectionMode || event.isPrimary === false || (event.button !== undefined && event.button !== 0) || event.target.closest?.('.story-swipe-delete, .card-select-action')) return;
+    suppressClick = false; horizontal = false;
+    origin = { x: event.clientX, y: event.clientY, id: event.pointerId };
+  });
+  card.addEventListener('pointermove', event => {
+    if (!origin || event.pointerId !== origin.id) return;
+    const dx = event.clientX - origin.x, dy = event.clientY - origin.y;
+    if (!horizontal && Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx) / 1.5) { origin = null; return; }
+    if (!horizontal && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      horizontal = true; suppressClick = true; cancelHold();
+      card.setPointerCapture?.(event.pointerId);
+    }
+    if (horizontal) event.preventDefault();
+  });
+  card.addEventListener('pointerup', event => {
+    if (!origin || event.pointerId !== origin.id) return;
+    const dx = event.clientX - origin.x;
+    if (horizontal && !state.storySelectionMode) {
+      if (dx <= -60) revealStory(card, id);
+      else if (dx >= 60) closeStoryReveal();
+    }
+    origin = null; horizontal = false;
+  });
+  card.addEventListener('pointercancel', () => { origin = null; horizontal = false; });
+  card.addEventListener('pointerleave', () => { if (!horizontal) origin = null; });
+  card.addEventListener('click', event => {
+    if (suppressClick) { event.preventDefault(); event.stopImmediatePropagation(); suppressClick = false; }
+  }, true);
+}
+function confirmStoryDeletion(ids, story = null) {
+  if (!ids.size || pendingDeletionBlocked()) { toast('Finish or save the current AI response before deleting.'); return; }
+  state.deleteStoryIds = new Set(ids);
+  $('delete-stories-title').textContent = story ? 'Delete story?' : 'Delete selected stories?';
+  $('confirm-delete-stories').textContent = story ? 'Delete story' : 'Delete stories';
+  $('delete-stories-message').textContent = story
+    ? `Delete “${story.title}” and all its chapters, versions and explanations? This cannot be undone.`
+    : `Delete ${ids.size} selected ${ids.size === 1 ? 'story' : 'stories'} and all their chapters, versions and explanations? This cannot be undone.`;
+  $('delete-stories-dialog').showModal(); $('cancel-delete-stories').focus();
 }
 function wireLongPress(card, onLongPress, onMove, allowStoryOpen = false, ignoreTarget = () => false) {
   let timer = null, origin = null, completed = false;
@@ -327,8 +383,10 @@ function wireLongPress(card, onLongPress, onMove, allowStoryOpen = false, ignore
     onMove?.(event);
   }, true);
   card.addEventListener('contextmenu', event => { if (origin || completed) event.preventDefault(); clear(); });
+  return clear;
 }
 function renderLibrary() {
+  closeStoryReveal();
   const list = $('library-list'), toolbar = $('story-selection-toolbar'); list.replaceChildren(toolbar); toolbar.hidden = !state.storySelectionMode;
   const filter = $('filter-language').value;
   const stories = state.stories.filter(story => filter === 'all' || story.language === filter);
@@ -350,23 +408,32 @@ function renderLibrary() {
     const title = document.createElement('h3'); title.textContent = story.title;
     const meta = document.createElement('p'); const date = new Date(story.createdAt); meta.textContent = `${story.practice || (story.words || []).join(' · ') || LANGUAGES[story.language]}  ·  ${date.toLocaleDateString()}`;
     open.append(lang,title,meta); open.addEventListener('click', () => { if (state.storySelectionMode) toggleStorySelection(story.id); else openReader(story); });
-    card.append(open); list.append(card);
+    card.append(open);
+    if (!state.storySelectionMode) {
+      const trash = document.createElement('button'); trash.type = 'button'; trash.className = 'icon-btn danger-icon-btn story-swipe-delete'; trash.hidden = true;
+      trash.setAttribute('aria-label', `Delete story ${story.title}`); trash.title = 'Delete story';
+      trash.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3"/></svg>';
+      trash.addEventListener('click', event => { event.stopPropagation(); confirmStoryDeletion(new Set([story.id]), story); }); card.append(trash);
+    }
+    list.append(card);
     card.addEventListener('click', event => { if (event.target === card && state.storySelectionMode) toggleStorySelection(story.id); });
-    wireLongPress(card, () => beginStorySelection(story.id), () => {}, true);
+    const cancelHold = wireLongPress(card, () => beginStorySelection(story.id), () => {}, true);
+    wireStorySwipe(card, story.id, cancelHold);
   });
   syncStorySelection();
 }
+document.addEventListener('pointerdown', event => {
+  if (state.revealedStoryId && !event.target.closest?.('.swipe-revealed')) closeStoryReveal();
+});
 $('finish-story-selection').addEventListener('click', () => leaveStorySelection(true));
 $('filter-language').addEventListener('change', () => { leaveStorySelection(); renderLibrary(); });
 $('delete-selected-stories').addEventListener('click', () => {
-  if (!state.selectedStoryIds.size || pendingDeletionBlocked()) return;
-  $('delete-stories-message').textContent = `Delete ${state.selectedStoryIds.size} selected ${state.selectedStoryIds.size === 1 ? 'story' : 'stories'} and all their chapters, versions and explanations? This cannot be undone.`;
-  $('delete-stories-dialog').showModal(); $('cancel-delete-stories').focus();
+  confirmStoryDeletion(state.selectedStoryIds);
 });
 $('cancel-delete-stories').addEventListener('click', () => $('delete-stories-dialog').close());
 $('delete-stories-dialog').addEventListener('click', event => { if (event.target === $('delete-stories-dialog')) $('delete-stories-dialog').close(); });
 $('confirm-delete-stories').addEventListener('click', () => {
-  const ids=new Set(state.selectedStoryIds);
+  const ids=new Set(state.deleteStoryIds);
   if (removeSelectedStories(ids)) $('delete-stories-dialog').close();
 });
 function normalizeChapters(story) {
@@ -444,12 +511,13 @@ function rememberReaderPosition() {
   state.readerPositions[story.id] = { chapterId: activeChapter(story).id, scrollTop: readerPanel().scrollTop };
 }
 function openReader(story) {
+  closeStoryReveal();
   state.readerId = story.id; story.chapters ||= normalizeChapters(story);
   clearExplanationSelection();
   const position = state.readerPositions[story.id];
-  state.readerChapter = Math.max(0, story.chapters.findIndex(chapter => chapter.id === position?.chapterId)); state.deleteArmed = false;
+  state.readerChapter = Math.max(0, story.chapters.findIndex(chapter => chapter.id === position?.chapterId));
   $('reader-help-section').hidden = true; $('reader-edit-panel').hidden = true; $('reader-prompt').value = '';
-  updateReader(); $('delete-story').textContent = 'Delete story';
+  updateReader();
   history.pushState({ ...(history.state && typeof history.state === 'object' ? history.state : {}), lingomageReader: story.id }, ''); state.readerHistoryEntry = true;
   $('reader-dialog').showModal(); readerPanel().scrollTop = position?.scrollTop || 0; renderGenerationRecovery();
 }
@@ -959,13 +1027,7 @@ $('reader-edit-submit').addEventListener('click', async () => {
 
 });
 $('reader-dialog').addEventListener('click', event => { if (event.target === $('reader-dialog')) $('reader-dialog').close(); });
-$('delete-story').addEventListener('click', () => {
-  if (pendingDeletionBlocked()) { toast('Finish or save the current AI response before deleting.'); return; }
-  if (!state.deleteArmed) { state.deleteArmed = true; $('delete-story').textContent = 'Tap again to delete'; return; }
-  const previous = state.stories;
-  state.stories = previous.filter(item => item.id !== state.readerId);
-  try { persistStories(); $('reader-dialog').close(); updateCount(); renderLibrary(); toast('Story deleted'); } catch (error) { state.stories = previous; toast(error.message); }
-});
+
 
 async function refreshModels() {
   const select = $('model-select');

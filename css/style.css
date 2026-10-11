@@ -117,10 +117,19 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 .library-heading h2 { margin: 0; font-size: 30px; font-weight: 720; letter-spacing: -.03em; }
 .filter-select { max-width: 150px; min-height: 42px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font-size: 12px; }
 .library-list { display: grid; gap: 10px; }
-.story-card { position: relative; display: grid; grid-template-columns: 1fr; align-items: center; gap: 10px; padding: 15px; touch-action: pan-y; }
+/* The reading surface slides over the destructive action underneath. */
+.story-card { position: relative; display: grid; grid-template-columns: 1fr; padding: 0; overflow: hidden; touch-action: pan-y; isolation: isolate; }
+.story-open { position: relative; z-index: 1; width: 100%; min-width: 0; border: 0; border-radius: 17px; background: var(--card); color: var(--ink); padding: 15px; text-align: left; transition: transform .2s ease; }
+.story-card.swipe-revealed .story-open { transform: translateX(-80px); }
+.story-card .story-swipe-delete { position: absolute; z-index: 0; inset: 0 0 0 auto; width: 80px; height: 100%; min-height: 44px; border: 0; border-radius: 0; background: #b91c1c; color: #fff; display: flex; align-items: center; justify-content: center; }
+.story-card .story-swipe-delete:hover, .story-card .story-swipe-delete:active { background: #991b1b; color: #fff; }
+.story-swipe-delete svg { width: 24px; height: 24px; }
+.story-swipe-delete[hidden] { display: none; }
+.story-check-control, .card-select-action { z-index: 2; }
+@media (prefers-reduced-motion: reduce) { .story-open { transition: none; } }
 .story-card.selecting { padding-right: 64px; }
 .story-card.selected-card { border-color: var(--accent-strong); background: rgba(59,130,246,.1); }
-.story-open { border: 0; background: transparent; color: var(--ink); padding: 0; text-align: left; }
+.story-card.selected-card .story-open { background: transparent; }
 .story-card h3 { margin: 0 0 5px; font-size: 18px; font-weight: 680; }
 .story-card p { margin: 0; color: var(--muted); font-size: 12px; }
 .language-tag { display: inline-block; margin-bottom: 5px; color: #a9c5ff; font-size: 10px; font-weight: 720; letter-spacing: .07em; text-transform: uppercase; }
@@ -200,7 +209,7 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 .reader-primary-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin: 20px 0 10px; }
 .reader-primary-actions button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; padding: 8px; }
 .reader-primary-actions button span { color: var(--accent); font-size: 18px; }
-.reader-delete-story { width: 100%; margin-top: 18px; }
+
 .selection-count { margin-right: auto; color: var(--muted); font-size: 13px; }
 .icon-btn { display: inline-flex; width: 48px; height: 48px; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
 .icon-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
