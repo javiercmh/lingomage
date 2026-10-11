@@ -11,7 +11,7 @@ Readers may select a word or phrase and request a concise English explanation wi
 
 Help explains the exact selected text, including fragments within words, using surrounding words or clauses only to clarify its function. The card shows an AI-chosen contiguous source excerpt containing the selection, with the exact occurrence highlighted by the app. A short context translation is optional when useful. The initial explanation is one short paragraph; it does not explain unrelated vocabulary, teach assumed-known scripts, recap the profile, or assess the learner's ability. Fragments may have no standalone translation. These rules apply to German, Japanese, Russian and Spanish. Language expectations can guide regional usage and register. Japanese support preserves canonical Japanese and furigana as a separate display annotation; Russian support does not transliterate Cyrillic. Follow-ups remain focused on the same selection and can build on earlier explanations.
 
-These interaction choices are product assumptions. No study cited here tests this implementation, the four target languages, or AI-generated explanations.
+These interaction choices are product assumptions. No study cited here tests this implementation, the four target languages, or AI-generated explanations. Saved explanation cards appear newest first. A long press opens checkbox selection so learners can remove multiple explanations together; this is an interaction choice and does not change the generated explanation or its provenance.
 
 ## Evidence and limits
 
@@ -21,7 +21,7 @@ The [reading and glossing review](../research/reading-and-glossing.md) finds sup
 
 ## Implementation
 
-The full-screen reader stores ordered chapters, alternate versions, and passage help in `data/stories.json`; legacy one-story records are interpreted as one chapter in memory. Reading text size and furigana preference are stored in `data/settings.json`. Saved help records the passage offsets, source version, learner profile snapshot, model and prompt version.
+The full-screen reader stores ordered chapters, alternate versions, and passage help in `data/stories.json`; legacy one-story records are interpreted as one chapter in memory. Reading text size and furigana preference are stored in `data/settings.json`. Saved help records the passage offsets, source version, learner profile snapshot, model and prompt version. The reader displays explanations newest first while preserving stored order and keeps follow-ups attached to their explanation. My stories uses long-press bulk selection and a confirmation before deleting stories and their contained learning records.
 
 Implementation: [App² reader](../../js/app.js), [reader UI](../../index.html), [reader styles](../../css/style.css), [runtime contract](../architecture/app2-runtime.md). Prompt version: `2026-10-11.4`.
 

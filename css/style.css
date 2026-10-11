@@ -125,12 +125,13 @@ body.kb .tabbar { display: none; }
 .library-heading h2 { margin: 0; font-size: 30px; font-weight: 720; letter-spacing: -.03em; }
 .filter-select { max-width: 150px; min-height: 42px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font-size: 12px; }
 .library-list { display: grid; gap: 10px; }
-.story-card { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 15px; }
+.story-card { display: grid; grid-template-columns: 1fr; align-items: center; gap: 10px; padding: 15px; touch-action: pan-y; }
+.story-card.selecting { grid-template-columns: 24px minmax(0,1fr); }
 .story-open { border: 0; background: transparent; color: var(--ink); padding: 0; text-align: left; }
 .story-card h3 { margin: 0 0 5px; font-size: 18px; font-weight: 680; }
 .story-card p { margin: 0; color: var(--muted); font-size: 12px; }
 .language-tag { display: inline-block; margin-bottom: 5px; color: #a9c5ff; font-size: 10px; font-weight: 720; letter-spacing: .07em; text-transform: uppercase; }
-.story-delete { width: 44px; height: 44px; border: 1px solid rgba(248,113,113,.13); border-radius: 12px; background: rgba(248,113,113,.1); color: #fda4af; font-size: 18px; }
+.story-select-checkbox, .explanation-select-checkbox { width: 22px; height: 22px; accent-color: var(--accent-strong); }
 .empty-state { padding: 48px 20px; color: var(--muted); line-height: 1.6; text-align: center; }
 .empty-state b { display: block; margin-bottom: 8px; color: var(--ink); font-size: 21px; font-weight: 700; }
 .dialog { width: min(92vw, 520px); max-width: 520px; max-height: 90dvh; padding: 0; border: 0; background: transparent; color: var(--ink); }
@@ -177,22 +178,35 @@ body.kb .tabbar { display: none; }
 .story-text ruby { user-select: text; -webkit-user-select: text; }
 .story-text.hide-furigana ruby rt { display: none; }
 .selectable-story { user-select: text; -webkit-user-select: text; cursor: text; }
-.reader-notes { margin: 22px 0 12px; border-top: 1px solid var(--line); padding-top: 14px; }
-.reader-notes summary { min-height: 44px; color: #b7c7df; font-weight: 680; cursor: pointer; }
-.reader-help { margin: 24px 0; display: grid; gap: 14px; }
+.reader-help { margin: 10px 0 24px; display: grid; gap: 14px; }
 .reader-edit-panel { margin: 16px 0; padding: 18px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); }
 .help-card { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); overflow-wrap: anywhere; }
+.help-card { position: relative; touch-action: pan-y; }
+.help-card.selected-card { border-color: var(--accent-strong); background: rgba(59,130,246,.1); }
+.explanation-select-checkbox { margin: 0 0 12px; }
 .help-card strong { color: #c8d8ff; }
 .help-card p { white-space: pre-wrap; line-height: 1.55; }
 .help-quote { margin: 12px 0; padding: 10px 14px; border-left: 3px solid var(--accent); background: var(--field); border-radius: 0 10px 10px 0; color: var(--ink); font-size: 20px; }
 .reader-prompt { height: 110px; padding: 12px; resize: vertical; }
 .reader-edit-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.reader-actions { padding-top: 14px; border-top: 1px solid var(--line); }
 .selection-toolbar { position: fixed; z-index: 10; right: max(12px, var(--sa-right)); bottom: calc(12px + var(--sa-bottom)); left: max(12px, var(--sa-left)); display: flex; justify-content: center; gap: 8px; padding: 8px; border: 1px solid var(--line); border-radius: 14px; background: #24344e; box-shadow: 0 8px 30px #0009; }
 .selection-toolbar .small-btn { min-width: 82px; min-height: 44px; }
 .floating-selection-toolbar { position: fixed; right: auto; bottom: auto; left: 0; justify-content: flex-start; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-.reader-actions { display: grid; gap: 8px; margin-top: 20px; }
+.reader-primary-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin: 20px 0 10px; }
+.reader-primary-actions button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; padding: 8px; }
+.reader-primary-actions button span { color: var(--accent); font-size: 18px; }
+.reader-delete-story { width: 100%; margin-top: 18px; }
+.bulk-select-actions, .help-selection-heading { min-height: 48px; display: flex; justify-content: flex-end; align-items: center; margin: 0 0 10px; }
+.inline-selection-toolbar { position: static; right: auto; bottom: auto; left: auto; justify-content: flex-end; width: 100%; padding: 0; border: 0; background: transparent; box-shadow: none; }
+.inline-selection-toolbar .small-btn { width: auto; }
+.selection-count { margin-right: auto; color: var(--muted); font-size: 13px; }
+.icon-btn { display: inline-flex; width: 48px; height: 48px; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.icon-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.danger-icon-btn { color: #fda4af; border-color: rgba(248,113,113,.3); }
+.confirm-dialog { width: min(92vw,440px); }
+.confirm-dialog h2 { margin: 0 0 12px; font-size: 22px; }
+.confirm-dialog .reader-edit-actions { margin-top: 20px; }
 .toast { position: fixed; z-index: 5; right: 18px; bottom: calc(var(--tabbar-h) + 20px + var(--sa-bottom)); left: 18px; max-width: 560px; margin: auto; padding: 14px 17px; border: 1px solid rgba(255,255,255,.1); border-radius: 13px; background: #263854; color: white; font-size: 13px; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
 @media (min-width: 600px) { body { padding-top: calc(24px + var(--sa-top)); } .panel { padding: 22px; } }
 @media (max-width: 480px) { .reader-panel { padding-left: max(14px, var(--sa-left)); padding-right: max(14px, var(--sa-right)); } .reader-toolbar { gap: 5px; } .reader-toolbar .filter-select { max-width: 104px; } .reader-toolbar .version-select { max-width: 92px; } .reader-panel h2 { font-size: 23px; } }
@@ -204,18 +218,13 @@ body.kb .tabbar { display: none; }
 .reader-toolbar { justify-content: space-between; gap: 12px; padding: 12px 0 18px; border-bottom: 1px solid var(--line); }
 .reader-control-group { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .reader-panel .story-text { padding: 12px 2px; line-height: 2; overflow-wrap: anywhere; }
-.reader-notes summary, .reader-story-actions summary { display: flex; align-items: center; min-height: 48px; cursor: pointer; color: var(--muted); font-size: 14px; font-weight: 650; }
-.reader-notes summary::before, .reader-story-actions summary::before { content: '+'; margin-right: 12px; color: var(--accent); }
-.reader-notes[open] summary::before, .reader-story-actions[open] summary::before { content: '−'; }
-.reader-story-actions { margin-top: 24px; border-top: 1px solid var(--line); }
-.reader-story-actions .reader-actions { margin-top: 4px; padding-top: 0; border: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .help-card > .small-btn { margin-top: 14px; color: var(--accent); }
 .help-follow-up { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
 .help-follow-up .field { margin-bottom: 12px; }
 .help-question { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--accent); font-weight: 650; }
 button:disabled { opacity: .55; cursor: default; }
 button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-@media (max-width: 360px) { .reader-header { gap: 6px; } .reader-header .eyebrow { font-size: 9px; } .reader-back { padding: 0 8px; font-size: 12px; } .reader-story-actions .reader-actions { grid-template-columns: 1fr; } }
+@media (max-width: 360px) { .reader-header { gap: 6px; } .reader-header .eyebrow { font-size: 9px; } .reader-back { padding: 0 8px; font-size: 12px; } .reader-primary-actions { gap: 6px; } .reader-primary-actions button { font-size: 12px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 
 .help-highlight { background: rgba(122,167,255,.24); color: var(--ink); border-radius: 3px; padding: 0 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }

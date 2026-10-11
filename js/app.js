@@ -8,7 +8,7 @@ const JOURNEY_DESCRIPTIONS = PROFILE_DEFINITIONS.languages;
 const PROMPT_VERSION = '2026-10-11.4';
 const PREFERRED_MODEL = 'gpt-6-luna';
 const $ = id => document.getElementById(id);
-const state = { stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingReaderRequestId: null, pendingReaderResult: null, readerPositions: {}, providerId: '', model: '', reasoning: '', targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, deleteArmed: false };
+const state = { stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingReaderRequestId: null, pendingReaderResult: null, readerPositions: {}, providerId: '', model: '', reasoning: '', targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, deleteArmed: false, storySelectionMode: false, selectedStoryIds: new Set(), explanationSelectionMode: false, selectedExplanationIds: new Set() };
 
 function readJson(path, fallback) {
   try { const text = readFile(path); return text.trim() ? JSON.parse(text) : fallback; }
@@ -30,6 +30,7 @@ function toast(message) {
   clearTimeout(state.toastTimer); state.toastTimer = setTimeout(() => { el.hidden = true; }, 2600);
 }
 function setView(name) {
+  if (name !== 'library' && state.storySelectionMode) leaveStorySelection();
   document.querySelectorAll('.tab').forEach(tab => {
     const active = tab.dataset.view === name;
     tab.classList.toggle('active', active);
@@ -243,23 +244,74 @@ $('new-story').addEventListener('click', async () => {
 });
 
 function updateCount() { $('story-count').textContent = String(state.stories.length); }
+function pendingDeletionBlocked() { return !!(state.requestId || state.pendingReaderRequestId || state.pendingReaderResult); }
+function syncStorySelection() {
+  $('select-stories').hidden = state.storySelectionMode;
+  $('story-selection-toolbar').hidden = !state.storySelectionMode;
+  $('story-selection-count').textContent = `${state.selectedStoryIds.size} selected`;
+  $('delete-selected-stories').disabled = !state.selectedStoryIds.size || pendingDeletionBlocked();
+}
+function leaveStorySelection() { state.storySelectionMode = false; state.selectedStoryIds.clear(); syncStorySelection(); }
+function setStorySelected(id, selected) { if (selected) state.selectedStoryIds.add(id); else state.selectedStoryIds.delete(id); syncStorySelection(); renderLibrary(); }
+function removeSelectedStories(ids) {
+  if (!ids.size || pendingDeletionBlocked()) return false;
+  const previous=state.stories; state.stories=previous.filter(story=>!ids.has(story.id));
+  try { persistStories(); leaveStorySelection(); updateCount(); renderLibrary(); toast(`${ids.size} ${ids.size===1?'story':'stories'} deleted`); return true; }
+  catch(error) { state.stories=previous; toast(error.message); return false; }
+}
+function wireLongPress(card, onLongPress, onMove, allowStoryOpen = false) {
+  let timer = null, origin = null, completed = false;
+  const clear = () => { clearTimeout(timer); timer = null; origin = null; };
+  card.addEventListener('pointerdown', event => {
+    if (event.button !== undefined && event.button !== 0) return;
+    if (event.target.closest?.('input, select, textarea, a, form') || (event.target.closest?.('button') && !(allowStoryOpen && event.target.closest?.('.story-open')))) return;
+    clear(); completed = false; origin = {x:event.clientX,y:event.clientY};
+    timer = setTimeout(() => { timer = null; completed = true; onLongPress(); }, 500);
+  });
+  card.addEventListener('pointermove', event => {
+    if (!origin) return;
+    if (Math.hypot(event.clientX-origin.x,event.clientY-origin.y)>10) clear();
+  });
+  card.addEventListener('pointerup', clear);
+  card.addEventListener('pointercancel', clear);
+  card.addEventListener('click', event => {
+    if (completed) { event.preventDefault(); event.stopPropagation(); completed = false; return; }
+    onMove?.(event);
+  }, true);
+  card.addEventListener('contextmenu', event => { if (origin || completed) event.preventDefault(); clear(); });
+}
 function renderLibrary() {
   const list = $('library-list'); list.textContent = '';
   const filter = $('filter-language').value;
   const stories = state.stories.filter(story => filter === 'all' || story.language === filter);
-  if (!stories.length) { const empty = document.createElement('div'); empty.className = 'empty-state'; empty.innerHTML = '<b>Your shelf is waiting.</b>Stories you save will appear here for offline reading.'; list.append(empty); return; }
+  if (!stories.length) { const empty = document.createElement('div'); empty.className = 'empty-state'; empty.innerHTML = '<b>Your shelf is waiting.</b>Stories you save will appear here for offline reading.'; list.append(empty); syncStorySelection(); return; }
   stories.forEach(story => {
-    const card = document.createElement('article'); card.className = 'story-card';
-    const open = document.createElement('button'); open.className = 'story-open';
+    const card = document.createElement('article'); card.className = `story-card${state.storySelectionMode?' selecting':''}`;
+    if (state.storySelectionMode) { const check = document.createElement('input'); check.type = 'checkbox'; check.className = 'story-select-checkbox'; check.checked = state.selectedStoryIds.has(story.id); check.setAttribute('aria-label', `Select ${story.title}`); check.addEventListener('change', () => { if (check.checked) state.selectedStoryIds.add(story.id); else state.selectedStoryIds.delete(story.id); syncStorySelection(); }); card.append(check); }
+    const open = document.createElement('button'); open.className = 'story-open'; open.type = 'button';
     const lang = document.createElement('span'); lang.className = 'language-tag'; lang.textContent = LANGUAGES[story.language] || story.language;
     const title = document.createElement('h3'); title.textContent = story.title;
     const meta = document.createElement('p'); const date = new Date(story.createdAt); meta.textContent = `${story.practice || (story.words || []).join(' · ') || LANGUAGES[story.language]}  ·  ${date.toLocaleDateString()}`;
-    open.append(lang,title,meta); open.addEventListener('click', () => openReader(story));
-    const del = document.createElement('button'); del.className = 'story-delete'; del.textContent = '×'; del.setAttribute('aria-label', `Delete ${story.title}`); del.addEventListener('click', () => { state.stories = state.stories.filter(item => item.id !== story.id); try { persistStories(); updateCount(); renderLibrary(); toast('Story deleted'); } catch (error) { toast(error.message); } });
-    card.append(open,del); list.append(card);
+    open.append(lang,title,meta); open.addEventListener('click', () => { if (state.storySelectionMode) setStorySelected(story.id,!state.selectedStoryIds.has(story.id)); else openReader(story); });
+    card.append(open); list.append(card);
+    wireLongPress(card, () => { if (!state.storySelectionMode) { state.storySelectionMode=true; state.selectedStoryIds.clear(); } state.selectedStoryIds.add(story.id); syncStorySelection(); renderLibrary(); }, () => {}, true);
   });
+  syncStorySelection();
 }
-$('filter-language').addEventListener('change', renderLibrary);
+$('select-stories').addEventListener('click', () => { state.storySelectionMode=true; state.selectedStoryIds.clear(); syncStorySelection(); renderLibrary(); });
+$('finish-story-selection').addEventListener('click', () => { leaveStorySelection(); renderLibrary(); });
+$('filter-language').addEventListener('change', () => { leaveStorySelection(); renderLibrary(); });
+$('delete-selected-stories').addEventListener('click', () => {
+  if (!state.selectedStoryIds.size || pendingDeletionBlocked()) return;
+  $('delete-stories-message').textContent = `Delete ${state.selectedStoryIds.size} selected ${state.selectedStoryIds.size === 1 ? 'story' : 'stories'} and all their chapters, versions and explanations? This cannot be undone.`;
+  $('delete-stories-dialog').showModal(); $('cancel-delete-stories').focus();
+});
+$('cancel-delete-stories').addEventListener('click', () => $('delete-stories-dialog').close());
+$('delete-stories-dialog').addEventListener('click', event => { if (event.target === $('delete-stories-dialog')) $('delete-stories-dialog').close(); });
+$('confirm-delete-stories').addEventListener('click', () => {
+  const ids=new Set(state.selectedStoryIds);
+  if (removeSelectedStories(ids)) $('delete-stories-dialog').close();
+});
 function normalizeChapters(story) {
   if (Array.isArray(story.chapters) && story.chapters.length) return story.chapters;
   const version = { id: `legacy-${story.id}`, title: story.title || '', story: story.story || '', titleSegments: story.titleSegments || null, storySegments: story.storySegments || null, glossary: story.glossary || [], createdAt: story.createdAt, promptVersion: story.promptVersion, providerId: story.providerId, model: story.model };
@@ -291,8 +343,6 @@ function updateReader() {
   $('reader-story').style.fontSize = `${state.readerFontSize}px`;
   $('reader-story').classList.toggle('hide-furigana', story.language === 'ja' && !state.furigana);
   $('furigana-control').hidden = story.language !== 'ja'; $('furigana-toggle').checked = state.furigana;
-  $('reader-notes').open = false;
-  renderGlossary($('reader-glossary'), version.glossary || []);
   renderSavedHelp(chapter, version);
   $('selection-toolbar').hidden = true; state.readerSelection = null;
   renderPendingReaderResult();
@@ -304,12 +354,13 @@ function rememberReaderPosition() {
 }
 function openReader(story) {
   state.readerId = story.id; story.chapters ||= normalizeChapters(story);
+  clearExplanationSelection();
   const position = state.readerPositions[story.id];
   state.readerChapter = Math.max(0, story.chapters.findIndex(chapter => chapter.id === position?.chapterId)); state.deleteArmed = false;
   $('reader-help').hidden = true; $('reader-edit-panel').hidden = true; $('reader-prompt').value = '';
   updateReader(); $('delete-story').textContent = 'Delete story'; $('reader-dialog').showModal(); readerPanel().scrollTop = position?.scrollTop || 0;
 }
-$('reader-dialog').addEventListener('close', rememberReaderPosition);
+$('reader-dialog').addEventListener('close', () => { rememberReaderPosition(); clearExplanationSelection(); });
 readerPanel().addEventListener('scroll', rememberReaderPosition);
 function getCanonicalSelection(root) {
   const selection = window.getSelection(); if (!selection || selection.isCollapsed || !root.contains(selection.anchorNode) || !root.contains(selection.focusNode)) return null;
@@ -465,10 +516,30 @@ function renderHelpExamples(card, examples) {
   }
   section.append(title, list); card.append(section);
 }
+function syncExplanationSelection() {
+  $('select-explanations').hidden = state.explanationSelectionMode || !$('reader-help').childElementCount;
+  $('explanation-selection-toolbar').hidden = !state.explanationSelectionMode;
+  $('explanation-selection-count').textContent = `${state.selectedExplanationIds.size} selected`;
+  $('delete-selected-explanations').disabled = !state.selectedExplanationIds.size || pendingDeletionBlocked();
+}
+function clearExplanationSelection() { state.explanationSelectionMode = false; state.selectedExplanationIds.clear(); syncExplanationSelection(); const story=readerStory(); if(story){const chapter=activeChapter(story);renderSavedHelp(chapter,activeVersion(chapter));} }
+function toggleExplanationSelection(id) { if (state.selectedExplanationIds.has(id)) state.selectedExplanationIds.delete(id); else state.selectedExplanationIds.add(id); syncExplanationSelection(); renderSavedHelp(activeChapter(),activeVersion()); }
+function removeSelectedExplanations(story,chapter,version,ids) {
+  if (!ids.size || pendingDeletionBlocked()) return false;
+  const before=chapter.help || []; chapter.help=before.filter(item=>!(item.versionId===version.id&&ids.has(item.id)));
+  try { persistReaderStory(story); clearExplanationSelection(); renderSavedHelp(chapter,version); toast(`${ids.size} ${ids.size===1?'explanation':'explanations'} deleted`); return true; }
+  catch(error) { chapter.help=before; renderSavedHelp(chapter,version); toast(error.message); return false; }
+}
 function renderSavedHelp(chapter, version) {
   const box = $('reader-help'); box.textContent = '';
-  (chapter.help || []).filter(item => item.versionId === version.id).forEach(item => {
-    const card = document.createElement('article'); card.className = 'help-card';
+  const orderedHelp = (chapter.help || []).map((item,index)=>({item,index})).filter(row=>row.item.versionId === version.id).sort((a,b)=>{
+    const at=Date.parse(a.item.createdAt||''), bt=Date.parse(b.item.createdAt||'');
+    if(Number.isFinite(at)!==Number.isFinite(bt)) return Number.isFinite(at)?-1:1;
+    return Number.isFinite(at)&&at!==bt ? bt-at : b.index-a.index;
+  });
+  orderedHelp.forEach(({item}) => {
+    const card = document.createElement('article'); card.className = 'help-card'; card.dataset.helpId = item.id;
+    if (state.explanationSelectionMode) { card.classList.toggle('selected-card',state.selectedExplanationIds.has(item.id)); const check=document.createElement('input'); check.type='checkbox'; check.className='explanation-select-checkbox'; check.checked=state.selectedExplanationIds.has(item.id); check.setAttribute('aria-label',`Select explanation for ${item.passage}`); check.addEventListener('change',()=>{if(check.checked)state.selectedExplanationIds.add(item.id);else state.selectedExplanationIds.delete(item.id);syncExplanationSelection();renderSavedHelp(chapter,version);}); card.append(check); }
     const title = document.createElement('strong'); title.textContent = item.kind === 'translate' ? 'Translation' : 'Explanation';
     const quote = document.createElement('p'); quote.className = 'help-quote story-text';
     const hasContext = validTextRange(version.story || '', item.contextStart, item.contextEnd) && item.contextStart <= item.start && item.contextEnd >= item.end;
@@ -477,7 +548,7 @@ function renderSavedHelp(chapter, version) {
     const body = document.createElement('p'); body.textContent = item.text;
     const profile = item.profile || {};
     const stale = JSON.stringify(profile) !== JSON.stringify(profileSnapshot(readerStory()));
-    const status = document.createElement('p'); status.className = 'helper'; status.textContent = stale ? 'Based on an earlier reading profile.' : 'Saved for offline reading.';
+    const status = document.createElement('p'); status.className = 'helper'; status.textContent = stale ? 'Based on an earlier reading profile.' : '';
     card.append(title, quote);
     if (hasContext && item.contextTranslation) { const translation = document.createElement('p'); translation.className = 'help-context-translation'; translation.textContent = item.contextTranslation; card.append(translation); }
     card.append(body);
@@ -487,7 +558,7 @@ function renderSavedHelp(chapter, version) {
       if (followUp.followUp) { const question = document.createElement('p'); question.className = 'help-question'; question.textContent = followUp.followUp; card.append(question); }
       const more = document.createElement('p'); more.textContent = followUp.text; card.append(more);
     }
-    if (item.kind === 'explain') {
+    if (item.kind === 'explain' && !state.explanationSelectionMode) {
       const buttons = document.createElement('div'); buttons.className = 'help-actions';
       const detail = document.createElement('button'); detail.type = 'button'; detail.className = 'small-btn'; detail.textContent = 'More detail'; detail.setAttribute('aria-expanded', 'false');
       const examples = document.createElement('button'); examples.type = 'button'; examples.className = 'small-btn'; examples.textContent = 'Generate examples';
@@ -514,10 +585,16 @@ function renderSavedHelp(chapter, version) {
       });
       buttons.append(detail, examples); card.append(buttons, form);
     }
-    card.append(status);
+    if (stale) card.append(status);
     box.append(card);
+    wireLongPress(card,()=>{if(!state.explanationSelectionMode){state.explanationSelectionMode=true;state.selectedExplanationIds.clear();}state.selectedExplanationIds.add(item.id);syncExplanationSelection();renderSavedHelp(chapter,version);},event=>{
+      if(!state.explanationSelectionMode||event.target.closest?.('button,input,select,textarea,a,form'))return;
+      event.preventDefault();toggleExplanationSelection(item.id);
+    });
   });
   box.hidden = !box.childElementCount;
+  $('select-explanations').hidden = !box.childElementCount || state.explanationSelectionMode;
+  syncExplanationSelection();
 }
 async function readerAi(kind, input, instructions) {
   if (state.pendingReaderResult) throw new Error('Save the completed response before starting another request.');
@@ -648,7 +725,7 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
       if (state.readerId === story.id && activeChapter().id === chapter.id && activeVersion().id === version.id) {
         renderSavedHelp(chapter, version); readerPanel().scrollTop = scrollTop;
       }
-      toast('Help saved for offline reading');
+      toast('Explanation saved');
     } catch (error) {
       try { await releaseInvalidReaderResponse(); } catch {}
       if (state.readerId === story.id && activeChapter().id === chapter.id && activeVersion().id === version.id) {
@@ -659,10 +736,15 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
   } finally { state.readerHelpBusy = false; }
 }
 $('selection-explain').addEventListener('click', () => explainSelection('explain'));
-$('chapter-select').addEventListener('change', () => { state.readerChapter = Number($('chapter-select').value); state.readerVersion = 0; updateReader(); });
-$('version-select').addEventListener('change', () => { const chapter = activeChapter(); chapter.activeVersionId = $('version-select').value; const story = readerStory(); try { persistReaderStory(story); } catch (error) { toast(error.message); } updateReader(); });
-$('chapter-prev').addEventListener('click', () => { if (state.readerChapter > 0) state.readerChapter--; updateReader(); });
-$('chapter-next').addEventListener('click', () => { if (state.readerChapter < normalizeChapters(readerStory()).length - 1) state.readerChapter++; updateReader(); });
+$('chapter-select').addEventListener('change', () => { state.readerChapter = Number($('chapter-select').value); state.readerVersion = 0; clearExplanationSelection(); updateReader(); });
+$('version-select').addEventListener('change', () => { clearExplanationSelection(); const chapter = activeChapter(); chapter.activeVersionId = $('version-select').value; const story = readerStory(); try { persistReaderStory(story); } catch (error) { toast(error.message); } updateReader(); });
+$('chapter-prev').addEventListener('click', () => { if (state.readerChapter > 0) { state.readerChapter--; clearExplanationSelection(); } updateReader(); });
+$('chapter-next').addEventListener('click', () => { if (state.readerChapter < normalizeChapters(readerStory()).length - 1) { state.readerChapter++; clearExplanationSelection(); } updateReader(); });
+$('select-explanations').addEventListener('click', () => { state.explanationSelectionMode=true; state.selectedExplanationIds.clear(); renderSavedHelp(activeChapter(),activeVersion()); });
+$('finish-explanation-selection').addEventListener('click', clearExplanationSelection);
+$('delete-selected-explanations').addEventListener('click', () => {
+  removeSelectedExplanations(readerStory(),activeChapter(),activeVersion(),new Set(state.selectedExplanationIds));
+});
 $('text-smaller').addEventListener('click', () => { state.readerFontSize = Math.max(15, state.readerFontSize - 1); $('reader-story').style.fontSize = `${state.readerFontSize}px`; try { persistSettings(); } catch (error) { toast(error.message); } });
 $('text-larger').addEventListener('click', () => { state.readerFontSize = Math.min(30, state.readerFontSize + 1); $('reader-story').style.fontSize = `${state.readerFontSize}px`; try { persistSettings(); } catch (error) { toast(error.message); } });
 $('furigana-toggle').addEventListener('change', () => { state.furigana = $('furigana-toggle').checked; $('reader-story').classList.toggle('hide-furigana', !state.furigana); document.querySelectorAll('#reader-help .story-text').forEach(node => node.classList.toggle('hide-furigana', !state.furigana)); try { persistSettings(); } catch (error) { toast(error.message); } });
@@ -707,7 +789,7 @@ $('reader-edit-submit').addEventListener('click', async () => {
     catch (error) { if (state.readerId === story.id) { $('reader-edit-error').textContent = error.message; renderPendingReaderResult(); } return; }
     if (state.readerId === story.id && activeChapter().id === chapter.id) {
       if (mode === 'continue') state.readerChapter = chapters.length - 1;
-      $('reader-edit-panel').hidden = true; updateReader(); readerPanel().scrollTop = 0;
+      clearExplanationSelection(); $('reader-edit-panel').hidden = true; updateReader(); readerPanel().scrollTop = 0;
     }
     toast(mode === 'continue' ? 'Chapter added' : 'Alternate version saved');
   } catch (error) { try { await releaseInvalidReaderResponse(); } catch {} if (state.readerId === story.id) { $('reader-edit-error').textContent = `${error.message} Submit again to explicitly retry.`; renderPendingReaderResult(); } }
@@ -718,11 +800,12 @@ $('reader-close').addEventListener('click', () => $('reader-dialog').close());
 $('reader-close-x').addEventListener('click', () => $('reader-dialog').close());
 $('reader-dialog').addEventListener('click', event => { if (event.target === $('reader-dialog')) $('reader-dialog').close(); });
 $('open-result-reader').addEventListener('click', () => { if (state.current) openReader(state.current); });
-$('reuse-story').addEventListener('click', () => { const story = state.stories.find(item => item.id === state.readerId); if (!story) return; if (!state.targetLanguages[story.language]) { state.targetLanguages[story.language] = story.difficulty || 'beginner'; renderTargetLanguageSettings(); try { persistSettings(); } catch (error) { toast(error.message); } } populateTargetPicker(story.language); if (story.difficulty && DIFFICULTIES[story.difficulty]) populateDifficulty(story.difficulty); $('topic').value = story.topic || ''; $('practice-input').value = story.practice || [story.words?.join(', '), story.concepts].filter(Boolean).join('; '); $('reader-dialog').close(); setView('create'); toast('Practice details added to your next story'); });
 $('delete-story').addEventListener('click', () => {
+  if (pendingDeletionBlocked()) { toast('Finish or save the current AI response before deleting.'); return; }
   if (!state.deleteArmed) { state.deleteArmed = true; $('delete-story').textContent = 'Tap again to delete'; return; }
-  state.stories = state.stories.filter(item => item.id !== state.readerId);
-  try { persistStories(); $('reader-dialog').close(); updateCount(); renderLibrary(); toast('Story deleted'); } catch (error) { toast(error.message); }
+  const previous = state.stories;
+  state.stories = previous.filter(item => item.id !== state.readerId);
+  try { persistStories(); $('reader-dialog').close(); updateCount(); renderLibrary(); toast('Story deleted'); } catch (error) { state.stories = previous; toast(error.message); }
 });
 
 async function refreshModels() {

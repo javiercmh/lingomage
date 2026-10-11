@@ -122,8 +122,8 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.equal(contract.decodeHelp('{"explanation":"Focused."}').explanation,'Focused.');
   console.log('PASS explanation/example contracts reject malformed counts, ranges, translations and annotations');
 
-  const rendered=sandbox({state:{furigana:true},readerStory:()=>({id:'S'}),profileSnapshot:()=>({})});
-  vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function renderHighlightedText(', 'async function readerAi('),rendered);
+  const rendered=sandbox({state:{furigana:true,explanationSelectionMode:false,selectedExplanationIds:new Set()},readerStory:()=>({id:'S'}),profileSnapshot:()=>({})});
+  vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function wireLongPress(', 'function renderLibrary(')+section('function renderHighlightedText(', 'async function readerAi('),rendered);
   const sample = {id:'H',kind:'explain',passage:'く',start:3,end:4,contextStart:0,contextEnd:15,text:'Focused.',versionId:'V',profile:{},followUps:[{action:'examples',examples}]};
   const v={id:'V',story:'空は青く、風はやさしいです。',storySegments:[{text:'空',reading:'そら'},{text:'は'},{text:'青',reading:'あお'},{text:'く、'},{text:'風',reading:'かぜ'},{text:'はやさしいです。'}]};
   sample.contextEnd=v.story.length;
@@ -152,6 +152,26 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   rendered.renderSavedHelp({id:'C',help:[legacyCard]},v);
   assert.ok(rendered.$('reader-help').textContent.includes('Old detail'));
   console.log('PASS canonical highlighted context, separate readings, safe text, examples and both UI actions; legacy cards remain readable');
+
+  const newer={...sample,id:'newer',text:'Newest',createdAt:'2026-10-11T12:00:00Z'},older={...sample,id:'older',text:'Oldest',createdAt:'2026-10-10T12:00:00Z'};
+  rendered.renderSavedHelp({id:'C',help:[older,newer]},v);
+  assert.deepEqual(Array.from(rendered.$('reader-help').childNodes,node=>node.dataset.helpId),['newer','older']);
+  console.log('PASS saved explanations render newest first without changing their stored order');
+
+  const removal=sandbox({state:{stories:[{id:'a'},{id:'b'}],selectedStoryIds:new Set(['a']),storySelectionMode:true},persistStories(){if(removal.fail)throw Error('disk');},updateCount(){},renderLibrary(){},toast(){},fail:false});
+  vm.runInContext(section('function pendingDeletionBlocked(', 'function wireLongPress('),removal);
+  assert.equal(removal.removeSelectedStories(new Set(['a'])),true);assert.deepEqual(removal.state.stories.map(x=>x.id),['b']);assert.equal(removal.state.storySelectionMode,false);
+  removal.state.stories=[{id:'a'},{id:'b'}];removal.state.selectedStoryIds=new Set(['a']);removal.state.storySelectionMode=true;removal.fail=true;
+  assert.equal(removal.removeSelectedStories(new Set(['a'])),false);assert.deepEqual(removal.state.stories.map(x=>x.id),['a','b']);assert.deepEqual(Array.from(removal.state.selectedStoryIds),['a']);
+  console.log('PASS confirmed story removal commits in bulk and restores stories plus selection when saving fails');
+
+  const expRemoval=sandbox({state:{selectedExplanationIds:new Set(['v1a','v1b']),explanationSelectionMode:true},pendingDeletionBlocked:()=>false,readerStory:()=>null,persistReaderStory(){if(expRemoval.fail)throw Error('disk');},renderSavedHelp(){},toast(){},fail:false});
+  vm.runInContext(section('function syncExplanationSelection(', 'function renderSavedHelp('),expRemoval);
+  const helpRows=[{id:'v1a',versionId:'v1'},{id:'v2',versionId:'v2'},{id:'v1b',versionId:'v1',followUps:[{text:'attached'}]}],ch={help:helpRows},storyHelp={};
+  assert.equal(expRemoval.removeSelectedExplanations(storyHelp,ch,{id:'v1'},new Set(['v1a','v1b'])),true);assert.deepEqual(ch.help.map(x=>x.id),['v2']);
+  ch.help=helpRows;expRemoval.state.explanationSelectionMode=true;expRemoval.state.selectedExplanationIds=new Set(['v1a']);expRemoval.fail=true;
+  assert.equal(expRemoval.removeSelectedExplanations(storyHelp,ch,{id:'v1'},new Set(['v1a'])),false);assert.equal(ch.help,helpRows);assert.deepEqual(Array.from(expRemoval.state.selectedExplanationIds),['v1a']);
+  console.log('PASS explanation removal is version-scoped, includes attached follow-ups, and rolls back on save failure');
 
   let failExampleSave=true, failExampleAck=false, callCount=0, captured;
   const entry={id:'H',kind:'explain',passage:'く',start:3,end:4,text:'Original',more:'Legacy',versionId:'V'};
@@ -206,7 +226,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   console.log('PASS cancelled request does not stage a completed result');
 
   const panel={scrollTop:321,addEventListener(){}};
-  const pos=sandbox({state:{readerId:'S',readerChapter:2,readerPositions:{}},readerStory:()=>story3,activeChapter:()=>story3.chapters[pos.state.readerChapter],normalizeChapters:s=>s.chapters,updateReader(){}});
+  const pos=sandbox({state:{readerId:'S',readerChapter:2,readerPositions:{}},readerStory:()=>story3,activeChapter:()=>story3.chapters[pos.state.readerChapter],normalizeChapters:s=>s.chapters,updateReader(){},clearExplanationSelection(){}});
   pos.$('reader-dialog').querySelector=()=>panel;pos.$('reader-dialog').showModal=()=>{};
   vm.runInContext(section('function readerPanel(', 'function getCanonicalSelection('),pos);
   pos.rememberReaderPosition();panel.scrollTop=0;pos.openReader(story3);
