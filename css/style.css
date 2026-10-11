@@ -126,12 +126,12 @@ body.kb .tabbar { display: none; }
 .filter-select { max-width: 150px; min-height: 42px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font-size: 12px; }
 .library-list { display: grid; gap: 10px; }
 .story-card { display: grid; grid-template-columns: 1fr; align-items: center; gap: 10px; padding: 15px; touch-action: pan-y; }
-.story-card.selecting { grid-template-columns: 24px minmax(0,1fr); }
+.story-card.selecting { grid-template-columns: 44px minmax(0,1fr); }
 .story-open { border: 0; background: transparent; color: var(--ink); padding: 0; text-align: left; }
 .story-card h3 { margin: 0 0 5px; font-size: 18px; font-weight: 680; }
 .story-card p { margin: 0; color: var(--muted); font-size: 12px; }
 .language-tag { display: inline-block; margin-bottom: 5px; color: #a9c5ff; font-size: 10px; font-weight: 720; letter-spacing: .07em; text-transform: uppercase; }
-.story-select-checkbox, .explanation-select-checkbox { width: 22px; height: 22px; accent-color: var(--accent-strong); }
+.story-select-checkbox, .explanation-select-checkbox { width: 44px; height: 44px; margin: 0; accent-color: var(--accent-strong); }
 .empty-state { padding: 48px 20px; color: var(--muted); line-height: 1.6; text-align: center; }
 .empty-state b { display: block; margin-bottom: 8px; color: var(--ink); font-size: 21px; font-weight: 700; }
 .dialog { width: min(92vw, 520px); max-width: 520px; max-height: 90dvh; padding: 0; border: 0; background: transparent; color: var(--ink); }

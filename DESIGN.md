@@ -14,6 +14,8 @@ The reader is full-screen, with a centered column no wider than 780px. Its heade
 
 On My stories, open a story with a normal tap and enter bulk selection with a long press or the accessible Select stories control. Show checkboxes and a selection toolbar in that mode; remove the per-card delete control. The trash button opens an app-styled confirmation that names the selected story count and warns that chapters, versions and explanations are removed. Cancel preserves selection. These interaction choices are product assumptions, not evidence of usability or learning effects.
 
+Selection checkboxes have 44px touch targets. Cancel a pending long press when the pointer leaves the card, moves beyond the hold threshold, is released or cancelled, or the page scrolls.
+
 ## Selection help and follow-ups
 
 Explain and Copy act on the exact canonical selection. Use separate bordered cards for saved explanations, with an accent rule marking the relevant source excerpt. The model chooses a contiguous source excerpt; the app copies canonical text and highlights only the user’s exact selection. Context translations are optional and appear beneath the excerpt when useful. Initial help is one short paragraph. English help uses the interface font; story text keeps its reading typography. Wrap long content without horizontal scrolling.

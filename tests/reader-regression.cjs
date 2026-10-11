@@ -14,6 +14,19 @@ function sandbox(extra = {}) {
 }
 const lifecycle = section('async function acknowledgeReaderResult(', 'function decodeHelp(');
 (async () => {
+  const pointerEvents = new Map(), timers = new Map(); let nextTimer = 0, holds = 0;
+  const pointer = sandbox({document:{addEventListener:(name,fn)=>pointerEvents.set(name,fn),removeEventListener:name=>pointerEvents.delete(name)},setTimeout:fn=>{const id=++nextTimer;timers.set(id,fn);return id;},clearTimeout:id=>timers.delete(id)});
+  vm.runInContext(section('function wireLongPress(', 'function renderLibrary('),pointer);
+  const pressCard={events:{},addEventListener(name,fn){this.events[name]=fn;}};
+  pointer.wireLongPress(pressCard,()=>holds++);
+  const down={button:0,clientX:10,clientY:10,target:{closest:()=>null}};
+  const expire=()=>{for(const fn of [...timers.values()])fn();};
+  for(const cancel of [()=>pressCard.events.pointerleave(),()=>pointerEvents.get('pointerup')(),()=>pointerEvents.get('pointercancel')(),()=>pointerEvents.get('scroll')(),()=>pressCard.events.pointermove({clientX:30,clientY:10})]) {
+    pressCard.events.pointerdown(down);cancel();expire();assert.equal(holds,0);assert.equal(pointerEvents.size,0);
+  }
+  pressCard.events.pointerdown(down);expire();assert.equal(holds,1);assert.equal(pointerEvents.size,0);
+  let suppressed=0;pressCard.events.click({preventDefault(){suppressed++;},stopPropagation(){}});assert.equal(suppressed,1);
+  console.log('PASS long press cancels on leaving, outside release, scrolling, cancellation and movement; completed holds suppress clicks');
   let failsSave = true, failsAck = false, durable, applied = 0, acked = 0;
   const story={id:'A',value:0};
   const c=sandbox({state:{pendingReaderRequestId:'request',readerId:'A'},persistReaderStory:s=>{if(failsSave) throw Error('disk'); durable=JSON.parse(JSON.stringify(s));},ai:{acknowledge:async()=>{if(failsAck) throw Error('ack');acked++;}}});

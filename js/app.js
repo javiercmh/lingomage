@@ -261,12 +261,20 @@ function removeSelectedStories(ids) {
 }
 function wireLongPress(card, onLongPress, onMove, allowStoryOpen = false) {
   let timer = null, origin = null, completed = false;
-  const clear = () => { clearTimeout(timer); timer = null; origin = null; };
+  const clear = () => {
+    clearTimeout(timer); timer = null; origin = null;
+    document.removeEventListener('pointerup', clear, true);
+    document.removeEventListener('pointercancel', clear, true);
+    document.removeEventListener('scroll', clear, true);
+  };
   card.addEventListener('pointerdown', event => {
     if (event.button !== undefined && event.button !== 0) return;
     if (event.target.closest?.('input, select, textarea, a, form') || (event.target.closest?.('button') && !(allowStoryOpen && event.target.closest?.('.story-open')))) return;
     clear(); completed = false; origin = {x:event.clientX,y:event.clientY};
-    timer = setTimeout(() => { timer = null; completed = true; onLongPress(); }, 500);
+    document.addEventListener('pointerup', clear, true);
+    document.addEventListener('pointercancel', clear, true);
+    document.addEventListener('scroll', clear, true);
+    timer = setTimeout(() => { clear(); completed = true; onLongPress(); }, 500);
   });
   card.addEventListener('pointermove', event => {
     if (!origin) return;
@@ -274,6 +282,7 @@ function wireLongPress(card, onLongPress, onMove, allowStoryOpen = false) {
   });
   card.addEventListener('pointerup', clear);
   card.addEventListener('pointercancel', clear);
+  card.addEventListener('pointerleave', clear);
   card.addEventListener('click', event => {
     if (completed) { event.preventDefault(); event.stopPropagation(); completed = false; return; }
     onMove?.(event);
