@@ -29,7 +29,7 @@
     "data/generation-checkpoints.json"
   ],
   "app2Update": {
-    "appId": "com.javiercmh.lingomage",
+    "appId": "com.wynh.lingomage",
     "minimumHostVersionCode": 4,
     "github": {
       "owner": "javiercmh",
