@@ -116,6 +116,11 @@ export function annotatedText(container, canonical, segments, { glossary = [], l
   });
 }
 
+export function selectCanonicalText(root) {
+  const selection = window.getSelection(), range = document.createRange();
+  range.selectNodeContents(root); selection.removeAllRanges(); selection.addRange(range);
+}
+
 export function getCanonicalSelection(root) {
   const selection = window.getSelection();
   if (!selection || selection.isCollapsed || !root.contains(selection.anchorNode) || !root.contains(selection.focusNode)) return null;

@@ -1,6 +1,6 @@
-import { ai, readFile, writeFile, speech, translation } from './bridge.js';
+import { ai, readFile, writeFile, speech, translation, selectionMenu } from './bridge.js';
 import { speakSelection, speakChapter } from './reader-speech.js';
-import { annotatedText, getCanonicalSelection, japaneseSegments } from './reader-text.js';
+import { annotatedText, getCanonicalSelection, japaneseSegments, selectCanonicalText } from './reader-text.js';
 import { createPipeline } from './generation-pipeline.js';
 import { SAFEGUARD_VERSION, LENGTHS, lengthPreference, parseContent, validateStory } from './learning-validation.js';
 import { saveBeforeAcknowledge } from './request-lifecycle.js';
@@ -1501,6 +1501,15 @@ $('selection-speak').addEventListener('click', async () => {
   catch (error) { toast(`Could not play audio: ${error.message}`); }
 });
 $('selection-explain').addEventListener('click', () => explainSelection('explain'));
+$('selection-copy').addEventListener('click', async () => {
+  const passage = state.readerSelection; if (!passage) return;
+  // The reader's copy listener writes the canonical text, without furigana.
+  try { if (!document.execCommand('copy')) await navigator.clipboard.writeText(passage.text); toast('Copied'); }
+  catch { toast('Could not copy the selection.'); }
+});
+$('selection-all').addEventListener('click', () => { selectCanonicalText($('reader-story')); });
+// Android's own selection menu would compete with this bar; the bar remains the fallback elsewhere.
+selectionMenu.setSuppressed(true);
 $('reader-actions-toggle').addEventListener('click', toggleReaderActions);
 $('reader-remove-chapters').addEventListener('click', () => confirmReaderRemoval('chapters'));
 $('reader-delete-path').addEventListener('click', () => confirmReaderRemoval('path'));
