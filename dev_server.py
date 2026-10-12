@@ -384,7 +384,9 @@ class Handler(SimpleHTTPRequestHandler):
                 memory['plot'] = (memory['plot'] + [request_data.get('chapterChunk', '')[:500]])[-8:]
                 memory['situation'] = [request_data.get('chapterChunk', '')[-500:]]
                 response_text = json.dumps(memory)
-            elif request_data.get('kind') in {'explain', 'translate'}:
+            elif request_data.get('kind') == 'readings':
+                response_text = self.mock_readings(request_data)
+            elif request_data.get('kind') in {'explain', 'translate', 'examples'}:
                 response_text = self.mock_help(request_data)
             else:
                 response_text = self.mock_story(data.get('input', ''))
@@ -560,6 +562,19 @@ class Handler(SimpleHTTPRequestHandler):
             'es-CL': ('Una tarde tranquila', 'Sofía sale a caminar por el barrio. Pasa por una feria y compra pan y palta. Después se junta con una amiga en una plaza. Conversan un rato y miran el cielo. Cuando baja el sol, vuelven a casa contentas.'),
         }
         title, story = samples.get(code, samples['de'])
+        length = data.get('storyLength', 'short')
+        ranges = {'short': (100, 8), 'medium': (200, 16), 'long': (400, 32)}
+        minimum, sentences = ranges.get(length, ranges['short'])
+        if code == 'ja':
+            chunks = [chunk + '。' for chunk in story.split('。') if chunk.strip()]
+            story = ''.join(chunks[i % len(chunks)] for i in range(sentences + 2))
+        else:
+            # Repeat complete fixture sentences until inside the selected range.
+            chunks = [chunk.strip() + '.' for chunk in story.split('.') if chunk.strip()]
+            output = []
+            while len(' '.join(output).split()) < minimum:
+                output.append(chunks[len(output) % len(chunks)])
+            story = ' '.join(output)
         notes = {
             'de': [('Ausflug', 'outing', 'Ausflug'), ('Markt', 'market', 'Markt')],
             'ja': [('公園', 'park', '公園'), ('買う', 'to buy', '買います')],
@@ -570,19 +585,27 @@ class Handler(SimpleHTTPRequestHandler):
                     for word, meaning, form in notes.get(code, notes['de'])]
         glossary.extend({'word': word, 'meaning': f'Development example for {word}', 'forms': [word]}
                         for word in words if word in story)
-        if code == 'ja':
-            story_segments = [
-                {'text':'今日','reading':'きょう'}, {'text':'はミアが'}, {'text':'町','reading':'まち'}, {'text':'へ'}, {'text':'行','reading':'い'}, {'text':'きます。\n'},
-                {'text':'店','reading':'みせ'}, {'text':'でパンを'}, {'text':'買','reading':'か'}, {'text':'います。友だちと'}, {'text':'公園','reading':'こうえん'}, {'text':'で'}, {'text':'話','reading':'はな'}, {'text':'します。\n'},
-                {'text':'空','reading':'そら'}, {'text':'は'}, {'text':'青','reading':'あお'}, {'text':'く、'}, {'text':'風','reading':'かぜ'}, {'text':'はやさしいです。\n'},
-                {'text':'二人','reading':'ふたり'}, {'text':'は'}, {'text':'笑','reading':'わら'}, {'text':'って'}, {'text':'家','reading':'いえ'}, {'text':'へ'}, {'text':'帰','reading':'かえ'}, {'text':'ります。'}
-            ]
-            return json.dumps({'title': title, 'story': story,
-                               'titleSegments': [{'text': '小', 'reading': 'ちい'}, {'text': 'さな一日', 'reading': ''}],
-                               'storySegments': story_segments, 'glossary': glossary}, ensure_ascii=False)
-        return json.dumps({'title': title, 'story': story,
-                           'titleSegments': [{'text': title}],
-                           'storySegments': [{'text': story}], 'glossary': glossary}, ensure_ascii=False)
+        return json.dumps({'title': title, 'story': story, 'glossary': glossary}, ensure_ascii=False)
+
+    def mock_readings(self, data):
+        """Known fixture pronunciations only; unknown spans fail explicitly."""
+        known = {'小': 'ちい', '一日': 'いちにち', '今日': 'きょう', '町': 'まち',
+                 '行': 'い', '店': 'みせ', '買': 'か', '友': 'とも', '公園': 'こうえん',
+                 '話': 'はな', '空': 'そら', '青': 'あお', '風': 'かぜ', '二人': 'ふたり',
+                 '笑': 'わら', '家': 'いえ', '帰': 'かえ'}
+        fixtures = json.loads((self.server.workspace / 'data/reader-help-fixtures.json').read_text())
+        for example in fixtures['ja']['examples']:
+            for segment in example.get('segments', []):
+                if segment.get('reading'):
+                    known[segment['text']] = segment['reading']
+        readings = []
+        for span in data.get('spans', []):
+            reading = known.get(span.get('text'))
+            if reading is None:
+                return json.dumps({'error': 'This kanji span has no offline reading fixture.'})
+            readings.append({'id': span['id'], 'reading': reading})
+        return json.dumps({'readings': readings}, ensure_ascii=False)
+
 
 
 if __name__ == '__main__':

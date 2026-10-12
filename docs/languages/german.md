@@ -1,6 +1,6 @@
 # German
 
-Status: design requirements recorded; App² uses a shared beginner-story prompt;
+Status: design requirements recorded; App² uses profile-aware difficulty and correctness guidance;
 deeper pedagogical review pending.
 
 ## Confirmed requirements
@@ -36,9 +36,13 @@ The validator verifies declared used forms occur in the text; it cannot establis
 that an inflected form is linguistically related to the chosen lemma or that a
 reading is correct in context. Separate language review remains necessary.
 
-Historical Android prompt source: [de.json](../../android/app/src/main/assets/prompts/de.json).
+Historical Android prompt source: [de.json](https://github.com/javiercmh/lingomage/blob/f8fef1255e608240301a13202168d4f6c41a1fea/android/app/src/main/assets/prompts/de.json).
 Current App² prompt status is in [App² runtime](../architecture/app2-runtime.md).
 
 ## App² reading self-report — 2026-10-10
 
 Settings offer three reading-task descriptions and an optional knowledge/difficulties description. These guide each story request and are revisable learner reports, not assessed proficiency. German examples can note familiar sentence patterns, vocabulary, and word-order difficulties. Definitions are in `data/learning-profiles.json`; evidence and limits are in [the self-assessment record](../research/self-assessment.md).
+
+## Current requirements — 2026-10-12.4
+
+The current App² profiles, difficulty and learner wishes remain authoritative. Legacy decisions above are historical; adopted, adapted and rejected rules are recorded in the [safeguard audit](../architecture/language-safeguards.md). New chapters require useful integrated English learning notes, validated target-script forms and selected length. Orthography and contextual correctness guidance do not reinstate the old beginner curriculum or regional defaults. Linguistic and pedagogical quality remain review requirements.

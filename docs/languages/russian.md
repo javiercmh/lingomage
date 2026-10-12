@@ -44,9 +44,15 @@ The validator verifies declared used forms occur in the text; it cannot establis
 that an inflected form is linguistically related to the chosen lemma or that a
 reading is correct in context. Separate language review remains necessary.
 
-Historical Android prompt source: [ru.json](../../android/app/src/main/assets/prompts/ru.json).
+Historical Android prompt source: [ru.json](https://github.com/javiercmh/lingomage/blob/f8fef1255e608240301a13202168d4f6c41a1fea/android/app/src/main/assets/prompts/ru.json).
 Current App² prompt status is in [App² runtime](../architecture/app2-runtime.md).
 
 ## App² reading self-report — 2026-10-10
 
 Settings offer three reading-task descriptions and an optional knowledge/difficulties description. These guide each story request and are revisable learner reports, not assessed proficiency. Russian assumes Cyrillic literacy; vocabulary, word endings, and sentence comprehension can be described separately. Generation uses Cyrillic without transliteration. Definitions are in `data/learning-profiles.json`; evidence and limits are in [the self-assessment record](../research/self-assessment.md).
+
+## Current requirements — 2026-10-12.4
+
+The current App² profiles, difficulty and learner wishes remain authoritative. Legacy decisions above are historical; adopted, adapted and rejected rules are recorded in the [safeguard audit](../architecture/language-safeguards.md). New chapters require useful integrated English learning notes, validated target-script forms and selected length. Orthography and contextual correctness guidance do not reinstate the old beginner curriculum or regional defaults. Linguistic and pedagogical quality remain review requirements.
+
+Russian stress marks are absent by default but permitted if explicitly requested; the old unconditional stress rejection is retired. Target-script validation still rejects Latin transliteration, including names.

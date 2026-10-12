@@ -1,5 +1,0 @@
-{
-  "version": "2026-10-09.5",
-  "story": "Write Japanese in exactly 8–12 short sentences ending in 。 or ！ or ？. Favor everyday vocabulary, simple particles and consistent polite です/ます forms. Do not imply equivalence to JLPT N5. Preserve appropriate kanji; use hiragana and katakana for the rest. Never use romaji. Return the common JSON shape with title, text and glossary. Leave segments and titleSegments empty: the app independently finds kanji spans and obtains their contextual kana readings in a separate stage. Do not replace kanji with kana to avoid annotations. In glossary entries whose headword includes kanji, supply the full headword reading in kana. English meanings stay English.",
-  "suggestions": "Suggest 5–10 useful Japanese beginner vocabulary items for the optional topic, using appropriate kanji and kana. No romaji. Suggestions will be editable before the story is generated."
-}

@@ -217,7 +217,21 @@ class MockStoryTests(unittest.TestCase):
                     self.assertTrue(result['glossary'])
                     for note in result['glossary']:
                         self.assertTrue(all(form in result['story'] for form in note['forms']))
-                    self.assertEqual(''.join(part['text'] for part in result['storySegments']), result['story'])
+                    self.assertNotIn('storySegments', result)  # The app requests readings separately.
+
+    def test_mock_length_preferences(self):
+        for language in ('de', 'ja', 'ru', 'es-CL'):
+            for length, low, high, ja_low, ja_high in [('short', 100, 150, 8, 12), ('medium', 200, 300, 16, 24), ('long', 400, 600, 32, 48)]:
+                result = json.loads(Handler.mock_story(json.dumps({'languageCode': language, 'storyLength': length})))
+                count = result['story'].count('。') if language == 'ja' else len(result['story'].split())
+                self.assertTrue((ja_low <= count <= ja_high) if language == 'ja' else (low <= count <= high))
+
+    def test_known_readings_and_unknown_fixture_failure(self):
+        from types import SimpleNamespace
+        handler = SimpleNamespace(server=SimpleNamespace(workspace=Path(__file__).resolve().parents[1]))
+        result = json.loads(Handler.mock_readings(handler, {'spans': [{'id': 1, 'text': '今日'}, {'id': 9, 'text': '高'}]}))
+        self.assertEqual(result['readings'], [{'id': 1, 'reading': 'きょう'}, {'id': 9, 'reading': 'たか'}])
+        self.assertIn('error', json.loads(Handler.mock_readings(handler, {'spans': [{'id': 0, 'text': '未知'}]})))
 
 
 if __name__ == '__main__':

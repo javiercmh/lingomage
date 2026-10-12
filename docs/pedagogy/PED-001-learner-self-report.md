@@ -42,3 +42,7 @@ A grammar checklist could require terminology and imply an unsupported curriculu
 Revisit if learners misunderstand the examples, copy them as their own reports, cannot describe their experience, or consistently receive unsuitable stories. Evaluate wording with learners and qualified language reviewers. If accurate placement becomes a requirement, select and evaluate an appropriate reading measure rather than treating these examples as a test.
 
 Settings copy refinement: `settingsDescriptions` in the managed learning-profile definitions provides shorter display summaries for each reading band. Full `languages` descriptions remain the generation and saved-report source; existing reports and profile versions are unchanged. Shorter textarea examples still describe understood material and a need for help, with Japanese kana/kanji and Russian Cyrillic distinctions retained in the band summaries. This copy has not been validated with learners.
+
+## Chapter length — 2026-10-12.4
+
+A shared Short/Medium/Long setting changes total chapter length separately from difficulty and sentence complexity. Short keeps current targets; Medium doubles them and Long quadruples them. Each operation captures the preference for provenance. These bands are product assumptions, not validated learning doses or assessed proficiency. The current learner profiles and wishes continue to govern content; legacy beginner curriculum rules are not reinstated.

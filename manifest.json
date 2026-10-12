@@ -22,7 +22,11 @@
     "data/settings.json",
     "data/learning-profiles.json",
     "DESIGN.md",
-    "data/reader-help-fixtures.json"
+    "data/reader-help-fixtures.json",
+    "js/learning-validation.js",
+    "js/generation-pipeline.js",
+    "data/language-safeguards.json",
+    "data/generation-checkpoints.json"
   ],
   "app2Update": {
     "appId": "com.javiercmh.lingomage",
@@ -46,15 +50,20 @@
       "AGENTS.md",
       "PACKAGING.md",
       "DESIGN.md",
-      "data/reader-help-fixtures.json"
+      "data/reader-help-fixtures.json",
+      "js/learning-validation.js",
+      "js/generation-pipeline.js",
+      "data/language-safeguards.json"
     ],
     "seedFiles": [
       "data/stories.json",
-      "data/settings.json"
+      "data/settings.json",
+      "data/generation-checkpoints.json"
     ],
     "seedDefaults": {
       "data/stories.json": [],
-      "data/settings.json": {}
+      "data/settings.json": {},
+      "data/generation-checkpoints.json": []
     }
   },
   "icons": [

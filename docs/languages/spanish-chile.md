@@ -37,7 +37,7 @@ example. The general learning rationale and transfer limits remain in the
 
 ## Historical Android prompt and review
 
-Source: [es-CL.json](../../android/app/src/main/assets/prompts/es-CL.json), version
+Source: [es-CL.json](https://github.com/javiercmh/lingomage/blob/f8fef1255e608240301a13202168d4f6c41a1fea/android/app/src/main/assets/prompts/es-CL.json), version
 2026-10-09.2, recorded with new stories. Existing stories retain their original
 text and prompt provenance. Increment the version when generation behavior changes.
 
@@ -50,3 +50,7 @@ human review remains necessary.
 ## App² reading self-report and preferences — 2026-10-10
 
 Settings offer three reading-task descriptions, an optional self-assessment, and optional expectations or general instructions. These guide each story request and are revisable learner reports, not assessed proficiency. Spanish has no assumed regional variety in the current App² prompt; learners can state their preference. Definitions are in `data/learning-profiles.json`; evidence and limits are in [the self-assessment record](../research/self-assessment.md).
+
+## Current requirements — 2026-10-12.4
+
+The current App² profiles, difficulty and learner wishes remain authoritative. Legacy decisions above are historical; adopted, adapted and rejected rules are recorded in the [safeguard audit](../architecture/language-safeguards.md). New chapters require useful integrated English learning notes, validated target-script forms and selected length. Orthography and contextual correctness guidance do not reinstate the old beginner curriculum or regional defaults. Linguistic and pedagogical quality remain review requirements.

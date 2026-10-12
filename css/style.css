@@ -325,3 +325,8 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px
 .reader-heading { display: flex; align-items: flex-start; gap: 12px; margin: 18px 0 14px; }
 .reader-panel .reader-heading h2 { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .reader-listen { flex: 0 0 44px; }
+
+.story-length-setting { margin-bottom: 24px; }
+.story-length-setting input { width: 100%; min-height: 44px; accent-color: var(--accent-strong); }
+.length-labels { display: flex; justify-content: space-between; color: var(--muted); font-size: 13px; }
+.recovery-panel > button { margin: 6px 0; }
