@@ -1001,8 +1001,11 @@ function selectedPassage() {
 function showSelectionToolbar() {
   const passage = selectedPassage(); const toolbar = $('selection-toolbar');
   if (!passage) { toolbar.hidden = true; state.readerSelection = null; return; }
+  const translationSelectionChanged = toolbar.hidden || !state.readerSelection ||
+    ['storyId', 'chapterId', 'versionId', 'start', 'end', 'text'].some(key => passage[key] !== state.readerSelection[key]);
   if (!state.readerSelection || passage.text !== state.readerSelection.text) closeWordNote();
   state.readerSelection = passage; toolbar.hidden = false;
+  if (translationSelectionChanged) refreshTranslationAvailability();
   $('selection-speak').disabled = !speech.available;
   $('selection-speak').title = speech.available ? 'Speak selected text' : 'Speech is available in App².';
   if (window.innerWidth > 700) {
@@ -1011,20 +1014,44 @@ function showSelectionToolbar() {
     toolbar.style.top = `${Math.max(12, rect.top - 56)}px`;
   } else { toolbar.classList.remove('floating-selection-toolbar'); toolbar.style.left = ''; toolbar.style.top = ''; }
 }
-async function refreshTranslationAvailability() {
+let translationAvailability = 'unknown';
+let translationLaunching = false;
+let translationCheckId = 0;
+let translationCheckPending = false;
+function renderTranslationButton() {
   const button = $('selection-translate');
+  button.disabled = translationLaunching || translationAvailability !== 'available';
+  button.title = translationLaunching ? 'Opening device translator' :
+    translationAvailability === 'available' ? 'Open selected text in your device translator' :
+    translationAvailability === 'unavailable' ? 'No device translation handler is available. Requires a supported App² host.' :
+    translationCheckPending ? 'Checking device translation availability' : 'Select text again to check device translation availability.';
+}
+async function refreshTranslationAvailability() {
+  if (document.hidden) return;
+  const checkId = ++translationCheckId;
+  translationCheckPending = true;
+  renderTranslationButton();
   try {
     const { available } = await translation.availability();
-    button.disabled = !available;
-    button.title = available ? 'Open selected text in your device translator' : 'No device translation handler is available. Requires a supported App² host.';
+    if (checkId === translationCheckId && !document.hidden) {
+      translationAvailability = available ? 'available' : 'unavailable';
+    }
   } catch {
-    button.disabled = true;
-    button.title = 'Could not check device translation availability.';
+    // A background rejection or timeout does not invalidate a confirmed handler.
+  } finally {
+    if (checkId === translationCheckId) {
+      translationCheckPending = false;
+      renderTranslationButton();
+    }
   }
 }
-refreshTranslationAvailability();
-window.addEventListener('pageshow', refreshTranslationAvailability);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTranslationAvailability(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    translationCheckId++;
+    translationCheckPending = false;
+    renderTranslationButton();
+  }
+});
 window.addEventListener('resize', () => { if (!$('selection-toolbar').hidden) showSelectionToolbar(); });
 let selectionTimer;
 document.addEventListener('selectionchange', () => { clearTimeout(selectionTimer); selectionTimer = setTimeout(showSelectionToolbar, 180); });
@@ -1461,11 +1488,12 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
   } finally { state.readerHelpBusy = false; }
 }
 $('selection-translate').addEventListener('click', async () => {
-  const passage = state.readerSelection; if (!passage) return;
-  const button = $('selection-translate'); button.disabled = true;
+  const passage = state.readerSelection;
+  if (!passage || translationLaunching || translationAvailability !== 'available') return;
+  translationLaunching = true; renderTranslationButton();
   try { await translation.open({ text: passage.text }); }
   catch (error) { toast(`Could not open translator: ${error.message}`); }
-  finally { refreshTranslationAvailability(); }
+  finally { translationLaunching = false; renderTranslationButton(); }
 });
 $('selection-speak').addEventListener('click', async () => {
   const passage = state.readerSelection; if (!passage || !speech.available) return;
