@@ -1,6 +1,6 @@
 import { ai, readFile, writeFile, speech, translation, selectionMenu } from './bridge.js';
 import { speakSelection, speakChapter } from './reader-speech.js';
-import { annotatedText, getCanonicalSelection, japaneseSegments, selectCanonicalText } from './reader-text.js';
+import { annotatedText, getCanonicalSelection, japaneseSegments } from './reader-text.js';
 import { createPipeline } from './generation-pipeline.js';
 import { SAFEGUARD_VERSION, LENGTHS, lengthPreference, parseContent, validateStory } from './learning-validation.js';
 import { saveBeforeAcknowledge } from './request-lifecycle.js';
@@ -1519,7 +1519,11 @@ $('selection-copy').addEventListener('click', async () => {
   try { if (!document.execCommand('copy')) await navigator.clipboard.writeText(passage.text); toast('Copied'); }
   catch { toast('Could not copy the selection.'); }
 });
-$('selection-all').addEventListener('click', () => { selectCanonicalText($('reader-story')); });
+$('reader-copy').addEventListener('click', async () => {
+  const story = readerStory(); if (!story) return;
+  try { await navigator.clipboard.writeText(activeVersion(activeChapter(story)).story); toast('Chapter copied'); }
+  catch { toast('Could not copy the chapter.'); }
+});
 // Android's own selection menu would compete with this bar; the bar remains the fallback elsewhere.
 selectionMenu.setSuppressed(true);
 $('reader-actions-toggle').addEventListener('click', toggleReaderActions);
