@@ -338,6 +338,9 @@ async function generate(event) {
     const connected = providers?.filter(provider => provider.connected) || [];
     const provider = connected.find(item => item.id === state.providerId) || connected[0];
     if (!provider) throw new Error('Open App² → Settings → AI and connect a provider, then return here.');
+    if (state.providerId && state.providerId !== provider.id) {
+      state.model = ''; state.reasoning = ''; state.models = [];
+    }
     state.providerId = provider.id;
     const modelsResult = await ai.models(provider.id);
     state.models = modelsResult.models || [];
@@ -1316,7 +1319,12 @@ async function readerAi(kind, input, instructions, requestPanel, config = { prov
   if (state.requestId) throw new Error('Another AI request is still running. Wait for it to finish before starting another.');
   if (!ai.available) throw new Error('Connect an AI provider in App² Settings → AI first.');
   const model = state.models.find(item => item.id === config.model); if (!model) throw new Error('Choose an available AI model in Settings first.');
-  const providerId = config.providerId || 'chatgpt';
+  const { providers } = await ai.providers();
+  const connected = providers?.filter(provider => provider.connected) || [];
+  const provider = connected.find(item => item.id === (config.providerId || state.providerId)) || connected[0];
+  if (!provider) throw new Error('Connect an AI provider in App² Settings → AI first.');
+  if (config.providerId && provider.id !== config.providerId) throw new Error('The available AI provider changed. Choose a model in Settings first.');
+  const providerId = provider.id;
   state.requestId = 'starting';
   let id;
   try { id = await ai.start({ providerId, model: model.id, instructions, input: JSON.stringify({ kind, ...input }), reasoningEffort: model.reasoningLevels?.includes(config.reasoning) ? config.reasoning : undefined }); }
@@ -1611,32 +1619,44 @@ $('reader-edit-submit').addEventListener('click', async () => {
 $('reader-dialog').addEventListener('click', event => { if (event.target === $('reader-dialog')) $('reader-dialog').close(); });
 
 
+let modelRefreshVersion = 0;
 async function refreshModels() {
+  const refreshVersion = ++modelRefreshVersion;
   const select = $('model-select');
   if (!ai.available) { $('ai-setup').hidden = false; $('model-controls').hidden = true; return; }
   try {
     const {providers} = await ai.providers();
+    if (refreshVersion !== modelRefreshVersion) return;
     const connected = providers?.filter(provider => provider.connected) || [];
     const provider = connected.find(item => item.id === state.providerId) || connected[0];
     if (!provider) {
+      state.models = [];
       $('ai-setup').hidden = false; $('model-controls').hidden = true;
       $('ai-setup').querySelector('.helper').textContent = ai.developmentLive
         ? 'ChatGPT is not connected in Codex. Run `codex login`, then restart the development server with --chatgpt.'
         : 'Open App² → Settings → AI, then connect a provider. Return here when it’s ready.';
       return;
     }
+    const hadModel = !!state.model;
+    const providerChanged = !!state.providerId && state.providerId !== provider.id;
+    if (providerChanged) { state.model = ''; state.reasoning = ''; state.models = []; }
     state.providerId = provider.id; $('ai-setup').hidden = true; $('model-controls').hidden = false;
-    const response = await ai.models(provider.id); state.models = response.models || [];
+    const response = await ai.models(provider.id);
+    if (refreshVersion !== modelRefreshVersion) return;
+    state.models = response.models || [];
+    if (!state.models.some(model => model.id === state.model)) { state.model = ''; state.reasoning = ''; }
+    persistSettings();
     select.textContent = '';
     state.models.forEach(model => { const option = document.createElement('option'); option.value = model.id; option.textContent = model.name; select.append(option); });
     if (state.models.length) {
       const normalize = value => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      const preferred = ai.developmentMock ? state.models[0] : (state.models.find(item => item.id === state.model) || state.models.find(item => normalize(item.id) === normalize(PREFERRED_MODEL) || normalize(item.name) === normalize(PREFERRED_MODEL)));
+      const preferred = ai.developmentMock ? state.models[0] : (state.models.find(item => item.id === state.model) || (!providerChanged && !hadModel && state.models.find(item => normalize(item.id) === normalize(PREFERRED_MODEL) || normalize(item.name) === normalize(PREFERRED_MODEL))));
       select.disabled = false;
       if (preferred) { state.model = preferred.id; select.value = preferred.id; select.dispatchEvent(new Event('change')); }
       else { state.model = ''; select.selectedIndex = -1; }
-    } else { select.innerHTML = '<option>No models available</option>'; }
-  } catch { $('ai-setup').hidden = false; $('model-controls').hidden = true; }
+    } else { state.model = ''; state.reasoning = ''; select.disabled = true; select.innerHTML = '<option>No models available</option>'; }
+    if (!state.model) { $('reasoning-select').value = ''; $('reasoning-select').hidden = true; $('reasoning-label').hidden = true; }
+  } catch { if (refreshVersion !== modelRefreshVersion) return; $('ai-setup').hidden = false; $('model-controls').hidden = true; }
 }
 $('language-settings-open').addEventListener('click', () => setView('settings'));
 $('language-setup-dismiss').addEventListener('click', () => {
