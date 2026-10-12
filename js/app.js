@@ -998,6 +998,20 @@ function selectedPassage() {
   const selection = window.getSelection(), range = selection.getRangeAt(0);
   return { ...value, sentence: sentenceContext(version.story, value.start, value.end), storyId: story.id, chapterId: chapter.id, versionId: version.id, language: story.language, languageTag: SPEECH_LANGUAGES[story.language] || 'en', profile: profileSnapshot(story), rect: range.getBoundingClientRect() };
 }
+function positionSelectionToolbar(rect = state.readerSelection?.rect) {
+  const toolbar = $('selection-toolbar'); if (!rect || toolbar.hidden) return;
+  const gap = 10, margin = 8, vw = window.innerWidth, vh = window.visualViewport?.height || window.innerHeight;
+  const topLimit = margin;
+  const { width, height } = toolbar.getBoundingClientRect();
+  const left = Math.max(margin, Math.min(vw - width - margin, rect.left + rect.width / 2 - width / 2));
+  // Prefer above the selection; fall back to below, clear of mobile selection handles.
+  const above = rect.top - height - gap, handles = matchMedia('(pointer: coarse)').matches ? 26 : 0;
+  const below = rect.bottom + gap + handles;
+  const top = above >= topLimit ? above : Math.min(below, vh - height - margin);
+  toolbar.style.left = `${Math.round(left)}px`;
+  toolbar.style.top = `${Math.round(Math.max(topLimit, top))}px`;
+  toolbar.classList.toggle('below-selection', above < topLimit);
+}
 function showSelectionToolbar() {
   const passage = selectedPassage(); const toolbar = $('selection-toolbar');
   if (!passage) { toolbar.hidden = true; state.readerSelection = null; return; }
@@ -1008,11 +1022,7 @@ function showSelectionToolbar() {
   if (translationSelectionChanged) refreshTranslationAvailability();
   $('selection-speak').disabled = !speech.available;
   $('selection-speak').title = speech.available ? 'Speak selected text' : 'Speech is available in App².';
-  if (window.innerWidth > 700) {
-    const rect = passage.rect; toolbar.classList.add('floating-selection-toolbar');
-    toolbar.style.left = `${Math.max(12, Math.min(window.innerWidth - 390, rect.left))}px`;
-    toolbar.style.top = `${Math.max(12, rect.top - 56)}px`;
-  } else { toolbar.classList.remove('floating-selection-toolbar'); toolbar.style.left = ''; toolbar.style.top = ''; }
+  positionSelectionToolbar(passage.rect);
 }
 let translationAvailability = 'unknown';
 let translationLaunching = false;
@@ -1053,6 +1063,8 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 window.addEventListener('resize', () => { if (!$('selection-toolbar').hidden) showSelectionToolbar(); });
+document.addEventListener('scroll', () => { if (!$('selection-toolbar').hidden) showSelectionToolbar(); }, true);
+window.visualViewport?.addEventListener('resize', () => { if (!$('selection-toolbar').hidden) showSelectionToolbar(); });
 let selectionTimer;
 document.addEventListener('selectionchange', () => { clearTimeout(selectionTimer); selectionTimer = setTimeout(showSelectionToolbar, 180); });
 $('selection-toolbar').addEventListener('pointerdown', event => { event.preventDefault(); clearTimeout(selectionTimer); });
