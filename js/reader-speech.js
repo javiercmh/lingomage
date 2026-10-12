@@ -38,3 +38,21 @@ export async function speakSelection(speech, text, language) {
   const { options } = await prepareSpeechOptions(speech, text, language);
   return speech.speak(options);
 }
+
+// Keep whole-chapter playback below Android's per-utterance input limit.
+export async function speakChapter(speech, text, language, isCurrent = () => true) {
+  const { options } = await prepareSpeechOptions(speech, text, language);
+  let remaining = text;
+  while (remaining && isCurrent()) {
+    let end = Math.min(2000, remaining.length);
+    if (end < remaining.length) {
+      const boundary = remaining.lastIndexOf(' ', end);
+      if (boundary > end / 2) end = boundary + 1;
+      if (/[\uD800-\uDBFF]/u.test(remaining[end - 1])) end--;
+    }
+    const result = await speech.speak({ ...options, text: remaining.slice(0, end) });
+    if (result?.status === 'cancelled') return result;
+    remaining = remaining.slice(end);
+  }
+  return { status: isCurrent() ? 'completed' : 'cancelled' };
+}

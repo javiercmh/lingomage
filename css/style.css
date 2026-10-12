@@ -314,3 +314,14 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px
 
 .reader-actions-menu { max-width: calc(100vw - var(--sa-left) - var(--sa-right) - 24px); max-height: calc(100dvh - 24px); overflow-y: auto; }
 .reader-actions-menu .helper { margin: 4px 12px 8px; }
+
+.reader-generation-bar { position: fixed; z-index: 9; bottom: calc(12px + var(--sa-bottom)); left: max(12px, var(--sa-left)); right: max(12px, var(--sa-right)); max-width: 756px; margin: auto; display: flex; align-items: center; gap: 8px; padding: 10px; background: #24344e; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 8px 30px #0009; }
+.reader-generation-bar[hidden] { display: none; }
+.reader-generation-bar span { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
+.reader-generation-bar button { min-height: 44px; flex-shrink: 0; }
+.reader-panel.has-generation-status { padding-bottom: calc(160px + var(--sa-bottom)); }
+.reader-panel.has-generation-status .selection-toolbar:not(.floating-selection-toolbar), .reader-panel.has-generation-status .explanation-selection-toolbar { bottom: calc(100px + var(--sa-bottom)); }
+
+.reader-heading { display: flex; align-items: flex-start; gap: 12px; margin: 18px 0 14px; }
+.reader-panel .reader-heading h2 { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.reader-listen { flex: 0 0 44px; }

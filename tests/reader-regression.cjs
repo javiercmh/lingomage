@@ -15,6 +15,7 @@ function sandbox(extra = {}) {
     get textContent(){return this.childNodes.map(node=>node.textContent).join('');},set textContent(value){this.childNodes=value ? [{tagName:'#text',textContent:String(value)}] : [];},
     append(...nodes){this.childNodes.push(...nodes);},addEventListener(name,fn){this.events[name]=fn;},setAttribute(name,value){this.attributes[name]=value;},focus(){this.focused=true;},scrollIntoView(){},remove(){},querySelector(selector){return this.childNodes.find(node=>node.tagName===selector) || this.childNodes.map(node=>node.querySelector?.(selector)).find(Boolean) || null;},querySelectorAll(){return [];},classList:{add(){},remove(){},toggle(){}}});
   const c = {state:{},console,crypto:{randomUUID:(()=>{let id=0;return ()=>`help-test-${++id}`;})()},PROMPT_VERSION:'test',STORY_GUIDES:{de:{beginner:'Simple sentences'}},renderChapterRequest(){},LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},SPEECH_LANGUAGES:{de:'de-DE',ja:'ja-JP',ru:'ru-RU','es-CL':'es-CL'},renderGenerationRecovery(){},readerPanel:()=>({classList:{toggle(){}}}),$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{createElement:element,createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},...extra};
+  c.readerGeneration = null; c.renderReaderGeneration = () => {}; c.setReaderGeneration = value => { c.readerGeneration = value; };
   vm.createContext(c);
   vm.runInContext(readerTextSource, c);
   vm.runInContext(requestLifecycleSource, c);
@@ -160,7 +161,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   const original={id:'A',language:'ja',chapters:[{id:'CA',help:[],versions:[{id:'VA',story:'日本'}]}]};
   const other={id:'B',language:'de',chapters:[{id:'CB',help:[],versions:[{id:'VB'}]}]};current=original;
   const help=sandbox({state:{readerId:'A',readerSelection:{storyId:'A',text:'日本',start:0,end:2,chapterId:'CA',versionId:'VA',profile:{}},model:'mock',providerId:'mock'},readerStory:()=>current,normalizeChapters:s=>s.chapters,activeChapter:()=>current.chapters[0],activeVersion:()=>current.chapters[0].versions[0],readerPanel:()=>({scrollTop:150}),persistReaderStory(){},readerAi:()=>{helpRequests++;return new Promise(r=>finish=r);},decodeHelp:JSON.parse,renderSavedHelp(){},ai:{acknowledge:async()=>{}}});
-  vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(',"$('selection-explain')"),help);
+  vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(',"$('selection-translate')"),help);
   const pending=help.explainSelection();await new Promise(r=>setImmediate(r));
   await help.explainSelection();assert.equal(helpRequests,1);
   assert.equal(help.state.activeHelpRequest.storyId,'A');assert.equal(help.state.activeHelpRequest.chapterId,'CA');assert.equal(help.state.activeHelpRequest.versionId,'VA');assert.equal(help.state.activeHelpRequest.action,'initial');
@@ -226,7 +227,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
     const story = {id:'S',language:code,chapters:[chapter]};
     let request, instructions, saved = false;
     const f = sandbox({state:{readerId:'S',providerId:'mock',model:'model'},readerStory:()=>story,normalizeChapters:s=>s.chapters,activeChapter:()=>chapter,activeVersion:()=>version,readerPanel:()=>({scrollTop:0}),persistReaderStory(){saved=true;},readerAi:async(kind,input,prompt)=>{request=input;instructions=prompt;f.state.pendingReaderRequestId='r';saved=false;return 'The ending adds a boundary.\n\n「でも」 marks a contrast.';},decodeHelp:text=>({explanation:text}),renderSavedHelp(){},ai:{acknowledge:async()=>{assert.equal(saved,true);}}});
-    vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(', "$('selection-explain')"),f);
+    vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(', "$('selection-translate')"),f);
     const selected = {storyId:'S',chapterId:'C',versionId:'V',helpId:'H',text:'く',start:3,end:4,profile:{}};
     await f.explainSelection('explain','detail','explain prefixes',selected);
     assert.equal(request.followUp,'explain prefixes');
@@ -368,7 +369,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   const version={id:'V',story:v.story};const chapter4={id:'C',help:[entry],versions:[version]};const story4={id:'S',language:'ja',chapters:[chapter4]};
   const selected4={storyId:'S',chapterId:'C',versionId:'V',helpId:'H',text:'く',start:3,end:4,profile:{}};
   const examplePending=sandbox({state:{readerId:'S',model:'mock',providerId:'mock'},readerStory:()=>story4,normalizeChapters:s=>s.chapters,activeChapter:()=>chapter4,activeVersion:()=>version,readerPanel:()=>({scrollTop:0}),persistReaderStory(){if(examplePending.state.pendingReaderResult && failExampleSave)throw Error('disk');},readerAi:async(kind,input)=>{callCount++;captured=input;examplePending.state.pendingReaderRequestId='request';return JSON.stringify({examples});},renderSavedHelp(){},ai:{acknowledge:async()=>{assert.ok(entry.followUps?.some(entry=>entry.action==='examples'));if(failExampleAck)throw Error('ack');}}});
-  vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('function decodeHelp(', "$('selection-explain')"),examplePending);
+  vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('function decodeHelp(', "$('selection-translate')"),examplePending);
   await examplePending.explainSelection('explain','examples','',selected4);
   assert.equal(entry.followUps,undefined);assert.equal(examplePending.state.pendingReaderResult.saved,false);
   assert.equal(captured.sourceText,v.story);assert.equal(captured.action,'examples');

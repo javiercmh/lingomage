@@ -50,3 +50,7 @@ user instructions; local changes are unavailable to GitHub updates until publish
 Package with App²'s `scripts/package_subapp.py`; it uses empty declared seed
 defaults rather than copying local stories or settings. ZIP installation belongs
 to the App² library; Share & Package is export-only.
+
+## Device translation
+
+`translation` from `js/bridge.js` exposes `availability()` → `{available: boolean}` and `open({text})` → `{opened: true}`. App² forwards text via Android ACTION_TRANSLATE to the configured handler or resolver. It returns no translation and accepts no language settings. Call only after a user action, with canonical text without readings. Browsers and older hosts report unavailable. Blank text or more than 100000 UTF-16 code units is rejected by the host. Handle `.code`/`.message` errors (`invalid_request`, `unavailable`, `timeout`) without automatic retry. The external translation tool may process text online.
