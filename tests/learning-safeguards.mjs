@@ -118,5 +118,13 @@ const boxes=new Map();const box=id=>{if(!boxes.has(id)){const b=element('section
 const recovery={pipeline:{records:[{kind:'create',stage:'readings'}],busy:true},readerGeneration:null,state:{readerId:null},$:box,document:{createElement:element},renderReaderGeneration(){},resumeCheckpoint(){}};
 vm.createContext(recovery);vm.runInContext(source.slice(source.indexOf('function renderCheckpointRecovery('),source.indexOf('async function resumeCheckpoint(')),recovery);recovery.renderCheckpointRecovery();
 assert.equal(box('generation-status').textContent,'Adding kanji readings…');assert.equal(box('checkpoint-recovery-reader').hidden,true);
+recovery.pipeline.busy=false;
+recovery.pipeline.records[0].error='The AI included a vocabulary note for a word or phrase that does not appear in the chapter. Explicitly retry or discard this request.';
+recovery.renderCheckpointRecovery();
+assert.equal(box('checkpoint-recovery-create').children[1].textContent,'Retry');
+assert.ok(box('checkpoint-recovery-create').children[0].textContent.includes('Use Retry below, or Discard'));
+assert.ok(!box('checkpoint-recovery-create').textContent.includes('Explicitly retry'));
+recovery.pipeline.records[0].stage='ready';recovery.renderCheckpointRecovery();
+assert.equal(box('checkpoint-recovery-create').children[1].textContent,'Save / finish');
 assert.equal(JSON.parse(fs.readFileSync(new URL('../data/language-safeguards.json',import.meta.url))).version,SAFEGUARD_VERSION);
 console.log('PASS current language requirements and staged generation regressions');

@@ -505,7 +505,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   await submit();assert.equal(gen.$('reader-prompt').value,'Next');
   assert.equal(gen.state.readerEditBusy,false);assert.equal(gen.state.activeChapterRequest,null);
   assert.equal(gen.state.readerEditDraft.chapterId,story3.chapters[0].id);
-  assert.ok(gen.$('reader-edit-error').textContent.includes('explicitly retry'));
+  assert.ok(gen.$('reader-edit-error').textContent.includes('Submit again to retry'));
   console.log('PASS failed chapter request clears loading and retains an anchored prompt for explicit retry');
 
   let cancelAction, rejectWait, cancelCalls=0;

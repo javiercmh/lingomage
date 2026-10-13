@@ -28,7 +28,7 @@ export function validateStory(value, language, unusedLegacyLength) {
     if (!Array.isArray(note.forms) || !note.forms.length || note.forms.length > 20) invalid('Each learning note needs 1–20 exact chapter forms.');
     for (const form of note.forms) {
       boundedText(form, 500, 'Note form'); validateScript(form, language);
-      if (!findGlossaryMatches(value.story, [{ ...note, forms: [form] }]).length) invalid('A learning note refers to a form absent from this chapter.');
+      if (!findGlossaryMatches(value.story, [{ ...note, forms: [form] }]).length) invalid('The AI included a vocabulary note for a word or phrase that does not appear in the chapter. The new chapter was not saved.');
     }
   }
   // Model annotations are ignored: the app owns Japanese boundaries.

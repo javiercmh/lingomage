@@ -144,8 +144,8 @@ function renderCheckpointRecovery() {
     box.hidden = !op || id === 'checkpoint-recovery-reader' && op.target?.storyId !== state.readerId || id === 'checkpoint-recovery-create' && pipeline.busy && !$('loading-card').hidden;
     if (box.hidden) continue;
     const message = document.createElement('p'); message.className='helper'; message.setAttribute('role','status');
-    message.textContent = pipeline.busy ? stageMessage : op.error || 'A generation is unfinished. Resume its saved progress or discard it.';
-    const resume = document.createElement('button'); resume.type='button'; resume.className='secondary-btn'; resume.textContent=op.stage === 'ready' || op.stage === 'applied' ? 'Save / finish' : 'Resume'; resume.disabled=pipeline.busy;
+    message.textContent = pipeline.busy ? stageMessage : op.error ? `${op.error.replace(/ Explicitly retry or discard this request\.$/, '')} Use ${op.stage === 'ready' || op.stage === 'applied' ? 'Save / finish' : 'Retry'} below, or Discard to abandon this attempt.` : 'A generation is unfinished. Resume its saved progress or discard it.';
+    const resume = document.createElement('button'); resume.type='button'; resume.className='secondary-btn'; resume.textContent=op.stage === 'ready' || op.stage === 'applied' ? 'Save / finish' : op.error ? 'Retry' : 'Resume'; resume.disabled=pipeline.busy;
     resume.addEventListener('click', () => resumeCheckpoint(op));
     const discard = document.createElement('button'); discard.type='button'; discard.className=pipeline.busy ? 'small-btn reader-ai-cancel' : 'small-btn'; discard.textContent=pipeline.busy ? 'Cancel request' : 'Discard';
     discard.addEventListener('click', async () => {
@@ -1605,7 +1605,7 @@ $('reader-edit-submit').addEventListener('click', async () => {
   } catch (error) {
     try { await releaseInvalidReaderResponse(); } catch {}
     if (readerGeneration) setReaderGeneration({ ...readerGeneration, phase: 'error', message: error.message });
-    const message = error.message === 'Request cancelled.' ? 'Generation cancelled.' : `${error.message} Submit again to explicitly retry.`;
+    const message = error.message === 'Request cancelled.' ? 'Generation cancelled.' : pipeline?.records.length ? 'The request stopped. Use Retry in the recovery panel below, or Discard. Your existing chapter is unchanged.' : `${error.message} Submit again to retry.`;
     state.readerEditDraft = { storyId: story.id, pathId: path.id, chapterId: chapter.id, mode, prompt, error: message };
     if (state.readerId === story.id) {
       state.readerChapter = chapters.indexOf(chapter); updateReader();
