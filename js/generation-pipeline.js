@@ -1,5 +1,5 @@
 import { PLAN_INSTRUCTIONS, decodePlan } from './story-generation.js';
-import { parseContent, validateProse, validateNotes, validateStory, validateExamples, readingPlan, attachReadings, NOTES_INSTRUCTIONS, READING_INSTRUCTIONS, SAFEGUARD_VERSION } from './learning-validation.js';
+import { parseContent, validateContentSize, validateProse, validateNotes, validateStory, validateExamples, readingPlan, attachReadings, NOTES_INSTRUCTIONS, READING_INSTRUCTIONS, SAFEGUARD_VERSION } from './learning-validation.js';
 
 // Checkpoints are user data. Valid stage results are durable before release;
 // the final application is idempotent via operationId on saved records.
@@ -60,6 +60,7 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
           let content;
           try {
             content = stage === 'plan' ? response : stage === 'prose' ? (op.kind === 'examples' ? validateExamples(response,op.language) : validateProse(response,op.language)) : stage === 'notes' ? validateNotes(response,op.prose,op.language) : attachReadings(validate(op),readingPlan(op.prose,op.kind),response,op.kind);
+            validateContentSize(content);
           } catch (error) {
             if (op.request) { op.request.completed=true; op.request.invalid=true; save(); await release(op); } throw error;
           }

@@ -9,7 +9,7 @@ The current App² product is the specification. The former Kotlin application su
 | Canonical text distinct from readings; kanji-only ruby | Adopted | Plain text remains authoritative for copy, speech and offsets. Display normalization never rewrites saved annotations. |
 | App-owned Japanese spans and contextual readings | Adopted | Separate occurrence IDs, contextual kana, exact coverage and UTF-16 offsets prevent model-owned annotation boundaries. Stories and examples use this pipeline. |
 | Mandatory Japanese glossary-headword readings | Rejected | Keep current word-note headword presentation unchanged; only title, story and examples receive readings. |
-| Fixed 100–150 words / 8–12 Japanese sentences | Adapted | Retired by PED-004 during integration: scene/chapter/longer narrative scope replaces numerical quotas; technical bounds remain active. |
+| Fixed 100–150 words / 8–12 Japanese sentences | Adapted | Retired by PED-004 during integration: scene/chapter narrative scope replaces numerical quotas; technical bounds remain active. |
 | Japanese without romaji; Russian Cyrillic without Latin transliteration | Adopted | Script checks include canonical title, story, headwords/forms and examples; names use the target script. |
 | Unconditional Russian stress-mark ban | Rejected | Default normal spelling, but permit explicitly requested stress marks. The validator does not claim to infer learner intent or linguistic correctness. |
 | Exact real story forms; no substring coverage trick | Adopted | Notes use the same exact forms and word-boundary matching as reader underlines. |

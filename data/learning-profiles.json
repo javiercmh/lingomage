@@ -239,10 +239,6 @@
     "chapter": {
       "label": "Chapter",
       "description": "Several connected events with room for development."
-    },
-    "longer": {
-      "label": "Longer passage",
-      "description": "A sustained sequence of events with more development."
     }
   },
   "sources": {

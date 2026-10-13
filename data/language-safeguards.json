@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-13.3",
+  "version": "2026-10-13.4",
   "basis": "Current App\u00b2 requirements; legacy code contributes selected techniques only. Structural and prompt checks do not certify linguistic quality or learning effectiveness.",
   "requirements": [
     {
@@ -33,7 +33,7 @@
       "id": "LANG-004",
       "status": "active",
       "enforcement": "deterministic",
-      "requirement": "Current technical field and collection bounds reject malformed or oversized outputs.",
+      "requirement": "Technical field bounds, per-note form bounds and a 1000000 UTF-16-unit total response bound reject malformed or oversized outputs; there is no fixed note-count cap.",
       "implementation": "js/learning-validation.js",
       "test": "tests/learning-safeguards.mjs",
       "limitation": "Behavioral tests establish the stated structural contract only."

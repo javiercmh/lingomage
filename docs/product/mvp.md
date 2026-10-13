@@ -28,7 +28,7 @@ Native App² generation and qualified language review remain pending.
 
 These are product assumptions, not established optimal learning parameters:
 
-- Reading scope: Scene, Chapter or Longer passage, default Scene. No numeric word/sentence quota applies.
+- Reading scope: Scene or Chapter, default Scene (side-by-side segmented control). The earlier Longer passage option was retired as confusing next to Chapter; saved records that used it are read as Chapter. No numeric word/sentence quota applies.
 - Language plans offer up to five vocabulary candidates and two grammar focuses, possibly none; these counts are unvalidated product choices.
 - Request level-guided vocabulary/grammar, narrative cohesion, contextual support and natural use of practice topics.
 - Japanese displays furigana above kanji by default; other story text uses

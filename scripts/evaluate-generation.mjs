@@ -9,7 +9,7 @@ import {parseContent,validateStory,readingPlan,attachReadings,READING_INSTRUCTIO
 import {findGlossaryMatches} from '../js/reader-text.js';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const args=process.argv.slice(2);const option=(key,fallback)=>{const i=args.indexOf(key);return i<0?fallback:args[i+1];};
-const suite=option('--suite','models'),endpoint=option('--endpoint','http://localhost:8889'),model=option('--model','gpt-6-sol'),effort=option('--effort','low');
+const suite=option('--suite','models'),endpoint=option('--endpoint','http://localhost:8889'),model=option('--model','gpt-6.1-sol'),effort=option('--effort','low');
 const output=path.resolve(option('--output',path.join(root,'docs/validation/generation-evaluation',suite)));
 const limit=Number(option('--limit','Infinity'));const retry=args.includes('--retry');const languageFilter=option('--language','');
 if(!['models','pilot','followups'].includes(suite))throw Error('Expected models, pilot or followups suite.');
@@ -17,10 +17,11 @@ if(!/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(endpoint))throw Error('Use th
 fs.mkdirSync(output,{recursive:true});
 const read=p=>JSON.parse(fs.readFileSync(p,'utf8'));const write=(p,value)=>{fs.writeFileSync(p+'.tmp',JSON.stringify(value,null,2)+'\n');fs.renameSync(p+'.tmp',p);};
 const app=fs.readFileSync(path.join(root,'js/app.js'),'utf8');const promptVersion=/const PROMPT_VERSION = '([^']+)'/.exec(app)[1];
-function loadPrompt(source){const context={};vm.createContext(context);vm.runInContext(source,context);return context.storyInstructions;}
-const revised=loadPrompt(app.slice(app.indexOf('function storyInstructions('),app.indexOf('function storyInput(')));
+function loadPrompt(source){const context={};vm.createContext(context);vm.runInContext(source,context);return context;}
+const revisedPrompts=loadPrompt(app.slice(app.indexOf('function storyInstructions('),app.indexOf('function storyInput(')));
 const baseline=read(path.join(root,'docs/validation/generation-evaluation/baseline.json'));
-const original=loadPrompt(baseline.storyInstructionsSource);
+const original=loadPrompt(baseline.storyInstructionsSource).storyInstructions;
+const revised=revisedPrompts.storyInstructions;
 const profiles=read(path.join(root,'data/learning-profiles.json'));
 const languages={de:'German',ja:'Japanese',ru:'Russian','es-CL':'Spanish'};
 const briefs=['Two friends at a railway station discover their tickets are for different destinations.','A customer and a shopkeeper misunderstand which parcel belongs to whom.'];
@@ -33,16 +34,16 @@ const info=await (await fetch(endpoint+'/__bridge/info')).json();if(!info.liveAi
 const available=(await bridge({action:'models',providerId:'chatgpt'})).models;
 let cases=[];
 for(const language of Object.keys(languages))for(const difficulty of language==='ja'?['N5','N3','N1']:['A1','B1','C1']) {
- const variants=suite==='models'?[['sol-low','gpt-6-sol','low'],['luna-high','gpt-6-luna','high']]:[['baseline',model,effort],['revised',model,effort]];
+ const variants=suite==='models'?[['sol-low','gpt-6.1-sol','low'],['luna-high','gpt-6-luna','high']]:[['baseline',model,effort],['revised',model,effort]];
  if(suite==='followups')continue;
  for(let brief=0;brief<(suite==='models'?1:2);brief++)for(const [variant,m,e] of variants)cases.push({id:`${language}-${difficulty}-${brief}-${variant}`,variant,model:m,effort:e,input:input(language,difficulty,brief),kind:'create'});
 }
-if(suite==='followups')for(const language of Object.keys(languages))for(const kind of ['continue','rewrite','chapter','longer']){
+if(suite==='followups')for(const language of Object.keys(languages))for(const kind of ['continue','rewrite','chapter']){
  const difficulty=language==='ja'?'N5':'A1';
  const parentFile=path.join(root,'docs/validation/generation-evaluation/pilot',`${language}-${difficulty}-0-revised.json`);
  if(!fs.existsSync(parentFile)||!read(parentFile).result)throw Error(`A completed pilot source is required: ${path.basename(parentFile)}`);
  const parent=read(parentFile).result;
- const value=input(language,difficulty,0,['chapter','longer'].includes(kind)?kind:'scene');
+ const value=input(language,difficulty,0,['chapter'].includes(kind)?kind:'scene');
  if(['continue','rewrite'].includes(kind)){value.recentProse=parent.story;value.storyMemory={characters:[],facts:[],plot:[],unresolved:[],uncertainties:[],situation:[]};value.prompt='';if(kind==='rewrite')value.currentChapter={title:parent.title,story:parent.story};}
  cases.push({id:`${language}-${difficulty}-${kind}`,variant:'revised',model,effort,input:value,kind:['continue','rewrite'].includes(kind)?kind:'create'});
 }
@@ -60,12 +61,11 @@ for(const spec of cases){
  async acknowledge(id){await bridge({action:'acknowledge',requestId:id});const trace=record.stages.find(s=>s.requestId===id);if(trace){trace.released=true;save();}},async cancel(id){await bridge({action:'cancel',requestId:id});}};
  const config={providerId:'chatgpt',model:spec.model,reasoning:spec.effort};
  let instructions=(spec.variant==='baseline'?original:revised)(spec.input.language,spec.input.difficulty,spec.input.levelDescription);
- if(spec.kind==='continue')instructions+=' Write the next chapter after supplied storyMemory and recentProse. An empty prompt continues naturally; preserve unresolved events and character continuity.';
- if(spec.kind==='rewrite')instructions+=' Rewrite only currentChapter as an alternate telling preserving its main events and narrative role. An empty prompt requests a fresh telling.';
+ if(['continue','rewrite'].includes(spec.kind))instructions=revisedPrompts.chapterInstructions(spec.input.language,spec.input.difficulty,spec.input.levelDescription,spec.kind);
  try {
  if(spec.variant==='baseline'){
    // Original combined writer baseline, with durable per-stage results before release.
-   const stage=async(kind,data,prompt,validate)=>{let saved=record.stages.find(s=>s.stage===kind&&s.validated);if(saved){if(!saved.released)await ai.acknowledge(saved.requestId);return saved.validated;}const pending=record.stages.find(s=>s.stage===kind&&!s.released&&s.requestId);const id=pending?.requestId||await ai.start({...config,reasoningEffort:config.reasoning,instructions:prompt,input:JSON.stringify(data)});const raw=await ai.wait(id);try{const value=validate(raw);record.stages.find(s=>s.requestId===id).validated=value;save();await ai.acknowledge(id);return value;}catch(error){await ai.acknowledge(id);throw error;}};
+   const stage=async(kind,data,prompt,validate)=>{let saved=record.stages.find(s=>s.stage===kind&&s.validated);if(saved){if(!saved.released)await ai.acknowledge(saved.requestId);return saved.validated;}const pending=record.stages.find(s=>s.stage===kind&&!s.released&&s.requestId);const id=pending?.requestId||await ai.start({...config,reasoningEffort:config.reasoning,instructions:prompt,input:JSON.stringify(data)});const raw=await ai.wait(id);let value;try{value=validate(raw);}catch(error){await ai.acknowledge(id);throw error;}record.stages.find(s=>s.requestId===id).validated=value;save();await ai.acknowledge(id);return value;};
    const plan=await stage('language-plan',{...spec.input,kind:'language-plan'},PLAN_INSTRUCTIONS,raw=>decodePlan(raw,spec.input.languageCode));
    let result=await stage(spec.kind,{...spec.input,kind:spec.kind,languagePlan:plan},instructions,raw=>validateStory(parseContent(raw),spec.input.languageCode));
    if(spec.input.languageCode==='ja'){const plan=readingPlan(result);if(plan.spans.length)result=await stage('readings',{kind:'readings',languageCode:'ja',spans:plan.spans},READING_INSTRUCTIONS,raw=>attachReadings(result,plan,parseContent(raw)));}
@@ -75,5 +75,5 @@ for(const spec of cases){
    const op=record.records[0]||pipeline.create({planned:true,kind:spec.kind,language:spec.input.languageCode,input:spec.input,instructions,config,promptVersion,safeguardVersion:SAFEGUARD_VERSION});await pipeline.run(op);
  }
  record.metrics={notes:record.result.glossary.length,matchedOccurrences:findGlossaryMatches(record.result.story,record.result.glossary).length,canonicalUnits:record.result.story.length};record.completedAt=new Date().toISOString();save();console.log(spec.id+': complete ('+record.metrics.notes+' notes)');
- }catch(error){record.error=error.message;save();console.log(spec.id+': rejected: '+error.message);if(!['invalid_request','provider'].includes(error.code))continue;throw error;}
+ }catch(error){record.error=error.message;save();console.log(spec.id+': rejected: '+error.message);if(error.code||record.records[0]?.request||record.stages.some(s=>s.requestId&&!s.released))throw error;}
 }

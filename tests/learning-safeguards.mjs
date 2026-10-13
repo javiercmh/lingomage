@@ -33,7 +33,8 @@ assert.ok(validateStory(good,'de')); tested('LANG-003');
 for (const [field,max] of [['title',500],['story',30000]]) {const bad=structuredClone(good);bad[field]='x'.repeat(max+1);assert.throws(()=>validateStory(bad,'de'),/at most/);}
 for (const [field,max] of [['word',500],['meaning',4000]]) {const bad=structuredClone(good);bad.glossary[0][field]='x'.repeat(max+1);assert.throws(()=>validateStory(bad,'de'),/at most/);}
 const badForms=structuredClone(good);badForms.glossary[0].forms=Array(21).fill('Stadt');assert.throws(()=>validateStory(badForms,'de'),/1–20/);
-assert.throws(()=>validateStory({...good,glossary:Array(101).fill(good.glossary[0])},'de'),/1–100/);tested('LANG-004');
+assert.equal(validateStory({...good,glossary:Array(101).fill(good.glossary[0])},'de').glossary.length,101);
+assert.throws(()=>validateStory({...good,glossary:Array(300).fill({...good.glossary[0],meaning:'a'.repeat(4000)})},'de'),/technical size/);tested('LANG-004');
 const canonical={title:'今日',story:'今日は町へ行きます。今日も町へ行きます。𠮷'};
 const plan=readingPlan(canonical);assert.equal(plan.spans.filter(s=>s.text==='今日').length,3);assert.equal(plan.spans.at(-1).end-plan.spans.at(-1).start,2);
 const response={readings:plan.spans.map(s=>({id:s.id,reading:s.text==='今日'?'きょう':'まち'}))};
@@ -108,6 +109,15 @@ const fixtures=JSON.parse(execFileSync('python3',['-c',`import json
 from dev_server import Handler
 print(json.dumps([dict(language=l,length=n,content=json.loads(Handler.mock_story(json.dumps({'languageCode':l,'storyLength':n})))) for l in ['de','ja','ru','es-CL'] for n in ['short','medium','long']]))`],{encoding:'utf8'}));
 for (const fixture of fixtures) validateStory(fixture.content,fixture.language,fixture.length);
+for (const fixture of fixtures) {
+  const notes=JSON.parse(execFileSync('python3',['-c',`import json,sys
+from dev_server import Handler
+print(Handler.mock_notes(json.load(sys.stdin)))`],{encoding:'utf8',input:JSON.stringify({languageCode:fixture.language,chapter:fixture.content})}));
+  const supported=validateNotes(notes,fixture.content,fixture.language);
+  assert.ok(supported.glossary.length>fixture.content.glossary.length,'Broad fixture should add useful note opportunities');
+  assert.equal(supported.story,fixture.content.story);
+}
+
 const japaneseFixture=fixtures.find(f=>f.language==='ja');const fixturePlan=readingPlan(japaneseFixture.content);
 const fixtureReadings=JSON.parse(execFileSync('python3',['-c',`import json,sys
 from pathlib import Path
@@ -117,11 +127,13 @@ print(Handler.mock_readings(SimpleNamespace(server=SimpleNamespace(workspace=Pat
 attachReadings(japaneseFixture.content,fixturePlan,fixtureReadings);
 // UI recovery must work for a fresh Create operation with no reader status.
 const boxes=new Map();const box=id=>{if(!boxes.has(id)){const b=element('section');b.hidden=true;boxes.set(id,b);}return boxes.get(id);};
-const recovery={pipeline:{records:[{kind:'create',stage:'readings'}],busy:true},readerGeneration:null,state:{readerId:null},$:box,document:{createElement:element},renderReaderGeneration(){},resumeCheckpoint(){}};
+const recovery={pipeline:{records:[{kind:'create',stage:'readings'}],busy:true},readerGeneration:null,state:{readerId:null},$:box,document:{createElement:element},renderReaderGeneration(){},resumeCheckpoint(){},setScopeDisabled(){}};
 vm.createContext(recovery);vm.runInContext(source.slice(source.indexOf('function renderCheckpointRecovery('),source.indexOf('async function resumeCheckpoint(')),recovery);recovery.renderCheckpointRecovery();
 assert.equal(box('generation-status').textContent,'Adding kanji readings…');assert.equal(box('checkpoint-recovery-reader').hidden,true);
 recovery.pipeline.records[0]={kind:'continue',stage:'notes',target:{storyId:'story'}};recovery.state.readerId='story';recovery.readerGeneration={storyId:'story',phase:'ready'};
-recovery.renderCheckpointRecovery();assert.equal(recovery.readerGeneration.phase,'working');assert.equal(recovery.readerGeneration.message,'Adding vocabulary notes…');
+recovery.renderCheckpointRecovery();assert.equal(box('reader-edit-submit').disabled,true);assert.equal(box('reader-prompt').disabled,true);assert.equal(recovery.readerGeneration.phase,'working');assert.equal(recovery.readerGeneration.message,'Adding vocabulary notes…');
+const heading={};recovery.state.activeChapterRequest={storyId:'story',loading:{querySelector:()=>heading}};recovery.renderCheckpointRecovery();assert.equal(heading.textContent,'Adding vocabulary notes…');assert.equal(box('checkpoint-recovery-reader').hidden,true);delete recovery.state.activeChapterRequest;
+
 recovery.pipeline.records[0]={kind:'create',stage:'notes'};
 
 recovery.pipeline.busy=false;
