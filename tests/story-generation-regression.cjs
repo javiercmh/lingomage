@@ -33,7 +33,7 @@ const appSource=fs.readFileSync('js/app.js','utf8');
 const defs=JSON.parse(fs.readFileSync('data/learning-profiles.json'));
 for(const lang of ['de','es-CL','ru']) assert.deepEqual(defs.standardizedLevels[lang].levels.map(x=>x.id),['A1','A2','B1','B2','C1','C2']);
 assert.deepEqual(defs.standardizedLevels.ja.levels.map(x=>x.id),['N5','N4','N3','N2','N1']);
-assert.equal(Object.keys(defs.scopes).length,3);
+assert.deepEqual(Object.keys(defs.scopes),['scene','chapter']);
 (async()=>{
   let events=[], failPersist=false, failAck=false, failWait=false, durable;
   const job={input:{difficulty:'A1',scope:'scene'}};
@@ -78,5 +78,12 @@ assert.equal(Object.keys(defs.scopes).length,3);
   assert.ok(topicGroup.includes('id="input-language-note"'), 'language-input note stays inside the story idea group');
   assert.ok(!html.includes('practice-input') && !html.includes('Topics to explore'), 'topics merged into the story idea field');
   assert.equal((html.match(/id="form-error"/g) || []).length, 1);
+  assert.ok(form.includes('id="reading-scope-group"') && form.includes('role="radiogroup"') && !form.includes('<select id="reading-scope"'), 'Reading scope is a segmented radio group');
+  assert.ok(!/longer/i.test(html), 'no Longer passage option');
+  const app = fs.readFileSync('js/app.js', 'utf8');
+  const fn = name => app.slice(app.indexOf('function ' + name), app.indexOf('\n}', app.indexOf('function ' + name)) + 2);
+  const scopeCtx = { SCOPES: defs.scopes, LEGACY_SCOPES: { longer: 'chapter' } };
+  vm.createContext(scopeCtx); vm.runInContext(app.slice(app.indexOf('const LEGACY_SCOPES'), app.indexOf('function normalizeScope')) + app.slice(app.indexOf('function normalizeScope'), app.indexOf('\n', app.indexOf('function normalizeScope'))), scopeCtx);
+  assert.deepEqual(['scene','chapter','longer','bogus',undefined].map(scopeCtx.normalizeScope), ['scene','chapter','chapter','scene','scene']);
   console.log('PASS Create form: story idea first, Reading scope second, single story idea and topics field');
 }

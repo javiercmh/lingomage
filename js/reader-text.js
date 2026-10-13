@@ -42,43 +42,62 @@ export function japaneseSegments(canonical, segments, strict = false) {
   });
 }
 
-export function findGlossaryMatches(canonical, glossary = []) {
-  const candidates = [];
+function glossaryRanges(canonical, form, firstOnly = false) {
+  const ranges=[];
   const wordCharacter = value => Boolean(value && /[\p{L}\p{N}\p{M}_]/u.test(value));
-  for (const note of glossary) {
-    for (const form of Array.isArray(note?.forms) ? note.forms : []) {
-      if (typeof form !== 'string' || !form.length || !note?.meaning) continue;
-      const usesJapaneseScript = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(form);
-      let from = 0;
-      while (from <= canonical.length - form.length) {
-        const start = canonical.indexOf(form, from);
-        if (start < 0) break;
-        const end = start + form.length;
-        const bounded = usesJapaneseScript || (!wordCharacter(form[0]) || !wordCharacter(canonical[start - 1])) && (!wordCharacter(form[form.length - 1]) || !wordCharacter(canonical[end]));
-        if (bounded) candidates.push({ start, end, form, note });
-        from = start + 1;
-      }
+  const usesJapaneseScript = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(form);
+  let from=0;
+  while (from <= canonical.length-form.length) {
+    const start=canonical.indexOf(form,from);if(start<0)break;
+    const end=start+form.length;
+    if (usesJapaneseScript || (!wordCharacter(form[0]) || !wordCharacter(canonical[start-1])) && (!wordCharacter(form[form.length-1]) || !wordCharacter(canonical[end]))) {
+      ranges.push({start,end});if(firstOnly)break;
+    }
+    from=start+1;
+  }
+  return ranges;
+}
+export function hasGlossaryForm(canonical, form) {
+  return typeof form === 'string' && form.length>0 && glossaryRanges(canonical,form,true).length>0;
+}
+export function findGlossaryMatches(canonical, glossary = []) {
+  // Group repeated forms before scanning. Process one length at a time so a
+  // larger glossary does not allocate every candidate across every length.
+  const forms=new Map();
+  for (const note of glossary) for (const form of Array.isArray(note?.forms) ? note.forms : []) {
+    if (typeof form !== 'string' || !form.length || !note?.meaning) continue;
+    if(!forms.has(form))forms.set(form,{form,notes:[],identities:new Map()});
+    const group=forms.get(form);
+    if(!group.identities.has(note.word))group.identities.set(note.word,new Set());
+    const meanings=group.identities.get(note.word);
+    if(!meanings.has(note.meaning)){meanings.add(note.meaning);group.notes.push(note);}
+  }
+  const lengths=new Map();
+  for(const group of forms.values()){
+    if(!lengths.has(group.form.length))lengths.set(group.form.length,[]);
+    lengths.get(group.form.length).push(group);
+  }
+  const occupied=new Uint8Array(canonical.length),chosen=[];
+  for(const length of [...lengths.keys()].sort((a,b)=>b-a)) {
+    const candidates=[];
+    for(const group of lengths.get(length))for(const range of glossaryRanges(canonical,group.form))candidates.push({...range,form:group.form,notes:group.notes});
+    candidates.sort((a,b)=>a.start-b.start);
+    for(const candidate of candidates){
+      if(occupied.subarray(candidate.start,candidate.end).some(value=>value))continue;
+      chosen.push(candidate);occupied.fill(1,candidate.start,candidate.end);
     }
   }
-  candidates.sort((a, b) => (b.end - b.start) - (a.end - a.start) || a.start - b.start);
-  const chosen = [];
-  for (const candidate of candidates) {
-    const identical = chosen.find(item => item.start === candidate.start && item.end === candidate.end);
-    if (identical) {
-      if (!identical.notes.some(note => note.word === candidate.note.word && note.meaning === candidate.note.meaning)) identical.notes.push(candidate.note);
-      continue;
-    }
-    if (chosen.some(item => candidate.start < item.end && candidate.end > item.start)) continue;
-    chosen.push({ start: candidate.start, end: candidate.end, form: candidate.form, notes: [candidate.note] });
-  }
-  return chosen.sort((a, b) => a.start - b.start);
+  return chosen.sort((a,b)=>a.start-b.start);
 }
 
 // PED-002: display each explanation once; validation still uses every occurrence.
 export function firstGlossaryMatches(canonical, glossary = []) {
   const seen = new Set();
+  const seenGroups = new WeakSet();
   const normalize = value => String(value || '').normalize('NFC').trim().replace(/\s+/gu, ' ');
   return findGlossaryMatches(canonical, glossary).flatMap(match => {
+    if (seenGroups.has(match.notes)) return [];
+    seenGroups.add(match.notes);
     const notes = match.notes.filter(note => {
       const key = JSON.stringify([normalize(note.word || note.forms?.[0]), normalize(note.meaning)]);
       if (seen.has(key)) return false;

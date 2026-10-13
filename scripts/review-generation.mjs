@@ -3,7 +3,7 @@ import fs from 'node:fs';import path from 'node:path';import {createHash} from '
 import {parseContent} from '../js/learning-validation.js';
 const args=process.argv.slice(2);const option=(key,fallback)=>{const i=args.indexOf(key);return i<0?fallback:args[i+1];};
 const directory=path.resolve(option('--input','docs/validation/generation-evaluation/models'));
-const endpoint=option('--endpoint','http://localhost:8890'),model=option('--model','gpt-6-sol'),effort=option('--effort','low');
+const endpoint=option('--endpoint','http://localhost:8890'),model=option('--model','gpt-6.1-sol'),effort=option('--effort','low');
 if(!/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(endpoint))throw Error('Local bridge required.');
 const limit=Number(option('--limit','Infinity')),retry=args.includes('--retry');
 const write=(p,x)=>{fs.writeFileSync(p+'.tmp',JSON.stringify(x,null,2)+'\n');fs.renameSync(p+'.tmp',p);};
@@ -15,7 +15,7 @@ const instructions=`You are doing preliminary multilingual issue-finding, not qu
 let count=0;
 for(const [key,records] of [...groups].sort((a,b)=>a[0].localeCompare(b[0]))){
  const pairExpected=records[0].id.endsWith('-sol-low')||records[0].id.endsWith('-luna-high')||records[0].id.endsWith('-baseline')||records[0].id.endsWith('-revised');if(pairExpected&&records.length!==2)continue;
- const filename=path.join(output,key+'.json');let saved=fs.existsSync(filename)?JSON.parse(fs.readFileSync(filename)):null;if(saved?.review)continue;if(saved?.error&&!retry)continue;if(count++>=limit)break;
+ const filename=path.join(output,key+'.json');let saved=fs.existsSync(filename)?JSON.parse(fs.readFileSync(filename)):null;if(saved?.review&&saved.released)continue;if(saved?.review&&!saved.released){if(!retry)throw Error('Saved review requires explicit --retry to release its request.');await bridge({action:'acknowledge',requestId:saved.requestId});saved.released=true;write(filename,saved);continue;}if(saved?.error&&!retry)continue;if(count++>=limit)break;
  const ordered=[...records].sort((a,b)=>createHash('sha256').update(a.id).digest('hex').localeCompare(createHash('sha256').update(b.id).digest('hex')));
  const samples=ordered.map((record,i)=>{let content=record.result;if(!content){const writer=record.stages.findLast(s=>['create','continue','rewrite'].includes(s.stage)&&s.raw);try{content=parseContent(writer.raw);const notes=record.stages.findLast(s=>s.stage==='notes'&&s.raw);if(notes)content={...content,glossary:parseContent(notes.raw).glossary};}catch{content={raw:writer?.raw||'',error:'No parseable completed prose'};}}return {id:'sample-'+(i+1),language:record.input.language,level:record.input.difficulty,guide:record.input.levelDescription,brief:record.input.topic,scope:record.input.scope,kind:record.kind,sourceChapter:record.input.currentChapter||record.input.recentProse||null,content};});
  saved=saved||{key,reviewer:{model,effort,kind:'preliminary AI review; no qualifications claimed'},mapping:ordered.map((r,i)=>({sample:'sample-'+(i+1),record:r.id})),instructions,input:{samples},startedAt:new Date().toISOString()};delete saved.error;write(filename,saved);

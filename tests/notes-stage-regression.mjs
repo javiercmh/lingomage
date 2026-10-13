@@ -6,7 +6,7 @@ const glossary=[{word:'kaufen',meaning:'buy; kauft is singular present',forms:['
 assert.deepEqual(validateProse({...prose,glossary:[{forms:['absent']}]},'de'),prose);
 assert.throws(()=>validateNotes({glossary,story:'rewritten'},prose,'de'),/without rewriting/);
 assert.throws(()=>validateNotes({glossary:[{...glossary[0],forms:['kauft','kaufen']}]},prose,'de'),/does not appear/);
-assert.throws(()=>validateNotes({glossary:[]},prose,'de'),/1–100/);
+assert.throws(()=>validateNotes({glossary:[]},prose,'de'),/at least one/);
 assert.throws(()=>validateNotes({glossary:[{word:'дом',meaning:'home',forms:['Latin']}]},{title:'Дом',story:'Дом'},'ru'),/target script/);
 for(const term of ['including common words','Skip routine proper names','Group alternate forms','not a list of dictionary senses','do not assume words are known'])assert.ok(NOTES_INSTRUCTIONS.includes(term));
 function harness(fail='') {

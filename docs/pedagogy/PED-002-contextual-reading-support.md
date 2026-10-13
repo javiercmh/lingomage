@@ -84,7 +84,7 @@ Every chapter intentionally supplies expressions or concepts for learning/practi
 
 First-only glossary display coexists with app-owned Japanese reading boundaries, chapter Copy/Listen, floating selection actions, device translation and generation status. The unified story pipeline adds planning before prose/readings and saves intermediate results in the checkpoint user file before release. Examples reuse prose/readings without a story language plan. Numeric length quotas are explicitly retired by PED-004; nonempty useful notes, structural bounds and script/reading checks remain enforced. This supersedes older generation storage/annotation descriptions without changing saved-story provenance. Existing citations and evidence limits remain applicable; no new efficacy claim is made.
 
-### Broad contextual notes from fixed prose — prompt 2026-10-13.16
+### Broad contextual notes from fixed prose — prompt 2026-10-13.18
 
 New chapters use a separate vocabulary-note request after canonical prose is validated and durably checkpointed. It defines most meaningful words and useful expressions, including common words, contextual inflections, idioms and constructions; it skips routine proper names and duplicate meanings. The reading target guides explanation complexity, not a presumption that individual words are known. Notes use the existing English meaning/headword/exact-forms schema and first-occurrence display. At least one valid note remains mandatory; the existing technical maxima are bounds rather than pedagogical quotas.
 

@@ -6,7 +6,7 @@ LingoMage is a dependency-free HTML/CSS/JavaScript App² subapp at the repositor
 
 [PED-004](../pedagogy/PED-004-level-guided-generation.md) governs standardized reading targets: CEFR A1–C2 for German/Spanish, JLPT N5–N1 for Japanese and Elementary/Basic/TORFL-I–IV for Russian. Targets are self-selected orientation, not assessed proficiency or certified alignment. App-authored definitions live in `data/learning-profiles.json`. Settings persist explicit standardized selections separately from legacy language enablement and self-assessments; no guessed conversion runs. New requests omit the old freeform knowledge field and preserve regional/register preferences.
 
-Create, Continue and Rewrite use the same frozen input/configuration and checkpoint pipeline: bounded optional vocabulary/grammar plan, validated canonical prose/glossary, then app-owned Japanese readings when kanji are present. Examples skip language planning and use the prose/readings pipeline. Narrative scope (scene/chapter/longer) replaces numerical word/sentence quotas. Technical bounds remain enforced. Plans guide writing but do not require coverage or claim individual word knowledge. Prompt version is `2026-10-13.14`, safeguard definition `2026-10-13.2`, app `1.2.15`.
+Create, Continue and Rewrite use the same frozen input/configuration and checkpoint pipeline: bounded optional vocabulary/grammar plan, validated canonical prose/glossary, then app-owned Japanese readings when kanji are present. Examples skip language planning and use the prose/readings pipeline. Narrative scope (scene/chapter; the retired `longer` value in saved records reads as chapter) replaces numerical word/sentence quotas. Technical bounds remain enforced. Plans guide writing but do not require coverage or claim individual word knowledge. Prompt version is `2026-10-13.14`, safeguard definition `2026-10-13.2`, app `1.2.15`.
 
 ## Ownership and data
 
@@ -21,7 +21,7 @@ Manifest ownership distinguishes managed definitions/code from user data. Packag
 
 ## Content and learning
 
-Prompt version `2026-10-13.16` uses standardized reading targets, one combined optional story idea and topics brief, language plans, narrative scope and regional preferences. Every chapter requests learning/practice material and useful English notes even when practice is blank. At least one structurally valid note is mandatory. Notes stay integrated as underlined exact chapter forms opening contextual popovers; headword presentation is unchanged.
+Prompt version `2026-10-13.18` uses standardized reading targets, one combined optional story idea and topics brief, language plans, narrative scope and regional preferences. Every chapter requests learning/practice material and useful English notes even when practice is blank. At least one structurally valid note is mandatory. Notes stay integrated as underlined exact chapter forms opening contextual popovers; headword presentation is unchanged.
 
 Shared content validation applies to creation, continuation, rewrite and examples. Target-script checks enforce Japanese without romaji and Russian Cyrillic without Latin transliteration. Russian stress is absent by default but permitted when requested; intent is prompt guidance, not a categorical validator ban. Correct orthography and natural grammar are requested without the former beginner curriculum restrictions. Definitions and limitations are in [the safeguard register/audit](language-safeguards.md).
 
@@ -29,7 +29,7 @@ Numerical chapter-length quotas are retired under PED-004 and LANG-001. Canonica
 
 ## Japanese readings and recovery
 
-For stories first save the optional language plan, then generate and validate canonical prose. The app then extracts contiguous kanji compounds from title/story or example sentences, with occurrence-specific IDs, UTF-16 offsets and context, and requests only kana readings. Validate exact ID coverage and construct annotations in the app. Kana-only content skips the reading call. Popover headwords are excluded.
+For stories first save the optional language plan, then generate and validate canonical prose and checkpoint it before requesting contextual notes. After note validation, the app extracts contiguous kanji compounds from title/story or example sentences, with occurrence-specific IDs, UTF-16 offsets and context, and requests only kana readings. Validate exact ID coverage and construct annotations in the app. Kana-only content skips the reading call. Popover headwords are excluded.
 
 Every validated stage is persisted in `data/generation-checkpoints.json` before acknowledgement; checkpoint storage, rather than settings, is authoritative for unfinished operations. Final story application is idempotent via `operationId`; partial prose never appears as a completed story. Resume reuses saved stages and captured configuration. Discard explicitly cancels/releases any outstanding request and removes progress. Cancellation stops subsequent stages. No inference automatically retries. Save/release failures retain recoverable progress, block new generation and offer explicit Resume or Save / finish. A confirmed `not_found` request may be released locally after a host/server restart; other release failures remain actionable. Malformed checkpoint files block generation rather than silently replacing data.
 

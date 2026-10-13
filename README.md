@@ -1,6 +1,6 @@
 # LingoMage — Learn languages through stories
 
-**Turn the words and ideas you want to practise into stories you want to read.** LingoMage creates AI stories for learners of German, Japanese, Russian and Spanish, with English explanations, self-selected reading levels and scene/chapter/longer narrative scope.
+**Turn the words and ideas you want to practise into stories you want to read.** LingoMage creates AI stories for learners of German, Japanese, Russian and Spanish, with English explanations, self-selected reading levels and scene/chapter narrative scope.
 
 LingoMage is an **[App²](https://github.com/javiercmh/appapp) subapp**: it runs inside App² on Android and uses its shared AI connection.
 

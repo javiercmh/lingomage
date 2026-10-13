@@ -7,7 +7,7 @@
 
 ## Decision
 
-Use one self-selected Reading level with a short English reading-task description, plus separate regional/tone preferences. Keep per-story and per-version overrides. Level labels orient generation rather than measure proficiency. Replace numerical story word/sentence quotas with Scene, Chapter and Longer passage; default Scene.
+Use one self-selected Reading level with a short English reading-task description, plus separate regional/tone preferences. Keep per-story and per-version overrides. Level labels orient generation rather than measure proficiency. Replace numerical story word/sentence quotas with Scene and Chapter; default Scene. Longer passage was retired because it was hard to tell apart from Chapter (product decision, no evidence either way); saved records that used it are read as Chapter.
 
 Generate a bounded language plan first (at most five vocabulary candidates and two grammar focuses, possibly none), then natural prose and its contextual glossary. These are optional practice focuses, not an exhaustive allowable language list. Prefer coherence and suitable surrounding language to mandatory coverage. No reader-feedback feature or automatic level progression is implemented. Persist checkpoints and final story data before request acknowledgement; inference retry is explicit.
 

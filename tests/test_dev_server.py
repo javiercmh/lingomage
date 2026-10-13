@@ -138,9 +138,8 @@ class DevelopmentServerTests(unittest.TestCase):
             self.assertLessEqual(len(plan['vocabulary']), 5)
             self.assertLessEqual(len(plan['grammar']), 2)
             self.ai(self.mock_server, 'acknowledge', requestId=request_id)
-            outputs = [json.loads(Handler.mock_story(json.dumps({'languageCode': language, 'scope': scope}))) for scope in ('scene', 'chapter', 'longer')]
+            outputs = [json.loads(Handler.mock_story(json.dumps({'languageCode': language, 'scope': scope}))) for scope in ('scene', 'chapter')]
             self.assertLess(len(outputs[0]['story']), len(outputs[1]['story']))
-            self.assertLess(len(outputs[1]['story']), len(outputs[2]['story']))
             for output in outputs:
                 self.assertNotIn('storySegments',output)
 

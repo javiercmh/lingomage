@@ -570,7 +570,7 @@ class Handler(SimpleHTTPRequestHandler):
             'es-CL': ('Una tarde tranquila', 'Sofía sale a caminar por el barrio. Pasa por una feria y compra pan y palta. Después se junta con una amiga en una plaza. Conversan un rato y miran el cielo. Cuando baja el sol, vuelven a casa contentas.'),
         }
         title, story = samples.get(code, samples['de'])
-        repetitions = {'scene': 1, 'chapter': 2, 'longer': 5}.get(data.get('scope'), 1)
+        repetitions = {'scene': 1, 'chapter': 2, 'longer': 2}.get(data.get('scope'), 1)
         story = '\n\n'.join([story] * repetitions)
         notes = {
             'de': [('Ausflug', 'outing', 'Ausflug'), ('Markt', 'market', 'Markt')],
