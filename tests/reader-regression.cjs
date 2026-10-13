@@ -15,6 +15,7 @@ function sandbox(extra = {}) {
     get textContent(){return this.childNodes.map(node=>node.textContent).join('');},set textContent(value){this.childNodes=value ? [{tagName:'#text',textContent:String(value)}] : [];},
     append(...nodes){this.childNodes.push(...nodes);},addEventListener(name,fn){this.events[name]=fn;},setAttribute(name,value){this.attributes[name]=value;},focus(){this.focused=true;},scrollIntoView(){},remove(){},querySelector(selector){return this.childNodes.find(node=>node.tagName===selector) || this.childNodes.map(node=>node.querySelector?.(selector)).find(Boolean) || null;},querySelectorAll(){return [];},classList:{add(){},remove(){},toggle(){}}});
   const c = {state:{},console,crypto:{randomUUID:(()=>{let id=0;return ()=>`help-test-${++id}`;})()},PROMPT_VERSION:'test',STORY_GUIDES:{de:{beginner:'Simple sentences'}},renderChapterRequest(){},LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},SPEECH_LANGUAGES:{de:'de-DE',ja:'ja-JP',ru:'ru-RU','es-CL':'es-CL'},renderGenerationRecovery(){},readerPanel:()=>({classList:{toggle(){}}}),$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{createElement:element,createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},...extra};
+  c.acknowledgeStoryRequest = id => c.ai.acknowledge(id);
   vm.createContext(c);
   vm.runInContext(readerTextSource, c);
   vm.runInContext(requestLifecycleSource, c);
@@ -82,8 +83,32 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.deepEqual(JSON.parse(JSON.stringify(matches.map(item=>[item.start,item.end,item.notes.length]))),[[0,5,2],[12,17,2]]);
   assert.equal(glossary.findGlossaryMatches('美しい', [{word:'美しい',meaning:'beautiful',forms:['美しい']}])[0].end,3);
   console.log('PASS exact glossary forms match repeated occurrences, group shared ranges and prefer longer overlaps');
-  const annotated=sandbox(), annotatedRoot=annotated.document.createElement('div');let noteOpened=0;
-  annotated.annotatedText(annotatedRoot,'日本語',[{text:'日',reading:'にち'},{text:'本語',reading:'ほんご'}],{language:'ja-JP',glossary:[{word:'日本語',meaning:'Japanese language',forms:['日本語']}],onNote(){noteOpened++;}});
+  const first = glossary.firstGlossaryMatches('canto cantó canto', [
+    {word:'cantar',meaning:'to sing',forms:['canto','cantó']},
+    {word:' cantar ',meaning:'to   sing',forms:['canto']},
+    {word:'canto',meaning:'song',forms:['canto']}
+  ]);
+  assert.deepEqual(JSON.parse(JSON.stringify(first.map(item=>[item.start,item.notes.length]))),[[0,2]]);
+  assert.equal(glossary.firstGlossaryMatches('a b',[
+    {word:'café',meaning:'coffee',forms:['a']},
+    {word:'cafe\u0301',meaning:'coffee',forms:['b']}
+  ]).length,1);
+  assert.equal(glossary.firstGlossaryMatches('a b',[
+    {word:'A',meaning:'meaning',forms:['a']},
+    {word:'a',meaning:'meaning',forms:['b']}
+  ]).length,2);
+  assert.deepEqual(Array.from(glossary.firstGlossaryMatches('美しい 美',[
+    {word:'美',meaning:'beauty',forms:['美']},
+    {word:'美しい',meaning:'beautiful',forms:['美しい']}
+  ]),item=>item.form),['美しい','美']);
+  const shared=glossary.firstGlossaryMatches('a b b',[
+    {word:'same',meaning:'one',forms:['a','b']},
+    {word:'same',meaning:'two',forms:['b']}
+  ]);
+  assert.deepEqual(JSON.parse(JSON.stringify(shared.map(item=>[item.start,item.notes.map(note=>note.meaning)]))),[[0,['one']],[2,['two']]]);
+  console.log('PASS first eligible notes share normalized identities across forms; meanings/case stay distinct and overlaps resolve first');
+  const annotated=sandbox(), annotatedRoot=annotated.document.createElement('div');let noteOpened=0, openedTrigger;
+  annotated.annotatedText(annotatedRoot,'日本語',[{text:'日',reading:'にち'},{text:'本語',reading:'ほんご'}],{language:'ja-JP',glossary:[{word:'日本語',meaning:'Japanese language',forms:['日本語']}],onNote(event,trigger){noteOpened++;openedTrigger=trigger;}});
   assert.equal(annotatedRoot.lang,'ja-JP');assert.equal(annotatedRoot.childNodes.length,2);
   assert.equal(annotatedRoot.childNodes[0].tagName,'ruby');assert.equal(annotatedRoot.childNodes[1].tagName,'ruby');
   assert.equal(annotatedRoot.childNodes[0].childNodes[0].className,'gloss-note-trigger');
@@ -91,6 +116,25 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.equal(annotatedRoot.childNodes[0].childNodes[1].textContent,'にち');assert.equal(annotatedRoot.childNodes[1].childNodes[1].textContent,'ほんご');
   let keyPrevented=false;annotatedRoot.childNodes[0].childNodes[0].events.keydown({key:'Enter',preventDefault(){keyPrevented=true;}});
   assert.equal(noteOpened,1);assert.equal(keyPrevented,true);
+  const primary=annotatedRoot.childNodes[0].childNodes[0], secondary=annotatedRoot.childNodes[1].childNodes[0];
+  assert.equal(primary.attributes.role,'button');assert.equal(primary.tabIndex,0);
+  assert.equal(secondary.attributes.role,undefined);assert.equal(secondary.tabIndex,undefined);
+  assert.equal(secondary.events.keydown,undefined);
+  secondary.events.click({});assert.equal(openedTrigger,primary);assert.equal(noteOpened,2);
+  annotated.annotatedText(annotatedRoot,'日本語日本語',[
+    {text:'日',reading:'にち'},{text:'本語',reading:'ほんご'},
+    {text:'日',reading:'にち'},{text:'本語',reading:'ほんご'}
+  ],{glossary:[{word:'日本語',meaning:'Japanese language',forms:['日本語']}]});
+  assert.equal(annotatedRoot.childNodes.length,4);
+  assert.deepEqual(Array.from(annotatedRoot.childNodes,node=>node.childNodes.at(-1).textContent),['にち','ほんご','にち','ほんご']);
+  assert.equal(annotatedRoot.childNodes.slice(2).some(node=>node.childNodes.some(child=>child.className==='gloss-note-trigger')),false);
+  const repeatedNotes=[{word:'Brot',meaning:'bread',forms:['Brot']}];
+  for(const text of ['Brot Brot','Brot','Brot Brot Brot','Brot Brot']) {
+    annotated.annotatedText(annotatedRoot,text,null,{glossary:repeatedNotes});
+    assert.equal(annotatedRoot.childNodes.filter(node=>node.className==='gloss-note-trigger').length,1);
+    assert.equal(annotatedRoot.textContent,text);
+  }
+  console.log('PASS repeated rendering/chapter versions reset first occurrences and leave canonical text intact');
   console.log('PASS cross-annotation glossary notes retain complete Japanese ruby readings and selectable source markup');
 
   const voices=[
@@ -151,6 +195,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   let failsSave = true, failsAck = false, durable, applied = 0, acked = 0;
   const story={id:'A',value:0};
   const c=sandbox({state:{pendingReaderRequestId:'request',readerId:'A'},persistReaderStory:s=>{if(failsSave) throw Error('disk'); durable=JSON.parse(JSON.stringify(s));},ai:{acknowledge:async()=>{if(failsAck) throw Error('ack');acked++;}}});
+  c.acknowledgeStoryRequest = id => c.ai.acknowledge(id);
   vm.runInContext(lifecycle,c);
   c.state.pendingReaderResult={story,saved:false,apply(){story.value++;applied++;return ()=>story.value--;}};
   await assert.rejects(c.savePendingReaderResult(),/disk/);
@@ -400,6 +445,10 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   let requested, generationInstructions;
   story3.topic = 'A mountain mystery'; story3.practice = 'Hiking vocabulary'; story3.difficulty = 'beginner'; story3.language = 'de';
   const gen=sandbox({state:{readerId:'S',readerChapter:0,model:'mock',providerId:'mock'},readerStory:()=>story3,normalizeChapters:s=>s.chapters,activeVersion:c=>c.versions.find(v=>v.id===c.activeVersionId),activeChapter:()=>story3.chapters[gen.state.readerChapter],profileSnapshot:()=>({}),persistReaderStory(){},decodeResponse:JSON.parse,readerAi:async(kind,input,instructions,loading)=>{if(kind==='summary'){gen.state.pendingReaderRequestId='r';return JSON.stringify({...input.previousMemory,plot:[...input.previousMemory.plot,input.chapterChunk]});} requested=input;generationInstructions=instructions;assert.ok(loading.textContent.includes(kind === 'continue' ? 'Writing the next chapter' : 'Rewriting this chapter'));gen.state.pendingReaderRequestId='r';return JSON.stringify({title:'four',story:'Text four',glossary:[{word:'four',meaning:'four',forms:['four']}]});},readerPanel:()=>({scrollTop:0}),updateReader(){},window:{addEventListener(){}},document:{documentElement:{style:{}},querySelectorAll:()=>[]},ai:{acknowledge:async()=>{}}});
+  gen.state.languageExpectations={};gen.levelDefinition=()=>({id:'A1'});gen.guideFor=()=> 'Simple';gen.readingDescription=()=> 'Simple reading';gen.LEVELS={de:{framework:'CEFR'}};gen.SCOPES={scene:{description:'One event'}};gen.renderJobRecovery=()=>{};gen.generationProvenance=job=>({difficulty:job.input.difficulty,scope:job.input.scope,languagePlan:job.plan,learnerContext:{}});
+  gen.acknowledgeStoryRequest=async id=>{await gen.ai.acknowledge(id);if(gen.state.generationJob?.writeRequestId===id)gen.state.generationJob=null;};
+  gen.plannedStory=async(mode,input,instructions,loading,config,applyContext)=>{gen.state.generationJob={input,applyContext,plan:{vocabulary:[],grammar:[],guidance:''},createdAt:'test',versionId:gen.crypto.randomUUID(),chapterId:gen.crypto.randomUUID(),alternateId:gen.crypto.randomUUID(),writeRequestId:'r'};return gen.readerAi(mode,input,instructions,loading);};
+  gen.$('reader-level').value='A1';gen.$('reader-scope').value='scene';
   gen.document.createElement = sandbox().document.createElement;
   gen.$('reader-edit-submit').addEventListener=(_,fn)=>submit=fn;
   gen.$('reader-prompt').value='Next';gen.$('reader-edit-panel').dataset.mode='continue';

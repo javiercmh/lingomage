@@ -126,6 +126,24 @@ class DevelopmentServerTests(unittest.TestCase):
         self.assertEqual(self.ai(self.mock_server, 'acknowledge', requestId=request_id)[0], 200)
         self.assertFalse(self.mock_server.requests)
 
+    def test_mock_language_plan_and_scopes(self):
+        for language in ('de', 'ja', 'ru', 'es-CL'):
+            status, request_id = self.ai(self.mock_server, 'start', data={
+                'providerId': 'chatgpt', 'model': 'development-mock',
+                'input': json.dumps({'kind': 'language-plan', 'languageCode': language}),
+            })
+            self.assertEqual(status, 200)
+            self.mock_server.requests[request_id]['ready'] = 0
+            plan = json.loads(self.ai(self.mock_server, 'result', requestId=request_id)[1])
+            self.assertLessEqual(len(plan['vocabulary']), 5)
+            self.assertLessEqual(len(plan['grammar']), 2)
+            self.ai(self.mock_server, 'acknowledge', requestId=request_id)
+            outputs = [json.loads(Handler.mock_story(json.dumps({'languageCode': language, 'scope': scope}))) for scope in ('scene', 'chapter', 'longer')]
+            self.assertLess(len(outputs[0]['story']), len(outputs[1]['story']))
+            self.assertLess(len(outputs[1]['story']), len(outputs[2]['story']))
+            for output in outputs:
+                self.assertEqual(''.join(part['text'] for part in output['storySegments']), output['story'])
+
     def test_live_account_and_model_discovery(self):
         server = self.start_live()
         status, providers = self.ai(server, 'providers')

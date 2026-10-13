@@ -23,7 +23,7 @@ require different decisions from German noun forms and capitalization.
 
 ## Maintaining a decision
 
-For shared pedagogical choices, use the [decision log and template](../pedagogy/README.md). Keep language-specific details here and link the relevant decision ID rather than duplicating its rationale. Current learner-profile rationale: [PED-001](../pedagogy/PED-001-learner-self-report.md).
+For shared pedagogical choices, use the [decision log and template](../pedagogy/README.md). Keep language-specific details here and link the relevant decision ID rather than duplicating its rationale. Current learner-profile and generation rationale: [PED-004](../pedagogy/PED-004-level-guided-generation.md); [PED-001](../pedagogy/PED-001-learner-self-report.md) is historical.
 
 Record:
 

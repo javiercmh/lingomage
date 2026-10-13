@@ -314,3 +314,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px
 
 .reader-actions-menu { max-width: calc(100vw - var(--sa-left) - var(--sa-right) - 24px); max-height: calc(100dvh - 24px); overflow-y: auto; }
 .reader-actions-menu .helper { margin: 4px 12px 8px; }
+
+/* Generation recovery actions remain comfortable when labels wrap. */
+#story-job-recovery button { margin: 6px 8px 0 0; min-height: 44px; }
+#reader-edit-panel .create-field-group { margin-top: 18px; }

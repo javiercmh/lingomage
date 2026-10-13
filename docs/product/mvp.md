@@ -1,20 +1,21 @@
 # Story-reading MVP
 
-Status: App² workspace implemented. The last documented preview and device import
-checks are dated 2026-10-10 and predate the latest UI and freeform-practice edits.
-Those latest edits have not been revalidated. Live generation and qualified
-language review remain pending.
+Status: App² workspace implemented. Standardized reading targets, narrative scope
+and language planning were checked in the offline browser preview on 2026-10-13;
+see [the validation record](../validation/2026-10-13-level-guided-generation.md).
+Native App² generation and qualified language review remain pending.
 
 ## Confirmed requirements
 
 - Featured target languages: **German, Japanese, Russian, and Spanish**. Learners can specify a regional variety in language preferences.
 - Interface language: **English** for every target language.
 - Glossary explanations: **English** for every target language.
-- Start with no learning languages selected. Let learners enable any combination, with a Beginner, Intermediate or Advanced **Reading starting point** per selected language. The main **Story difficulty** selector defaults to that starting point and permits a temporary override. If none are enabled, the main language picker offers all target languages and stories can be generated at the selected story difficulty. See [PED-001](../pedagogy/PED-001-learner-self-report.md).
-- Use concise, language-specific reading descriptions as generation guidance; these are product assumptions, not proficiency scores or CEFR claims.
+- Start with no learning languages selected. Settings offer one self-selected **Reading level** per language: CEFR A1–C2 for German/Spanish, JLPT N5–N1 for Japanese, and Elementary/Basic/TORFL-I–IV with A1–C2 references for Russian. Create defaults to the saved selection and permits a per-story override; reader edits default to the source version. If no languages are enabled, Create offers all targets but still requires an explicit level selection. See [PED-004](../pedagogy/PED-004-level-guided-generation.md).
+- Use concise English reading-task descriptions and app-authored language-specific guidance. These orient generation, not scored proficiency or certified alignment.
+- Plan suitable vocabulary and grammar before writing the story and its final-text glossary. Candidates are optional practice focuses rather than mandatory coverage; no reader-feedback or automatic level-advancement feature is included.
 - Let learners optionally enter freeform vocabulary or concepts such as grammar
   points in one field for the story to consider.
-- Include a story title, story text, and an English glossary.
+- Include a story title, story text, and an English glossary. Link each explanation only at its first eligible occurrence per displayed chapter version; later occurrences remain selectable for Explain.
 - Offer an optional topic.
 - Save completed stories locally with reopen and delete controls.
 - Support generating another story using the same practice text.
@@ -27,10 +28,9 @@ language review remain pending.
 
 These are product assumptions, not established optimal learning parameters:
 
-- German, Russian, and Spanish: approximately 100–150 words per story.
-- Japanese: approximately 8–12 short sentences; do not use whitespace word counts.
-- Request simple grammar, familiar situations, and consideration of the supplied
-  practice text.
+- Reading scope: Scene, Chapter or Longer passage, default Scene. No numeric word/sentence quota applies.
+- Language plans offer up to five vocabulary candidates and two grammar focuses, possibly none; these counts are unvalidated product choices.
+- Request level-guided vocabulary/grammar, narrative cohesion, contextual support and natural use of practice topics.
 - Japanese displays furigana above kanji by default; other story text uses
   hiragana and katakana. See [Japanese](../languages/japanese.md).
 - Russian text always uses Cyrillic, without Latin transliteration. English

@@ -17,6 +17,8 @@ use the current validation status in the product and App² runtime documents.
 - [MVP specification](product/mvp.md): Shared requirements and delivery sequence.
 - [Language decisions](languages/README.md): Language-specific requirements and research questions.
 - [Research and evidence policy](research/README.md): How findings become documented design decisions.
+- [Level-guided generation evidence](research/level-guided-generation.md): Standardized targets, lexical load, grammar control, cohesion and evidence limits.
+- [Level-guided generation checks](validation/2026-10-13-level-guided-generation.md): Offline stage recovery, compatibility, functional and screenshot checks.
 - [Reading and glossing review](research/reading-and-glossing.md): Initial research records and applicability limits.
 - [Japanese furigana discovery](research/japanese-furigana.md): Preliminary evidence and verification gaps.
 - [Authentication architecture](architecture/authentication.md): Legacy Android sign-in and inference components.

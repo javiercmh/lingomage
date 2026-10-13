@@ -30,23 +30,43 @@ export function findGlossaryMatches(canonical, glossary = []) {
   return chosen.sort((a, b) => a.start - b.start);
 }
 
+// PED-002: display each explanation once; validation still uses every occurrence.
+export function firstGlossaryMatches(canonical, glossary = []) {
+  const seen = new Set();
+  const normalize = value => String(value || '').normalize('NFC').trim().replace(/\s+/gu, ' ');
+  return findGlossaryMatches(canonical, glossary).flatMap(match => {
+    const notes = match.notes.filter(note => {
+      const key = JSON.stringify([normalize(note.word || note.forms?.[0]), normalize(note.meaning)]);
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+    return notes.length ? [{ ...match, notes }] : [];
+  });
+}
+
 export function annotatedText(container, canonical, segments, { glossary = [], language = '', onNote = () => {} } = {}) {
   container.textContent = '';
   container.lang = language;
   const valid = Array.isArray(segments) && segments.every(part => part && typeof part.text === 'string') && segments.map(part => part.text).join('') === canonical;
   const parts = valid ? segments : [{ text: canonical }];
-  const matches = findGlossaryMatches(canonical, glossary);
+  const matches = firstGlossaryMatches(canonical, glossary);
+  const controls = new Map();
   let offset = 0;
   const triggerFor = (match, start, end) => {
     const trigger = document.createElement('span');
-    trigger.className = 'gloss-note-trigger'; trigger.lang = language; trigger.setAttribute('role', 'button'); trigger.tabIndex = 0;
-    trigger.setAttribute('aria-label', `Word note for ${canonical.slice(match.start, match.end)}`);
-    trigger.setAttribute('aria-haspopup', 'dialog'); trigger.textContent = canonical.slice(start, end);
-    trigger.addEventListener('click', event => onNote(event, trigger, match.notes));
-    trigger.addEventListener('keydown', event => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      event.preventDefault(); onNote(event, trigger, match.notes);
-    });
+    trigger.className = 'gloss-note-trigger'; trigger.lang = language;
+    trigger.textContent = canonical.slice(start, end);
+    if (!controls.has(match)) {
+      controls.set(match, trigger);
+      trigger.setAttribute('role', 'button'); trigger.tabIndex = 0;
+      trigger.setAttribute('aria-label', `Word note for ${canonical.slice(match.start, match.end)}`);
+      trigger.setAttribute('aria-haspopup', 'dialog');
+      trigger.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault(); onNote(event, trigger, match.notes);
+      });
+    }
+    trigger.addEventListener('click', event => onNote(event, controls.get(match), match.notes));
     return trigger;
   };
   for (const part of parts) {

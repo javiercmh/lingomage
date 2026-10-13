@@ -1,5 +1,7 @@
 # Spanish
 
+Current App² level, planning and scope behavior follows [PED-004](../pedagogy/PED-004-level-guided-generation.md). Fixed lengths and broad reading bands below record earlier prompts; canonical orthography and reading-support requirements still apply.
+
 Current App² behavior: Spanish is presented without a fixed regional variety.
 Learners can request a regional variety, register, or other language preference
 in Settings. Language review remains pending.
@@ -50,3 +52,8 @@ human review remains necessary.
 ## App² reading self-report and preferences — 2026-10-10
 
 Settings offer three reading-task descriptions, an optional self-assessment, and optional expectations or general instructions. These guide each story request and are revisable learner reports, not assessed proficiency. Spanish has no assumed regional variety in the current App² prompt; learners can state their preference. Definitions are in `data/learning-profiles.json`; evidence and limits are in [the self-assessment record](../research/self-assessment.md).
+
+
+## Current App² reading targets — 2026-10-13
+
+[PED-004](../pedagogy/PED-004-level-guided-generation.md) replaces broad reading bands/freeform self-assessment for new generation. The managed standardized-level definitions and app-authored guides are in `data/learning-profiles.json`. German/Spanish use CEFR A1–C2, Japanese JLPT N5–N1 and Russian Elementary/Basic/TORFL-I–IV with A1–C2 references. Canonical script requirements remain. Numeric story lengths in the earlier implementation above are historical; new generation uses narrative scope and a separate language-planning stage. Self-selected levels do not establish certified alignment or individual vocabulary knowledge. Existing saved content/provenance is preserved.

@@ -4,7 +4,8 @@ Start here before changing learner profiles, story difficulty, prompts, or readi
 
 | ID | Decision | Status | Evidence |
 | --- | --- | --- | --- |
-| [PED-001](PED-001-learner-self-report.md) | Revisable reading profiles and English examples of concrete abilities | Implemented; exact instrument unvalidated | [Self-assessment review](../research/self-assessment.md) |
+| [PED-004](PED-004-level-guided-generation.md) | Standardized reading targets, narrative scope and two-stage language planning | Implemented; level control unvalidated | [Level-guided generation](../research/level-guided-generation.md) |
+| [PED-001](PED-001-learner-self-report.md) | Revisable reading profiles and English examples of concrete abilities | Superseded by PED-004 for new generation | [Self-assessment review](../research/self-assessment.md) |
 | [PED-002](PED-002-contextual-reading-support.md) | Focused contextual explanations, inline word notes, pronunciation and learner-steered detail | Implemented; feature quality unvalidated | [Self-assessment](../research/self-assessment.md); [reading and glossing](../research/reading-and-glossing.md) |
 | [PED-003](PED-003-story-memory-and-paths.md) | Bounded narrative memory and alternate story paths | Implemented; fidelity and learning effects unvalidated | Product assumption; no direct evaluation |
 
