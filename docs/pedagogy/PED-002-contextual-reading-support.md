@@ -19,7 +19,7 @@ These interaction choices are product assumptions. No study cited here tests thi
 
 Self-reports can inform adaptation but do not establish an individual's proficiency. The appraisal of self-assessment evidence in [the self-assessment review](../research/self-assessment.md) cites `liZhang2021SelfAssessment` and `tigchelaarEtAl2017CanDoValidity`; those studies do not validate LingoMage's free-text profile or model-based difficulty estimates.
 
-The [reading and glossing review](../research/reading-and-glossing.md) finds support for glossed reading with heterogeneous, partial outcomes. This supports offering contextual help as an option, not claiming that it improves learning or predicts retention. Its meta-analysis references do not yet have stable BibTeX entries in `references.bib`; no new citation key is invented here.
+The [reading and glossing review](../research/reading-and-glossing.md) finds support for glossed reading with heterogeneous, partial outcomes. This supports offering contextual help as an option, not claiming that it improves learning or predicts retention. The glossing meta-analysis is recorded as `yanagisawaWebbUchihara2020Glossing` ([DOI](https://doi.org/10.1017/S0272263119000688)); it does not establish an optimal frequency for displaying notes.
 
 ## Implementation
 
@@ -53,3 +53,14 @@ Vocabulary notes offer Listen beside the displayed headword through native App²
 Optional chapter prompts (prompt `2026-10-11.10`): learners may submit Continue or Rewrite with a blank prompt. Continuation proceeds naturally from existing active chapters; rewrite creates a fresh telling preserving the chapter’s main events and narrative role. Existing topics, learner context, fresh glossary guidance and open-ended default remain in effect. Save the actual empty prompt, rather than inventing learner instructions. These defaults are product assumptions; no new evidence or learning-effectiveness claim is made.
 
 Multilingual input invitation: Create explicitly permits English, the learning language, or mixed-language ideas and topics. Story idea invites optional target-language writing, and chapter prompt placeholders accept ideas in any language. Inputs continue to guide narrative generation; the app does not promise correction or assessment of learner writing. This is a discoverability and practice opportunity assumption, not evidence of learning effects. Copy-only changes leave prompt versions and saved provenance unchanged.
+
+
+Current generation profiles and narrative scope follow [PED-004](PED-004-level-guided-generation.md). Its standardized self-selected targets supersede older broad-band/freeform-profile references for new requests; contextual explanation behavior and saved provenance remain in effect.
+
+### First-occurrence glossary display (prompt `2026-10-13.13`)
+
+Show each glossary explanation only at its first eligible occurrence in the displayed chapter version. Later occurrences remain plain text and can still be selected for Explain. Resolve longest-form overlaps before selecting first occurrences. Identity consists of the headword and English meaning, normalized to NFC with trimmed/collapsed whitespace; preserve case and punctuation. Alternate forms and equivalent duplicate records share an identity; different meanings remain distinct. Rendering, chapter navigation and alternate versions each recompute this local selection without changing stored glossary or provenance.
+
+Japanese matches spanning annotation segments retain complete ruby readings and canonical copy text. Their fragments share one popup anchor and one keyboard control. Cancellation buttons record intent even while a stage is starting, so a newly returned request ID is cancelled before waiting or starting the next stage.
+
+First-only display is the learner's requested product preference for reducing repeated help, not an evidence-based optimum or a claim of better retention. `yanagisawaWebbUchihara2020Glossing` ([DOI](https://doi.org/10.1017/S0272263119000688)) supports glossed reading broadly; it does not directly test this display policy, these four languages or AI explanations. No density cap or mandatory glossary coverage is introduced. See [validation](../validation/2026-10-13-first-glossary-occurrence.md).

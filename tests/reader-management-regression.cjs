@@ -67,6 +67,10 @@ console.log('PASS chapter/path removal, shared content and memory, mirrors, name
  c.renderChapterRequest=()=>{};vm.runInContext(fs.readFileSync('js/request-lifecycle.js','utf8').replaceAll('export async function ','async function '),c);
  c.ai={acknowledge:async()=>{}};c.readerAi=async(kind,input)=>{c.state.pendingReaderRequestId='request';if(kind==='summary')return JSON.stringify({...input.previousMemory,plot:[input.chapterChunk]});requested=input;return JSON.stringify({title:'New',story:'Next scene',glossary:[]});};
  vm.runInContext(slice('async function acknowledgeReaderResult(', 'function decodeHelp(')+slice('function storyInstructions(', 'function storyInput(')+slice('function createHelpLoading(', 'function renderSavedHelp('),c);
+ c.state.languageExpectations={};c.levelDefinition=()=>({id:'A1'});c.guideFor=()=> 'Simple';c.readingDescription=()=> 'I can read simple text';c.LEVELS={de:{framework:'CEFR'}};c.SCOPES={scene:{description:'One event'}};c.renderJobRecovery=()=>{};c.generationProvenance=job=>({difficulty:job.input.difficulty,scope:job.input.scope,languagePlan:job.plan,learnerContext:{}});
+ c.acknowledgeStoryRequest=async id=>{await c.ai.acknowledge(id);if(c.state.generationJob?.writeRequestId===id)c.state.generationJob=null;};
+ c.plannedStory=async(mode,input,instructions,loading,config,applyContext)=>{requested=input;c.state.generationJob={input,applyContext,plan:{vocabulary:[],grammar:[],guidance:''},createdAt:'test',versionId:c.crypto.randomUUID(),chapterId:c.crypto.randomUUID(),alternateId:c.crypto.randomUUID(),writeRequestId:'write'};return JSON.stringify({title:'New',story:'Next scene',glossary:[]});};
+ $('reader-level').value='A1';$('reader-scope').value='scene';
  $('reader-edit-submit').addEventListener=(_,fn)=>submit=fn;$('reader-edit-panel').dataset={mode:'continue'};$('reader-prompt').value='';
  vm.runInContext(slice("$('reader-edit-submit').addEventListener", "$('reader-dialog').addEventListener"),c);
  await submit();assert.equal(story.paths[0].entries.length,2);assert.equal(requested.recentProse,'Start');assert.equal(story.paths[1].entries[1].versionId,'bx');

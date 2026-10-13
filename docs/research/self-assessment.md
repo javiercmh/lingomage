@@ -47,3 +47,7 @@ Bibliography follow-up, 2026-10-10: author names and issue details for Brown et 
 ## Next validation
 
 Qualified language review of the exact descriptors and generated stories is pending for all four languages. If accurate placement becomes necessary, evaluate a suitable validated reading measure against the app's intended population instead of labeling a small invented questionnaire a test.
+
+## Superseding decision — 2026-10-13
+
+[PED-004](../pedagogy/PED-004-level-guided-generation.md) replaces the broad bands and freeform field with standardized self-selected reading targets for new requests. The evidence limitations here still apply; this is not an automatic assessment. Old reports are preserved, and no conversion to certified levels is inferred.

@@ -137,11 +137,10 @@ export const ai = {
     if (cached && value !== null) Object.assign(cached, { done: true, value });
     return cached || { id, done: value !== null, value };
   },
-  // -> completed text. Only supports requests started in this page instance.
+  // -> completed text, including persisted request IDs after page recreation.
   wait: (id) => new Promise((resolve, reject) => {
     const request = aiResults.get(id);
-    if (!request) { reject(new Error('Request not found.')); return; }
-    if (request.done) { request.error ? reject(Object.assign(new Error(request.error.message), { code: request.error.code })) : resolve(request.value); return; }
+    if (request?.done) { request.error ? reject(Object.assign(new Error(request.error.message), { code: request.error.code })) : resolve(request.value); return; }
     const poll = async () => {
       try {
         const result = await ai.result(id);

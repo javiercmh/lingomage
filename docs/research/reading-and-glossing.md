@@ -66,3 +66,6 @@ Five to ten words, story lengths, A1-oriented AI suggestions, glossary placement
 and local rereading are product choices. No learning trial has been run.
 Language-specific grammar progression and beginner readability still need deeper
 review; content checks must not be reported as retention evidence.
+
+
+Current product assumptions: [PED-004](../pedagogy/PED-004-level-guided-generation.md) replaces the former numeric story lengths and mandatory word-list framing with narrative scope and optional planned practice focuses. The evidence reviewed above does not validate those new bounds or the planning/writing split.

@@ -10,7 +10,7 @@ LingoMage is an **[App²](https://github.com/javiercmh/appapp) subapp**: it runs
 
 ## What you can do
 
-- **Make it personal:** choose a topic, vocabulary, difficulty and language preferences.
+- **Make it personal:** choose a story idea, practice topics, reading level, narrative scope and language preferences.
 - **Read comfortably:** adjust text size, toggle Japanese furigana and open word notes when needed.
 - **Get contextual help:** select a passage and tap Explain for its English meaning and usage.
 - **Shape the story:** add chapters with follow-up prompts or rewrite a chapter while keeping the original.
@@ -20,9 +20,9 @@ LingoMage is an **[App²](https://github.com/javiercmh/appapp) subapp**: it runs
 
 1. In App², tap **Import** and paste `https://github.com/javiercmh/lingomage`.
 2. Connect an AI provider in the App² library under **Settings → AI**.
-3. Open LingoMage, choose your language and model, and generate a story.
+3. Open LingoMage, choose your learning languages and reading levels in Settings, then choose a story idea and reading scope.
 
-Difficulty and explanations are AI estimates, not certified proficiency assessments.
+Reading levels are self-selected targets, not certified proficiency assessments. Generation first plans suitable vocabulary and grammar, then writes the story and contextual glossary.
 
 ## For developers
 

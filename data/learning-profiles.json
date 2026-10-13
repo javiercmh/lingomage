@@ -1,6 +1,6 @@
 {
-  "version": "2026-10-10.1",
-  "basis": "Reading self-report; app-specific descriptions, not a validated placement instrument.",
+  "version": "2026-10-13.2",
+  "basis": "Self-selected reading levels. Descriptions are adapted orientation aids; generation guides are app-authored and unvalidated.",
   "languages": {
     "de": {
       "beginner": "I am starting out, or I can understand familiar words and short sentences about daily life with help.",
@@ -70,5 +70,184 @@
       "intermediate": "Short everyday stories, with help for unfamiliar words.",
       "advanced": "Detailed stories, viewpoints, and implied meaning."
     }
+  },
+  "standardizedLevels": {
+    "de": {
+      "framework": "CEFR",
+      "levels": [
+        {
+          "id": "A1",
+          "label": "A1 (Beginner)",
+          "description": "I can understand familiar names, everyday words and very simple sentences.",
+          "guide": "Use familiar concrete words, explicit subjects, one idea per clause and clear repetition. Preserve noun capitalization, umlauts and ß. Use correct case, agreement and verb placement."
+        },
+        {
+          "id": "A2",
+          "label": "A2 (Elementary)",
+          "description": "I can understand short everyday texts and find information in notices, menus and messages.",
+          "guide": "Use frequent everyday vocabulary and connected simple clauses; explain unfamiliar words through context. Preserve noun capitalization, umlauts and ß. Use correct case, agreement and verb placement."
+        },
+        {
+          "id": "B1",
+          "label": "B1 (Intermediate)",
+          "description": "I can follow connected stories about familiar situations, events and feelings.",
+          "guide": "Use connected narrative, common past forms, clear cause and effect and straightforward subordinate clauses. Preserve noun capitalization, umlauts and ß. Use correct case, agreement and verb placement."
+        },
+        {
+          "id": "B2",
+          "label": "B2 (Upper intermediate)",
+          "description": "I can follow detailed stories and viewpoints, including some implied meaning.",
+          "guide": "Use varied clauses, precise everyday vocabulary and viewpoints; keep references and narrative connections clear. Preserve noun capitalization, umlauts and ß. Use correct case, agreement and verb placement."
+        },
+        {
+          "id": "C1",
+          "label": "C1 (Advanced)",
+          "description": "I can understand complex stories, subtle attitudes and unfamiliar styles with occasional support.",
+          "guide": "Use nuanced vocabulary, flexible syntax and implied meaning; support uncommon or specialized expressions when useful. Preserve noun capitalization, umlauts and ß. Use correct case, agreement and verb placement."
+        },
+        {
+          "id": "C2",
+          "label": "C2 (Proficient)",
+          "description": "I can understand demanding texts, including fine distinctions in style and meaning.",
+          "guide": "Use flexible, precise and sophisticated language appropriate to the narrative without gratuitous complexity. Preserve noun capitalization, umlauts and ß. Use correct case, agreement and verb placement."
+        }
+      ]
+    },
+    "es-CL": {
+      "framework": "CEFR",
+      "levels": [
+        {
+          "id": "A1",
+          "label": "A1 (Beginner)",
+          "description": "I can understand familiar names, everyday words and very simple sentences.",
+          "guide": "Use familiar concrete words, explicit subjects, one idea per clause and clear repetition. Use correct agreement, tense and aspect; honor regional preferences without assuming Chilean Spanish."
+        },
+        {
+          "id": "A2",
+          "label": "A2 (Elementary)",
+          "description": "I can understand short everyday texts and find information in notices, menus and messages.",
+          "guide": "Use frequent everyday vocabulary and connected simple clauses; explain unfamiliar words through context. Use correct agreement, tense and aspect; honor regional preferences without assuming Chilean Spanish."
+        },
+        {
+          "id": "B1",
+          "label": "B1 (Intermediate)",
+          "description": "I can follow connected stories about familiar situations, events and feelings.",
+          "guide": "Use connected narrative, common past forms, clear cause and effect and straightforward subordinate clauses. Use correct agreement, tense and aspect; honor regional preferences without assuming Chilean Spanish."
+        },
+        {
+          "id": "B2",
+          "label": "B2 (Upper intermediate)",
+          "description": "I can follow detailed stories and viewpoints, including some implied meaning.",
+          "guide": "Use varied clauses, precise everyday vocabulary and viewpoints; keep references and narrative connections clear. Use correct agreement, tense and aspect; honor regional preferences without assuming Chilean Spanish."
+        },
+        {
+          "id": "C1",
+          "label": "C1 (Advanced)",
+          "description": "I can understand complex stories, subtle attitudes and unfamiliar styles with occasional support.",
+          "guide": "Use nuanced vocabulary, flexible syntax and implied meaning; support uncommon or specialized expressions when useful. Use correct agreement, tense and aspect; honor regional preferences without assuming Chilean Spanish."
+        },
+        {
+          "id": "C2",
+          "label": "C2 (Proficient)",
+          "description": "I can understand demanding texts, including fine distinctions in style and meaning.",
+          "guide": "Use flexible, precise and sophisticated language appropriate to the narrative without gratuitous complexity. Use correct agreement, tense and aspect; honor regional preferences without assuming Chilean Spanish."
+        }
+      ]
+    },
+    "ru": {
+      "framework": "TORFL",
+      "levels": [
+        {
+          "id": "A1",
+          "label": "Elementary (A1)",
+          "description": "I can understand familiar names, everyday words and very simple sentences.",
+          "guide": "Use familiar concrete words, explicit subjects, one idea per clause and clear repetition. Use correct case, aspect and agreement. Cyrillic only, without Latin transliteration or added stress marks."
+        },
+        {
+          "id": "A2",
+          "label": "Basic (A2)",
+          "description": "I can understand short everyday texts and find information in notices, menus and messages.",
+          "guide": "Use frequent everyday vocabulary and connected simple clauses; explain unfamiliar words through context. Use correct case, aspect and agreement. Cyrillic only, without Latin transliteration or added stress marks."
+        },
+        {
+          "id": "B1",
+          "label": "TORFL-I (B1)",
+          "description": "I can follow connected stories about familiar situations, events and feelings.",
+          "guide": "Use connected narrative, common past forms, clear cause and effect and straightforward subordinate clauses. Use correct case, aspect and agreement. Cyrillic only, without Latin transliteration or added stress marks."
+        },
+        {
+          "id": "B2",
+          "label": "TORFL-II (B2)",
+          "description": "I can follow detailed stories and viewpoints, including some implied meaning.",
+          "guide": "Use varied clauses, precise everyday vocabulary and viewpoints; keep references and narrative connections clear. Use correct case, aspect and agreement. Cyrillic only, without Latin transliteration or added stress marks."
+        },
+        {
+          "id": "C1",
+          "label": "TORFL-III (C1)",
+          "description": "I can understand complex stories, subtle attitudes and unfamiliar styles with occasional support.",
+          "guide": "Use nuanced vocabulary, flexible syntax and implied meaning; support uncommon or specialized expressions when useful. Use correct case, aspect and agreement. Cyrillic only, without Latin transliteration or added stress marks."
+        },
+        {
+          "id": "C2",
+          "label": "TORFL-IV (C2)",
+          "description": "I can understand demanding texts, including fine distinctions in style and meaning.",
+          "guide": "Use flexible, precise and sophisticated language appropriate to the narrative without gratuitous complexity. Use correct case, aspect and agreement. Cyrillic only, without Latin transliteration or added stress marks."
+        }
+      ]
+    },
+    "ja": {
+      "framework": "JLPT",
+      "levels": [
+        {
+          "id": "N5",
+          "label": "N5",
+          "description": "I can understand simple everyday sentences in kana and basic kanji, with readings when needed.",
+          "guide": "Common concrete words, basic particles, simple polite or plain forms and clear short clauses. Canonical text omits readings. Provide contextual kana readings separately. No romaji."
+        },
+        {
+          "id": "N4",
+          "label": "N4",
+          "description": "I can follow short texts about familiar everyday situations, with support for unfamiliar kanji.",
+          "guide": "Frequent everyday words, basic verb/adjective combinations and clearly connected everyday events. Canonical text omits readings. Provide contextual kana readings separately. No romaji."
+        },
+        {
+          "id": "N3",
+          "label": "N3",
+          "description": "I can follow everyday stories and understand their main points and relationships between events.",
+          "guide": "Connected everyday narrative, common compound sentences and contextual support for less familiar expressions. Canonical text omits readings. Provide contextual kana readings separately. No romaji."
+        },
+        {
+          "id": "N2",
+          "label": "N2",
+          "description": "I can follow detailed texts on varied topics and understand viewpoints and narrative intent.",
+          "guide": "Varied clause patterns and register, precise vocabulary and clear narrative cohesion; support specialized expressions. Canonical text omits readings. Provide contextual kana readings separately. No romaji."
+        },
+        {
+          "id": "N1",
+          "label": "N1",
+          "description": "I can follow complex texts and understand subtle relationships, intentions and implied meaning.",
+          "guide": "Nuanced vocabulary, flexible clause patterns, shifts of viewpoint and implied meaning appropriate to the story. Canonical text omits readings. Provide contextual kana readings separately. No romaji."
+        }
+      ]
+    }
+  },
+  "scopes": {
+    "scene": {
+      "label": "Scene",
+      "description": "One focused event with a natural stopping point."
+    },
+    "chapter": {
+      "label": "Chapter",
+      "description": "Several connected events with room for development."
+    },
+    "longer": {
+      "label": "Longer passage",
+      "description": "A sustained sequence of events with more development."
+    }
+  },
+  "sources": {
+    "CEFR": "https://www.coe.int/en/web/common-european-framework-reference-languages/level-descriptions",
+    "JLPT": "https://www.jlpt.jp/e/about/levelsummary.html",
+    "TORFL": "https://english.spbstu.ru/education/programs/short-term-programs/russian-language-studies/testing-center-russian-as-foreign-language/"
   }
 }

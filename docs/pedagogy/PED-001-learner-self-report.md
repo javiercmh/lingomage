@@ -1,7 +1,7 @@
 # PED-001: Revisable reading profiles and concrete ability examples
 
 - Date: 2026-10-10
-- Status: implemented; pedagogical evaluation pending
+- Status: superseded for new generation by [PED-004](PED-004-level-guided-generation.md); retained as historical rationale
 - Scope: German, Japanese, Russian and Spanish learners using generated reading stories
 - Evidence basis: product requirements and evidence-informed extrapolation; exact profiles and examples unvalidated
 

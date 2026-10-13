@@ -1,5 +1,7 @@
 # Russian
 
+Current App² level, planning and scope behavior follows [PED-004](../pedagogy/PED-004-level-guided-generation.md). Fixed lengths and broad reading bands below record earlier prompts; canonical orthography and reading-support requirements still apply.
+
 Status: design requirements recorded; App² requests Cyrillic; deeper
 pedagogical review pending.
 
@@ -50,3 +52,8 @@ Current App² prompt status is in [App² runtime](../architecture/app2-runtime.m
 ## App² reading self-report — 2026-10-10
 
 Settings offer three reading-task descriptions and an optional knowledge/difficulties description. These guide each story request and are revisable learner reports, not assessed proficiency. Russian assumes Cyrillic literacy; vocabulary, word endings, and sentence comprehension can be described separately. Generation uses Cyrillic without transliteration. Definitions are in `data/learning-profiles.json`; evidence and limits are in [the self-assessment record](../research/self-assessment.md).
+
+
+## Current App² reading targets — 2026-10-13
+
+[PED-004](../pedagogy/PED-004-level-guided-generation.md) replaces broad reading bands/freeform self-assessment for new generation. The managed standardized-level definitions and app-authored guides are in `data/learning-profiles.json`. German/Spanish use CEFR A1–C2, Japanese JLPT N5–N1 and Russian Elementary/Basic/TORFL-I–IV with A1–C2 references. Canonical script requirements remain. Numeric story lengths in the earlier implementation above are historical; new generation uses narrative scope and a separate language-planning stage. Self-selected levels do not establish certified alignment or individual vocabulary knowledge. Existing saved content/provenance is preserved.

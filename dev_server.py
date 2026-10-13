@@ -378,7 +378,12 @@ class Handler(SimpleHTTPRequestHandler):
                 request_data = json.loads(data.get('input', '{}'))
             except (TypeError, ValueError):
                 request_data = {}
-            if request_data.get('kind') == 'summary':
+            if request_data.get('kind') == 'language-plan':
+                code = request_data.get('languageCode', 'de')
+                words = {'de': ('Markt', 'market'), 'ja': ('公園', 'park'), 'ru': ('рынок', 'market'), 'es-CL': ('feria', 'market')}
+                word, meaning = words.get(code, words['de'])
+                response_text = json.dumps({'vocabulary': [{'word': word, 'meaning': meaning}], 'grammar': [], 'guidance': 'Offline fixture: clear references and contextual support.'}, ensure_ascii=False)
+            elif request_data.get('kind') == 'summary':
                 memory = request_data.get('previousMemory', {})
                 memory = {key: list(memory.get(key, [])) for key in ('characters', 'facts', 'plot', 'unresolved', 'uncertainties', 'situation')}
                 memory['plot'] = (memory['plot'] + [request_data.get('chapterChunk', '')[:500]])[-8:]
@@ -560,6 +565,9 @@ class Handler(SimpleHTTPRequestHandler):
             'es-CL': ('Una tarde tranquila', 'Sofía sale a caminar por el barrio. Pasa por una feria y compra pan y palta. Después se junta con una amiga en una plaza. Conversan un rato y miran el cielo. Cuando baja el sol, vuelven a casa contentas.'),
         }
         title, story = samples.get(code, samples['de'])
+        base_story = story
+        repeats = {'scene': 1, 'chapter': 2, 'longer': 5}.get(data.get('scope'), 1)
+        story = '\n\n'.join([base_story] * repeats)
         notes = {
             'de': [('Ausflug', 'outing', 'Ausflug'), ('Markt', 'market', 'Markt')],
             'ja': [('公園', 'park', '公園'), ('買う', 'to buy', '買います')],
@@ -573,12 +581,13 @@ class Handler(SimpleHTTPRequestHandler):
         if code == 'ja':
             story_segments = [
                 {'text':'今日','reading':'きょう'}, {'text':'はミアが'}, {'text':'町','reading':'まち'}, {'text':'へ'}, {'text':'行','reading':'い'}, {'text':'きます。\n'},
-                {'text':'店','reading':'みせ'}, {'text':'でパンを'}, {'text':'買','reading':'か'}, {'text':'います。友だちと'}, {'text':'公園','reading':'こうえん'}, {'text':'で'}, {'text':'話','reading':'はな'}, {'text':'します。\n'},
+                {'text':'店','reading':'みせ'}, {'text':'でパンを'}, {'text':'買','reading':'か'}, {'text':'います。'}, {'text':'友','reading':'とも'}, {'text':'だちと'}, {'text':'公園','reading':'こうえん'}, {'text':'で'}, {'text':'話','reading':'はな'}, {'text':'します。\n'},
                 {'text':'空','reading':'そら'}, {'text':'は'}, {'text':'青','reading':'あお'}, {'text':'く、'}, {'text':'風','reading':'かぜ'}, {'text':'はやさしいです。\n'},
                 {'text':'二人','reading':'ふたり'}, {'text':'は'}, {'text':'笑','reading':'わら'}, {'text':'って'}, {'text':'家','reading':'いえ'}, {'text':'へ'}, {'text':'帰','reading':'かえ'}, {'text':'ります。'}
             ]
+            story_segments = [part for index in range(repeats) for part in (([{'text': '\n\n'}] if index else []) + story_segments)]
             return json.dumps({'title': title, 'story': story,
-                               'titleSegments': [{'text': '小', 'reading': 'ちい'}, {'text': 'さな一日', 'reading': ''}],
+                               'titleSegments': [{'text': '小', 'reading': 'ちい'}, {'text': 'さな'}, {'text': '一日', 'reading': 'いちにち'}],
                                'storySegments': story_segments, 'glossary': glossary}, ensure_ascii=False)
         return json.dumps({'title': title, 'story': story,
                            'titleSegments': [{'text': title}],
