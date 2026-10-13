@@ -23,6 +23,14 @@ function sandbox(extra = {}) {
 }
 const lifecycle = section('async function acknowledgeReaderResult(', 'function decodeHelp(');
 (async () => {
+  const correctionDisabledTags = htmlSource.match(/<[^>]+spellcheck=["']false["'][^>]*>/g) || [];
+  assert.equal(correctionDisabledTags.length, 2);
+  for (const id of ['reader-title', 'reader-story']) {
+    assert.ok(correctionDisabledTags.some(tag => tag.includes(`id="${id}"`)));
+  }
+  assert.ok(correctionDisabledTags.every(tag => !/^<(?:input|textarea|dialog|article)\b/.test(tag)));
+  assert.ok(!/spellcheck|\.spellCheck\s*=/.test(source), 'App logic must not override field spellchecking');
+  console.log('PASS correction suppression is scoped to canonical reader title and body, excluding editable fields and ancestors');
   const pointerEvents = new Map(), timers = new Map(); let nextTimer = 0, holds = 0;
   const pointer = sandbox({document:{addEventListener:(name,fn)=>pointerEvents.set(name,fn),removeEventListener:name=>pointerEvents.delete(name)},setTimeout:fn=>{const id=++nextTimer;timers.set(id,fn);return id;},clearTimeout:id=>timers.delete(id)});
   vm.runInContext(section('function wireLongPress(', 'function renderLibrary('),pointer);
