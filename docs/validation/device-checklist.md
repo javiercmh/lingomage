@@ -1,41 +1,16 @@
-# Physical-device authentication gate
+# App² device verification checklist
 
-This checklist applies only to the earlier native Android proof of concept. The
-current App² workspace uses the host-managed provider setup in **Settings → AI**;
-it does not use this sign-in flow.
+Install/import LingoMage through the App² library; there is no LingoMage APK or Kotlin build. Provider setup belongs to App² Settings → AI. Use a disposable learning workspace and record only checks actually performed; never record credentials, tokens, callback URLs or account identifiers.
 
-Use the connection-test app before implementing dependent story features.
-Do not record credentials, authorization codes, raw authorization URLs, or token bodies.
+- Confirm launch, safe-area insets, keyboard navigation and 44px touch targets.
+- Verify Short/Medium/Long persists and affects future chapters independently of difficulty.
+- Generate Japanese with both stages; verify kanji-only furigana, compound grouping, selection, canonical copy and speech without readings.
+- Check integrated notes, English meanings, learner preferences and all four target scripts with real provider output; content accuracy requires separate review.
+- Cancel in each stage; close/reopen with saved progress; explicitly Resume/Discard. Verify no partial story appears and no completed stage is regenerated.
+- Exercise continuation, rewrite, examples and saved-stage recovery against their original source/path even after reader navigation.
+- Check native speech, external translation and availability errors. Translation is user-initiated, may process text online and returns no translation to LingoMage.
+- Review updates through App²; installation needs native confirmation. Confirm existing user stories/settings/checkpoints survive managed-file updates.
 
-## Run
+Record date, device/host versions, tested app commit, actual outcomes and sanitized error categories. Unchecked items stay pending. Passing a mock/browser test establishes neither native device behavior nor language/learning quality.
 
-1. Enable USB debugging and approve this computer on the phone.
-2. Build with `cd android && ./gradlew assembleDebug`.
-3. Install `android/app/build/outputs/apk/debug/app-debug.apk` using Android Studio
-   or `adb install -r` and open LingoMage.
-4. Tap **Continue with ChatGPT**, complete consent in the browser, and manually
-   return to LingoMage after the callback page appears.
-5. Confirm the app shows the account as signed in with plan permission.
-6. Tap **Load available models**, choose a model, and tap **Run inference check**.
-7. Record whether **Inference completed** appears and the returned text.
-
-This request uses the selected account's ChatGPT plan. No developer API key is required.
-
-## Additional acceptance checks
-
-- Cancel sign-in and retry; deny consent; let an attempt time out.
-- Rotate during browser authentication, then complete sign-in.
-- Restart the app and confirm saved-account recovery.
-- Add/switch accounts without overwriting another registration.
-- Verify refresh after access-token expiry and reauthorization of a saved account.
-- Sign out; confirm local token deletion and report revocation status.
-- Terminate the process during authentication; a new attempt must be required.
-
-## Result record fields
-
-Date, device model, Android/API version, browser/version, app version/commit,
-step outcomes, sanitized error category, and whether callback, identity validation,
-and completed inference all passed. Keep unchecked steps explicitly pending.
-
-Passing the connection check establishes protocol feasibility on that device/browser,
-not compatibility on all Android versions or evidence of learning effectiveness.
+Historical native authentication checks remain documented in dated validation records and [Git history](https://github.com/javiercmh/lingomage/tree/f8fef1255e608240301a13202168d4f6c41a1fea/android); they are not instructions for the current subapp.

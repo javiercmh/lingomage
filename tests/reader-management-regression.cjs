@@ -15,7 +15,7 @@ function fixture(){
 function harness(story=fixture()){
  const elements=new Map();const $=id=>{if(!elements.has(id)) elements.set(id,{textContent:'',hidden:true,style:{},open:false,focus(){this.focused=true;},setAttribute(key,value){this[key]=value;},showModal(){this.open=true;},close(){this.open=false;},getBoundingClientRect(){return {left:300,top:80,bottom:124,height:104};}});return elements.get(id);};
  let failed=false, saves=0, deleted;
- const c={state:{readerId:'S',readerChapter:1,stories:[story],readerPositions:{'S:original':{chapterId:'C'},'S:alt1':{chapterId:'B'},'S:alt3':{chapterId:'A'}},readerEditDraft:{storyId:'S',pathId:'original',chapterId:'C'}},$,console,window:{innerWidth:390,innerHeight:844},
+ const c={pipeline:null,state:{readerId:'S',readerChapter:1,stories:[story],readerPositions:{'S:original':{chapterId:'C'},'S:alt1':{chapterId:'B'},'S:alt3':{chapterId:'A'}},readerEditDraft:{storyId:'S',pathId:'original',chapterId:'C'}},$,console,window:{innerWidth:390,innerHeight:844},
  readerStory:()=>c.state.stories.find(x=>x.id===c.state.readerId),persistReaderStory(s){assert.equal(s,c.state.stories[0]);if(failed)throw Error('disk');saves++;},
  clearExplanationSelection(){},closeWordNote(){},updateReader(){},readerPanel:()=>({scrollTop:0}),toast(){},setView(){},confirmStoryDeletion(ids){deleted=ids;}};
  vm.createContext(c);vm.runInContext(slice('function pendingDeletionBlocked(', 'function syncStorySelection('),c);vm.runInContext(slice('function closeReaderActions(', 'function readerStory('),c);
@@ -64,7 +64,11 @@ console.log('PASS chapter/path removal, shared content and memory, mirrors, name
  let submit, requested, sequence=0;
  const element=tag=>({tagName:tag,childNodes:[],textContent:'',setAttribute(){},append(...nodes){this.childNodes.push(...nodes);},querySelector(selector){return this.childNodes.find(x=>x.tagName===selector)||this.childNodes.map(x=>x.querySelector?.(selector)).find(Boolean);},remove(){},scrollIntoView(){}});
  c.document={createElement:element,querySelectorAll:()=>[]};c.crypto={randomUUID:()=>`generated-${++sequence}`};c.PROMPT_VERSION='test';c.LANGUAGES={de:'German'};c.STORY_GUIDES={de:{beginner:'Simple'}};c.profileSnapshot=()=>({});c.decodeResponse=JSON.parse;c.state.model='mock';c.state.providerId='mock';story.language='de';story.difficulty='beginner';
- c.renderChapterRequest=()=>{};vm.runInContext(fs.readFileSync('js/request-lifecycle.js','utf8').replaceAll('export async function ','async function '),c);
+ c.readerGeneration=null;c.renderReaderGeneration=()=>{};c.setReaderGeneration=value=>{c.readerGeneration=value;};c.renderChapterRequest=()=>{};vm.runInContext(fs.readFileSync('js/request-lifecycle.js','utf8').replaceAll('export async function ','async function '),c);
+ c.LENGTHS={short:{words:[100,150],sentences:[8,12]}};c.lengthPreference=()=> 'short';c.structuredClone=structuredClone;
+ c.operationProvenance=op=>({operationId:op.id,promptVersion:'test'});
+ vm.runInContext(slice('function applyContentOperation(', 'function showOperationResult('),c);
+ c.runContentOperation=async spec=>{const op={...spec,id:`operation-${++sequence}`,createdAt:'test',result:JSON.parse(await c.readerAi(spec.kind,spec.input))};c.applyContentOperation(op);return op;};c.showOperationResult=()=>{};
  c.ai={acknowledge:async()=>{}};c.readerAi=async(kind,input)=>{c.state.pendingReaderRequestId='request';if(kind==='summary')return JSON.stringify({...input.previousMemory,plot:[input.chapterChunk]});requested=input;return JSON.stringify({title:'New',story:'Next scene',glossary:[]});};
  vm.runInContext(slice('async function acknowledgeReaderResult(', 'function decodeHelp(')+slice('function storyInstructions(', 'function storyInput(')+slice('function createHelpLoading(', 'function renderSavedHelp('),c);
  c.state.languageExpectations={};c.levelDefinition=()=>({id:'A1'});c.guideFor=()=> 'Simple';c.readingDescription=()=> 'I can read simple text';c.LEVELS={de:{framework:'CEFR'}};c.SCOPES={scene:{description:'One event'}};c.renderJobRecovery=()=>{};c.generationProvenance=job=>({difficulty:job.input.difficulty,scope:job.input.scope,languagePlan:job.plan,learnerContext:{}});

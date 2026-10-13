@@ -2,7 +2,7 @@
 
 This directory contains product rationale, language decisions, research and
 validation. The current App² workspace is at the repository root; the earlier
-native Android implementation remains in `android/`.
+native Android implementation is retired and remains in Git history.
 
 The architecture documents for Android authentication, generation, furigana, and
 text selection/reasoning preserve details of that earlier implementation. The
@@ -26,7 +26,8 @@ use the current validation status in the product and App² runtime documents.
 - [App² runtime migration](architecture/app2-runtime.md): Current runtime, workspace data and validation limits.
 - [Furigana rendering](architecture/furigana.md): Legacy Android annotation structure, layout and accessibility.
 - [Text selection and reasoning preferences](architecture/selection-and-reasoning.md): Earlier Android implementation details.
-- [Physical-device checklist](validation/device-checklist.md): Legacy Android authentication gate and remaining manual checks.
+- [Physical-device checklist](validation/device-checklist.md): Current App² host checks.
+- [Language safeguard audit](architecture/language-safeguards.md): Current requirements, legacy decisions and regression coverage.
 - [Story implementation checks](validation/2026-10-09-stories.md): Historical Android build, device and generation outcomes.
 - [Initial language samples](validation/sample-review.md): Historical sample review and limitations.
 - [Initial implementation checks](validation/2026-10-09-authentication.md): Historical Android results and pending checks.
@@ -48,3 +49,5 @@ Do not label planned checks as completed validation.
 
 Changes to generation prompts, reading aids, or difficulty rules should update
 the affected language decisions and evidence records in the same change.
+
+Merged generation and reader verification: [2026-10-13 merge integration](validation/2026-10-13-merge-integration.md).

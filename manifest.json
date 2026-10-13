@@ -1,7 +1,7 @@
 {
   "name": "LingoMage",
   "short_name": "LingoMage",
-  "version": "1.2.12",
+  "version": "1.2.15",
   "templateVersion": 3,
   "description": "Create AI-powered stories tailored to your story ideas, topics, and reading level.",
   "main": "index.html",
@@ -23,10 +23,14 @@
     "data/learning-profiles.json",
     "DESIGN.md",
     "data/reader-help-fixtures.json",
+    "js/learning-validation.js",
+    "js/generation-pipeline.js",
+    "data/language-safeguards.json",
+    "data/generation-checkpoints.json",
     "js/story-generation.js"
   ],
   "app2Update": {
-    "appId": "com.javiercmh.lingomage",
+    "appId": "com.wynh.lingomage",
     "minimumHostVersionCode": 4,
     "github": {
       "owner": "javiercmh",
@@ -48,15 +52,20 @@
       "PACKAGING.md",
       "DESIGN.md",
       "data/reader-help-fixtures.json",
+      "js/learning-validation.js",
+      "js/generation-pipeline.js",
+      "data/language-safeguards.json",
       "js/story-generation.js"
     ],
     "seedFiles": [
       "data/stories.json",
-      "data/settings.json"
+      "data/settings.json",
+      "data/generation-checkpoints.json"
     ],
     "seedDefaults": {
       "data/stories.json": [],
-      "data/settings.json": {}
+      "data/settings.json": {},
+      "data/generation-checkpoints.json": []
     }
   },
   "icons": [

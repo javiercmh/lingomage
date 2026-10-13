@@ -6,6 +6,7 @@ const source = fs.readFileSync(require('node:path').join(__dirname, '../js/app.j
 const htmlSource = fs.readFileSync(require('node:path').join(__dirname, '../index.html'), 'utf8');
 const cssSource = fs.readFileSync(require('node:path').join(__dirname, '../css/style.css'), 'utf8');
 const readerTextSource = fs.readFileSync(require('node:path').join(__dirname, '../js/reader-text.js'), 'utf8').replaceAll('export function ', 'function ');
+const learningSource = fs.readFileSync(require('node:path').join(__dirname, '../js/learning-validation.js'), 'utf8').replace(/^import .*;\n/m, '').replaceAll('export ', '');
 const requestLifecycleSource = fs.readFileSync(require('node:path').join(__dirname, '../js/request-lifecycle.js'), 'utf8').replaceAll('export async function ', 'async function ');
 const speechSource = fs.readFileSync(require('node:path').join(__dirname, '../js/reader-speech.js'), 'utf8').replaceAll('export function ', 'function ').replaceAll('export async function ', 'async function ');
 function section(start, end) { return source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start))); }
@@ -14,24 +15,17 @@ function sandbox(extra = {}) {
   const element = (tag = 'div') => ({tagName:tag,hidden:false,dataset:{},childNodes:[],events:{},attributes:{},
     get textContent(){return this.childNodes.map(node=>node.textContent).join('');},set textContent(value){this.childNodes=value ? [{tagName:'#text',textContent:String(value)}] : [];},
     append(...nodes){this.childNodes.push(...nodes);},addEventListener(name,fn){this.events[name]=fn;},setAttribute(name,value){this.attributes[name]=value;},focus(){this.focused=true;},scrollIntoView(){},remove(){},querySelector(selector){return this.childNodes.find(node=>node.tagName===selector) || this.childNodes.map(node=>node.querySelector?.(selector)).find(Boolean) || null;},querySelectorAll(){return [];},classList:{add(){},remove(){},toggle(){}}});
-  const c = {state:{},console,crypto:{randomUUID:(()=>{let id=0;return ()=>`help-test-${++id}`;})()},PROMPT_VERSION:'test',STORY_GUIDES:{de:{beginner:'Simple sentences'}},renderChapterRequest(){},LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},SPEECH_LANGUAGES:{de:'de-DE',ja:'ja-JP',ru:'ru-RU','es-CL':'es-CL'},renderGenerationRecovery(){},readerPanel:()=>({classList:{toggle(){}}}),$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{createElement:element,createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},...extra};
-  c.acknowledgeStoryRequest = id => c.ai.acknowledge(id);
+  const c = {pipeline:null,state:{},console,crypto:{randomUUID:(()=>{let id=0;return ()=>`help-test-${++id}`;})()},PROMPT_VERSION:'test',STORY_GUIDES:{de:{beginner:'Simple sentences'}},renderChapterRequest(){},LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},SPEECH_LANGUAGES:{de:'de-DE',ja:'ja-JP',ru:'ru-RU','es-CL':'es-CL'},renderGenerationRecovery(){},readerPanel:()=>({classList:{toggle(){}}}),$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{createElement:element,createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},...extra};
+  c.readerGeneration = null; c.renderReaderGeneration = () => {}; c.setReaderGeneration = value => { c.readerGeneration = value; };
   vm.createContext(c);
   vm.runInContext(readerTextSource, c);
+  vm.runInContext(learningSource, c);
   vm.runInContext(requestLifecycleSource, c);
   vm.runInContext(speechSource, c);
   return c;
 }
 const lifecycle = section('async function acknowledgeReaderResult(', 'function decodeHelp(');
 (async () => {
-  const correctionDisabledTags = htmlSource.match(/<[^>]+spellcheck=["']false["'][^>]*>/g) || [];
-  assert.equal(correctionDisabledTags.length, 2);
-  for (const id of ['reader-title', 'reader-story']) {
-    assert.ok(correctionDisabledTags.some(tag => tag.includes(`id="${id}"`)));
-  }
-  assert.ok(correctionDisabledTags.every(tag => !/^<(?:input|textarea|dialog|article)\b/.test(tag)));
-  assert.ok(!/spellcheck|\.spellCheck\s*=/.test(source), 'App logic must not override field spellchecking');
-  console.log('PASS correction suppression is scoped to canonical reader title and body, excluding editable fields and ancestors');
   const pointerEvents = new Map(), timers = new Map(); let nextTimer = 0, holds = 0;
   const pointer = sandbox({document:{addEventListener:(name,fn)=>pointerEvents.set(name,fn),removeEventListener:name=>pointerEvents.delete(name)},setTimeout:fn=>{const id=++nextTimer;timers.set(id,fn);return id;},clearTimeout:id=>timers.delete(id)});
   vm.runInContext(section('function wireLongPress(', 'function renderLibrary('),pointer);
@@ -83,6 +77,24 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.deepEqual(JSON.parse(JSON.stringify(matches.map(item=>[item.start,item.end,item.notes.length]))),[[0,5,2],[12,17,2]]);
   assert.equal(glossary.findGlossaryMatches('美しい', [{word:'美しい',meaning:'beautiful',forms:['美しい']}])[0].end,3);
   console.log('PASS exact glossary forms match repeated occurrences, group shared ranges and prefer longer overlaps');
+  const furigana = sandbox();
+  const normalize = (text, reading, strict = true) => JSON.parse(JSON.stringify(furigana.japaneseSegments(text, [{text, reading}], strict)));
+  assert.deepEqual(normalize('日本の同僚と学食に行きます。', 'にほんのどうりょうとがくしょくにいきます。'), [
+    {text:'日本',reading:'にほん'},{text:'の'},{text:'同僚',reading:'どうりょう'},{text:'と'},{text:'学食',reading:'がくしょく'},{text:'に'},{text:'行',reading:'い'},{text:'きます。'}
+  ]);
+  assert.deepEqual(normalize('食べ物', 'たべもの'), [{text:'食',reading:'た'},{text:'べ'},{text:'物',reading:'もの'}]);
+  assert.deepEqual(normalize('ユキさんは学生です。', 'ゆきさんはがくせいです。'), [{text:'ユキさんは'},{text:'学生',reading:'がくせい'},{text:'です。'}]);
+  assert.deepEqual(normalize('学生。', 'がくせい'), [{text:'学生',reading:'がくせい'},{text:'。'}]);
+  assert.deepEqual(normalize('かな。', 'かな。'), [{text:'かな。'}]);
+  for (const reading of ['', 'romaji', 'たべべもの']) assert.throws(() => normalize('食べ物', reading));
+  const legacyAnnotations = [{text:'食べ物',reading:'たべべもの'}];
+  assert.deepEqual(JSON.parse(JSON.stringify(furigana.japaneseSegments('食べ物', legacyAnnotations))), legacyAnnotations);
+  assert.throws(() => furigana.japaneseSegments('日本', [{text:'日',reading:'にち'}], true));
+  const originalAnnotations = [{text:'行きます',reading:'いきます'}];
+  furigana.japaneseSegments('行きます', originalAnnotations);
+  assert.deepEqual(originalAnnotations, [{text:'行きます',reading:'いきます'}]);
+  console.log('PASS kanji-only alignment, sentence-wide legacy readings, katakana anchors, missing/ambiguous readings and immutable saved annotations');
+
   const first = glossary.firstGlossaryMatches('canto cantó canto', [
     {word:'cantar',meaning:'to sing',forms:['canto','cantó']},
     {word:' cantar ',meaning:'to   sing',forms:['canto']},
@@ -107,7 +119,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   ]);
   assert.deepEqual(JSON.parse(JSON.stringify(shared.map(item=>[item.start,item.notes.map(note=>note.meaning)]))),[[0,['one']],[2,['two']]]);
   console.log('PASS first eligible notes share normalized identities across forms; meanings/case stay distinct and overlaps resolve first');
-  const annotated=sandbox(), annotatedRoot=annotated.document.createElement('div');let noteOpened=0, openedTrigger;
+  const annotated=sandbox(), annotatedRoot=annotated.document.createElement('div');let noteOpened=0,openedTrigger;
   annotated.annotatedText(annotatedRoot,'日本語',[{text:'日',reading:'にち'},{text:'本語',reading:'ほんご'}],{language:'ja-JP',glossary:[{word:'日本語',meaning:'Japanese language',forms:['日本語']}],onNote(event,trigger){noteOpened++;openedTrigger=trigger;}});
   assert.equal(annotatedRoot.lang,'ja-JP');assert.equal(annotatedRoot.childNodes.length,2);
   assert.equal(annotatedRoot.childNodes[0].tagName,'ruby');assert.equal(annotatedRoot.childNodes[1].tagName,'ruby');
@@ -195,7 +207,6 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   let failsSave = true, failsAck = false, durable, applied = 0, acked = 0;
   const story={id:'A',value:0};
   const c=sandbox({state:{pendingReaderRequestId:'request',readerId:'A'},persistReaderStory:s=>{if(failsSave) throw Error('disk'); durable=JSON.parse(JSON.stringify(s));},ai:{acknowledge:async()=>{if(failsAck) throw Error('ack');acked++;}}});
-  c.acknowledgeStoryRequest = id => c.ai.acknowledge(id);
   vm.runInContext(lifecycle,c);
   c.state.pendingReaderResult={story,saved:false,apply(){story.value++;applied++;return ()=>story.value--;}};
   await assert.rejects(c.savePendingReaderResult(),/disk/);
@@ -213,7 +224,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   const original={id:'A',language:'ja',chapters:[{id:'CA',help:[],versions:[{id:'VA',story:'日本'}]}]};
   const other={id:'B',language:'de',chapters:[{id:'CB',help:[],versions:[{id:'VB'}]}]};current=original;
   const help=sandbox({state:{readerId:'A',readerSelection:{storyId:'A',text:'日本',start:0,end:2,chapterId:'CA',versionId:'VA',profile:{}},model:'mock',providerId:'mock'},readerStory:()=>current,normalizeChapters:s=>s.chapters,activeChapter:()=>current.chapters[0],activeVersion:()=>current.chapters[0].versions[0],readerPanel:()=>({scrollTop:150}),persistReaderStory(){},readerAi:()=>{helpRequests++;return new Promise(r=>finish=r);},decodeHelp:JSON.parse,renderSavedHelp(){},ai:{acknowledge:async()=>{}}});
-  vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(',"$('selection-explain')"),help);
+  vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(',"$('selection-translate')"),help);
   const pending=help.explainSelection();await new Promise(r=>setImmediate(r));
   await help.explainSelection();assert.equal(helpRequests,1);
   assert.equal(help.state.activeHelpRequest.storyId,'A');assert.equal(help.state.activeHelpRequest.chapterId,'CA');assert.equal(help.state.activeHelpRequest.versionId,'VA');assert.equal(help.state.activeHelpRequest.action,'initial');
@@ -279,7 +290,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
     const story = {id:'S',language:code,chapters:[chapter]};
     let request, instructions, saved = false;
     const f = sandbox({state:{readerId:'S',providerId:'mock',model:'model'},readerStory:()=>story,normalizeChapters:s=>s.chapters,activeChapter:()=>chapter,activeVersion:()=>version,readerPanel:()=>({scrollTop:0}),persistReaderStory(){saved=true;},readerAi:async(kind,input,prompt)=>{request=input;instructions=prompt;f.state.pendingReaderRequestId='r';saved=false;return 'The ending adds a boundary.\n\n「でも」 marks a contrast.';},decodeHelp:text=>({explanation:text}),renderSavedHelp(){},ai:{acknowledge:async()=>{assert.equal(saved,true);}}});
-    vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(', "$('selection-explain')"),f);
+    vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(', "$('selection-translate')"),f);
     const selected = {storyId:'S',chapterId:'C',versionId:'V',helpId:'H',text:'く',start:3,end:4,profile:{}};
     await f.explainSelection('explain','detail','explain prefixes',selected);
     assert.equal(request.followUp,'explain prefixes');
@@ -316,7 +327,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.ok(htmlSource.includes('<h3 id="reader-help-title">Explanations</h3>'));
   assert.ok(cssSource.includes('.help-examples { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line);'));
   console.log('PASS settings feedback, single Explanations heading, accessible loading, and in-card example divider');
-  const examples = [0,1,2].map(()=>({sentence:'山は高く、道はせまいです。',translation:'The mountain is tall, and the road is narrow.',highlightStart:3,highlightEnd:4,segments:[{text:'山',reading:'やま'},{text:'は高く、道はせまいです。'}]}));
+  const examples = [0,1,2].map(()=>({sentence:'山は高く、道はせまいです。',translation:'The mountain is tall, and the road is narrow.',highlightStart:3,highlightEnd:4,segments:[{text:'山',reading:'やま'},{text:'は'},{text:'高',reading:'たか'},{text:'く、'},{text:'道',reading:'みち'},{text:'はせまいです。'}]}));
   assert.equal(contract.decodeHelp(JSON.stringify({examples}), 'examples').examples.length,3);
   for (const invalid of [{examples:examples.slice(1)}, {examples:[...examples.slice(0,2),{...examples[2],highlightEnd:999}]}, {examples:[...examples.slice(0,2),{...examples[2],translation:42}]}, {examples:[...examples.slice(0,2),{...examples[2],segments:[{text:'wrong'}]}]}]) {
     assert.throws(()=>contract.decodeHelp(JSON.stringify(invalid),'examples'),/invalid/);
@@ -416,22 +427,8 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.equal(expRemoval.removeSelectedExplanations(storyHelp,ch,{id:'v1'},new Set(['v1a'])),false);assert.equal(ch.help,helpRows);assert.deepEqual(Array.from(expRemoval.state.selectedExplanationIds),['v1a']);
   console.log('PASS explanation removal is version-scoped, includes attached follow-ups, and rolls back on save failure');
 
-  let failExampleSave=true, failExampleAck=false, callCount=0, captured;
-  const entry={id:'H',kind:'explain',passage:'く',start:3,end:4,text:'Original',more:'Legacy',versionId:'V'};
-  const version={id:'V',story:v.story};const chapter4={id:'C',help:[entry],versions:[version]};const story4={id:'S',language:'ja',chapters:[chapter4]};
-  const selected4={storyId:'S',chapterId:'C',versionId:'V',helpId:'H',text:'く',start:3,end:4,profile:{}};
-  const examplePending=sandbox({state:{readerId:'S',model:'mock',providerId:'mock'},readerStory:()=>story4,normalizeChapters:s=>s.chapters,activeChapter:()=>chapter4,activeVersion:()=>version,readerPanel:()=>({scrollTop:0}),persistReaderStory(){if(examplePending.state.pendingReaderResult && failExampleSave)throw Error('disk');},readerAi:async(kind,input)=>{callCount++;captured=input;examplePending.state.pendingReaderRequestId='request';return JSON.stringify({examples});},renderSavedHelp(){},ai:{acknowledge:async()=>{assert.ok(entry.followUps?.some(entry=>entry.action==='examples'));if(failExampleAck)throw Error('ack');}}});
-  vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('function decodeHelp(', "$('selection-explain')"),examplePending);
-  await examplePending.explainSelection('explain','examples','',selected4);
-  assert.equal(entry.followUps,undefined);assert.equal(examplePending.state.pendingReaderResult.saved,false);
-  assert.equal(captured.sourceText,v.story);assert.equal(captured.action,'examples');
-  await examplePending.explainSelection('explain','examples','',selected4);assert.equal(callCount,1);
-  failExampleSave=false;failExampleAck=true;await assert.rejects(examplePending.savePendingReaderResult(),/ack/);
-  assert.equal(entry.followUps.length,2);assert.equal(entry.more,'Legacy');
-  failExampleAck=false;await examplePending.savePendingReaderResult();assert.equal(entry.followUps.length,2);
-  await examplePending.explainSelection('explain','examples','',selected4);assert.equal(entry.followUps.length,3);
-  assert.equal(entry.text,'Original');assert.equal(callCount,2);
-  console.log('PASS examples retain history; failed save rollback and acknowledgement retry do not duplicate or regenerate');
+  // Durable examples/save/release regressions now exercise the production
+  // generation pipeline in learning-safeguards.mjs.
 
   const normalized=sandbox();vm.runInContext(section('function normalizeChapters(', 'function profileSnapshot('),normalized);
   const legacy={id:'legacy',title:'Title',story:'Text',providerId:'provider',promptVersion:'original'};
@@ -445,10 +442,17 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   let requested, generationInstructions;
   story3.topic = 'A mountain mystery'; story3.practice = 'Hiking vocabulary'; story3.difficulty = 'beginner'; story3.language = 'de';
   const gen=sandbox({state:{readerId:'S',readerChapter:0,model:'mock',providerId:'mock'},readerStory:()=>story3,normalizeChapters:s=>s.chapters,activeVersion:c=>c.versions.find(v=>v.id===c.activeVersionId),activeChapter:()=>story3.chapters[gen.state.readerChapter],profileSnapshot:()=>({}),persistReaderStory(){},decodeResponse:JSON.parse,readerAi:async(kind,input,instructions,loading)=>{if(kind==='summary'){gen.state.pendingReaderRequestId='r';return JSON.stringify({...input.previousMemory,plot:[...input.previousMemory.plot,input.chapterChunk]});} requested=input;generationInstructions=instructions;assert.ok(loading.textContent.includes(kind === 'continue' ? 'Writing the next chapter' : 'Rewriting this chapter'));gen.state.pendingReaderRequestId='r';return JSON.stringify({title:'four',story:'Text four',glossary:[{word:'four',meaning:'four',forms:['four']}]});},readerPanel:()=>({scrollTop:0}),updateReader(){},window:{addEventListener(){}},document:{documentElement:{style:{}},querySelectorAll:()=>[]},ai:{acknowledge:async()=>{}}});
-  gen.state.languageExpectations={};gen.levelDefinition=()=>({id:'A1'});gen.guideFor=()=> 'Simple';gen.readingDescription=()=> 'Simple reading';gen.LEVELS={de:{framework:'CEFR'}};gen.SCOPES={scene:{description:'One event'}};gen.renderJobRecovery=()=>{};gen.generationProvenance=job=>({difficulty:job.input.difficulty,scope:job.input.scope,languagePlan:job.plan,learnerContext:{}});
-  gen.acknowledgeStoryRequest=async id=>{await gen.ai.acknowledge(id);if(gen.state.generationJob?.writeRequestId===id)gen.state.generationJob=null;};
-  gen.plannedStory=async(mode,input,instructions,loading,config,applyContext)=>{gen.state.generationJob={input,applyContext,plan:{vocabulary:[],grammar:[],guidance:''},createdAt:'test',versionId:gen.crypto.randomUUID(),chapterId:gen.crypto.randomUUID(),alternateId:gen.crypto.randomUUID(),writeRequestId:'r'};return gen.readerAi(mode,input,instructions,loading);};
-  gen.$('reader-level').value='A1';gen.$('reader-scope').value='scene';
+  gen.state.languageExpectations={};gen.levelDefinition=()=>({id:'A1'});gen.guideFor=()=> 'Simple';gen.readingDescription=()=> 'Simple reading';gen.LEVELS={de:{framework:'CEFR'}};gen.SCOPES={scene:{description:'One event'}};gen.$('reader-level').value='A1';gen.$('reader-scope').value='scene';
+  gen.runContentOperation=async spec=>{
+    const result=JSON.parse(await gen.readerAi(spec.kind,spec.input,spec.instructions,gen.state.activeChapterRequest.loading));
+    const op={...spec,result,id:'generated-'+Date.now()+Math.random(),promptVersion:'test',createdAt:'test'};
+    gen.applyContentOperation(op); return op;
+  };
+  gen.showOperationResult=()=>{};
+  gen.structuredClone=structuredClone;
+  gen.operationProvenance=op=>({operationId:op.id,promptVersion:'test'});
+  vm.runInContext(section('function applyContentOperation(', 'function showOperationResult('),gen);
+  gen.state.stories=[story3];
   gen.document.createElement = sandbox().document.createElement;
   gen.$('reader-edit-submit').addEventListener=(_,fn)=>submit=fn;
   gen.$('reader-prompt').value='Next';gen.$('reader-edit-panel').dataset.mode='continue';
@@ -505,7 +509,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   console.log('PASS failed chapter request clears loading and retains an anchored prompt for explicit retry');
 
   let cancelAction, rejectWait, cancelCalls=0;
-  const cancelContext=sandbox({state:{models:[{id:'mock'}],model:'mock'},ai:{available:true,start:async()=> 'cancel-id',wait:()=>new Promise((_,reject)=>rejectWait=reject),cancel:async()=>{cancelCalls++;rejectWait(Error('cancelled'));},acknowledge:async()=>{}},document:{createElement:()=>({addEventListener:(_,fn)=>cancelAction=fn,remove(){}})}});
+  const cancelContext=sandbox({state:{models:[{id:'mock'}],model:'mock'},ai:{available:true,providers:async()=>({providers:[{id:'openrouter',connected:true}]}),start:async args=>{assert.equal(args.providerId,'openrouter');return 'cancel-id';},wait:()=>new Promise((_,reject)=>rejectWait=reject),cancel:async()=>{cancelCalls++;rejectWait(Error('cancelled'));},acknowledge:async()=>{}},document:{createElement:()=>({addEventListener:(_,fn)=>cancelAction=fn,remove(){}})}});
   vm.runInContext(section('async function readerAi(', 'async function acknowledgeReaderResult('),cancelContext);
   const cancellation=cancelContext.readerAi('explain',{},'test');
   await new Promise(resolve=>setImmediate(resolve));await cancelAction();

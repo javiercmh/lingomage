@@ -202,9 +202,19 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 .help-quote { margin: 12px 0; padding: 10px 14px; border-left: 3px solid var(--accent); background: var(--field); border-radius: 0 10px 10px 0; color: var(--ink); font-size: 20px; }
 .reader-prompt { height: 110px; padding: 12px; resize: vertical; }
 .reader-edit-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.selection-toolbar { position: fixed; z-index: 10; right: max(12px, var(--sa-right)); bottom: calc(12px + var(--sa-bottom)); left: max(12px, var(--sa-left)); display: flex; justify-content: center; gap: 8px; padding: 8px; border: 1px solid var(--line); border-radius: 14px; background: #24344e; box-shadow: 0 8px 30px #0009; }
-.selection-toolbar .small-btn { min-width: 82px; min-height: 44px; }
-.floating-selection-toolbar { position: fixed; right: auto; bottom: auto; left: 0; justify-content: flex-start; }
+/* Floating selection popover, anchored to the selected text. */
+.selection-toolbar { --pop-bg: #1e293b; --pop-ink: #f1f5f9; --pop-line: rgba(203,213,225,.16); --pop-hover: rgba(255,255,255,.09); position: fixed; z-index: 10; top: 0; left: 0; display: flex; flex-wrap: nowrap; align-items: center; gap: 2px; max-width: calc(100vw - 16px); padding: 4px; border: 1px solid var(--pop-line); border-radius: 14px; background: var(--pop-bg); color: var(--pop-ink); box-shadow: 0 4px 6px rgba(0,0,0,.18), 0 10px 28px rgba(0,0,0,.35); animation: selection-pop .12s ease-out; }
+.selection-toolbar[hidden] { display: none; }
+@keyframes selection-pop { from { opacity: 0; transform: translateY(4px) scale(.97); } }
+@media (prefers-reduced-motion: reduce) { .selection-toolbar { animation: none; } }
+.selection-toolbar .small-btn, .selection-toolbar .icon-btn { min-height: 44px; border: 0; border-radius: 10px; background: transparent; color: inherit; }
+.selection-toolbar .small-btn { min-width: 0; padding: 0 12px; font-size: 13px; white-space: nowrap; }
+.selection-toolbar .icon-btn { width: 44px; height: 44px; }
+.selection-toolbar .icon-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.selection-toolbar button:hover:not(:disabled), .selection-toolbar button:focus-visible { background: var(--pop-hover); }
+.selection-toolbar button:disabled { opacity: .4; }
+.selection-toolbar #selection-explain { font-weight: 700; }
+@media (max-width: 420px) { .selection-toolbar .small-btn { padding: 0 9px; font-size: 12px; } }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .reader-primary-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin: 20px 0 10px; }
 .reader-primary-actions button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; padding: 8px; }
@@ -316,5 +326,17 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px
 .reader-actions-menu .helper { margin: 4px 12px 8px; }
 
 /* Generation recovery actions remain comfortable when labels wrap. */
-#story-job-recovery button { margin: 6px 8px 0 0; min-height: 44px; }
+
 #reader-edit-panel .create-field-group { margin-top: 18px; }
+.reader-generation-bar { position: fixed; z-index: 9; bottom: calc(12px + var(--sa-bottom)); left: max(12px, var(--sa-left)); right: max(12px, var(--sa-right)); max-width: 756px; margin: auto; display: flex; align-items: center; gap: 8px; padding: 10px; background: #24344e; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 8px 30px #0009; }
+.reader-generation-bar[hidden] { display: none; }
+.reader-generation-bar span { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
+.reader-generation-bar button { min-height: 44px; flex-shrink: 0; }
+.reader-panel.has-generation-status { padding-bottom: calc(160px + var(--sa-bottom)); }
+.reader-panel.has-generation-status .explanation-selection-toolbar { bottom: calc(100px + var(--sa-bottom)); }
+
+.reader-heading { display: flex; align-items: flex-start; gap: 12px; margin: 18px 0 14px; }
+.reader-panel .reader-heading h2 { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.reader-listen { flex: 0 0 44px; }
+
+.recovery-panel > button { margin: 6px 0; }

@@ -4,14 +4,15 @@ This workspace is a plain HTML/CSS/JavaScript subapp. `manifest.json` lists the 
 
 ## Data and language text
 
-- `data/stories.json` contains saved story records, including language, canonical title and story, optional Japanese reading segments, glossary, vocabulary, topic, model, prompt version and creation time.
+- `data/stories.json` contains saved story records, including language, canonical title and story, app-owned Japanese reading segments, glossary, vocabulary, topic, model, prompt version and creation time.
 - `data/settings.json` stores the selected model and reasoning preference. ChatGPT credentials remain in App² and are not exposed to the subapp.
-- Japanese `story` and `title` remain the canonical strings. `storySegments` and `titleSegments` add optional reading annotations for display. Copying uses canonical text and excludes readings.
-- Russian output is expected in Cyrillic. English glossary meanings are retained for all four target languages.
+- Japanese uses a canonical prose request followed by an app-owned kanji reading request; validated stages save before acknowledgement. Japanese `story` and `title` remain the canonical strings. `storySegments` and `titleSegments` add optional reading annotations for display. Copying uses canonical text and excludes readings.
+- `data/generation-checkpoints.json` stores unfinished generation stages and captured context; seed it empty. `data/language-safeguards.json` is a managed definition.
+- Russian output is validated as Cyrillic. English glossary meanings are retained for all four target languages.
 
 ## AI
 
-The app imports `ai`, `readFile` and `writeFile` from `js/bridge.js`. It discovers providers and models at runtime, sends a versioned beginner-story instruction and selected words, validates the returned JSON shape and glossary coverage, saves completed stories locally, then acknowledges the completed request. Generation errors do not trigger automatic retries.
+The app imports `ai`, `readFile` and `writeFile` from `js/bridge.js`. It discovers providers and models at runtime, sends a versioned profile-aware learning instruction and freeform wishes, validates chapter length, scripts, field bounds and nonempty inline learning notes, saves completed stories locally, then acknowledges the completed request. Generation errors do not trigger automatic retries.
 
 Connect ChatGPT through App² library **Settings → AI**. Browser preview supports the explicitly enabled offline `--mock-ai` responses. For optional live desktop testing, sign in with `codex login` and run `python3 dev_server.py --chatgpt`; this uses Codex's ChatGPT account and may use plan allowance. The development server keeps no credentials, uses ephemeral threads in a temporary directory and does not retain pending requests across restart. This local development mode is an exception to the App²-only connection rule; released app behavior still uses App²'s managed AI bridge. Mock outputs are fixed examples and do not establish translation quality or learning effectiveness.
 
@@ -27,8 +28,8 @@ confirmation. Browser previews hide the button. App² follows
 `javiercmh/lingomage` branch `main`, pinned to one commit during download.
 
 `manifest.json.app2Update` declares publisher identity and file ownership.
-`data/stories.json` and `data/settings.json` are user files seeded only when absent.
-`data/learning-profiles.json` is a shipped managed definition and updates with the
+`data/stories.json`, `data/settings.json` and `data/generation-checkpoints.json` are user files seeded only when absent.
+`data/learning-profiles.json` and `data/language-safeguards.json` are shipped managed definitions and updates with the
 code. All other unowned files remain untouched. Keep these declarations current.
 Existing saved records must remain readable; v1 has no automatic data migration.
 Increment the app version for a published update. Commit and push require explicit
@@ -37,3 +38,17 @@ user instructions; local changes are unavailable to GitHub updates until publish
 Package with App²'s `scripts/package_subapp.py`; it uses empty declared seed
 defaults rather than copying local stories or settings. ZIP installation belongs
 to the App² library; Share & Package is export-only.
+
+## Device translation
+
+`translation` from `js/bridge.js` exposes `availability()` → `{available: boolean}` and `open({text})` → `{opened: true}`. App² forwards text via Android ACTION_TRANSLATE to the configured handler or resolver. It returns no translation and accepts no language settings. Call only after a user action, with canonical text without readings. Browsers and older hosts report unavailable. Blank text or more than 100000 UTF-16 code units is rejected by the host. Handle `.code`/`.message` errors (`invalid_request`, `unavailable`, `timeout`) without automatic retry. The external translation tool may process text online.
+
+## Host-controlled AI providers
+
+App² Settings → AI exposes ChatGPT, OpenRouter or one Combined provider. LingoMage
+discovers the connected exposed provider and uses its existing model selector; it
+does not need provider-specific credentials or response parsing. Combined model IDs
+are opaque and model names include their source. A provider change clears unavailable
+model/reasoning choices. Pending generation checkpoints retain their original config.
+OpenRouter models may return valid text that fails LingoMage's JSON/content validation;
+existing safeguards remain authoritative and no inference is retried automatically.

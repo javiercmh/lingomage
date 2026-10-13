@@ -5,7 +5,7 @@ export const PLAN_INSTRUCTIONS = 'Plan language for a reading story using the su
 
 function canonicalScript(text, language) {
   const allowed = language === 'ru' ? /\p{Script=Cyrillic}/u : /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー々〆]/u;
-  return Array.from(text).every(char => !/\p{L}/u.test(char) || allowed.test(char)) && !(language === 'ru' && /\u0301/u.test(text));
+  return Array.from(text).every(char => !/\p{L}/u.test(char) || allowed.test(char));
 }
 
 export function decodePlan(text, language) {
