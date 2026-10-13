@@ -18,7 +18,7 @@ is selected. The UI remains English in all four languages.
 
 ## Prompts and validation
 
-[Prompt assets](../../android/app/src/main/assets/prompts/) contain a common JSON
+[Prompt assets](https://github.com/javiercmh/lingomage/tree/f8fef1255e608240301a13202168d4f6c41a1fea/android/app/src/main/assets/prompts/) contain a common JSON
 contract and four independent language files. Initial version `2026-10-09.1` and Japanese/Spanish revisions `2026-10-09.2` are saved
 with their corresponding stories, alongside its model, language, selected vocabulary, topic,
 canonical text, glossary, annotations, and creation time. Prompts request simple,
@@ -50,10 +50,10 @@ transport through coroutine cancellation; partial output is never saved.
 
 The local library can filter by language, reopen offline, delete after explicit
 confirmation, and reuse selected vocabulary. Offline reading has no token/API
-requirement. Room schema version 1 is exported under `android/app/schemas/`;
-future schema changes need migrations, without destructive fallback. Backups and
-device transfer are excluded for credentials, preferences, and stories. Deleting
-or uninstalling the app can lose this local library; no cloud sync is provided.
+requirement. The former Kotlin implementation's Room schema is preserved in
+[the retained historical source commit](https://github.com/javiercmh/lingomage/tree/f8fef1255e608240301a13202168d4f6c41a1fea/android).
+The current App² app stores stories and settings in inspectable JSON files; it
+does not use Room or provide cloud sync.
 
 ## Adding languages and regional variants
 

@@ -19,9 +19,11 @@ The stage split, practice-focus bounds, simplified descriptors, app-authored lev
 
 ## Implementation and compatibility
 
-Managed definitions: `data/learning-profiles.json`; orchestration: `js/story-generation.js` and `js/app.js`. User settings retain old target language enablement/self-assessment values and add separate standardized selections; no broad-band conversion is guessed. Old stories remain readable. New generation requires an explicit standard-level selection. Each generated version retains plan, level/framework, scope, exact learner context and provider/model/prompt/profile provenance. Prompt version is 2026-10-13.12.
+Managed definitions: `data/learning-profiles.json`; orchestration: `js/story-generation.js`, `js/generation-pipeline.js`, `js/learning-validation.js` and `js/app.js`. User settings retain old target language enablement/self-assessment values and add separate standardized selections; no broad-band conversion is guessed. Old stories remain readable. New generation requires an explicit standard-level selection. Each generated version retains plan, level/framework, scope, exact learner context and provider/model/prompt/profile provenance. Current merged prompt version is 2026-10-13.14.
 
-One frozen job in settings checkpoints request IDs, plan and final response. Resume is explicit and prevents changed-input reuse; discard releases its requests. Story/version IDs remain stable across recovery to prevent duplicates. Completed writer responses remain unacknowledged until `data/stories.json` is saved.
+One frozen operation in `data/generation-checkpoints.json` saves the plan, canonical prose and optional Japanese readings before acknowledging their requests. App-owned kanji spans replace model-owned annotation boundaries. Stable operation-derived IDs make final application idempotent. Resume is explicit and reuses completed stages; changed inputs require discard/new generation. Completed content remains recoverable after final save failure. Incompatible historical operation definitions are retained for explicit discard rather than silently rewritten.
+
+During integration with newer main, numeric length safeguard LANG-001 is explicitly retired to honor this decision. LANG-002–009 and GEN-001–004 remain active: target script, useful nonempty English notes, exact forms, technical bounds, app-owned readings, examples, legacy alignment, contextual instruction, inline help, durable stages, recovery, cancellation and captured provenance. Russian stress is allowed when requested, retaining the newer main decision rather than imposing an unconditional ban. These are engineering/product decisions without new learning-effectiveness claims. The existing citations and limitations above still apply.
 
 ## Validation
 

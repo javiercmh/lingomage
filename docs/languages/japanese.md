@@ -1,9 +1,9 @@
 # Japanese
 
-Current App² level, planning and scope behavior follows [PED-004](../pedagogy/PED-004-level-guided-generation.md). Fixed lengths and broad reading bands below record earlier prompts; canonical orthography and reading-support requirements still apply.
+Current behavior follows PED-004: standardized self-selected reading targets and narrative scope; older dated requirements below are historical. App-owned Japanese readings and all active structural safeguards remain enforced.
 
-Status: presentation requirements recorded; App² requests readings with the
-current story response; deeper pedagogical review pending.
+Status: App² stores canonical Japanese prose first, then requests contextual
+readings for app-extracted kanji spans; deeper pedagogical review pending.
 
 ## Confirmed presentation requirements
 
@@ -63,7 +63,7 @@ Write Japanese in exactly 8–12 short sentences ending in 。 or ！ or ？. Fa
 
 These are product assumptions and linguistic presentation requirements, not a
 validated curriculum. Shared rationale remains in the [reading review](../research/reading-and-glossing.md).
-Historical Android prompt source: [ja.json](../../android/app/src/main/assets/prompts/ja.json).
+Historical Android prompt source: [ja.json](https://github.com/javiercmh/lingomage/blob/f8fef1255e608240301a13202168d4f6c41a1fea/android/app/src/main/assets/prompts/ja.json).
 If the App² prompt adopts these detailed rules later, record that change in
 [App² runtime](../architecture/app2-runtime.md) and review this decision.
 
@@ -135,6 +135,18 @@ does not certify that a supplied kana pronunciation is linguistically correct.
 ## App² reading self-report — 2026-10-10
 
 Settings offer three reading-task descriptions and an optional knowledge/difficulties description. These guide each story request and are revisable learner reports, not assessed proficiency. Japanese assumes hiragana and katakana literacy; kanji familiarity and comprehension can be described separately. Kanji readings remain visible at every level. Definitions are in `data/learning-profiles.json`; evidence and limits are in [the self-assessment record](../research/self-assessment.md).
+
+## App² furigana placement correction — 2026-10-12
+
+Prompt provenance `2026-10-12.3` requires readings only on contiguous kanji runs, retaining whole compounds and leaving kana, okurigana, punctuation and whitespace unannotated. App² continues to use one story inference request. The app extracts kanji runs and aligns supplied readings against fixed written text; katakana anchors may match their hiragana equivalents. New title/story annotations and Japanese help examples must reconstruct canonical text and have exactly one valid alignment with nonempty kana readings for every kanji run. Missing, invalid or ambiguous readings reject the response without automatic inference retry or partial saving.
+
+Saved story and example annotations are normalized for display only when alignment is unique, including sentence-wide legacy readings. Ambiguous legacy annotations retain their original display; canonical text, stored annotation data and original prompt provenance remain unchanged. Copy and speech continue to omit readings. This restores the existing kanji-only presentation convention; it is a product correctness choice, not a new claim of learning effectiveness. Alignment cannot establish linguistic correctness of a pronunciation; Japanese content review remains necessary. See [validation](../validation/2026-10-12-furigana.md).
+
+## Current requirements — 2026-10-12.4
+
+The current App² profiles, difficulty and learner wishes remain authoritative. Legacy decisions above are historical; adopted, adapted and rejected rules are recorded in the [safeguard audit](../architecture/language-safeguards.md). New chapters require useful integrated English learning notes, validated target-script forms and technical bounds; narrative scope replaces numerical length quotas. Orthography and contextual correctness guidance do not reinstate the old beginner curriculum or regional defaults. Linguistic and pedagogical quality remain review requirements.
+
+Japanese stories and examples now use separate canonical generation and app-owned kanji reading stages. Glossary headword popovers remain unchanged. The 2026-10-12.3 single-request correction above is historical and superseded by this pipeline.
 
 
 ## Current App² reading targets — 2026-10-13

@@ -2,7 +2,7 @@
 
 ## Product and content
 
-- The current product is a plain HTML, CSS and JavaScript App² workspace at the repository root. `android/` retains the earlier native Android implementation.
+- The current product is a plain HTML, CSS and JavaScript App² workspace at the repository root. There is no native LingoMage implementation; historical Kotlin remains in Git. The Python server is development-only.
 - Keep the interface and glossary explanations in English. Current targets are German, Japanese, Russian and Spanish; let learners request a regional variety in their language preferences.
 - Keep workspace domain data in inspectable JSON files under `data/`. Keep rationale, research, language decisions and validation records in `docs/`.
 - Before changing learning behavior, consult `docs/pedagogy/README.md`. Update the relevant pedagogical decision in the same change; use stable citation keys from `docs/research/references.bib`, and distinguish evidence from product assumptions.
@@ -18,11 +18,18 @@
 
 - Follow the plain-file starter structure: `index.html`, `css/style.css`, `js/app.js`, `js/bridge.js`, `manifest.json`, and `data/`.
 - Keep the host API calls in `js/bridge.js`; app logic uses its exported wrappers. Keep the project dependency-free and do not add a build step.
-- Keep `manifest.json`'s `main` and `files` entries current. Domain records and preferences belong in `data/stories.json` and `data/settings.json`, not opaque host preferences.
+- Keep `manifest.json`'s `main` and `files` entries current. Domain records, preferences and unfinished generation belong in `data/stories.json`, `data/settings.json` and `data/generation-checkpoints.json`, not opaque host preferences.
 - Released app behavior uses the App² managed `ai` bridge. Connect and choose models only through App² library Settings → AI. Never store credentials or request headers in the workspace. The local development server may offer an explicit `--chatgpt` mode through the Codex CLI login for desktop testing; this exception must remain development-only.
 - Save completed story data before acknowledging an AI request. Do not silently retry inference.
 - Respect edge-to-edge safe-area variables, provide touch targets of at least 44px, and do not use system `alert()` or `confirm()` dialogs.
 - Keep user-generated text rendered with `textContent` or text nodes.
+
+## Safeguard maintenance
+
+- The current App² product is the specification. Consult `docs/architecture/language-safeguards.md` and `data/language-safeguards.json` before changing generation, validation or migrating runtime behavior. Legacy code is not a curriculum specification.
+- Account for every registered safeguard during a migration. Weakening or retiring one requires an explicit documented product decision and corresponding test changes; do not replace enforcement with a prompt silently.
+- Every active deterministic safeguard needs behavioral tests; prompt requirements need prompt-contract tests and stated semantic limitations. Run `python3 scripts/check.py` (Node 22, Python 3.9+) before completion.
+- Completed intermediate prose/readings belong in `data/generation-checkpoints.json` before releasing requests. Never publish or package learner checkpoints; seed them empty. Resume/retry is explicit and completed stages must not regenerate.
 
 ## Development and verification
 
@@ -40,8 +47,8 @@ confirmation. Browser previews hide the button. App² follows
 `javiercmh/lingomage` branch `main`, pinned to one commit during download.
 
 `manifest.json.app2Update` declares publisher identity and file ownership.
-`data/stories.json` and `data/settings.json` are user files seeded only when absent.
-`data/learning-profiles.json` is a shipped managed definition and updates with the
+`data/stories.json`, `data/settings.json` and `data/generation-checkpoints.json` are user files seeded only when absent.
+`data/learning-profiles.json` and `data/language-safeguards.json` are shipped managed definitions and updates with the
 code. All other unowned files remain untouched. Keep these declarations current.
 Existing saved records must remain readable; v1 has no automatic data migration.
 Increment the app version for a published update. Commit and push require explicit
@@ -50,3 +57,7 @@ user instructions; local changes are unavailable to GitHub updates until publish
 Package with App²'s `scripts/package_subapp.py`; it uses empty declared seed
 defaults rather than copying local stories or settings. ZIP installation belongs
 to the App² library; Share & Package is export-only.
+
+## Device translation
+
+`translation` from `js/bridge.js` exposes `availability()` → `{available: boolean}` and `open({text})` → `{opened: true}`. App² forwards text via Android ACTION_TRANSLATE to the configured handler or resolver. It returns no translation and accepts no language settings. Call only after a user action, with canonical text without readings. Browsers and older hosts report unavailable. Blank text or more than 100000 UTF-16 code units is rejected by the host. Handle `.code`/`.message` errors (`invalid_request`, `unavailable`, `timeout`) without automatic retry. The external translation tool may process text online.
