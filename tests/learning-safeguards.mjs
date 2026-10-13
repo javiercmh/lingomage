@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { execFileSync } from 'node:child_process';
-import { validateStory, validateExamples, validateScript, wordCount, sentenceCount, readingPlan, attachReadings, SAFEGUARD_VERSION } from '../js/learning-validation.js';
+import { validateProse, validateNotes, NOTES_INSTRUCTIONS, validateStory, validateExamples, validateScript, wordCount, sentenceCount, readingPlan, attachReadings, SAFEGUARD_VERSION } from '../js/learning-validation.js';
 import { createPipeline } from '../js/generation-pipeline.js';
 import { annotatedText, getCanonicalSelection, japaneseSegments } from '../js/reader-text.js';
 const tested = id => console.log(`SAFEGUARD ${id}`);
@@ -56,9 +56,11 @@ const promptSection=source.slice(source.indexOf('function storyInstructions('),s
 const prompts={};vm.createContext(prompts);vm.runInContext(promptSection,prompts);
 for (const language of ['German','Japanese','Russian','Spanish']) {
   const prompt=prompts.storyInstructions(language,'advanced','Nuanced usage.','long');
-  for (const text of ['languagePlan','languageExpectations','at least one useful note','no numerical length quota','not a claim of certified CEFR, JLPT or TORFL alignment','Do not impose a fixed beginner curriculum','unless explicitly requested','German preserves noun capitalization','Spanish preserves accents']) assert.ok(prompt.includes(text),text);
+  for (const text of ['languagePlan','languageExpectations','no numerical length quota','not a claim of certified CEFR, JLPT or TORFL alignment','Do not impose a fixed beginner curriculum','unless explicitly requested','German preserves noun capitalization','Spanish preserves accents']) assert.ok(prompt.includes(text),text);
   assert.ok(!prompt.includes('return an empty array'));
 }
+for (const text of ['Define most meaningful vocabulary','including common words','fixed canonical chapter','Every form must be copied exactly','English explanations only','At least one useful note','do not pad a quota']) assert.ok(NOTES_INSTRUCTIONS.includes(text),text);
+assert.ok(prompts.storyInstructions('Russian','A1','test').includes('canonical title and story'));
 tested('LANG-008');
 // Exercise the production renderer: notes stay inline and canonical text is intact.
 function element(tag) { return {tagName:tag,children:[],events:{},append(...nodes){this.children.push(...nodes);},setAttribute(){},addEventListener(n,f){this.events[n]=f;},set textContent(v){this.children=v?[{textContent:v}]:[];},get textContent(){return this.children.map(n=>n.textContent).join('');}}; }
@@ -72,7 +74,7 @@ function harness(options={}) {
   const flags={failPersist:false,failAck:false,failApply:false,invalidReadings:false,cancelled:false};
   const records=[];
   const callbacks={records,persist:records=>{if(flags.failPersist)throw Error('disk');durable=structuredClone(records);},ai:{
-    start:async args=>{starts++;const id=String(++next), input=JSON.parse(args.input);results.set(id,input.kind==='readings'?{readings:input.spans.map(s=>({id:s.id,reading:flags.invalidReadings?'Latin':'まち'}))}:story(options.language || 'ja'));return id;},
+    start:async args=>{starts++;const id=String(++next), input=JSON.parse(args.input);results.set(id,input.kind==='notes'?{glossary:story(options.language || 'ja').glossary}:input.kind==='readings'?{readings:input.spans.map(s=>({id:s.id,reading:flags.invalidReadings?'Latin':'まち'}))}:story(options.language || 'ja'));return id;},
     wait:async id=>{if(flags.cancelled)throw Error('Request cancelled.');return JSON.stringify(results.get(id));},
     acknowledge:async id=>{assert.ok(durable.some(o=>o.request?.id===id&&o.request.completed),'release precedes durable stage');if(flags.failAck)throw Error('ack');acknowledgements.push(id);},cancel:async()=>{flags.cancelled=true;}
   },apply:async op=>{if(flags.failApply)throw Error('final disk');if(!saved.has(op.id)){saved.add(op.id);applies++;}}};
@@ -80,16 +82,16 @@ function harness(options={}) {
   const spec={kind:'create',language:options.language||'ja',length:'short',input:{storyLength:'short'},instructions:'test',config:{providerId:'mock',model:'model'},promptVersion:'test'};
   return {pipeline,spec,flags,callbacks,get durable(){return durable;},get starts(){return starts;},get applies(){return applies;},acknowledgements};
 }
-let h=harness();let op=h.pipeline.create(h.spec);await h.pipeline.run(op);assert.equal(h.starts,2);assert.equal(h.applies,1);assert.equal(h.pipeline.records.length,0);tested('GEN-001');
-h=harness();op=h.pipeline.create(h.spec);h.flags.failAck=true;await assert.rejects(h.pipeline.run(op),/ack/);assert.equal(op.stage,'readings');assert.equal(h.starts,1);
-h.flags.failAck=false;const restored=structuredClone(h.durable);const reloaded=createPipeline({...h.callbacks,records:restored});await reloaded.run(restored[0]);assert.equal(h.starts,2);assert.equal(h.applies,1);
-h=harness();op=h.pipeline.create(h.spec);h.flags.failApply=true;await assert.rejects(h.pipeline.run(op),/final disk/);assert.equal(op.stage,'ready');h.flags.failApply=false;await h.pipeline.run(op);assert.equal(h.starts,2);assert.equal(h.applies,1);
-h=harness({language:'de'});op=h.pipeline.create(h.spec);h.flags.failPersist=true;await assert.rejects(h.pipeline.run(op),/disk/);assert.equal(h.starts,0);h.flags.failPersist=false;await h.pipeline.run(op);assert.equal(h.starts,1);
+let h=harness();let op=h.pipeline.create(h.spec);await h.pipeline.run(op);assert.equal(h.starts,3);assert.equal(h.applies,1);assert.equal(h.pipeline.records.length,0);tested('GEN-001');
+h=harness();op=h.pipeline.create(h.spec);h.flags.failAck=true;await assert.rejects(h.pipeline.run(op),/ack/);assert.equal(op.stage,'notes');assert.equal(h.starts,1);
+h.flags.failAck=false;const restored=structuredClone(h.durable);const reloaded=createPipeline({...h.callbacks,records:restored});await reloaded.run(restored[0]);assert.equal(h.starts,3);assert.equal(h.applies,1);
+h=harness();op=h.pipeline.create(h.spec);h.flags.failApply=true;await assert.rejects(h.pipeline.run(op),/final disk/);assert.equal(op.stage,'ready');h.flags.failApply=false;await h.pipeline.run(op);assert.equal(h.starts,3);assert.equal(h.applies,1);
+h=harness({language:'de'});op=h.pipeline.create(h.spec);h.flags.failPersist=true;await assert.rejects(h.pipeline.run(op),/disk/);assert.equal(h.starts,0);h.flags.failPersist=false;await h.pipeline.run(op);assert.equal(h.starts,2);
 // Fail the first durable result write, retain in-memory completion, retry without inference.
 h=harness();op=h.pipeline.create(h.spec);let writes=0;const records=[op];const failing=createPipeline({...h.callbacks,records,persist:value=>{writes++;if(writes===3)throw Error('stage disk');h.callbacks.persist(value);}});
-await assert.rejects(failing.run(op),/stage disk/);assert.equal(op.stage,'readings');await failing.run(op);assert.equal(h.starts,2);
+await assert.rejects(failing.run(op),/stage disk/);assert.equal(op.stage,'notes');await failing.run(op);assert.equal(h.starts,3);
 tested('GEN-002');
-h=harness();op=h.pipeline.create(h.spec);h.flags.invalidReadings=true;await assert.rejects(h.pipeline.run(op),/kana/);assert.equal(op.stage,'readings');assert.equal(h.starts,2);h.flags.invalidReadings=false;await h.pipeline.run(op);assert.equal(h.starts,3);
+h=harness();op=h.pipeline.create(h.spec);h.flags.invalidReadings=true;await assert.rejects(h.pipeline.run(op),/kana/);assert.equal(op.stage,'readings');assert.equal(h.starts,3);h.flags.invalidReadings=false;await h.pipeline.run(op);assert.equal(h.starts,4);
 h=harness();op=h.pipeline.create(h.spec);h.flags.cancelled=true;await assert.rejects(h.pipeline.run(op),/cancelled/);assert.equal(h.starts,1);await h.pipeline.discard(op);assert.equal(h.pipeline.records.length,0);
 tested('GEN-003');
 h=harness();op=h.pipeline.create({...h.spec,input:{storyLength:'short',learnerKnowledge:'snapshot'},config:{providerId:'old',model:'old'}});h.spec.input.storyLength='long';assert.equal(op.input.storyLength,'short');assert.equal(op.config.model,'old');assert.equal(op.safeguardVersion,SAFEGUARD_VERSION);assert.throws(()=>h.pipeline.create(h.spec),/pending/);
@@ -118,6 +120,10 @@ const boxes=new Map();const box=id=>{if(!boxes.has(id)){const b=element('section
 const recovery={pipeline:{records:[{kind:'create',stage:'readings'}],busy:true},readerGeneration:null,state:{readerId:null},$:box,document:{createElement:element},renderReaderGeneration(){},resumeCheckpoint(){}};
 vm.createContext(recovery);vm.runInContext(source.slice(source.indexOf('function renderCheckpointRecovery('),source.indexOf('async function resumeCheckpoint(')),recovery);recovery.renderCheckpointRecovery();
 assert.equal(box('generation-status').textContent,'Adding kanji readings…');assert.equal(box('checkpoint-recovery-reader').hidden,true);
+recovery.pipeline.records[0]={kind:'continue',stage:'notes',target:{storyId:'story'}};recovery.state.readerId='story';recovery.readerGeneration={storyId:'story',phase:'ready'};
+recovery.renderCheckpointRecovery();assert.equal(recovery.readerGeneration.phase,'working');assert.equal(recovery.readerGeneration.message,'Adding vocabulary notes…');
+recovery.pipeline.records[0]={kind:'create',stage:'notes'};
+
 recovery.pipeline.busy=false;
 recovery.pipeline.records[0].error='The AI included a vocabulary note for a word or phrase that does not appear in the chapter. Explicitly retry or discard this request.';
 recovery.renderCheckpointRecovery();

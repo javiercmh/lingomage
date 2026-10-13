@@ -40,3 +40,8 @@ Structural validity cannot establish whether a concept is new, whether a reading
 ## Integration decision — 2026-10-13
 
 LANG-001 is explicitly retired by the learner-requested [PED-004](../pedagogy/PED-004-level-guided-generation.md) decision to remove numerical length quotas. Short and longer valid content are now accepted within LANG-004 technical maxima. Other registered safeguards remain active and tested. Generation adds a durable language-planning stage before prose; Japanese reading extraction and exact occurrence-ID coverage remain app-owned. Inline notes display once per explanation per chapter version, while validation still checks every form. This integration adds no certification or effectiveness claim. See [merge validation](../validation/2026-10-13-merge-integration.md).
+
+
+## Separate notes — 2026-10-13
+
+Register version 2026-10-13.3 retains every active safeguard. LANG-003 is enforced after the separate notes request against already validated fixed prose; final stories still require at least one valid note. GEN-001–004 cover the additional durable stage, note-only recovery, explicit retry, unchanged captured inputs and no partial chapter publication. Technical and script validation apply before saving prose, then to notes before merging them, and again to completed content. Broad note coverage is prompt guidance with semantic limitations, not a deterministic guarantee or measured learner knowledge.

@@ -71,3 +71,10 @@ assert.equal(Object.keys(defs.scopes).length,3);
   assert.equal(await bridgeContext.ai.wait('persisted-id'),'retained text');
   console.log('PASS standardized levels, bounded plans, glossary forms, long stories, sequential checkpoints, reload reuse, save/release failures, malformed plans and cancellation');
 })().catch(error=>{console.error(error);process.exitCode=1;});
+{
+  const html = fs.readFileSync('index.html', 'utf8'), form = html.slice(html.indexOf('id="story-form"'), html.indexOf('</form>'));
+  assert.ok(form.indexOf('id="reading-scope"') < form.indexOf('id="topic"'), 'Reading scope leads Create');
+  assert.ok(!html.includes('practice-input') && !html.includes('Topics to explore'), 'topics merged into the story idea field');
+  assert.equal((html.match(/id="form-error"/g) || []).length, 1);
+  console.log('PASS Create form: Reading scope first, single story idea and topics field');
+}

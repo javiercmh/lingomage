@@ -1,0 +1,489 @@
+{
+  "suite": "models",
+  "live": true,
+  "promptVersion": "2026-10-13.16",
+  "safeguardVersion": "2026-10-13.3",
+  "profileVersion": "2026-10-13.2",
+  "cases": [
+    {
+      "id": "de-A1-0-sol-low",
+      "variant": "sol-low",
+      "model": "gpt-6-sol",
+      "effort": "low",
+      "input": {
+        "language": "German",
+        "languageCode": "de",
+        "difficulty": "A1",
+        "framework": "CEFR",
+        "levelDescription": "Use familiar concrete words, explicit subjects, one idea per clause and clear repetition. Preserve noun capitalization, umlauts and ß. Use correct case, agreement and verb placement.",
+        "readingSelfReport": "I can understand familiar names, everyday words and very simple sentences.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "de-A1-0-luna-high",
+      "variant": "luna-high",
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "input": {
+        "language": "German",
+        "languageCode": "de",
+        "difficulty": "A1",
+        "framework": "CEFR",
+        "levelDescription": "Use familiar concrete words, explicit subjects, one idea per clause and clear repetition. Preserve noun capitalization, umlauts and ß. Use correct case, agreement and verb placement.",
+        "readingSelfReport": "I can understand familiar names, everyday words and very simple sentences.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "de-B1-0-sol-low",
+      "variant": "sol-low",
+      "model": "gpt-6-sol",
+      "effort": "low",
+      "input": {
+        "language": "German",
+        "languageCode": "de",
+        "difficulty": "B1",
+        "framework": "CEFR",
+        "levelDescription": "Use connected narrative, common past forms, clear cause and effect and straightforward subordinate clauses. Preserve noun capitalization, umlauts and ß. Use correct case, agreement and verb placement.",
+        "readingSelfReport": "I can follow connected stories about familiar situations, events and feelings.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "de-B1-0-luna-high",
+      "variant": "luna-high",
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "input": {
+        "language": "German",
+        "languageCode": "de",
+        "difficulty": "B1",
+        "framework": "CEFR",
+        "levelDescription": "Use connected narrative, common past forms, clear cause and effect and straightforward subordinate clauses. Preserve noun capitalization, umlauts and ß. Use correct case, agreement and verb placement.",
+        "readingSelfReport": "I can follow connected stories about familiar situations, events and feelings.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "de-C1-0-sol-low",
+      "variant": "sol-low",
+      "model": "gpt-6-sol",
+      "effort": "low",
+      "input": {
+        "language": "German",
+        "languageCode": "de",
+        "difficulty": "C1",
+        "framework": "CEFR",
+        "levelDescription": "Use nuanced vocabulary, flexible syntax and implied meaning; support uncommon or specialized expressions when useful. Preserve noun capitalization, umlauts and ß. Use correct case, agreement and verb placement.",
+        "readingSelfReport": "I can understand complex stories, subtle attitudes and unfamiliar styles with occasional support.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "de-C1-0-luna-high",
+      "variant": "luna-high",
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "input": {
+        "language": "German",
+        "languageCode": "de",
+        "difficulty": "C1",
+        "framework": "CEFR",
+        "levelDescription": "Use nuanced vocabulary, flexible syntax and implied meaning; support uncommon or specialized expressions when useful. Preserve noun capitalization, umlauts and ß. Use correct case, agreement and verb placement.",
+        "readingSelfReport": "I can understand complex stories, subtle attitudes and unfamiliar styles with occasional support.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ja-N5-0-sol-low",
+      "variant": "sol-low",
+      "model": "gpt-6-sol",
+      "effort": "low",
+      "input": {
+        "language": "Japanese",
+        "languageCode": "ja",
+        "difficulty": "N5",
+        "framework": "JLPT",
+        "levelDescription": "Common concrete words, basic particles, simple polite or plain forms and clear short clauses. Canonical text omits readings. Provide contextual kana readings separately. No romaji.",
+        "readingSelfReport": "I can understand simple everyday sentences in kana and basic kanji, with readings when needed.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ja-N5-0-luna-high",
+      "variant": "luna-high",
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "input": {
+        "language": "Japanese",
+        "languageCode": "ja",
+        "difficulty": "N5",
+        "framework": "JLPT",
+        "levelDescription": "Common concrete words, basic particles, simple polite or plain forms and clear short clauses. Canonical text omits readings. Provide contextual kana readings separately. No romaji.",
+        "readingSelfReport": "I can understand simple everyday sentences in kana and basic kanji, with readings when needed.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ja-N3-0-sol-low",
+      "variant": "sol-low",
+      "model": "gpt-6-sol",
+      "effort": "low",
+      "input": {
+        "language": "Japanese",
+        "languageCode": "ja",
+        "difficulty": "N3",
+        "framework": "JLPT",
+        "levelDescription": "Connected everyday narrative, common compound sentences and contextual support for less familiar expressions. Canonical text omits readings. Provide contextual kana readings separately. No romaji.",
+        "readingSelfReport": "I can follow everyday stories and understand their main points and relationships between events.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ja-N3-0-luna-high",
+      "variant": "luna-high",
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "input": {
+        "language": "Japanese",
+        "languageCode": "ja",
+        "difficulty": "N3",
+        "framework": "JLPT",
+        "levelDescription": "Connected everyday narrative, common compound sentences and contextual support for less familiar expressions. Canonical text omits readings. Provide contextual kana readings separately. No romaji.",
+        "readingSelfReport": "I can follow everyday stories and understand their main points and relationships between events.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ja-N1-0-sol-low",
+      "variant": "sol-low",
+      "model": "gpt-6-sol",
+      "effort": "low",
+      "input": {
+        "language": "Japanese",
+        "languageCode": "ja",
+        "difficulty": "N1",
+        "framework": "JLPT",
+        "levelDescription": "Nuanced vocabulary, flexible clause patterns, shifts of viewpoint and implied meaning appropriate to the story. Canonical text omits readings. Provide contextual kana readings separately. No romaji.",
+        "readingSelfReport": "I can follow complex texts and understand subtle relationships, intentions and implied meaning.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ja-N1-0-luna-high",
+      "variant": "luna-high",
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "input": {
+        "language": "Japanese",
+        "languageCode": "ja",
+        "difficulty": "N1",
+        "framework": "JLPT",
+        "levelDescription": "Nuanced vocabulary, flexible clause patterns, shifts of viewpoint and implied meaning appropriate to the story. Canonical text omits readings. Provide contextual kana readings separately. No romaji.",
+        "readingSelfReport": "I can follow complex texts and understand subtle relationships, intentions and implied meaning.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ru-A1-0-sol-low",
+      "variant": "sol-low",
+      "model": "gpt-6-sol",
+      "effort": "low",
+      "input": {
+        "language": "Russian",
+        "languageCode": "ru",
+        "difficulty": "A1",
+        "framework": "TORFL",
+        "levelDescription": "Use familiar concrete words, explicit subjects, one idea per clause and clear repetition. Use correct case, aspect and agreement. Cyrillic only, without Latin transliteration or added stress marks.",
+        "readingSelfReport": "I can understand familiar names, everyday words and very simple sentences.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ru-A1-0-luna-high",
+      "variant": "luna-high",
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "input": {
+        "language": "Russian",
+        "languageCode": "ru",
+        "difficulty": "A1",
+        "framework": "TORFL",
+        "levelDescription": "Use familiar concrete words, explicit subjects, one idea per clause and clear repetition. Use correct case, aspect and agreement. Cyrillic only, without Latin transliteration or added stress marks.",
+        "readingSelfReport": "I can understand familiar names, everyday words and very simple sentences.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ru-B1-0-sol-low",
+      "variant": "sol-low",
+      "model": "gpt-6-sol",
+      "effort": "low",
+      "input": {
+        "language": "Russian",
+        "languageCode": "ru",
+        "difficulty": "B1",
+        "framework": "TORFL",
+        "levelDescription": "Use connected narrative, common past forms, clear cause and effect and straightforward subordinate clauses. Use correct case, aspect and agreement. Cyrillic only, without Latin transliteration or added stress marks.",
+        "readingSelfReport": "I can follow connected stories about familiar situations, events and feelings.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ru-B1-0-luna-high",
+      "variant": "luna-high",
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "input": {
+        "language": "Russian",
+        "languageCode": "ru",
+        "difficulty": "B1",
+        "framework": "TORFL",
+        "levelDescription": "Use connected narrative, common past forms, clear cause and effect and straightforward subordinate clauses. Use correct case, aspect and agreement. Cyrillic only, without Latin transliteration or added stress marks.",
+        "readingSelfReport": "I can follow connected stories about familiar situations, events and feelings.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ru-C1-0-sol-low",
+      "variant": "sol-low",
+      "model": "gpt-6-sol",
+      "effort": "low",
+      "input": {
+        "language": "Russian",
+        "languageCode": "ru",
+        "difficulty": "C1",
+        "framework": "TORFL",
+        "levelDescription": "Use nuanced vocabulary, flexible syntax and implied meaning; support uncommon or specialized expressions when useful. Use correct case, aspect and agreement. Cyrillic only, without Latin transliteration or added stress marks.",
+        "readingSelfReport": "I can understand complex stories, subtle attitudes and unfamiliar styles with occasional support.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ru-C1-0-luna-high",
+      "variant": "luna-high",
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "input": {
+        "language": "Russian",
+        "languageCode": "ru",
+        "difficulty": "C1",
+        "framework": "TORFL",
+        "levelDescription": "Use nuanced vocabulary, flexible syntax and implied meaning; support uncommon or specialized expressions when useful. Use correct case, aspect and agreement. Cyrillic only, without Latin transliteration or added stress marks.",
+        "readingSelfReport": "I can understand complex stories, subtle attitudes and unfamiliar styles with occasional support.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "es-CL-A1-0-sol-low",
+      "variant": "sol-low",
+      "model": "gpt-6-sol",
+      "effort": "low",
+      "input": {
+        "language": "Spanish",
+        "languageCode": "es-CL",
+        "difficulty": "A1",
+        "framework": "CEFR",
+        "levelDescription": "Use familiar concrete words, explicit subjects, one idea per clause and clear repetition. Use correct agreement, tense and aspect; honor regional preferences without assuming Chilean Spanish.",
+        "readingSelfReport": "I can understand familiar names, everyday words and very simple sentences.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "es-CL-A1-0-luna-high",
+      "variant": "luna-high",
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "input": {
+        "language": "Spanish",
+        "languageCode": "es-CL",
+        "difficulty": "A1",
+        "framework": "CEFR",
+        "levelDescription": "Use familiar concrete words, explicit subjects, one idea per clause and clear repetition. Use correct agreement, tense and aspect; honor regional preferences without assuming Chilean Spanish.",
+        "readingSelfReport": "I can understand familiar names, everyday words and very simple sentences.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "es-CL-B1-0-sol-low",
+      "variant": "sol-low",
+      "model": "gpt-6-sol",
+      "effort": "low",
+      "input": {
+        "language": "Spanish",
+        "languageCode": "es-CL",
+        "difficulty": "B1",
+        "framework": "CEFR",
+        "levelDescription": "Use connected narrative, common past forms, clear cause and effect and straightforward subordinate clauses. Use correct agreement, tense and aspect; honor regional preferences without assuming Chilean Spanish.",
+        "readingSelfReport": "I can follow connected stories about familiar situations, events and feelings.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "es-CL-B1-0-luna-high",
+      "variant": "luna-high",
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "input": {
+        "language": "Spanish",
+        "languageCode": "es-CL",
+        "difficulty": "B1",
+        "framework": "CEFR",
+        "levelDescription": "Use connected narrative, common past forms, clear cause and effect and straightforward subordinate clauses. Use correct agreement, tense and aspect; honor regional preferences without assuming Chilean Spanish.",
+        "readingSelfReport": "I can follow connected stories about familiar situations, events and feelings.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "es-CL-C1-0-sol-low",
+      "variant": "sol-low",
+      "model": "gpt-6-sol",
+      "effort": "low",
+      "input": {
+        "language": "Spanish",
+        "languageCode": "es-CL",
+        "difficulty": "C1",
+        "framework": "CEFR",
+        "levelDescription": "Use nuanced vocabulary, flexible syntax and implied meaning; support uncommon or specialized expressions when useful. Use correct agreement, tense and aspect; honor regional preferences without assuming Chilean Spanish.",
+        "readingSelfReport": "I can understand complex stories, subtle attitudes and unfamiliar styles with occasional support.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "es-CL-C1-0-luna-high",
+      "variant": "luna-high",
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "input": {
+        "language": "Spanish",
+        "languageCode": "es-CL",
+        "difficulty": "C1",
+        "framework": "CEFR",
+        "levelDescription": "Use nuanced vocabulary, flexible syntax and implied meaning; support uncommon or specialized expressions when useful. Use correct agreement, tense and aspect; honor regional preferences without assuming Chilean Spanish.",
+        "readingSelfReport": "I can understand complex stories, subtle attitudes and unfamiliar styles with occasional support.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    }
+  ]
+}
