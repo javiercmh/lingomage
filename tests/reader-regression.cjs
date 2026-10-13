@@ -461,7 +461,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.ok(requested.storyMemory.plot.includes('Text three'));assert.equal(requested.recentProse,'Text three');assert.equal(requested.priorActiveChapters,undefined);assert.equal(requested.precedingChapters,undefined);
   assert.equal(story3.chapters.length,4);assert.equal(story3.chapters[3].basedOnVersionId,'threev');assert.equal(story3.chapters[1].versions.length,1);
   assert.equal(requested.topic, 'A mountain mystery'); assert.equal(requested.practice, 'Hiking vocabulary');
-  assert.ok(generationInstructions.includes('Generate fresh glossary notes'));
+  assert.ok(generationInstructions.includes('requests contextual vocabulary notes'));
   assert.ok(generationInstructions.includes('Do not wrap up the chapter or story unless'));
   assert.equal(story3.chapters[3].versions[0].glossary[0].word, 'four');
   assert.equal(gen.state.readerEditBusy, false); assert.equal(gen.state.activeChapterRequest, null);

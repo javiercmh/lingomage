@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """Local LingoMage server with optional offline mock or Codex ChatGPT inference."""
 import argparse
 import base64
@@ -391,6 +392,8 @@ class Handler(SimpleHTTPRequestHandler):
                 response_text = json.dumps({'vocabulary': [{'word': word, 'meaning': meaning}], 'grammar': [], 'guidance': 'Offline fixture: clear references and contextual support.'}, ensure_ascii=False)
             elif request_data.get('kind') == 'readings':
                 response_text = self.mock_readings(request_data)
+            elif request_data.get('kind') == 'notes':
+                response_text = self.mock_notes(request_data)
             elif request_data.get('kind') in {'explain', 'translate', 'examples'}:
                 response_text = self.mock_help(request_data)
             else:
@@ -599,6 +602,15 @@ class Handler(SimpleHTTPRequestHandler):
                 return json.dumps({'error': 'This kanji span has no offline reading fixture.'})
             readings.append({'id': span['id'], 'reading': reading})
         return json.dumps({'readings': readings}, ensure_ascii=False)
+
+    @staticmethod
+    def mock_notes(data):
+        """Broad offline notes for the fixed fixture, never new prose."""
+        notes = json.loads((Path(__file__).parent / 'data/reader-note-fixtures.json').read_text())
+        text = data.get('chapter', {}).get('story', '')
+        glossary = [{'word': word, 'meaning': meaning, 'forms': [form]}
+                    for word, meaning, form in notes.get(data.get('languageCode'), []) if form in text]
+        return json.dumps({'glossary': glossary}, ensure_ascii=False)
 
 
 

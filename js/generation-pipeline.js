@@ -1,5 +1,5 @@
 import { PLAN_INSTRUCTIONS, decodePlan } from './story-generation.js';
-import { parseContent, validateStory, validateExamples, readingPlan, attachReadings, READING_INSTRUCTIONS, SAFEGUARD_VERSION } from './learning-validation.js';
+import { parseContent, validateProse, validateNotes, validateStory, validateExamples, readingPlan, attachReadings, NOTES_INSTRUCTIONS, READING_INSTRUCTIONS, SAFEGUARD_VERSION } from './learning-validation.js';
 
 // Checkpoints are user data. Valid stage results are durable before release;
 // the final application is idempotent via operationId on saved records.
@@ -39,14 +39,14 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
         // Also retries failed checkpoint writes before touching inference.
         save();
         if (op.request?.completed) await release(op);
-        while (['plan','prose','readings'].includes(op.stage)) {
+        while (['plan','prose','notes','readings'].includes(op.stage)) {
           await checkCancelled(op);
           const stage = op.stage;
           if (stage === 'readings' && !readingPlan(op.prose,op.kind).spans.length) {
             op.result=attachReadings(validate(op),readingPlan(op.prose,op.kind),{readings:[]},op.kind); op.stage='ready'; save(); break;
           }
-          const input = stage === 'plan' ? {kind:'language-plan',...op.input} : stage === 'prose' ? {kind:op.kind,...op.input,languagePlan:op.plan} : {kind:'readings',languageCode:'ja',spans:readingPlan(op.prose,op.kind).spans};
-          const instructions = stage === 'plan' ? PLAN_INSTRUCTIONS : stage === 'prose' ? op.instructions : READING_INSTRUCTIONS;
+          const input = stage === 'plan' ? {...op.input,kind:'language-plan'} : stage === 'prose' ? {...op.input,kind:op.kind,languagePlan:op.plan} : stage === 'notes' ? {...op.input,kind:'notes',languagePlan:op.plan,chapter:validateProse(op.prose,op.language)} : {kind:'readings',languageCode:'ja',spans:readingPlan(op.prose,op.kind).spans};
+          const instructions = stage === 'plan' ? PLAN_INSTRUCTIONS : stage === 'prose' ? op.instructions : stage === 'notes' ? NOTES_INSTRUCTIONS : READING_INSTRUCTIONS;
           if (!op.request) {
             const id = await ai.start({providerId:op.config.providerId,model:op.config.model,reasoningEffort:op.config.reasoning || undefined,instructions,input:JSON.stringify(input)});
             op.request={id,stage,completed:false}; save();
@@ -59,12 +59,17 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
           }
           let content;
           try {
-            content = stage === 'plan' ? response : stage === 'prose' ? (op.kind === 'examples' ? validateExamples(response,op.language) : validateStory(response,op.language,op.length)) : attachReadings(validate(op),readingPlan(op.prose,op.kind),response,op.kind);
+            content = stage === 'plan' ? response : stage === 'prose' ? (op.kind === 'examples' ? validateExamples(response,op.language) : validateProse(response,op.language)) : stage === 'notes' ? validateNotes(response,op.prose,op.language) : attachReadings(validate(op),readingPlan(op.prose,op.kind),response,op.kind);
           } catch (error) {
             if (op.request) { op.request.completed=true; op.request.invalid=true; save(); await release(op); } throw error;
           }
           if (stage === 'plan') { op.plan=content; op.stage='prose'; }
           else if (stage === 'prose') {
+            op.prose=content;
+            if (op.kind !== 'examples') op.stage='notes';
+            else if (op.language === 'ja') op.stage='readings';
+            else { op.result=content; op.stage='ready'; }
+          } else if (stage === 'notes') {
             op.prose=content;
             if (op.language === 'ja') op.stage='readings';
             else { op.result=content; op.stage='ready'; }

@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-13.2",
+  "version": "2026-10-13.3",
   "basis": "Current App\u00b2 requirements; legacy code contributes selected techniques only. Structural and prompt checks do not certify linguistic quality or learning effectiveness.",
   "requirements": [
     {

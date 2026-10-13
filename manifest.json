@@ -27,7 +27,8 @@
     "js/generation-pipeline.js",
     "data/language-safeguards.json",
     "data/generation-checkpoints.json",
-    "js/story-generation.js"
+    "js/story-generation.js",
+    "data/reader-note-fixtures.json"
   ],
   "app2Update": {
     "appId": "com.wynh.lingomage",
@@ -55,7 +56,8 @@
       "js/learning-validation.js",
       "js/generation-pipeline.js",
       "data/language-safeguards.json",
-      "js/story-generation.js"
+      "js/story-generation.js",
+      "data/reader-note-fixtures.json"
     ],
     "seedFiles": [
       "data/stories.json",

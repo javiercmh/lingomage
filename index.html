@@ -18,16 +18,12 @@
       <div class="intro"><h2>Build a story<br>for your practice.</h2><p>Start with a story you’d like to read, then choose what to explore and your reading language.</p></div>
       <section id="checkpoint-recovery-create" class="recovery-panel" hidden></section>
       <form id="story-form" class="panel">
+        <div class="create-field-group"><label class="field-label" for="reading-scope">Reading scope</label><select id="reading-scope" class="field" aria-describedby="scope-description"></select><p id="scope-description" class="helper">One focused event with a natural stopping point.</p></div>
         <p id="input-language-note" class="helper input-language-note">Write in English, your learning language, or a mix.</p>
         <div class="create-field-group">
-          <label class="field-label" for="topic">Story idea <span class="optional">optional</span></label>
-          <textarea id="topic" class="field story-brief" maxlength="1200" rows="3" aria-describedby="input-language-note topic-description" placeholder="A cozy mystery in a mountain hut"></textarea>
-          <p id="topic-description" class="helper">Try writing your idea in the language you’re learning.</p>
-        </div>
-        <div class="create-field-group">
-          <label class="field-label" for="practice-input">Topics to explore <span class="optional">optional</span></label>
-          <input id="practice-input" class="field" maxlength="500" aria-describedby="input-language-note practice-description" placeholder="Hiking, travel, directions">
-          <p id="practice-description" class="helper">Topics, situations, or grammar to practise.</p>
+          <label class="field-label" for="topic">Story idea and topics <span class="optional">optional</span></label>
+          <textarea id="topic" class="field story-brief" maxlength="1200" rows="3" aria-describedby="input-language-note topic-description" placeholder="A cozy mystery in a mountain hut, with hiking vocabulary"></textarea>
+          <p id="topic-description" class="helper">Describe the story and any topics, situations, or grammar to practise. Try writing in the language you’re learning.</p>
         </div>
         <aside id="language-setup" class="language-setup" aria-label="Learning preferences" hidden>
           <p class="field-label">Make stories fit your practice</p>
@@ -43,8 +39,6 @@
           <select id="difficulty" class="field" aria-describedby="difficulty-description"></select>
           <p id="difficulty-description" class="helper difficulty-description"></p>
         </div>
-        <p id="form-error" class="form-error" role="alert"></p>
-        <div class="create-field-group"><label class="field-label" for="reading-scope">Reading scope</label><select id="reading-scope" class="field" aria-describedby="scope-description"></select><p id="scope-description" class="helper">One focused event with a natural stopping point.</p></div>
         <p id="form-error" class="form-error" role="alert"></p>
         <button id="generate" class="primary-btn" type="submit">✦ &nbsp; Generate my story</button>
         <p class="usage-note">Generation uses your AI provider connected in App².</p>
