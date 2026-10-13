@@ -73,8 +73,10 @@ assert.equal(Object.keys(defs.scopes).length,3);
 })().catch(error=>{console.error(error);process.exitCode=1;});
 {
   const html = fs.readFileSync('index.html', 'utf8'), form = html.slice(html.indexOf('id="story-form"'), html.indexOf('</form>'));
-  assert.ok(form.indexOf('id="reading-scope"') < form.indexOf('id="topic"'), 'Reading scope leads Create');
+  assert.ok(form.indexOf('id="topic"') < form.indexOf('id="reading-scope"') && form.indexOf('id="reading-scope"') < form.indexOf('id="language-setup"'), 'Story idea leads Create; Reading scope follows it');
+  const topicGroup = form.slice(form.indexOf('<label class="field-label" for="topic"'), form.indexOf('id="reading-scope"'));
+  assert.ok(topicGroup.includes('id="input-language-note"'), 'language-input note stays inside the story idea group');
   assert.ok(!html.includes('practice-input') && !html.includes('Topics to explore'), 'topics merged into the story idea field');
   assert.equal((html.match(/id="form-error"/g) || []).length, 1);
-  console.log('PASS Create form: Reading scope first, single story idea and topics field');
+  console.log('PASS Create form: story idea first, Reading scope second, single story idea and topics field');
 }

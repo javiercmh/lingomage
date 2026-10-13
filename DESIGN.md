@@ -8,7 +8,7 @@ Use the shared CSS tokens: `--paper` (#090d16), slate reader surface (#0f172a), 
 
 ## Layout and controls
 
-Create leads with Reading scope, then one optional multiline Story idea and topics field (premise, genre, tone or format, plus domains, communication situations, concepts or expressions), then Language and Reading level. Keep the learning-preferences setup notice beside the language fields. These story-first choices are product assumptions.
+Create leads with one optional multiline Story idea and topics field (premise, genre, tone or format, plus domains, communication situations, concepts or expressions), then Reading scope, then Language and Reading level. Keep the learning-preferences setup notice beside the language fields. These story-first choices are product assumptions.
 
 Keep the mobile-first Create, My stories and Settings navigation with icons above labels, matching the App² starter. Reserve space for the bottom bar and combine host and browser safe-area insets. Controls have at least 44px touch targets, visible keyboard focus and English accessible labels. Respect reduced motion. Use shared button and field classes instead of feature-specific replacements.
 
@@ -45,7 +45,7 @@ On My stories, swipe a card left at least 60px to reveal an 80px-wide, full-heig
 
 Continuation and rewrite prompt labels show optional. Blank continuation follows the existing narrative; blank rewrite creates a fresh telling of the same main events. Keep concise placeholders explaining that ideas may be multilingual or blank. Settings helpers and examples are brief, with 6px to their field and 22px before the next labelled field; reading-band summaries retain Japanese kana and Russian Cyrillic prerequisites.
 
-Create shows one brief language-input note above the story fields: “Write in English, your learning language, or a mix.” The story field references it for accessibility. Story idea and topics gently invites writing in the learning language. Chapter prompt placeholders also allow ideas in any language or a blank submission. Avoid repeating the note under each field or implying that these inputs provide writing corrections.
+Create shows one brief language-input note inside the Story idea and topics group, between its label and the textarea: “Write in English, your learning language, or a mix.” The story field references it for accessibility. Story idea and topics gently invites writing in the learning language. Chapter prompt placeholders also allow ideas in any language or a blank submission. Avoid repeating the note under each field or implying that these inputs provide writing corrections.
 
 
 Story paths preserve alternate histories. Show a labelled Story path selector above chapter navigation only when more than one path exists; name paths Original and Alternate N. Chapter navigation contains only that path's pinned versions. Rewriting switches to a new path ending at the rewritten chapter and preserves the source path's later chapters. Show the fork chapter and source path beneath navigation. Continue appends after the selected path's ending even when an earlier chapter is displayed. Keep reading positions separately per path within the page session. Disable path switching during generation; navigation within the path may remain available. Preparing story context uses the existing cancellable status card before chapter generation. Retain the prompt and completed memory checkpoints after cancellation or failure. These interaction choices are product assumptions.
