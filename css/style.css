@@ -310,7 +310,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px
 .target-language-settings > .helper { margin-top: 6px; }
 .target-language-settings > .knowledge-label { margin-top: 22px; }
 
-#story-form > .input-language-note { margin: 0 0 18px; }
+#story-form .input-language-note { margin: 6px 0 8px; }
 
 .reader-path-control { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .reader-path-control[hidden] { display: none; }
