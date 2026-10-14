@@ -37,3 +37,18 @@ function section(start, end) { const at = source.indexOf(start); assert(at >= 0,
   assert(/\.selection-toolbar\.title-selection #selection-explain \{ display: none/.test(fs.readFileSync(path.join(__dirname, '../css/style.css'), 'utf8')), 'Explain is hidden for title selections');
   console.log('PASS title section structure and title selection uses the custom toolbar without Explain');
 }
+
+// Explained expressions: newest range owns overlaps; overlapping explanations are detected for replacement.
+{
+  const textSource = fs.readFileSync(path.join(__dirname, '../js/reader-text.js'), 'utf8').replaceAll('export function ', 'function ');
+  const context = {}; vm.createContext(context);
+  vm.runInContext(textSource + '\n' + section('function overlappingHelp(', 'function confirmReplaceHelp('), context);
+  const segments = JSON.parse(JSON.stringify(context.explainedSegments(20, [{ id: 'old', start: 2, end: 10, label: 'a' }, { id: 'new', start: 6, end: 14, label: 'b' }])));
+  assert.deepEqual(segments.map(s => [s.start, s.end, s.id]), [[0, 2, ''], [2, 6, 'old'], [6, 14, 'new'], [14, 20, '']]);
+  const chapter = { help: [{ id: 'a', versionId: 'v', start: 0, end: 5 }, { id: 'b', versionId: 'v', start: 5, end: 9 }, { id: 'c', versionId: 'other', start: 0, end: 9 }, { id: 'd', versionId: 'v' }] };
+  assert.deepEqual(context.overlappingHelp(chapter, 'v', 4, 6).map(e => e.id), ['a', 'b'], 'ranges that touch but do not overlap are kept');
+  assert.deepEqual(context.overlappingHelp(chapter, 'v', 5, 5).map(e => e.id), [], 'adjacent explanations do not overlap');
+  assert.deepEqual(context.overlappingHelp(chapter, 'v', 9, 12).map(e => e.id), []);
+  assert(/overlapping|overlaps/.test(source) && /confirmReplaceHelp\(overlaps\)/.test(source) && /replace-help-dialog/.test(fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8')));
+  console.log('PASS explained expression segments favor the newest explanation and overlap detection drives the replace warning');
+}
