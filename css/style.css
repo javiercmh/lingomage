@@ -125,11 +125,7 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 /* The reading surface slides over the destructive action underneath. */
 .story-card { position: relative; display: grid; grid-template-columns: 1fr; padding: 0; overflow: hidden; touch-action: pan-y; isolation: isolate; }
 .story-open { position: relative; z-index: 1; width: 100%; min-width: 0; border: 0; border-radius: 17px; background: var(--card); color: var(--ink); padding: 15px; text-align: left; transition: transform .2s ease; }
-.story-card.swipe-revealed .story-open { transform: translateX(-80px); }
-.story-card .story-swipe-delete { position: absolute; z-index: 0; inset: 0 0 0 auto; width: 80px; height: 100%; min-height: 44px; border: 0; border-radius: 0; background: #b91c1c; color: #fff; display: flex; align-items: center; justify-content: center; }
-.story-card .story-swipe-delete:hover, .story-card .story-swipe-delete:active { background: #991b1b; color: #fff; }
-.story-swipe-delete svg { width: 24px; height: 24px; }
-.story-swipe-delete[hidden] { display: none; }
+.story-card.swipe-revealed .story-open { transform: translateX(-168px); }
 .story-check-control, .card-select-action { z-index: 2; }
 @media (prefers-reduced-motion: reduce) { .story-open { transition: none; } }
 .story-card.selecting { padding-right: 64px; }
@@ -374,3 +370,19 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px
 .explained-expression.mark-pulse { animation: mark-pulse 1.4s ease-out; }
 @keyframes mark-pulse { 0%, 50% { background: rgba(122,167,255,.55); } 100% { background: rgba(122,167,255,.18); } }
 .help-card > .help-show-in-text { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin: -6px 0 0 -6px; padding: 0 12px; color: var(--accent); }
+
+/* Story actions tray: revealed by swipe or the visible actions button; surface follows the finger. */
+.story-actions-tray { position: absolute; z-index: 0; inset: 0 0 0 auto; width: 168px; display: flex; }
+.story-actions-tray[hidden] { display: none; }
+.story-tray-action { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 44px; border: 0; border-radius: 0; color: #fff; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+.story-tray-action svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.story-tray-select { background: #2b3d5c; }
+.story-tray-select:hover, .story-tray-select:focus-visible { background: #35496b; }
+.story-tray-action.story-swipe-delete { background: #b91c1c; }
+.story-tray-action.story-swipe-delete:hover, .story-tray-action.story-swipe-delete:focus-visible { background: #991b1b; }
+.story-tray-action:focus-visible { outline: 2px solid #fff; outline-offset: -4px; }
+.story-menu-toggle { position: absolute; z-index: 2; top: 6px; right: 6px; width: 44px; height: 44px; border: 0; background: transparent; color: var(--muted); }
+.story-menu-toggle svg { width: 20px; height: 20px; }
+.story-menu-toggle circle { fill: currentColor; stroke: none; }
+.story-card.swipe-revealed .story-menu-toggle { visibility: hidden; }
+.story-card:not(.selecting) .story-open { padding-right: 52px; }
