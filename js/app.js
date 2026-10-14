@@ -505,23 +505,28 @@ function removeSelectedStories(ids) {
   try { persistStories(); leaveStorySelection(); updateCount(); renderLibrary(); toast(`${ids.size} ${ids.size===1?'story':'stories'} deleted`); return true; }
   catch(error) { state.stories=previous; toast(error.message); return false; }
 }
-function closeStoryReveal() {
-  state.revealedStoryId = null;
+function closeStoryReveal(restoreFocus = false) {
+  const revealedId = state.revealedStoryId; state.revealedStoryId = null;
   document.querySelectorAll('.story-card').forEach(card => {
     card.classList.remove('swipe-revealed');
-    const trash = card.querySelector('.story-swipe-delete');
-    if (trash) trash.hidden = true;
+    const tray = card.querySelector('.story-actions-tray'); if (tray) tray.hidden = true;
+    const toggle = card.querySelector('.story-menu-toggle'); if (toggle) toggle.setAttribute('aria-expanded', 'false');
+    if (restoreFocus && card.dataset.storyId === revealedId) toggle?.focus();
   });
 }
-function revealStory(card, id) {
+function revealStory(card, id, focusTray = false) {
   closeStoryReveal(); state.revealedStoryId = id;
   card.classList.add('swipe-revealed');
-  card.querySelector('.story-swipe-delete').hidden = false;
+  card.querySelector('.story-actions-tray').hidden = false;
+  card.querySelector('.story-menu-toggle')?.setAttribute('aria-expanded', 'true');
+  if (focusTray) card.querySelector('.story-actions-tray button')?.focus();
 }
+const STORY_TRAY_WIDTH = 168;
 function wireStorySwipe(card, id, cancelHold) {
   let origin = null, horizontal = false, suppressClick = false;
+  const releaseSurface = () => { const surface = card.querySelector?.('.story-open'); if (surface) { surface.style.transition = ''; surface.style.transform = ''; } };
   card.addEventListener('pointerdown', event => {
-    if (state.storySelectionMode || event.isPrimary === false || (event.button !== undefined && event.button !== 0) || event.target.closest?.('.story-swipe-delete, .card-select-action')) return;
+    if (state.storySelectionMode || event.isPrimary === false || (event.button !== undefined && event.button !== 0) || event.target.closest?.('.story-actions-tray, .story-menu-toggle')) return;
     suppressClick = false; horizontal = false;
     origin = { x: event.clientX, y: event.clientY, id: event.pointerId };
   });
@@ -533,18 +538,27 @@ function wireStorySwipe(card, id, cancelHold) {
       horizontal = true; suppressClick = true; cancelHold();
       card.setPointerCapture?.(event.pointerId);
     }
-    if (horizontal) event.preventDefault();
+    if (horizontal) {
+      event.preventDefault();
+      // The whole reading surface follows the finger (clamped to the tray width).
+      const surface = card.querySelector?.('.story-open');
+      if (surface) {
+        const base = card.classList.contains('swipe-revealed') ? -STORY_TRAY_WIDTH : 0;
+        surface.style.transition = 'none'; surface.style.transform = `translateX(${Math.max(-STORY_TRAY_WIDTH, Math.min(0, base + dx))}px)`;
+      }
+    }
   });
   card.addEventListener('pointerup', event => {
     if (!origin || event.pointerId !== origin.id) return;
     const dx = event.clientX - origin.x;
+    releaseSurface();
     if (horizontal && !state.storySelectionMode) {
       if (dx <= -60) revealStory(card, id);
       else if (dx >= 60) closeStoryReveal();
     }
     origin = null; horizontal = false;
   });
-  card.addEventListener('pointercancel', () => { origin = null; horizontal = false; });
+  card.addEventListener('pointercancel', () => { releaseSurface(); origin = null; horizontal = false; });
   card.addEventListener('pointerleave', () => { if (!horizontal) origin = null; });
   card.addEventListener('click', event => {
     if (suppressClick) { event.preventDefault(); event.stopImmediatePropagation(); suppressClick = false; }
@@ -606,9 +620,6 @@ function renderLibrary() {
       const control = document.createElement('label'); control.className = 'story-check-control';
       const check = document.createElement('input'); check.type = 'checkbox'; check.className = 'story-select-checkbox'; check.checked = state.selectedStoryIds.has(story.id); check.setAttribute('aria-label', `Select ${story.title}`); check.addEventListener('change', () => toggleStorySelection(story.id));
       control.append(check); card.append(control);
-    } else {
-      const select = document.createElement('button'); select.type = 'button'; select.className = 'card-select-action'; select.textContent = 'Select story'; select.setAttribute('aria-label', `Select story ${story.title}`);
-      select.addEventListener('click', event => { event.stopPropagation(); beginStorySelection(story.id); }); card.append(select);
     }
     const open = document.createElement('button'); open.className = 'story-open'; open.type = 'button';
     const lang = document.createElement('span'); lang.className = 'language-tag'; lang.textContent = LANGUAGES[story.language] || story.language;
@@ -617,10 +628,20 @@ function renderLibrary() {
     open.append(lang,title,meta); open.addEventListener('click', () => { if (state.storySelectionMode) toggleStorySelection(story.id); else openReader(story); });
     card.append(open);
     if (!state.storySelectionMode) {
-      const trash = document.createElement('button'); trash.type = 'button'; trash.className = 'icon-btn danger-icon-btn story-swipe-delete'; trash.hidden = true;
-      trash.setAttribute('aria-label', `Delete story ${story.title}`); trash.title = 'Delete story';
-      trash.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3"/></svg>';
-      trash.addEventListener('click', event => { event.stopPropagation(); confirmStoryDeletion(new Set([story.id]), story); }); card.append(trash);
+      const icon = path => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg>`;
+      const tray = document.createElement('div'); tray.className = 'story-actions-tray'; tray.hidden = true; tray.setAttribute('role', 'group'); tray.setAttribute('aria-label', `Actions for ${story.title}`);
+      const select = document.createElement('button'); select.type = 'button'; select.className = 'story-tray-action story-tray-select'; select.setAttribute('aria-label', `Select story ${story.title}`);
+      select.innerHTML = `${icon('m5 12 4.5 4.5L19 7')}<span>Select</span>`;
+      select.addEventListener('click', event => { event.stopPropagation(); beginStorySelection(story.id); });
+      const trash = document.createElement('button'); trash.type = 'button'; trash.className = 'story-tray-action story-swipe-delete';
+      trash.setAttribute('aria-label', `Delete story ${story.title}`);
+      trash.innerHTML = `${icon('M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3')}<span>Delete</span>`;
+      trash.addEventListener('click', event => { event.stopPropagation(); confirmStoryDeletion(new Set([story.id]), story); });
+      tray.append(select, trash); card.append(tray);
+      const more = document.createElement('button'); more.type = 'button'; more.className = 'icon-btn story-menu-toggle'; more.setAttribute('aria-label', `Actions for ${story.title}`); more.title = 'Story actions'; more.setAttribute('aria-expanded', 'false');
+      more.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>';
+      more.addEventListener('click', event => { event.stopPropagation(); if (state.revealedStoryId === story.id) closeStoryReveal(true); else revealStory(card, story.id, true); });
+      card.append(more);
     }
     list.append(card);
     card.addEventListener('click', event => { if (event.target === card && state.storySelectionMode) toggleStorySelection(story.id); });
@@ -629,6 +650,9 @@ function renderLibrary() {
   });
   syncStorySelection();
 }
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && state.revealedStoryId && !document.querySelector('dialog[open]')) { event.preventDefault(); closeStoryReveal(true); }
+});
 document.addEventListener('pointerdown', event => {
   if (state.revealedStoryId && !event.target.closest?.('.swipe-revealed')) closeStoryReveal();
 });

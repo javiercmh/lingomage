@@ -52,3 +52,26 @@ function section(start, end) { const at = source.indexOf(start); assert(at >= 0,
   assert(/overlapping|overlaps/.test(source) && /confirmReplaceHelp\(overlaps\)/.test(source) && /replace-help-dialog/.test(fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8')));
   console.log('PASS explained expression segments favor the newest explanation and overlap detection drives the replace warning');
 }
+
+// Story actions tray: swipe tracks the finger and a visible keyboard-reachable control exposes Select and Delete.
+{
+  const css = fs.readFileSync(path.join(__dirname, '../css/style.css'), 'utf8');
+  assert(/\.story-card\.swipe-revealed \.story-open \{ transform: translateX\(-168px\)/.test(css), 'tray width matches the slide distance');
+  assert(/story-menu-toggle[^}]*width: 44px; height: 44px/.test(css) && /\.story-tray-action \{[^}]*min-height: 44px/.test(css), '44px targets');
+  const surface = { style: {} }, handlers = {}, classes = new Set();
+  const card = { classList: { contains: name => classes.has(name) }, querySelector: selector => selector === '.story-open' ? surface : null, addEventListener: (name, fn) => { handlers[name] = fn; }, setPointerCapture() {} };
+  const context = { state: { storySelectionMode: false }, revealStory() {}, closeStoryReveal() {} }; vm.createContext(context);
+  vm.runInContext(section('const STORY_TRAY_WIDTH', 'function confirmStoryDeletion('), context);
+  context.wireStorySwipe(card, 'a', () => {});
+  handlers.pointerdown({ clientX: 300, clientY: 100, pointerId: 1, isPrimary: true, button: 0, target: { closest: () => null } });
+  handlers.pointermove({ clientX: 250, clientY: 100, pointerId: 1, preventDefault() {} });
+  assert.equal(surface.style.transform, 'translateX(-50px)', 'surface follows the finger');
+  handlers.pointermove({ clientX: 20, clientY: 100, pointerId: 1, preventDefault() {} });
+  assert.equal(surface.style.transform, 'translateX(-168px)', 'drag is clamped to the tray width');
+  handlers.pointerup({ clientX: 20, clientY: 100, pointerId: 1 });
+  assert.equal(surface.style.transform, '', 'inline transform is released so the class settles the surface');
+  const app = source;
+  assert(/story-tray-select/.test(app) && /story-swipe-delete/.test(app) && /Actions for \$\{story\.title\}/.test(app) && /closeStoryReveal\(true\)/.test(app));
+  assert(!/card-select-action'; select\.textContent = 'Select story'/.test(app), 'hidden focus-only Select story control is retired for stories');
+  console.log('PASS story swipe follows the finger, clamps to the tray, and a visible Actions button exposes Select and Delete');
+}
