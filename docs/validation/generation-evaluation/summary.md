@@ -1,16 +1,10 @@
-# Broad contextual notes and generation evaluation
+# Generation evaluation summary
 
 The production workflow is language plan → canonical prose → contextual English notes → Japanese readings, when applicable → saved chapter. Completed stages are checkpointed before releasing requests. An explicit notes retry reuses the completed prose. Example requests retain their separate workflow.
 
 The learner requested more definitions, including common words. Prompt policy .19, retained in current prompt .20, therefore asks for broad contextual coverage without a fixed note quota. This is a product preference, not evidence of improved learning or certified level alignment. See PED-002 and PED-004.
 
 The fixed 100-note limit was replaced, with explicit user approval, by a serialized content limit of 1,000,000 UTF-16 units. Existing per-field, canonical prose, script, exact-form, Japanese reading and checkpoint safeguards remain. The matcher was optimized and compared with the original behavior in randomized overlap cases; 250-note rendering and repeated-meaning scaling cases pass.
-
-## Verification actually performed
-
-`python3 scripts/check.py` passed after the final retry-message correction. `git diff --check` and evaluation script syntax checks passed. Behavioral tests cover explicit notes retry after reload, cancellation, save/release failure, unchanged prose, example bypass, response-size boundaries and exact forms.
-
-Development mock screenshots were visually inspected at desktop 1200 × 900 and narrow mobile 360 × 800. Inspected: a synthetic 250-note reader and contextual popup, normal fixture notes, disabled follow-up fields during a pending checkpoint, the recovery panel below the follow-up form, notes progress, Retry/Discard, notes-only retry and recovered chapter. Spacing, wrapping, hierarchy, helper grouping and clipping were checked. Viewport-resize popup dismissal and clearing a stale failure message during retry were corrected. These are browser checks; App² Android inference, native behavior and safe-area handling remain pending on-device verification.
 
 ## Evaluation interpretation
 
@@ -20,7 +14,7 @@ Offline revalidation under the new size policy accepts 11/12 Sol notes outputs a
 
 An anonymous preliminary AI review preferred Sol in 11 of 12 pairs and Luna for German B1. The judge was GPT-6.1 Sol low; family bias, a small fixed brief set and lack of calibrated qualified reviewers limit this finding. Sol low is the provisional development choice. Both models can produce inaccurate contextual explanations, above-target constructions and narrative continuity problems. Counts alone do not establish quality.
 
-The original-versus-revised pilot covers two briefs, four languages and three requested levels (48 attempts): 45 completed, with three exact-form rejections (Russian B1 revised, C1 revised parcel, and C1 baseline railway). The completed original samples have 8–11 notes (median 10); revised samples have 41–220 (median 129.5). Different sampled prose and unequal rejected cases mean this is a descriptive comparison, not a controlled learning-effect estimate. Raw prompts, responses, checkpoints, errors and preliminary review records are archived in Git history at commit `7fd046c` (see `generation-evaluation/README.md`). Follow-up cases cover Scene continuation, Scene rewrite and Chapter creation in each language; retired Longer passage preferences are covered by compatibility tests.
+The original-versus-revised pilot covers two briefs, four languages and three requested levels (48 attempts): 45 completed, with three exact-form rejections (Russian B1 revised, C1 revised parcel, and C1 baseline railway). The completed original samples have 8–11 notes (median 10); revised samples have 41–220 (median 129.5). Different sampled prose and unequal rejected cases mean this is a descriptive comparison, not a controlled learning-effect estimate. Raw prompts, responses, checkpoints, errors and preliminary review records are archived in Git history at commit `7fd046c` (see [README](README.md)). Follow-up cases cover Scene continuation, Scene rewrite and Chapter creation in each language; retired Longer passage preferences are covered by compatibility tests.
 
 No official CEFR/JLPT/TORFL certification or measured learning effectiveness is claimed. Qualified language review remains necessary before stronger alignment claims. Evaluation uses the explicitly authorized development-only Codex bridge; released behavior continues through App² managed AI.
 

@@ -23,12 +23,12 @@ Legacy stories derive paths lazily from version-source and chapter predecessor l
 
 ## Validation
 
-See [implementation validation](../validation/2026-10-11-story-memory-and-paths.md). Deterministic mock output and schema tests cannot establish narrative accuracy, language quality, or pedagogical effectiveness. Revisit budgets and summary instructions after live-model review of long stories and branched narratives.
+Behavior is covered by `tests/story-memory-regression.cjs`. Deterministic mock output and schema tests cannot establish narrative accuracy, language quality, or pedagogical effectiveness. Revisit budgets and summary instructions after live-model review of long stories and branched narratives.
 
 
 ## Reader management (2026-10-12)
 
-Learners can remove a chapter and its successors from the selected path or delete an entire path through Story actions. Shared chapter versions, explanations and memory remain available on other paths; exclusively unreferenced content is permanently removed after confirmation. Removing the beginning of the final path deletes the story. The app uses one durable save with rollback on failure, blocks removal while AI work or a result awaits saving/release, and clears positions/drafts for deleted content. Names use a persistent counter so a later rewrite cannot reuse a deleted alternate's name. This is a product assumption about keeping narrative continuity understandable, not evidence of learning effectiveness. Generation instructions and prompt version are unchanged. See [management validation](../validation/2026-10-12-reader-management.md).
+Learners can remove a chapter and its successors from the selected path or delete an entire path through Story actions. Shared chapter versions, explanations and memory remain available on other paths; exclusively unreferenced content is permanently removed after confirmation. Removing the beginning of the final path deletes the story. The app uses one durable save with rollback on failure, blocks removal while AI work or a result awaits saving/release, and clears positions/drafts for deleted content. Names use a persistent counter so a later rewrite cannot reuse a deleted alternate's name. This is a product assumption about keeping narrative continuity understandable, not evidence of learning effectiveness. Generation instructions and prompt version are unchanged. Covered by `tests/reader-management-regression.cjs`.
 
 ### Continuity experiment prepared — 2026-10-14
 

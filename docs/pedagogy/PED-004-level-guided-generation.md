@@ -27,10 +27,10 @@ During integration with newer main, numeric length safeguard LANG-001 is explici
 
 ## Validation
 
-Engineering and screenshot checks are recorded in [2026-10-13-level-guided-generation](../validation/2026-10-13-level-guided-generation.md). Native App² and qualified language review remain pending. Revisit if level choices confuse learners, generated prose is consistently unsuitable, or a measured placement requirement emerges.
+Engineering behavior is covered by `tests/story-generation-regression.cjs` and `tests/learning-safeguards.mjs`. Native App² behavior is pending in the [device checklist](../validation/device-checklist.md); qualified language review remains pending. Revisit if level choices confuse learners, generated prose is consistently unsuitable, or a measured placement requirement emerges.
 
 
-Follow-up [implementation audit](../validation/2026-10-13-generation-audit.md) corrected cancellation at stage boundaries, canonical-script validation and shared glossary matching. Underlines are contextual support links, not measured unknown-word coverage; the five vocabulary candidates do not cap the final glossary. No underline-density policy or generation-prompt change was introduced.
+A follow-up implementation audit (2026-10-13) corrected cancellation at stage boundaries, canonical-script validation and shared glossary matching. Underlines are contextual support links, not measured unknown-word coverage; the five vocabulary candidates do not cap the final glossary. No underline-density policy or generation-prompt change was introduced.
 
 
 Separate contextual notes refinement — 2026-10-13: chapter generation now runs plan → prose → notes → Japanese readings → final save. Planning remains optional guidance; the note request receives fixed prose and broader support instructions under PED-002. No numerical story or pedagogical note quotas are added. Completed stages are reused on explicit resume, while final content still requires all active safeguards. Level suitability remains unvalidated pending the recorded live pilot and qualified review.
