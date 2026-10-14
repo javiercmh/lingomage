@@ -242,3 +242,47 @@ export function getCanonicalSelection(root) {
   while ((node = walker.nextNode())) canonical += node.nodeValue;
   return { start, end, text: canonical.slice(start, end), rootText: root.textContent };
 }
+
+// Split [0, length) at every range boundary; where ranges overlap the later range (newest) owns the span.
+export function explainedSegments(length, ranges) {
+  const cuts = new Set([0, length]);
+  for (const range of ranges) { cuts.add(Math.max(0, Math.min(length, range.start))); cuts.add(Math.max(0, Math.min(length, range.end))); }
+  const points = [...cuts].sort((a, b) => a - b), segments = [];
+  for (let index = 0; index < points.length - 1; index++) {
+    const start = points[index], end = points[index + 1];
+    let owner = null;
+    for (const range of ranges) if (range.start <= start && range.end >= end) owner = range;
+    const previous = segments[segments.length - 1], id = owner?.id || '';
+    if (previous && previous.id === id) previous.end = end;
+    else segments.push({ start, end, id, label: owner?.label || '' });
+  }
+  return segments;
+}
+
+// Wrap text covered by saved explanations in <mark> elements; canonical offsets ignore ruby readings.
+export function applyExplainedMarks(container, ranges) {
+  for (const mark of [...container.querySelectorAll('mark.explained-expression')]) mark.replaceWith(...mark.childNodes);
+  container.normalize();
+  if (!ranges.length) return;
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, { acceptNode: node => node.parentElement?.closest('rt') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+  const nodes = []; let offset = 0;
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) { nodes.push({ node, start: offset }); offset += node.nodeValue.length; }
+  const seen = new Set();
+  for (const { node, start } of nodes) {
+    const length = node.nodeValue.length;
+    const local = ranges.filter(range => range.end > start && range.start < start + length).map(range => ({ ...range, start: range.start - start, end: range.end - start }));
+    if (!local.length) continue;
+    const fragment = document.createDocumentFragment();
+    for (const segment of explainedSegments(length, local)) {
+      const text = node.nodeValue.slice(segment.start, segment.end);
+      if (!segment.id) { fragment.append(document.createTextNode(text)); continue; }
+      const mark = document.createElement('mark'); mark.className = 'explained-expression'; mark.dataset.helpId = segment.id; mark.textContent = text;
+      if (!seen.has(segment.id)) {
+        seen.add(segment.id);
+        mark.setAttribute('role', 'button'); mark.tabIndex = 0; mark.setAttribute('aria-label', `Show explanation for ${segment.label}`);
+      }
+      fragment.append(mark);
+    }
+    node.replaceWith(fragment);
+  }
+}

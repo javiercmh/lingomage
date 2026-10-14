@@ -1,6 +1,6 @@
 import { ai, readFile, writeFile, speech, translation, selectionMenu } from './bridge.js';
 import { speakSelection, speakChapter } from './reader-speech.js';
-import { annotatedText, getCanonicalSelection, japaneseSegments } from './reader-text.js';
+import { annotatedText, applyExplainedMarks, getCanonicalSelection, japaneseSegments } from './reader-text.js';
 import { createPipeline } from './generation-pipeline.js';
 import { SAFEGUARD_VERSION, parseContent, validateStory } from './learning-validation.js';
 import { saveBeforeAcknowledge } from './request-lifecycle.js';
@@ -1035,6 +1035,27 @@ function helpInstructions(action = 'initial') {
   if (action === 'examples') return `${common} Return only one JSON object in this shape: {"examples":[{"sentence":"...","translation":"...","highlightStart":0,"highlightEnd":1,"segments":[{"text":"...","reading":"..."}]}]}. Generate exactly three short, natural target-language sentences demonstrating the same meaning or grammatical function as the selection here, not merely the same spelling. Vary surrounding vocabulary while keeping that function clear. For く linking descriptions in 青く, demonstrate that adjective-linking function rather than unrelated adverbial uses of く. Provide an English translation and UTF-16 highlight offsets identifying the relevant form in each sentence. Use canonical target-script sentence text without reading annotations or transliteration; the app requests Japanese kanji readings separately. Omit segments. Preserve natural spelling and grammar, and match the learner profile and language preferences. Russian stress marks are absent by default but allowed if explicitly requested.`;
   return `${common} Return only one JSON object in this shape: {"contextStart":0,"contextEnd":1,"contextTranslation":"","explanation":"..."}. Choose the contiguous source excerpt needed to understand the selection, usually a clause or sentence, containing the entire selection. Return its absolute UTF-16 boundaries in sourceText; do not rewrite or reproduce the excerpt. Include an English contextTranslation only when it adds understanding beyond the explanation; otherwise use an empty string. Explain directly what the selection means or does here in one short paragraph. Identify its containing word and underlying form when useful. A fragment may have no independent translation: explain its function rather than inventing a standalone meaning. Reserve expanded formation rules, grammatical terminology and usage distinctions for follow-ups.`;
 }
+function overlappingHelp(chapter, versionId, start, end) {
+  return (chapter.help || []).filter(entry => entry.versionId === versionId && Number.isFinite(entry.start) && Number.isFinite(entry.end) && entry.start < end && start < entry.end);
+}
+function confirmReplaceHelp(items) {
+  const dialog = $('replace-help-dialog');
+  const quotes = items.map(entry => `“${entry.passage.length > 40 ? `${entry.passage.slice(0, 40)}…` : entry.passage}”`).join(', ');
+  $('replace-help-message').textContent = items.length === 1
+    ? `This selection overlaps the saved explanation for ${quotes}. The new explanation will replace it, along with its follow-ups and examples.`
+    : `This selection overlaps ${items.length} saved explanations (${quotes}). The new explanation will replace them, along with their follow-ups and examples.`;
+  return new Promise(resolve => {
+    let answer = false;
+    const done = value => { answer = value; dialog.close(); };
+    const onConfirm = () => done(true), onCancel = () => done(false);
+    $('replace-help-confirm').addEventListener('click', onConfirm); $('replace-help-cancel').addEventListener('click', onCancel);
+    dialog.addEventListener('close', () => {
+      $('replace-help-confirm').removeEventListener('click', onConfirm); $('replace-help-cancel').removeEventListener('click', onCancel);
+      resolve(answer);
+    }, { once: true });
+    dialog.showModal(); $('replace-help-cancel').focus();
+  });
+}
 function selectedTitle() {
   const value = getCanonicalSelection($('reader-title')); if (!value || !value.text.trim()) return null;
   const story = readerStory(), chapter = activeChapter(story), version = activeVersion(chapter);
@@ -1313,6 +1334,10 @@ function renderSavedHelp(chapter, version) {
     const stale = JSON.stringify(profile) !== JSON.stringify(profileSnapshot(readerStory()));
     const status = document.createElement('p'); status.className = 'helper help-text-selectable'; status.textContent = stale ? 'Based on an earlier reading profile.' : '';
     if (title) card.append(title);
+    if (hasContext && !state.explanationSelectionMode) {
+      const show = document.createElement('button'); show.type = 'button'; show.className = 'small-btn help-show-in-text'; show.setAttribute('aria-label', `Show “${item.passage}” in the story`);
+      show.innerHTML = '<span aria-hidden="true">↑</span> Show in text'; show.addEventListener('click', () => showPassageInText(item.id)); card.append(show);
+    }
     card.append(quote);
     if (hasContext && item.contextTranslation) { const translation = document.createElement('p'); translation.className = 'help-context-translation help-text-selectable'; translation.textContent = item.contextTranslation; card.append(translation); }
     card.append(body);
@@ -1360,7 +1385,39 @@ function renderSavedHelp(chapter, version) {
   });
   section.hidden = !box.childElementCount;
   syncExplanationSelection();
+  if (typeof refreshExplainedMarks === 'function') refreshExplainedMarks(chapter, version);
 }
+function refreshExplainedMarks(chapter, version) {
+  const root = $('reader-story'); if (typeof root?.normalize !== 'function') return;
+  const ranges = (chapter.help || []).filter(item => item.versionId === version.id && validTextRange(version.story || '', item.start, item.end) && version.story.slice(item.start, item.end) === item.passage)
+    .sort((a, b) => (Date.parse(a.createdAt || '') || 0) - (Date.parse(b.createdAt || '') || 0))
+    .map(item => ({ id: item.id, start: item.start, end: item.end, label: item.passage }));
+  applyExplainedMarks(root, ranges);
+}
+function pulse(elements) {
+  elements.forEach(node => { node.classList.add('mark-pulse'); setTimeout(() => node.classList.remove('mark-pulse'), 1400); });
+}
+function showPassageInText(helpId) {
+  const marks = [...$('reader-story').querySelectorAll('mark.explained-expression')].filter(mark => mark.dataset.helpId === helpId);
+  if (!marks.length) { toast('This passage is no longer highlighted.'); return; }
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  marks[0].scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
+  pulse(marks);
+}
+function showExplanationForMark(mark) {
+  const card = [...$('reader-help').querySelectorAll('.help-card')].find(node => node.dataset.helpId === mark.dataset.helpId);
+  if (card) revealCard(card);
+}
+$('reader-story').addEventListener('click', event => {
+  const mark = event.target.closest?.('mark.explained-expression');
+  if (!mark || event.target.closest('.gloss-note-trigger') || !window.getSelection().isCollapsed || state.explanationSelectionMode) return;
+  showExplanationForMark(mark);
+});
+$('reader-story').addEventListener('keydown', event => {
+  const mark = event.target.closest?.('mark.explained-expression');
+  if (!mark || (event.key !== 'Enter' && event.key !== ' ')) return;
+  event.preventDefault(); showExplanationForMark(mark);
+});
 async function readerAi(kind, input, instructions, requestPanel, config = { providerId: state.providerId, model: state.model, reasoning: state.reasoning }) {
   if (state.pendingReaderResult) throw new Error('Save the completed response before starting another request.');
   if (state.requestId) throw new Error('Another AI request is still running. Wait for it to finish before starting another.');
@@ -1483,6 +1540,10 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
   if (!validTextRange(version.story, passage.start, passage.end) || version.story.slice(passage.start, passage.end) !== passage.text) { toast('Select the passage again to request help.'); return; }
   const existingHelp = action !== 'initial' ? chapter.help?.find(entry => entry.id === passage.helpId) : null;
   if (action !== 'initial' && !existingHelp) return;
+  if (action === 'initial') {
+    const overlaps = overlappingHelp(chapter, version.id, passage.start, passage.end);
+    if (overlaps.length && !await confirmReplaceHelp(overlaps)) return;
+  }
   const scrollTop = readerPanel().scrollTop;
   const providerId = state.providerId, model = state.model, reasoning = state.reasoning;
   state.readerHelpBusy = true;
@@ -1523,8 +1584,10 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
           if (action === 'detail') Object.assign(existingHelp, { more: item.text, detailProvenance: item });
           return () => { for (const key of Object.keys(existingHelp)) delete existingHelp[key]; Object.assign(existingHelp, before); };
         }
-        chapter.help ||= []; chapter.help.push(item);
-        return () => { chapter.help = chapter.help.filter(entry => entry.id !== item.id); };
+        const before = chapter.help || [];
+        const replaced = new Set(overlappingHelp(chapter, version.id, item.start, item.end));
+        chapter.help = [...before.filter(entry => !replaced.has(entry)), item];
+        return () => { chapter.help = before; };
       } };
       try { await savePendingReaderResult(); }
       catch { if (state.readerId === story.id) renderPendingReaderResult(); return; }
