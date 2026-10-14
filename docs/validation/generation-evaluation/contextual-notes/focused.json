@@ -1,0 +1,170 @@
+[
+  {
+    "id": "focused-de-possessive",
+    "focused": true,
+    "expectation": "Explain ihre as Mara’s ticket and seine as Paul’s ticket; possessors differ from the gender of Fahrkarte.",
+    "input": {
+      "kind": "notes",
+      "language": "German",
+      "languageCode": "de",
+      "difficulty": "A1",
+      "levelDescription": "Focused contextual regression; no assessed proficiency claim.",
+      "practice": "",
+      "topic": "Focused regression",
+      "languageExpectations": "",
+      "chapter": {
+        "title": "Am Bahnhof",
+        "story": "Mara zeigt Paul ihre Fahrkarte. Paul hält seine Fahrkarte fest."
+      },
+      "languagePlan": {
+        "vocabulary": [],
+        "grammar": [],
+        "guidance": "Use the supplied passage unchanged."
+      }
+    }
+  },
+  {
+    "id": "focused-de-pronouns",
+    "focused": true,
+    "expectation": "Distinguish singular she (Anna) from plural they (Anna and friends); use disambiguating attested phrases.",
+    "input": {
+      "kind": "notes",
+      "language": "German",
+      "languageCode": "de",
+      "difficulty": "A1",
+      "levelDescription": "Focused contextual regression; no assessed proficiency claim.",
+      "practice": "",
+      "topic": "Focused regression",
+      "languageExpectations": "",
+      "chapter": {
+        "title": "Am Bahnhof",
+        "story": "Anna wartet. Sie liest die Anzeige. Ihre Freunde kommen. Jetzt stehen sie zusammen am Gleis."
+      },
+      "languagePlan": {
+        "vocabulary": [],
+        "grammar": [],
+        "guidance": "Use the supplied passage unchanged."
+      }
+    }
+  },
+  {
+    "id": "focused-de-discontinuous",
+    "focused": true,
+    "expectation": "Explain einsteigen/aussteigen through the sentences without claiming ein alone means board a train.",
+    "input": {
+      "kind": "notes",
+      "language": "German",
+      "languageCode": "de",
+      "difficulty": "A1",
+      "levelDescription": "Focused contextual regression; no assessed proficiency claim.",
+      "practice": "",
+      "topic": "Focused regression",
+      "languageExpectations": "",
+      "chapter": {
+        "title": "Am Bahnhof",
+        "story": "Paul steigt in den Zug ein. Mara steigt am nächsten Bahnhof aus."
+      },
+      "languagePlan": {
+        "vocabulary": [],
+        "grammar": [],
+        "guidance": "Use the supplied passage unchanged."
+      }
+    }
+  },
+  {
+    "id": "focused-es-association",
+    "focused": true,
+    "expectation": "Distinguish the train the speaker intends to take, family relationship and actual book ownership.",
+    "input": {
+      "kind": "notes",
+      "language": "Spanish",
+      "languageCode": "es-CL",
+      "difficulty": "A1",
+      "levelDescription": "Focused contextual regression; no assessed proficiency claim.",
+      "practice": "",
+      "topic": "Focused regression",
+      "languageExpectations": "",
+      "chapter": {
+        "title": "En la estación",
+        "story": "Mi tren sale a las ocho. Mi hermana trabaja aquí. Este libro es mío; lo compré ayer."
+      },
+      "languagePlan": {
+        "vocabulary": [],
+        "grammar": [],
+        "guidance": "Use the supplied passage unchanged."
+      }
+    }
+  },
+  {
+    "id": "focused-ru-repair",
+    "focused": true,
+    "expectation": "Explain accusative поезд, genitive поезда and prepositional поезде; inspect repaired forms for misleading surviving case claims.",
+    "input": {
+      "kind": "notes",
+      "language": "Russian",
+      "languageCode": "ru",
+      "difficulty": "A1",
+      "levelDescription": "Focused contextual regression; no assessed proficiency claim.",
+      "practice": "",
+      "topic": "Focused regression",
+      "languageExpectations": "",
+      "chapter": {
+        "title": "На вокзале",
+        "story": "Я вижу поезд. Мы ждём поезда. В поезде тепло."
+      },
+      "languagePlan": {
+        "vocabulary": [],
+        "grammar": [],
+        "guidance": "Use the supplied passage unchanged."
+      }
+    }
+  },
+  {
+    "id": "focused-ja-script",
+    "focused": true,
+    "expectation": "Headwords and forms use Japanese script; a Latin eki form must be rejected, not repaired.",
+    "input": {
+      "kind": "notes",
+      "language": "Japanese",
+      "languageCode": "ja",
+      "difficulty": "N5",
+      "levelDescription": "Focused contextual regression; no assessed proficiency claim.",
+      "practice": "",
+      "topic": "Focused regression",
+      "languageExpectations": "",
+      "chapter": {
+        "title": "駅",
+        "story": "駅で電車を待ちます。友達は本を読みます。"
+      },
+      "languagePlan": {
+        "vocabulary": [],
+        "grammar": [],
+        "guidance": "Use the supplied passage unchanged."
+      }
+    }
+  },
+  {
+    "id": "focused-de-senses",
+    "focused": true,
+    "expectation": "Distinguish bench from financial institution with exact disambiguating phrases.",
+    "input": {
+      "kind": "notes",
+      "language": "German",
+      "languageCode": "de",
+      "difficulty": "B1",
+      "levelDescription": "Focused contextual regression; no assessed proficiency claim.",
+      "practice": "",
+      "topic": "Focused regression",
+      "languageExpectations": "",
+      "chapter": {
+        "title": "Am Bahnhof",
+        "story": "Die Bank am Fluss ist nass. Bei der Bank in der Stadt hebt Anna Geld ab."
+      },
+      "languagePlan": {
+        "vocabulary": [],
+        "grammar": [],
+        "guidance": "Use the supplied passage unchanged."
+      }
+    }
+  }
+]
