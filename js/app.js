@@ -528,10 +528,16 @@ function revealStory(card, id, focusTray = false) {
 const STORY_TRAY_WIDTH = 168;
 function wireStorySwipe(card, id, cancelHold) {
   let origin = null, horizontal = false, suppressClick = false;
-  const releaseSurface = () => { const surface = card.querySelector?.('.story-open'); if (surface) { surface.style.transition = ''; surface.style.transform = ''; } };
+  // The surface and the Actions button share --swipe-x so they move together; the tray underneath is shown while dragging.
+  const releaseSurface = () => {
+    card.classList.remove('swiping'); card.style.removeProperty('--swipe-x');
+    const tray = card.querySelector('.story-actions-tray');
+    if (tray && !card.classList.contains('swipe-revealed')) setTimeout(() => { if (!card.classList.contains('swipe-revealed') && !card.classList.contains('swiping')) tray.hidden = true; }, 220);
+  };
   card.addEventListener('pointerdown', event => {
+    suppressClick = false;
     if (state.storySelectionMode || event.isPrimary === false || (event.button !== undefined && event.button !== 0) || event.target.closest?.('.story-actions-tray, .story-menu-toggle')) return;
-    suppressClick = false; horizontal = false;
+    horizontal = false;
     origin = { x: event.clientX, y: event.clientY, id: event.pointerId };
   });
   card.addEventListener('pointermove', event => {
@@ -540,16 +546,14 @@ function wireStorySwipe(card, id, cancelHold) {
     if (!horizontal && Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx) / 1.5) { origin = null; return; }
     if (!horizontal && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) {
       horizontal = true; suppressClick = true; cancelHold();
+      const tray = card.querySelector('.story-actions-tray'); if (tray) tray.hidden = false;
       card.setPointerCapture?.(event.pointerId);
     }
     if (horizontal) {
       event.preventDefault();
       // The whole reading surface follows the finger (clamped to the tray width).
-      const surface = card.querySelector?.('.story-open');
-      if (surface) {
-        const base = card.classList.contains('swipe-revealed') ? -STORY_TRAY_WIDTH : 0;
-        surface.style.transition = 'none'; surface.style.transform = `translateX(${Math.max(-STORY_TRAY_WIDTH, Math.min(0, base + dx))}px)`;
-      }
+      const base = card.classList.contains('swipe-revealed') ? -STORY_TRAY_WIDTH : 0;
+      card.classList.add('swiping'); card.style.setProperty('--swipe-x', `${Math.max(-STORY_TRAY_WIDTH, Math.min(0, base + dx))}px`);
     }
   });
   card.addEventListener('pointerup', event => {
@@ -1673,6 +1677,9 @@ $('reader-copy').addEventListener('click', async () => {
 // Android's own selection menu would compete with this bar on story text, but fields need Cut/Copy/Paste.
 // The host flag is page-wide, so toggle it by touch target; pointerdown precedes a long-press menu and focus.
 const FIELD_SELECTOR = 'input, textarea, select, [contenteditable]:not([contenteditable="false"])';
+// Targets that keep Android's native menu: fields plus selectable explanation text, vocabulary notes and errors.
+// Story text and the reader title use the LingoMage toolbar; all other chrome is unselectable.
+const NATIVE_MENU_SELECTOR = `${FIELD_SELECTOR}, .help-text-selectable, .word-note-popover, .form-error`;
 let selectionMenuSuppressed = null;
 function suppressSelectionMenu(suppressed) {
   if (selectionMenuSuppressed === suppressed) return;
@@ -1680,8 +1687,8 @@ function suppressSelectionMenu(suppressed) {
   selectionMenu.setSuppressed(suppressed);
 }
 suppressSelectionMenu(true);
-document.addEventListener('pointerdown', event => suppressSelectionMenu(!event.target.closest?.(FIELD_SELECTOR)), true);
-document.addEventListener('focusout', event => { if (event.target.closest?.(FIELD_SELECTOR) && !event.relatedTarget?.closest?.(FIELD_SELECTOR)) suppressSelectionMenu(true); }, true);
+document.addEventListener('pointerdown', event => suppressSelectionMenu(!event.target.closest?.(NATIVE_MENU_SELECTOR)), true);
+document.addEventListener('focusout', event => { if (event.target.closest?.(FIELD_SELECTOR) && !event.relatedTarget?.closest?.(NATIVE_MENU_SELECTOR)) suppressSelectionMenu(true); }, true);
 $('reader-copy').addEventListener('click', () => closeReaderActions());
 $('reader-actions-toggle').addEventListener('click', toggleReaderActions);
 $('reader-remove-chapters').addEventListener('click', () => confirmReaderRemoval('chapters'));
