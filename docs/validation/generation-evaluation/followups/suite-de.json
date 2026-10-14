@@ -1,0 +1,93 @@
+{
+  "suite": "followups",
+  "live": true,
+  "promptVersion": "2026-10-13.20",
+  "safeguardVersion": "2026-10-14.1",
+  "profileVersion": "2026-10-13.2",
+  "cases": [
+    {
+      "id": "de-A1-continue",
+      "variant": "revised",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "input": {
+        "language": "German",
+        "languageCode": "de",
+        "difficulty": "A1",
+        "framework": "CEFR",
+        "levelDescription": "Use familiar concrete words, explicit subjects, one idea per clause and clear repetition. Preserve noun capitalization, umlauts and ß. Use correct case, agreement and verb placement.",
+        "readingSelfReport": "I can understand familiar names, everyday words and very simple sentences.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": "",
+        "recentProse": "Mia und Paul stehen am Bahnhof. Mia hat eine Tasche. Paul hat einen Rucksack. Sie wollen zusammen nach Berlin fahren.\n\n„Hast du deine Fahrkarte?“, fragt Mia.\n\n„Ja, hier“, sagt Paul. Er nimmt die Fahrkarte aus seinem Rucksack.\n\nMia sieht auf ihre Fahrkarte.\n\n„Mein Zug fährt nach Berlin“, sagt sie. „Wohin fährt dein Zug?“\n\nPaul liest seine Fahrkarte.\n\n„Mein Zug fährt nach Bremen.“\n\nEr sieht Mia an.\n\n„Nach Bremen? Ich will auch nach Berlin!“\n\n„Zeig mir deine Fahrkarte“, sagt Mia.\n\nPaul zeigt Mia die Fahrkarte. Mia hält ihre Fahrkarte daneben.\n\n„Hier steht Berlin“, sagt Mia. „Und auf deiner Fahrkarte steht Bremen.“\n\nPaul liest die Namen noch einmal.\n\n„Die Stadt ist anders“, sagt er. „Meine Fahrkarte ist nicht für Berlin.“\n\n„Ja“, sagt Mia. „Wir haben Fahrkarten für zwei verschiedene Städte.“\n\nPaul sieht einen Schalter. Dort sitzt eine Frau.\n\n„Wir brauchen Hilfe“, sagt er.\n\nMia nickt. Die beiden gehen mit ihren Fahrkarten zum Schalter.",
+        "storyMemory": {
+          "characters": [],
+          "facts": [],
+          "plot": [],
+          "unresolved": [],
+          "uncertainties": [],
+          "situation": []
+        },
+        "prompt": ""
+      },
+      "kind": "continue"
+    },
+    {
+      "id": "de-A1-rewrite",
+      "variant": "revised",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "input": {
+        "language": "German",
+        "languageCode": "de",
+        "difficulty": "A1",
+        "framework": "CEFR",
+        "levelDescription": "Use familiar concrete words, explicit subjects, one idea per clause and clear repetition. Preserve noun capitalization, umlauts and ß. Use correct case, agreement and verb placement.",
+        "readingSelfReport": "I can understand familiar names, everyday words and very simple sentences.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": "",
+        "recentProse": "Mia und Paul stehen am Bahnhof. Mia hat eine Tasche. Paul hat einen Rucksack. Sie wollen zusammen nach Berlin fahren.\n\n„Hast du deine Fahrkarte?“, fragt Mia.\n\n„Ja, hier“, sagt Paul. Er nimmt die Fahrkarte aus seinem Rucksack.\n\nMia sieht auf ihre Fahrkarte.\n\n„Mein Zug fährt nach Berlin“, sagt sie. „Wohin fährt dein Zug?“\n\nPaul liest seine Fahrkarte.\n\n„Mein Zug fährt nach Bremen.“\n\nEr sieht Mia an.\n\n„Nach Bremen? Ich will auch nach Berlin!“\n\n„Zeig mir deine Fahrkarte“, sagt Mia.\n\nPaul zeigt Mia die Fahrkarte. Mia hält ihre Fahrkarte daneben.\n\n„Hier steht Berlin“, sagt Mia. „Und auf deiner Fahrkarte steht Bremen.“\n\nPaul liest die Namen noch einmal.\n\n„Die Stadt ist anders“, sagt er. „Meine Fahrkarte ist nicht für Berlin.“\n\n„Ja“, sagt Mia. „Wir haben Fahrkarten für zwei verschiedene Städte.“\n\nPaul sieht einen Schalter. Dort sitzt eine Frau.\n\n„Wir brauchen Hilfe“, sagt er.\n\nMia nickt. Die beiden gehen mit ihren Fahrkarten zum Schalter.",
+        "storyMemory": {
+          "characters": [],
+          "facts": [],
+          "plot": [],
+          "unresolved": [],
+          "uncertainties": [],
+          "situation": []
+        },
+        "prompt": "",
+        "currentChapter": {
+          "title": "Zwei Fahrkarten",
+          "story": "Mia und Paul stehen am Bahnhof. Mia hat eine Tasche. Paul hat einen Rucksack. Sie wollen zusammen nach Berlin fahren.\n\n„Hast du deine Fahrkarte?“, fragt Mia.\n\n„Ja, hier“, sagt Paul. Er nimmt die Fahrkarte aus seinem Rucksack.\n\nMia sieht auf ihre Fahrkarte.\n\n„Mein Zug fährt nach Berlin“, sagt sie. „Wohin fährt dein Zug?“\n\nPaul liest seine Fahrkarte.\n\n„Mein Zug fährt nach Bremen.“\n\nEr sieht Mia an.\n\n„Nach Bremen? Ich will auch nach Berlin!“\n\n„Zeig mir deine Fahrkarte“, sagt Mia.\n\nPaul zeigt Mia die Fahrkarte. Mia hält ihre Fahrkarte daneben.\n\n„Hier steht Berlin“, sagt Mia. „Und auf deiner Fahrkarte steht Bremen.“\n\nPaul liest die Namen noch einmal.\n\n„Die Stadt ist anders“, sagt er. „Meine Fahrkarte ist nicht für Berlin.“\n\n„Ja“, sagt Mia. „Wir haben Fahrkarten für zwei verschiedene Städte.“\n\nPaul sieht einen Schalter. Dort sitzt eine Frau.\n\n„Wir brauchen Hilfe“, sagt er.\n\nMia nickt. Die beiden gehen mit ihren Fahrkarten zum Schalter."
+        }
+      },
+      "kind": "rewrite"
+    },
+    {
+      "id": "de-A1-chapter",
+      "variant": "revised",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "input": {
+        "language": "German",
+        "languageCode": "de",
+        "difficulty": "A1",
+        "framework": "CEFR",
+        "levelDescription": "Use familiar concrete words, explicit subjects, one idea per clause and clear repetition. Preserve noun capitalization, umlauts and ß. Use correct case, agreement and verb placement.",
+        "readingSelfReport": "I can understand familiar names, everyday words and very simple sentences.",
+        "scope": "chapter",
+        "scopeDescription": "Several connected events with room for development.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    }
+  ]
+}
