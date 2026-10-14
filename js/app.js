@@ -175,7 +175,7 @@ function renderCheckpointRecovery() {
   if (!pipeline) return;
   const op = pipeline.records[0];
   const readerFrozen = !!(state.readerEditBusy || op && op.target?.storyId === state.readerId && ['continue','rewrite'].includes(op.kind));
-  for (const id of ['reader-prompt','reader-level','reader-edit-submit','continue-story','rewrite-chapter','path-select']) $(id).disabled=readerFrozen;
+  for (const id of ['reader-prompt','reader-level','reader-edit-submit','continue-story','rewrite-chapter','reader-menu-continue','reader-menu-rewrite','path-select']) $(id).disabled=readerFrozen;
   setScopeDisabled($('reader-scope'), readerFrozen);
   const stageMessage=op?.stage === 'plan' ? 'Planning suitable language…' : op?.stage === 'notes' ? 'Adding vocabulary notes…' : op?.stage === 'readings' ? 'Adding kanji readings…' : 'Writing your story…';
   if (op && pipeline.busy) {
@@ -894,6 +894,7 @@ function updateReader() {
   $('reader-listen').title = speech.available ? 'Listen to this chapter' : 'Listening requires App²';
   $('reader-title').textContent = version.title || story.title;
   $('reader-title').lang = SPEECH_LANGUAGES[story.language] || 'en';
+  $('reader-title-meta').textContent = [LANGUAGES[story.language] || story.language, `Chapter ${state.readerChapter + 1} of ${chapters.length}`, story.paths.length > 1 ? selectedPath(story).name : ''].filter(Boolean).join(' · ');
   const select = $('chapter-select'); select.textContent = '';
   chapters.forEach((item, index) => { const option = document.createElement('option'); option.value = String(index); option.textContent = `Chapter ${index + 1}`; select.append(option); });
   select.value = String(state.readerChapter);
@@ -1034,7 +1035,13 @@ function helpInstructions(action = 'initial') {
   if (action === 'examples') return `${common} Return only one JSON object in this shape: {"examples":[{"sentence":"...","translation":"...","highlightStart":0,"highlightEnd":1,"segments":[{"text":"...","reading":"..."}]}]}. Generate exactly three short, natural target-language sentences demonstrating the same meaning or grammatical function as the selection here, not merely the same spelling. Vary surrounding vocabulary while keeping that function clear. For く linking descriptions in 青く, demonstrate that adjective-linking function rather than unrelated adverbial uses of く. Provide an English translation and UTF-16 highlight offsets identifying the relevant form in each sentence. Use canonical target-script sentence text without reading annotations or transliteration; the app requests Japanese kanji readings separately. Omit segments. Preserve natural spelling and grammar, and match the learner profile and language preferences. Russian stress marks are absent by default but allowed if explicitly requested.`;
   return `${common} Return only one JSON object in this shape: {"contextStart":0,"contextEnd":1,"contextTranslation":"","explanation":"..."}. Choose the contiguous source excerpt needed to understand the selection, usually a clause or sentence, containing the entire selection. Return its absolute UTF-16 boundaries in sourceText; do not rewrite or reproduce the excerpt. Include an English contextTranslation only when it adds understanding beyond the explanation; otherwise use an empty string. Explain directly what the selection means or does here in one short paragraph. Identify its containing word and underlying form when useful. A fragment may have no independent translation: explain its function rather than inventing a standalone meaning. Reserve expanded formation rules, grammatical terminology and usage distinctions for follow-ups.`;
 }
-function selectedPassage() {
+function selectedTitle() {
+  const value = getCanonicalSelection($('reader-title')); if (!value || !value.text.trim()) return null;
+  const story = readerStory(), chapter = activeChapter(story), version = activeVersion(chapter);
+  return { ...value, kind: 'title', storyId: story.id, chapterId: chapter.id, versionId: version.id, language: story.language, languageTag: SPEECH_LANGUAGES[story.language] || 'en', rect: window.getSelection().getRangeAt(0).getBoundingClientRect() };
+}
+function selectedPassage() { return selectedBodyPassage() || selectedTitle(); }
+function selectedBodyPassage() {
   const value = getCanonicalSelection($('reader-story')); if (!value || !value.text.trim()) return null;
   const story = readerStory(), chapter = activeChapter(story), version = activeVersion(chapter);
   const selection = window.getSelection(), range = selection.getRangeAt(0);
@@ -1053,6 +1060,7 @@ function positionSelectionToolbar(rect = state.readerSelection?.rect) {
   toolbar.style.left = `${Math.round(left)}px`;
   toolbar.style.top = `${Math.round(Math.max(topLimit, top))}px`;
   toolbar.classList.toggle('below-selection', above < topLimit);
+  toolbar.classList.toggle('title-selection', state.readerSelection?.kind === 'title');
 }
 function showSelectionToolbar() {
   const passage = selectedPassage(); const toolbar = $('selection-toolbar');
@@ -1559,7 +1567,7 @@ $('selection-speak').addEventListener('click', async () => {
   try { await speakSelection(speech, passage.text, passage.languageTag); }
   catch (error) { toast(`Could not play audio: ${error.message}`); }
 });
-$('selection-explain').addEventListener('click', () => explainSelection('explain'));
+$('selection-explain').addEventListener('click', () => { if (state.readerSelection?.kind !== 'title') explainSelection('explain'); });
 $('selection-copy').addEventListener('click', async () => {
   const passage = state.readerSelection; if (!passage) return;
   // The reader's copy listener writes the canonical text, without furigana.
@@ -1573,6 +1581,7 @@ $('reader-copy').addEventListener('click', async () => {
 });
 // Android's own selection menu would compete with this bar; the bar remains the fallback elsewhere.
 selectionMenu.setSuppressed(true);
+$('reader-copy').addEventListener('click', () => closeReaderActions());
 $('reader-actions-toggle').addEventListener('click', toggleReaderActions);
 $('reader-remove-chapters').addEventListener('click', () => confirmReaderRemoval('chapters'));
 $('reader-delete-path').addEventListener('click', () => confirmReaderRemoval('path'));
@@ -1615,6 +1624,7 @@ function showEditPanel(mode) {
 }
 $('continue-story').addEventListener('click', () => showEditPanel('continue'));
 $('rewrite-chapter').addEventListener('click', () => showEditPanel('rewrite'));
+for (const [id, mode] of [['reader-menu-continue', 'continue'], ['reader-menu-rewrite', 'rewrite']]) $(id).addEventListener('click', () => { closeReaderActions(); showEditPanel(mode); });
 $('reader-edit-cancel').addEventListener('click', () => { if (!state.readerEditBusy) { $('reader-edit-panel').hidden = true; state.readerEditDraft = null; } });
 $('reader-edit-submit').addEventListener('click', async () => {
   if (state.readerEditBusy) return;
