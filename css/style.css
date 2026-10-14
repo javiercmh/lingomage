@@ -28,6 +28,10 @@ body {
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
 }
+/* Text is unselectable by default; only fields, story text, explanations, notes and errors opt in. */
+body { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=button]), textarea, [contenteditable]:not([contenteditable="false"]),
+.selectable-story, .reader-panel .reader-title, .help-text-selectable, .word-note-popover, .form-error { user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; }
 button, input, select, textarea { font: inherit; }
 button { color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .app-shell { max-width: 600px; margin: 0 auto; }
@@ -124,10 +128,13 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 .library-list { display: grid; gap: 10px; }
 /* The reading surface slides over the destructive action underneath. */
 .story-card { position: relative; display: grid; grid-template-columns: 1fr; padding: 0; overflow: hidden; touch-action: pan-y; isolation: isolate; }
-.story-open { position: relative; z-index: 1; width: 100%; min-width: 0; border: 0; border-radius: 17px; background: var(--card); color: var(--ink); padding: 15px; text-align: left; transition: transform .2s ease; }
-.story-card.swipe-revealed .story-open { transform: translateX(-168px); }
+.story-open { position: relative; z-index: 1; width: 100%; min-width: 0; border: 0; border-radius: 17px; background: var(--card); color: var(--ink); padding: 15px; text-align: left; }
+.story-card { --swipe-x: 0px; }
+.story-card.swipe-revealed { --swipe-x: -168px; }
+.story-open, .story-menu-toggle { transform: translateX(var(--swipe-x)); transition: transform .2s ease; }
+.story-card.swiping .story-open, .story-card.swiping .story-menu-toggle { transition: none; }
 .story-check-control, .card-select-action { z-index: 2; }
-@media (prefers-reduced-motion: reduce) { .story-open { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .story-open, .story-menu-toggle { transition: none; } }
 .story-card.selecting { padding-right: 64px; }
 .story-card.selected-card { border-color: var(--accent-strong); background: rgba(59,130,246,.1); }
 .story-card.selected-card .story-open { background: transparent; }
@@ -384,5 +391,4 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px
 .story-menu-toggle { position: absolute; z-index: 2; top: 6px; right: 6px; width: 44px; height: 44px; border: 0; background: transparent; color: var(--muted); }
 .story-menu-toggle svg { width: 20px; height: 20px; }
 .story-menu-toggle circle { fill: currentColor; stroke: none; }
-.story-card.swipe-revealed .story-menu-toggle { visibility: hidden; }
 .story-card:not(.selecting) .story-open { padding-right: 52px; }
