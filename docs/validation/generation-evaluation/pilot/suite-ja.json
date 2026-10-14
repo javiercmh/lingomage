@@ -1,0 +1,249 @@
+{
+  "suite": "pilot",
+  "live": true,
+  "promptVersion": "2026-10-13.20",
+  "safeguardVersion": "2026-10-13.4",
+  "profileVersion": "2026-10-13.2",
+  "cases": [
+    {
+      "id": "ja-N5-0-baseline",
+      "variant": "baseline",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "input": {
+        "language": "Japanese",
+        "languageCode": "ja",
+        "difficulty": "N5",
+        "framework": "JLPT",
+        "levelDescription": "Common concrete words, basic particles, simple polite or plain forms and clear short clauses. Canonical text omits readings. Provide contextual kana readings separately. No romaji.",
+        "readingSelfReport": "I can understand simple everyday sentences in kana and basic kanji, with readings when needed.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ja-N5-0-revised",
+      "variant": "revised",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "input": {
+        "language": "Japanese",
+        "languageCode": "ja",
+        "difficulty": "N5",
+        "framework": "JLPT",
+        "levelDescription": "Common concrete words, basic particles, simple polite or plain forms and clear short clauses. Canonical text omits readings. Provide contextual kana readings separately. No romaji.",
+        "readingSelfReport": "I can understand simple everyday sentences in kana and basic kanji, with readings when needed.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ja-N5-1-baseline",
+      "variant": "baseline",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "input": {
+        "language": "Japanese",
+        "languageCode": "ja",
+        "difficulty": "N5",
+        "framework": "JLPT",
+        "levelDescription": "Common concrete words, basic particles, simple polite or plain forms and clear short clauses. Canonical text omits readings. Provide contextual kana readings separately. No romaji.",
+        "readingSelfReport": "I can understand simple everyday sentences in kana and basic kanji, with readings when needed.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "A customer and a shopkeeper misunderstand which parcel belongs to whom.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ja-N5-1-revised",
+      "variant": "revised",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "input": {
+        "language": "Japanese",
+        "languageCode": "ja",
+        "difficulty": "N5",
+        "framework": "JLPT",
+        "levelDescription": "Common concrete words, basic particles, simple polite or plain forms and clear short clauses. Canonical text omits readings. Provide contextual kana readings separately. No romaji.",
+        "readingSelfReport": "I can understand simple everyday sentences in kana and basic kanji, with readings when needed.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "A customer and a shopkeeper misunderstand which parcel belongs to whom.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ja-N3-0-baseline",
+      "variant": "baseline",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "input": {
+        "language": "Japanese",
+        "languageCode": "ja",
+        "difficulty": "N3",
+        "framework": "JLPT",
+        "levelDescription": "Connected everyday narrative, common compound sentences and contextual support for less familiar expressions. Canonical text omits readings. Provide contextual kana readings separately. No romaji.",
+        "readingSelfReport": "I can follow everyday stories and understand their main points and relationships between events.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ja-N3-0-revised",
+      "variant": "revised",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "input": {
+        "language": "Japanese",
+        "languageCode": "ja",
+        "difficulty": "N3",
+        "framework": "JLPT",
+        "levelDescription": "Connected everyday narrative, common compound sentences and contextual support for less familiar expressions. Canonical text omits readings. Provide contextual kana readings separately. No romaji.",
+        "readingSelfReport": "I can follow everyday stories and understand their main points and relationships between events.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ja-N3-1-baseline",
+      "variant": "baseline",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "input": {
+        "language": "Japanese",
+        "languageCode": "ja",
+        "difficulty": "N3",
+        "framework": "JLPT",
+        "levelDescription": "Connected everyday narrative, common compound sentences and contextual support for less familiar expressions. Canonical text omits readings. Provide contextual kana readings separately. No romaji.",
+        "readingSelfReport": "I can follow everyday stories and understand their main points and relationships between events.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "A customer and a shopkeeper misunderstand which parcel belongs to whom.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ja-N3-1-revised",
+      "variant": "revised",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "input": {
+        "language": "Japanese",
+        "languageCode": "ja",
+        "difficulty": "N3",
+        "framework": "JLPT",
+        "levelDescription": "Connected everyday narrative, common compound sentences and contextual support for less familiar expressions. Canonical text omits readings. Provide contextual kana readings separately. No romaji.",
+        "readingSelfReport": "I can follow everyday stories and understand their main points and relationships between events.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "A customer and a shopkeeper misunderstand which parcel belongs to whom.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ja-N1-0-baseline",
+      "variant": "baseline",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "input": {
+        "language": "Japanese",
+        "languageCode": "ja",
+        "difficulty": "N1",
+        "framework": "JLPT",
+        "levelDescription": "Nuanced vocabulary, flexible clause patterns, shifts of viewpoint and implied meaning appropriate to the story. Canonical text omits readings. Provide contextual kana readings separately. No romaji.",
+        "readingSelfReport": "I can follow complex texts and understand subtle relationships, intentions and implied meaning.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ja-N1-0-revised",
+      "variant": "revised",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "input": {
+        "language": "Japanese",
+        "languageCode": "ja",
+        "difficulty": "N1",
+        "framework": "JLPT",
+        "levelDescription": "Nuanced vocabulary, flexible clause patterns, shifts of viewpoint and implied meaning appropriate to the story. Canonical text omits readings. Provide contextual kana readings separately. No romaji.",
+        "readingSelfReport": "I can follow complex texts and understand subtle relationships, intentions and implied meaning.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "Two friends at a railway station discover their tickets are for different destinations.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ja-N1-1-baseline",
+      "variant": "baseline",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "input": {
+        "language": "Japanese",
+        "languageCode": "ja",
+        "difficulty": "N1",
+        "framework": "JLPT",
+        "levelDescription": "Nuanced vocabulary, flexible clause patterns, shifts of viewpoint and implied meaning appropriate to the story. Canonical text omits readings. Provide contextual kana readings separately. No romaji.",
+        "readingSelfReport": "I can follow complex texts and understand subtle relationships, intentions and implied meaning.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "A customer and a shopkeeper misunderstand which parcel belongs to whom.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    },
+    {
+      "id": "ja-N1-1-revised",
+      "variant": "revised",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "input": {
+        "language": "Japanese",
+        "languageCode": "ja",
+        "difficulty": "N1",
+        "framework": "JLPT",
+        "levelDescription": "Nuanced vocabulary, flexible clause patterns, shifts of viewpoint and implied meaning appropriate to the story. Canonical text omits readings. Provide contextual kana readings separately. No romaji.",
+        "readingSelfReport": "I can follow complex texts and understand subtle relationships, intentions and implied meaning.",
+        "scope": "scene",
+        "scopeDescription": "One focused event with a natural stopping point.",
+        "topic": "A customer and a shopkeeper misunderstand which parcel belongs to whom.",
+        "practice": "",
+        "languageExpectations": ""
+      },
+      "kind": "create"
+    }
+  ]
+}
