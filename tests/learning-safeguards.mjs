@@ -1,3 +1,4 @@
+import { failureInfo, recoverySummary } from '../js/generation-errors.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -129,22 +130,26 @@ print(Handler.mock_readings(SimpleNamespace(server=SimpleNamespace(workspace=Pat
 attachReadings(japaneseFixture.content,fixturePlan,fixtureReadings);
 // UI recovery must work for a fresh Create operation with no reader status.
 const boxes=new Map();const box=id=>{if(!boxes.has(id)){const b=element('section');b.hidden=true;boxes.set(id,b);}return boxes.get(id);};
-const recovery={pipeline:{records:[{kind:'create',stage:'readings'}],busy:true},readerGeneration:null,state:{readerId:null},$:box,document:{createElement:element},renderReaderGeneration(){},resumeCheckpoint(){},setScopeDisabled(){}};
+const recovery={failureInfo,recoverySummary,appendFailureDetails(){},PROMPT_VERSION:'test',SAFEGUARD_VERSION:'test',pipeline:{records:[{kind:'create',stage:'readings'}],busy:true},readerGeneration:null,state:{readerId:null},$:box,document:{createElement:element},renderReaderGeneration(){},resumeCheckpoint(){},setScopeDisabled(){}};
 vm.createContext(recovery);vm.runInContext(source.slice(source.indexOf('function renderCheckpointRecovery('),source.indexOf('async function resumeCheckpoint(')),recovery);recovery.renderCheckpointRecovery();
 assert.equal(box('generation-status').textContent,'Adding kanji readings…');assert.equal(box('checkpoint-recovery-reader').hidden,true);
 recovery.pipeline.records[0]={kind:'continue',stage:'notes',target:{storyId:'story'}};recovery.state.readerId='story';recovery.readerGeneration={storyId:'story',phase:'ready'};
 recovery.renderCheckpointRecovery();assert.equal(box('reader-edit-submit').disabled,true);assert.equal(box('reader-prompt').disabled,true);assert.equal(recovery.readerGeneration.phase,'working');assert.equal(recovery.readerGeneration.message,'Adding vocabulary notes…');
 const heading={};recovery.state.activeChapterRequest={storyId:'story',loading:{querySelector:()=>heading}};recovery.renderCheckpointRecovery();assert.equal(heading.textContent,'Adding vocabulary notes…');assert.equal(box('checkpoint-recovery-reader').hidden,true);delete recovery.state.activeChapterRequest;
 
-recovery.pipeline.records[0]={kind:'create',stage:'notes'};
+recovery.pipeline.records[0]={kind:'create',stage:'notes',promptVersion:'test',safeguardVersion:'test'};
 
 recovery.pipeline.busy=false;
 recovery.pipeline.records[0].error='The AI included a vocabulary note for a word or phrase that does not appear in the chapter. Explicitly retry or discard this request.';
 recovery.renderCheckpointRecovery();
-assert.equal(box('checkpoint-recovery-create').children[1].textContent,'Retry');
-assert.ok(box('checkpoint-recovery-create').children[0].textContent.includes('Use Retry below, or Discard'));
+assert.equal(box('checkpoint-recovery-create').children.at(-1).children[0].textContent,'Retry');
+assert.ok(box('checkpoint-recovery-create').children[0].textContent.includes('Story generation stopped during vocabulary notes'));
 assert.ok(!box('checkpoint-recovery-create').textContent.includes('Explicitly retry'));
 recovery.pipeline.records[0].stage='ready';recovery.renderCheckpointRecovery();
-assert.equal(box('checkpoint-recovery-create').children[1].textContent,'Save / finish');
+assert.equal(box('checkpoint-recovery-create').children.at(-1).children[0].textContent,'Save response');
+recovery.pipeline.records[0].promptVersion='old';recovery.renderCheckpointRecovery();
+assert.equal(box('checkpoint-recovery-create').children.at(-1).children[0].disabled,true);
+assert.match(box('checkpoint-recovery-create').children[0].textContent,/older app definition/);
+assert.equal(box('generate').disabled,true);
 assert.equal(JSON.parse(fs.readFileSync(new URL('../data/language-safeguards.json',import.meta.url))).version,SAFEGUARD_VERSION);
 console.log('PASS current language requirements and staged generation regressions');

@@ -16,7 +16,6 @@
 
     <section id="view-create" class="view active">
       <div class="intro"><h2>Build a story<br>for your practice.</h2><p>Start with a story you’d like to read, then choose what to explore and your reading language.</p></div>
-      <section id="checkpoint-recovery-create" class="recovery-panel" hidden></section>
       <form id="story-form" class="panel">
         <div class="create-field-group">
           <label class="field-label" for="topic">Story idea and topics <span class="optional">optional</span></label>
@@ -39,7 +38,9 @@
           <select id="difficulty" class="field" aria-describedby="difficulty-description"></select>
           <p id="difficulty-description" class="helper difficulty-description"></p>
         </div>
+        <section id="checkpoint-recovery-create" class="recovery-panel" hidden></section>
         <p id="form-error" class="form-error" role="alert"></p>
+        <div id="create-error-details"></div>
         <button id="generate" class="primary-btn" type="submit">✦ &nbsp; Generate my story</button>
         <p class="usage-note">Generation uses your AI provider connected in App².</p>
       </form>

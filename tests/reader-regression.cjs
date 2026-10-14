@@ -18,6 +18,7 @@ function sandbox(extra = {}) {
   const c = {pipeline:null,state:{},console,crypto:{randomUUID:(()=>{let id=0;return ()=>`help-test-${++id}`;})()},PROMPT_VERSION:'test',STORY_GUIDES:{de:{beginner:'Simple sentences'}},renderChapterRequest(){},renderCheckpointRecovery(){},LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},SPEECH_LANGUAGES:{de:'de-DE',ja:'ja-JP',ru:'ru-RU','es-CL':'es-CL'},renderGenerationRecovery(){},readerPanel:()=>({classList:{toggle(){}}}),$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{createElement:element,createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},...extra};
   c.readerGeneration = null; c.renderReaderGeneration = () => {}; c.setReaderGeneration = value => { c.readerGeneration = value; };
   vm.createContext(c);
+  vm.runInContext(fs.readFileSync('js/generation-errors.js','utf8').replaceAll('export function ', 'function '), c);
   vm.runInContext(readerTextSource, c);
   vm.runInContext(learningSource, c);
   vm.runInContext(requestLifecycleSource, c);
@@ -233,6 +234,25 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.equal(original.chapters[0].help.length,1);assert.equal(other.chapters[0].help.length,0);
   assert.equal(original.chapters[0].help[0].model,'mock');
   console.log('PASS overlapping help blocked; response remains anchored after switching stories and captures model provenance');
+
+  for (const action of ['initial','detail']) {
+    const entry={id:'H',passage:'Brot',start:0,end:4,versionId:'V',text:'Existing explanation',followUps:[]};
+    const story={id:'S',language:'de',chapters:[{id:'C',help:action==='detail'?[entry]:[],versions:[{id:'V',story:'Brot'}]}]};
+    let calls=0,fail=true,captured;
+    const selected={storyId:'S',chapterId:'C',versionId:'V',text:'Brot',start:0,end:4,profile:{},helpId:action==='detail'?'H':undefined};
+    const retryHelp=sandbox({state:{readerId:'S',readerSelection:selected,model:'mock',providerId:'mock'},readerStory:()=>story,normalizeChapters:s=>s.chapters,activeChapter:()=>story.chapters[0],activeVersion:()=>story.chapters[0].versions[0],readerPanel:()=>({scrollTop:0}),persistReaderStory(){},readerAi:async(kind,input)=>{calls++;captured=input;if(fail)throw Object.assign(Error('Service failed'),{code:'service'});return JSON.stringify({explanation:'Saved response'});},decodeHelp:JSON.parse,renderSavedHelp(){},ai:{acknowledge:async()=>{}}});
+    vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(',"$('selection-translate')"),retryHelp);
+    await retryHelp.explainSelection('explain',action,'Why this form?',selected);
+    assert.equal(retryHelp.state.readerHelpBusy,false);assert.equal(calls,1);
+    const recovery=retryHelp.$('reader-help').childNodes.find(node=>node.className==='recovery-panel help-request-recovery');assert.ok(recovery);
+    const retry=recovery.childNodes.at(-1).childNodes[0];assert.equal(retry.textContent,'Retry');
+    // Change current selection; explicit retry must use the captured source and question.
+    retryHelp.state.readerSelection={...selected,text:'different'};fail=false;
+    await retry.events.click();assert.equal(calls,2);assert.equal(captured.passage,'Brot');assert.equal(captured.followUp,'Why this form?');
+    assert.equal(action==='detail'?entry.followUps.length:story.chapters[0].help.length,1);
+    assert.equal(retryHelp.state.readerHelpBusy,false);
+  }
+  console.log('PASS explanation and more-detail error panels retry captured selection/question and save exactly once');
 
   const text=value=>({nodeType:3,nodeValue:value,childNodes:[]});
   const element=(tag,...children)=>({nodeType:1,childNodes:children,matches:name=>name===tag,closest:()=>null,contains:()=>true});
@@ -510,11 +530,22 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
 
   let cancelAction, rejectWait, cancelCalls=0;
   const cancelContext=sandbox({state:{models:[{id:'mock'}],model:'mock'},ai:{available:true,providers:async()=>({providers:[{id:'openrouter',connected:true}]}),start:async args=>{assert.equal(args.providerId,'openrouter');return 'cancel-id';},wait:()=>new Promise((_,reject)=>rejectWait=reject),cancel:async()=>{cancelCalls++;rejectWait(Error('cancelled'));},acknowledge:async()=>{}},document:{createElement:()=>({addEventListener:(_,fn)=>cancelAction=fn,remove(){}})}});
-  vm.runInContext(section('async function readerAi(', 'async function acknowledgeReaderResult('),cancelContext);
+  vm.runInContext(lifecycle + section('async function readerAi(', 'async function acknowledgeReaderResult('),cancelContext);
   const cancellation=cancelContext.readerAi('explain',{},'test');
   await new Promise(resolve=>setImmediate(resolve));await cancelAction();
-  await assert.rejects(cancellation,/Request cancelled/);assert.equal(cancelCalls,1);assert.equal(cancelContext.state.pendingReaderRequestId,undefined);assert.equal(cancelContext.state.requestId,null);
+  await assert.rejects(cancellation,/Request cancelled/);assert.equal(cancelCalls,1);assert.equal(cancelContext.state.pendingReaderRequestId,null);assert.equal(cancelContext.state.requestId,null);
   console.log('PASS cancelled request does not stage a completed result');
+  for (const code of ['not_found','service']) {
+    let starts=0,releaseFails=true;
+    const releaseContext=sandbox({state:{models:[{id:'mock'}],model:'mock'},ai:{available:true,providers:async()=>({providers:[{id:'mock',connected:true}]}),start:async()=>{starts++;return 'failed-id';},wait:async()=>{throw Object.assign(Error('Service failed'),{code:'service'});},acknowledge:async()=>{if(releaseFails)throw Object.assign(Error('Release failed'),{code});}}});
+    vm.runInContext(lifecycle+section('async function readerAi(', 'async function acknowledgeReaderResult('),releaseContext);
+    await assert.rejects(releaseContext.readerAi('explain',{},'fixture'),/Service failed/);
+    assert.equal(releaseContext.state.requestId,null);
+    assert.equal(releaseContext.state.pendingReaderRequestId,code==='not_found'?null:'failed-id');
+    releaseFails=false;await releaseContext.releaseInvalidReaderResponse();assert.equal(releaseContext.state.pendingReaderRequestId,null);assert.equal(starts,1);
+  }
+  console.log('PASS failed reader release remains recoverable; already-released host requests clear without new inference');
+
 
   const panel={scrollTop:321,addEventListener(){}};
   const pos=sandbox({state:{readerId:'S',readerChapter:2,readerPositions:{}},readerStory:()=>story3,activeChapter:()=>story3.chapters[pos.state.readerChapter],normalizeChapters:s=>s.chapters,closeStoryReveal(){},updateReader(){},clearExplanationSelection(){},window:{addEventListener(){}},history:{pushState(){}}});

@@ -20,7 +20,8 @@ context.setReaderGeneration({storyId: 'story', phase: 'ready', message: 'Ready'}
 assert.equal(element('reader-generation-action').textContent, 'View result');
 assert.equal(element('reader-generation-dismiss').hidden, false);
 context.setReaderGeneration({storyId: 'story', phase: 'error', message: 'Failed'});
-assert.equal(element('reader-generation-action').hidden, true);
+assert.equal(element('reader-generation-action').hidden, false);
+assert.equal(element('reader-generation-action').textContent, 'View recovery');
 assert.equal(element('reader-generation-message').textContent, 'Failed');
 context.setReaderGeneration(null); assert.equal(element('reader-generation-bar').hidden, true);
 console.log('PASS floating status: working, story association, save/release recovery, ready, error and dismissal');
