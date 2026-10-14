@@ -56,3 +56,9 @@ export async function speakChapter(speech, text, language, isCurrent = () => tru
   }
   return { status: isCurrent() ? 'completed' : 'cancelled' };
 }
+
+// Speech includes the displayed canonical title without changing stored story offsets.
+export function chapterSpeechText(version, fallbackTitle = '') {
+  const title = version.title || fallbackTitle;
+  return title ? `${title}\n\n${version.story}` : version.story;
+}

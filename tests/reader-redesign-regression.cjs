@@ -22,13 +22,16 @@ function section(start, end) { const at = source.indexOf(start); assert(at >= 0,
   console.log('PASS Show reveals only the bottom of an explanation, aligns tall cards at the top and skips needless scrolling');
 }
 
-// Title section: one header with meta, title, labelled Listen, navigation and a Story menu holding continue/rewrite/copy.
+// Title section: compact accessible Listen, floating navigation/preferences and Story actions.
 {
   const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
   const headerStart = html.indexOf('<header class="reader-title-section"'), header = html.slice(headerStart, html.indexOf('</header>', headerStart));
   for (const id of ['reader-title-meta', 'reader-title', 'reader-actions-toggle', 'reader-menu-continue', 'reader-menu-rewrite', 'reader-copy', 'reader-remove-chapters', 'reader-delete-path', 'reader-listen', 'chapter-select'])
     assert(header.includes(`id="${id}"`), `${id} belongs to the title section`);
-  assert(header.includes('Listen to chapter</span>'), 'Listen is labelled with its scope');
+  assert(header.includes('aria-label="Listen to this chapter"'), 'icon-only Listen retains its accessible scope');
+  assert(!header.includes('Listen to chapter</span>'));
+  for (const id of ['reader-navigation-toggle', 'reader-navigation-panel', 'reader-preferences-toggle', 'reader-preferences-panel', 'reader-text-size']) assert(header.includes(`id="${id}"`));
+  assert(!html.includes('id="text-smaller"') && !html.includes('class="reader-toolbar"'));
   assert.equal((html.match(/id="reader-copy"/g) || []).length, 1);
   const titleContext = { window: { getSelection: () => ({ getRangeAt: () => ({ getBoundingClientRect: () => ({ left: 1, top: 2 }) }) }) }, getCanonicalSelection: () => ({ text: 'Titel', start: 0, end: 5 }), $: () => ({}), readerStory: () => ({ id: 's', language: 'de' }), activeChapter: () => ({ id: 'c' }), activeVersion: () => ({ id: 'v' }), SPEECH_LANGUAGES: { de: 'de-DE' } };
   vm.createContext(titleContext); vm.runInContext(section('function selectedTitle(', 'function selectedPassage('), titleContext);

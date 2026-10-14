@@ -39,3 +39,5 @@ Record date, device and host versions, tested app commit, the items checked, act
 - 2026-10-12, Samsung SM-S921B, existing App² install, synthetic test subapp built from the translation-recovery change (33b48f9): 20 consecutive launches of the reader Translate button opened Google Translate each time and the button stayed enabled after every return. Native timeout/failure injection was not performed. Original subapps were byte-identical after the test. Every other item above is unverified on device.
 
 - Pending Android verification: language-settings disclosure, automatic expansion on checking, Move up/down touch controls and persisted Create language order.
+
+- Pending Android verification: compact reader toolbar at narrow widths and safe areas; borderless Story actions touch/focus behavior; chapter/path and Aa floating panels, outside dismissal and Back behavior; native range adjustment with TalkBack; Japanese furigana persistence; Listen speaks canonical title followed by the complete chapter and stops on navigation/background interruption.
