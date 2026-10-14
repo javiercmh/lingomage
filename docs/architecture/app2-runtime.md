@@ -21,7 +21,7 @@ Manifest ownership distinguishes managed definitions/code from user data. Packag
 
 ## Content and learning
 
-Prompt version `2026-10-13.18` uses standardized reading targets, one combined optional story idea and topics brief, language plans, narrative scope and regional preferences. Every chapter requests learning/practice material and useful English notes even when practice is blank. At least one structurally valid note is mandatory. Notes stay integrated as underlined exact chapter forms opening contextual popovers; headword presentation is unchanged.
+Prompt version `2026-10-13.20` uses standardized reading targets, one combined optional story idea and topics brief, language plans, narrative scope and regional preferences. Every chapter requests learning/practice material and useful English notes even when practice is blank. At least one structurally valid note is mandatory. Notes stay integrated as underlined exact chapter forms opening contextual popovers; headword presentation is unchanged.
 
 Shared content validation applies to creation, continuation, rewrite and examples. Target-script checks enforce Japanese without romaji and Russian Cyrillic without Latin transliteration. Russian stress is absent by default but permitted when requested; intent is prompt guidance, not a categorical validator ban. Correct orthography and natural grammar are requested without the former beginner curriculum restrictions. Definitions and limitations are in [the safeguard register/audit](language-safeguards.md).
 
@@ -53,3 +53,5 @@ Chapter Copy/Listen, floating selection actions, device Translate, generation st
 
 
 New chapter generation checkpoints planning, canonical prose, contextual vocabulary notes, and Japanese readings separately, before releasing each successful request. Prose validation does not require notes until the notes stage; completed chapters still require validated nonempty exact-form notes. Failed note requests retain prose and expose explicit Retry/Discard. The saved-story schema is unchanged. Examples omit planning and notes. Older prompt/safeguard checkpoint versions remain inspectable and require explicit discard to start with current definitions.
+
+Total AI response and assembled content size is bounded to 1000000 UTF-16 units. The glossary has no fixed count cap; nonempty notes, exact attested forms, 20 forms per note and field maxima remain required. The reader groups repeated forms and processes matching candidates one form-length group at a time, retaining longest-overlap and first-occurrence behavior without allocating all duplicate candidates. Validation checks the first eligible exact occurrence and caches repeated form checks. Existing saved records retain their original data and provenance.

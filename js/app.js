@@ -208,6 +208,10 @@ async function resumeCheckpoint(op) {
   if (state.requestId || state.readerEditBusy || state.readerHelpBusy || state.pendingReaderResult || state.pendingGeneration) { toast('Finish the active request first.'); return; }
   try {
     if (op.promptVersion !== PROMPT_VERSION || op.safeguardVersion !== SAFEGUARD_VERSION) throw new Error('This saved operation belongs to an older app definition. Discard it to start with the current requirements.');
+    if (state.readerEditDraft?.storyId === op.target?.storyId) {
+      state.readerEditDraft.error = '';
+      $('reader-edit-error').textContent = '';
+    }
     if (op.target?.storyId) setReaderGeneration({storyId:op.target.storyId,phase:'working',message:'Resuming saved progress…'});
     await pipeline.run(op); showOperationResult(op);
   } catch (error) { op.error=error.message; if (readerGeneration?.storyId === op.target?.storyId) setReaderGeneration({...readerGeneration,phase:'error',message:op.stage === 'notes' ? 'Vocabulary notes stopped. Completed prose is preserved. Use Retry or Discard below.' : error.message}); toast(error.message); renderCheckpointRecovery(); }
