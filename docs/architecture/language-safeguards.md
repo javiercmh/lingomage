@@ -44,7 +44,12 @@ LANG-001 is explicitly retired by the learner-requested [PED-004](../pedagogy/PE
 
 ## Separate notes — 2026-10-13
 
-Register version 2026-10-13.3 retains every active safeguard. LANG-003 is enforced after the separate notes request against already validated fixed prose; final stories still require at least one valid note. GEN-001–004 cover the additional durable stage, note-only recovery, explicit retry, unchanged captured inputs and no partial chapter publication. Technical and script validation apply before saving prose, then to notes before merging them, and again to completed content. Broad note coverage is prompt guidance with semantic limitations, not a deterministic guarantee or measured learner knowledge.
+Register version 2026-10-13.4 retains every active safeguard ID. LANG-003 is enforced after the separate notes request against already validated fixed prose; final stories still require at least one valid note. GEN-001–004 cover the additional durable stage, note-only recovery, explicit retry, unchanged captured inputs and no partial chapter publication. Technical and script validation apply before saving prose, then to notes before merging them, and again to completed content. Broad note coverage is prompt guidance with semantic limitations, not a deterministic guarantee or measured learner knowledge.
+
+
+## Explicit size-bound decision — 2026-10-13
+
+The learner explicitly requested replacing the 100-note cap with a total-response size bound. LANG-004 now enforces 1000000 UTF-16 units for raw AI responses and assembled content, while retaining canonical title/story, headword, meaning, form and per-note form bounds. Nonempty glossaries remain required. Note count itself does not establish quality or suitability, and a longer story may appropriately have more definitions. This replaces one resource policy rather than relaxing exact-form or script enforcement. Tests accept 250 distinct attested notes, exercise the exact payload boundary and oversize rejection, and compare the optimized matcher with the prior matcher across 150 deterministic overlap/boundary cases. Historical count-cap failures are retained in evaluation records and separately revalidated against the new size policy; they are not language-quality failures.
 
 
 ## Note-form repair — 2026-10-14
