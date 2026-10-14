@@ -1,4 +1,5 @@
 // Development-only live evaluation. No credentials; uses the explicit local --chatgpt bridge.
+import {PLAN_LOAD_CHECK,WRITER_CHECK} from './evaluation/prose-candidate.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -12,7 +13,7 @@ const args=process.argv.slice(2);const option=(key,fallback)=>{const i=args.inde
 const suite=option('--suite','models'),endpoint=option('--endpoint','http://localhost:8889'),model=option('--model','gpt-6.1-sol'),effort=option('--effort','low');
 const output=path.resolve(option('--output',path.join(root,'docs/validation/generation-evaluation',suite)));
 const limit=Number(option('--limit','Infinity'));const retry=args.includes('--retry');const languageFilter=option('--language','');
-if(!['models','pilot','followups'].includes(suite))throw Error('Expected models, pilot or followups suite.');
+if(!['models','pilot','followups','prose'].includes(suite))throw Error('Expected models, pilot, followups or prose suite.');
 if(!/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(endpoint))throw Error('Use the local development bridge only.');
 fs.mkdirSync(output,{recursive:true});
 const read=p=>JSON.parse(fs.readFileSync(p,'utf8'));const write=(p,value)=>{fs.writeFileSync(p+'.tmp',JSON.stringify(value,null,2)+'\n');fs.renameSync(p+'.tmp',p);};
@@ -22,6 +23,10 @@ const revisedPrompts=loadPrompt(app.slice(app.indexOf('function storyInstruction
 const baseline=read(path.join(root,'docs/validation/generation-evaluation/baseline.json'));
 const original=loadPrompt(baseline.storyInstructionsSource).storyInstructions;
 const revised=revisedPrompts.storyInstructions;
+const selectedNotesFile=option('--selected-notes','');
+if(suite==='prose'&&!selectedNotesFile)throw Error('Prose comparison requires an explicitly selected notes prompt file.');
+const selectedNotes=selectedNotesFile?read(path.resolve(selectedNotesFile)):null;
+if(selectedNotes&&(!selectedNotes.instructions||!selectedNotes.selectionProvenance))throw Error('Selected notes need instructions and selectionProvenance.');
 const profiles=read(path.join(root,'data/learning-profiles.json'));
 const languages={de:'German',ja:'Japanese',ru:'Russian','es-CL':'Spanish'};
 const briefs=['Two friends at a railway station discover their tickets are for different destinations.','A customer and a shopkeeper misunderstand which parcel belongs to whom.'];
@@ -34,34 +39,40 @@ const info=await (await fetch(endpoint+'/__bridge/info')).json();if(!info.liveAi
 const available=(await bridge({action:'models',providerId:'chatgpt'})).models;
 let cases=[];
 for(const language of Object.keys(languages))for(const difficulty of language==='ja'?['N5','N3','N1']:['A1','B1','C1']) {
- const variants=suite==='models'?[['sol-low','gpt-6.1-sol','low'],['luna-high','gpt-6-luna','high']]:[['baseline',model,effort],['revised',model,effort]];
+ const variants=suite==='models'?[['sol-low','gpt-6.1-sol','low'],['luna-high','gpt-6-luna','high']]:suite==='prose'?[['current',model,effort],['candidate',model,effort]]:[['baseline',model,effort],['revised',model,effort]];
  if(suite==='followups')continue;
  for(let brief=0;brief<(suite==='models'?1:2);brief++)for(const [variant,m,e] of variants)cases.push({id:`${language}-${difficulty}-${brief}-${variant}`,variant,model:m,effort:e,input:input(language,difficulty,brief),kind:'create'});
 }
-if(suite==='followups')for(const language of Object.keys(languages))for(const kind of ['continue','rewrite','chapter']){
+if(suite==='followups'||suite==='prose')for(const language of Object.keys(languages))for(const kind of ['continue','rewrite','chapter']){
  const difficulty=language==='ja'?'N5':'A1';
  const parentFile=path.join(root,'docs/validation/generation-evaluation/pilot',`${language}-${difficulty}-0-revised.json`);
  if(!fs.existsSync(parentFile)||!read(parentFile).result)throw Error(`A completed pilot source is required: ${path.basename(parentFile)}`);
  const parent=read(parentFile).result;
  const value=input(language,difficulty,0,['chapter'].includes(kind)?kind:'scene');
  if(['continue','rewrite'].includes(kind)){value.recentProse=parent.story;value.storyMemory={characters:[],facts:[],plot:[],unresolved:[],uncertainties:[],situation:[]};value.prompt='';if(kind==='rewrite')value.currentChapter={title:parent.title,story:parent.story};}
- cases.push({id:`${language}-${difficulty}-${kind}`,variant:'revised',model,effort,input:value,kind:['continue','rewrite'].includes(kind)?kind:'create'});
+ for(const variant of suite==='prose'?['current','candidate']:['revised'])cases.push({id:`${language}-${difficulty}-${kind}${suite==='prose'?'-'+variant:''}`,variant,model,effort,input:value,kind:['continue','rewrite'].includes(kind)?kind:'create'});
 }
 for(const item of cases){if(args.includes('--mock')){item.model='development-mock';item.effort='';}const found=available.find(m=>m.id===item.model);if(!found||item.effort&&!found.reasoningLevels.includes(item.effort))throw Error(`Unavailable evaluation setting: ${item.model} ${item.effort}`);}
 if(languageFilter)cases=cases.filter(item=>item.input.languageCode===languageFilter);
-write(path.join(output,languageFilter?'suite-'+languageFilter+'.json':'suite.json'),{suite,live:!!info.liveAi,promptVersion,safeguardVersion:SAFEGUARD_VERSION,profileVersion:profiles.version,cases});
+const suiteFile=path.join(output,languageFilter?'suite-'+languageFilter+'.json':'suite.json');
+const suiteRecord={suite,live:!!info.liveAi,promptVersion,safeguardVersion:SAFEGUARD_VERSION,profileVersion:profiles.version,selectedNotes,cases,experimentalPrompts:suite==='prose'?{plan:PLAN_INSTRUCTIONS,planAddition:PLAN_LOAD_CHECK,writerSource:app.slice(app.indexOf('function storyInstructions('),app.indexOf('function storyInput(')),writerAddition:WRITER_CHECK}:null};
+if(suite==='prose'&&fs.existsSync(suiteFile)&&JSON.stringify(read(suiteFile))!==JSON.stringify(suiteRecord))throw Error('Experimental definition changed; use a new output directory.');
+write(suiteFile,suiteRecord);
 let count=0;
 for(const spec of cases){
  const filename=path.join(output,spec.id+'.json');let record=fs.existsSync(filename)?read(filename):{...spec,live:!!info.liveAi,promptVersion:spec.variant==='baseline'?baseline.promptVersion:promptVersion,stages:[],records:[],createdAt:new Date().toISOString()};
+ if(suite==='prose'&&record.selectedNotes&&JSON.stringify(record.selectedNotes)!==JSON.stringify(selectedNotes))throw Error('Selected notes changed; use a new output directory.');
  if(record.result)continue;if(record.error&&!retry){console.log(spec.id+': failed attempt retained; --retry required');continue;}if(count++>=limit)break;
  if(record.promptVersion!==(spec.variant==='baseline'?baseline.promptVersion:promptVersion))throw Error('Prompt changed; use a new output directory.');
  const save=()=>write(filename,record);record.attempts=[...(record.attempts||[]),{startedAt:new Date().toISOString(),kind:record.error?'explicit retry':'initial or resume',previousError:record.error||null}];delete record.error;save();
- const ai={async start(data){const stage=JSON.parse(data.input).kind;const trace={stage,input:JSON.parse(data.input),instructions:data.instructions,model:data.model,effort:data.reasoningEffort||'',startedAt:new Date().toISOString()};record.stages.push(trace);save();const id=await bridge({action:'start',data});trace.requestId=id;save();return id;},
+ const ai={async start(data){const stage=JSON.parse(data.input).kind; if(suite==='prose'){if(stage==='notes')data.instructions=selectedNotes.instructions; if(stage==='language-plan'&&spec.variant==='candidate')data.instructions+=PLAN_LOAD_CHECK;}const trace={stage,input:JSON.parse(data.input),instructions:data.instructions,model:data.model,effort:data.reasoningEffort||'',startedAt:new Date().toISOString()};record.stages.push(trace);save();const id=await bridge({action:'start',data});trace.requestId=id;save();return id;},
  async wait(id){let trace=record.stages.find(s=>s.requestId===id);const deadline=Date.now()+600000;while(Date.now()<deadline){let raw;try{raw=await bridge({action:'result',requestId:id});}catch(error){trace.error=error.message;save();throw error;}if(raw!==null){trace.raw=raw;trace.finishedAt=new Date().toISOString();trace.seconds=(Date.parse(trace.finishedAt)-Date.parse(trace.startedAt))/1000;save();return raw;}await new Promise(resolve=>setTimeout(resolve,1000));}throw Error('Evaluation request timed out; explicit retry or cancellation required.');},
  async acknowledge(id){let local=false;try{await bridge({action:'acknowledge',requestId:id});}catch(error){if(error.code!=='not_found')throw error;local=true;}const trace=record.stages.find(s=>s.requestId===id);if(trace){trace.released=true;if(local)trace.releasedAfterServerRestart=true;save();}},async cancel(id){await bridge({action:'cancel',requestId:id});}};
  const config={providerId:'chatgpt',model:spec.model,reasoning:spec.effort};
  let instructions=(spec.variant==='baseline'?original:revised)(spec.input.language,spec.input.difficulty,spec.input.levelDescription);
  if(['continue','rewrite'].includes(spec.kind))instructions=revisedPrompts.chapterInstructions(spec.input.language,spec.input.difficulty,spec.input.levelDescription,spec.kind);
+ if(suite==='prose'&&spec.variant==='candidate')instructions+=WRITER_CHECK;
+ record.selectedNotes=selectedNotes;
  try {
  if(spec.variant==='baseline'){
    // Original combined writer baseline, with durable per-stage results before release.

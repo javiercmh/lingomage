@@ -34,3 +34,9 @@ Follow-up [implementation audit](../validation/2026-10-13-generation-audit.md) c
 
 
 Separate contextual notes refinement — 2026-10-13: chapter generation now runs plan → prose → notes → Japanese readings → final save. Planning remains optional guidance; the note request receives fixed prose and broader support instructions under PED-002. No numerical story or pedagogical note quotas are added. Completed stages are reused on explicit resume, while final content still requires all active safeguards. Level suitability remains unvalidated pending the recorded live pilot and qualified review.
+
+### Separate prose experiment prepared — 2026-10-14
+
+After notes selection, the development `prose` suite can compare current and candidate planning/writing prompts on matched briefs and fixed follow-up contexts, using the same explicitly selected notes prompt for both. The candidate uses existing `guidance` to identify likely vocabulary/construction load problems and accessible ways to express the brief. The writer internally checks avoidable difficulty against the guide while preserving natural language and optional practice focuses. Schemas, stages and request counts remain unchanged. These are product hypotheses, not evidence of certified alignment or proven learning effects; existing research citations and limitations still apply.
+
+No prose candidate is shipped or evaluated yet. Promotion is conditional on notes selection and separate level-fit, naturalness and continuity review, and requires a new `PROMPT_VERSION`. See [comparison instructions](../validation/generation-evaluation/contextual-notes/README.md).

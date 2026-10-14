@@ -1,0 +1,49 @@
+{
+  "status": "not accepted",
+  "totals": {
+    "current": {
+      "material": 0,
+      "missing": 0
+    },
+    "candidate": {
+      "material": 0,
+      "missing": 0
+    }
+  },
+  "languages": {},
+  "pending": [
+    "de-A1-0",
+    "de-A1-1",
+    "de-B1-0",
+    "de-B1-1",
+    "de-C1-0",
+    "de-C1-1",
+    "ja-N5-0",
+    "ja-N5-1",
+    "ja-N3-0",
+    "ja-N3-1",
+    "ja-N1-0",
+    "ja-N1-1",
+    "ru-A1-0",
+    "ru-A1-1",
+    "ru-B1-0",
+    "ru-B1-1",
+    "ru-C1-0",
+    "ru-C1-1",
+    "es-CL-A1-0",
+    "es-CL-A1-1",
+    "es-CL-B1-0",
+    "es-CL-B1-1",
+    "es-CL-C1-0",
+    "es-CL-C1-1",
+    "focused-de-possessive",
+    "focused-de-pronouns",
+    "focused-de-discontinuous",
+    "focused-es-association",
+    "focused-ru-repair",
+    "focused-ja-script",
+    "focused-de-senses"
+  ],
+  "disputes": [],
+  "limitations": "Engineering release criteria only; AI preference is insufficient. Disputed findings require qualified review."
+}

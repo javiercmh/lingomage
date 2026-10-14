@@ -49,3 +49,7 @@ Qualified reviewers should record name or agreed anonymous identifier, relevant 
 OpenAI's [model-optimization guidance](https://developers.openai.com/api/docs/guides/model-optimization) motivates representative inputs and iterative prompt evaluation. It does not validate these reading guides, AI reviewers or LingoMage's pedagogy.
 
 Missing Japanese annotation stages can be completed explicitly with `node scripts/evaluate-missing-readings.mjs RECORD.json http://localhost:PORT`. This saves a separate `supplementalReadings` trace and result, retains original failure/provenance, and never regenerates prose or notes. A rerun polls the same saved request. Original preliminary reviews remain tied to their original inputs; supplemental completion does not retroactively change those judgments. Review runs accept `--language` for independent per-language shards.
+
+## Controlled contextual-accuracy iteration
+
+Use the [notes-only comparison](contextual-notes/README.md) to remove the earlier pilot's changing-prose confound. It includes a frozen 24-chapter corpus, experimental prompts, focused regressions, raw-versus-repaired reporting, anonymous qualified-review packs and an explicit acceptance report. Live execution is separately authorized; all semantic review is currently pending. The later `prose` suite requires an explicitly selected notes prompt and compares planning/writing independently.
