@@ -1,9 +1,9 @@
 # Story-reading MVP
 
 Status: App² workspace implemented. Standardized reading targets, narrative scope
-and language planning were checked in the offline browser preview on 2026-10-13;
-see [the validation record](../validation/2026-10-13-level-guided-generation.md).
-Native App² generation and qualified language review remain pending.
+and language planning were checked in the offline browser preview on 2026-10-13.
+Native App² generation is pending in the [device checklist](../validation/device-checklist.md);
+qualified language review remains pending.
 
 ## Confirmed requirements
 

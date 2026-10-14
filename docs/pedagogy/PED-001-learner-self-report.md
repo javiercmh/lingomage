@@ -33,7 +33,7 @@ The studies do not establish certified CEFR/JLPT/TORFL alignment, exact curricul
 - [js/app.js](../../js/app.js): `renderTargetLanguageSettings` owns the English examples and helper; `storyInput` supplies the saved report; `storyInstructions` uses it as adaptation context. Selected story difficulty controls generation. `populateTargetPicker` manages the setup message and disabled controls; `generate` rejects submissions without an enabled language before any AI call.
 - [learning-profiles.json](../../data/learning-profiles.json): reading bands, prerequisites and generation guides; [settings.json](../../data/settings.json): per-language defaults and personal reports.
 - Completed stories preserve profile and prompt versions plus the report used. Example-copy changes do not change the prompt version or rewrite saved reports/stories.
-- [Reading-profile checks](../validation/2026-10-10-reading-profiles.md) concern earlier functionality. They do not validate the current English examples pedagogically. Language review and learner evaluation of the new wording are pending.
+- Earlier reading-profile engineering checks did not validate the current English examples pedagogically. Language review and learner evaluation of the new wording are pending.
 
 ## Alternatives and revisit conditions
 

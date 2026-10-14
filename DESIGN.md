@@ -14,7 +14,7 @@ Show familiar interaction mechanics visually. A labelled expandable section uses
 
 Visual cues supplement accessible labels and semantic state. Use native disclosure behavior or equivalent keyboard operation and announced expanded/collapsed state. Do not rely on a chevron, color or icon alone to communicate an action, error cause, destructive consequence or unavailable feature. Keep the cue near its label and make the whole control a touch target of at least 44px.
 
-Before adding explanatory copy, ask whether a clearer label, visible state, spacing or familiar symbol would communicate the same interaction. Keep words when they explain meaning or consequences; use a visual cue when it explains how a familiar control behaves. This convention follows the learner’s feedback on generation recovery and the [disclosure inspection](docs/validation/2026-10-14-generation-recovery.md#disclosure-affordance-follow-up); it is a product preference, not a measured usability finding.
+Before adding explanatory copy, ask whether a clearer label, visible state, spacing or familiar symbol would communicate the same interaction. Keep words when they explain meaning or consequences; use a visual cue when it explains how a familiar control behaves. This convention follows the learner’s feedback on generation recovery (2026-10-14): an instruction to open Technical details was redundant, and a collapsed/expanded chevron made the disclosure's behavior visible; it is a product preference, not a measured usability finding.
 
 ## Layout and controls
 

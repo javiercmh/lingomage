@@ -4,7 +4,7 @@
 
 - The current product is a plain HTML, CSS and JavaScript App² workspace at the repository root. There is no native LingoMage implementation; historical Kotlin remains in Git. The Python server is development-only.
 - Keep the interface and glossary explanations in English. Current targets are German, Japanese, Russian and Spanish; let learners request a regional variety in their language preferences.
-- Keep workspace domain data in inspectable JSON files under `data/`. Keep rationale, research, language decisions and validation records in `docs/`.
+- Keep workspace domain data in inspectable JSON files under `data/`. Keep rationale, research, language decisions, pending device checks and evaluation evidence in `docs/`, following the documentation policy in `docs/README.md`: record decisions and evidence rather than activity, delete superseded docs and implemented plans (Git history is the archive), and do not add dated per-change validation files.
 - Before changing learning behavior, consult `docs/pedagogy/README.md`. Update the relevant pedagogical decision in the same change; use stable citation keys from `docs/research/references.bib`, and distinguish evidence from product assumptions.
 - Update affected documentation when prompts or learning behavior change. Increment `PROMPT_VERSION` in `js/app.js` and preserve saved-story provenance.
 - Label product assumptions and evidence limitations; do not claim certified CEFR alignment or proven learning effectiveness.
@@ -34,9 +34,9 @@
 ## Development and verification
 
 - Run the local workspace with `python3 dev_server.py --mock-ai`; open `http://localhost:8888`. The development mock is deterministic and makes no external requests. Optional live desktop testing uses `codex login` followed by `python3 dev_server.py --chatgpt`; requests may use ChatGPT plan allowance, and Codex is an optional external dependency.
-- For every interface or copy change, visually inspect screenshots from the development server at desktop and narrow mobile widths before declaring it complete. Check spacing, wrapping, hierarchy, field/helper grouping, clipping, and touch targets; DOM checks alone do not establish layout quality. Record what was actually inspected.
+- For every interface or copy change, visually inspect screenshots from the development server at desktop and narrow mobile widths before declaring it complete. Check spacing, wrapping, hierarchy, field/helper grouping, clipping, and touch targets; DOM checks alone do not establish layout quality. Record what was actually inspected in the commit message.
 - Use the development server for browser checks. Native AI, alarms, Android insets and install shortcuts require App² on Android and should be marked pending unless actually verified there.
-- Record only checks actually run. Do not export credentials or log tokens, callback URLs or account identifiers.
+- Record only checks actually run, in the commit message. Add anything that needs Android verification to `docs/validation/device-checklist.md`. Do not export credentials or log tokens, callback URLs or account identifiers.
 - The Python server requires Python 3.9 or newer and no dependencies.
 
 ## App updates
