@@ -60,6 +60,54 @@ function glossaryRanges(canonical, form, firstOnly = false) {
 export function hasGlossaryForm(canonical, form) {
   return typeof form === 'string' && form.length>0 && glossaryRanges(canonical,form,true).length>0;
 }
+// Tolerant lookup used only to repair model-listed note forms. It returns exact
+// chapter text, so reader matching and storage keep using literal substrings.
+const FOLD_PUNCTUATION = [[/[\u2018\u2019\u201A\u201B\u2032\u02BC]/u, "'"], [/[\u201C\u201D\u201E\u201F\u00AB\u00BB\u2039\u203A]/u, '"'], [/[\u2010-\u2015\u2212]/u, '-'], [/[\s\u00A0]/u, ' ']];
+function foldUnit(unit) {
+  let value = unit.normalize('NFC').toLowerCase().replace(/ё/gu, 'е');
+  for (const [pattern, replacement] of FOLD_PUNCTUATION) if (pattern.test(value)) return replacement;
+  return value;
+}
+function foldedUnits(text) {
+  const units = [];
+  for (const match of text.matchAll(/[\s\S][\p{M}]*/gu)) {
+    const key = foldUnit(match[0]);
+    if (key === ' ' && units.length && units[units.length - 1].key === ' ') { units[units.length - 1].end = match.index + match[0].length; continue; }
+    units.push({key, start: match.index, end: match.index + match[0].length});
+  }
+  return units;
+}
+let foldedCache = {text: null, units: []};
+function tolerantRange(canonical, form) {
+  const wanted = foldedUnits(form.trim().replace(/^[^\p{L}\p{N}\p{M}]+|[^\p{L}\p{N}\p{M}]+$/gu, '')).map(unit => unit.key);
+  if (!wanted.length) return null;
+  if (foldedCache.text !== canonical) foldedCache = {text: canonical, units: foldedUnits(canonical)};
+  const units = foldedCache.units;
+  const wordCharacter = value => Boolean(value && /[\p{L}\p{N}\p{M}_]/u.test(value));
+  const japanese = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(form);
+  for (let i = 0; i + wanted.length <= units.length; i++) {
+    if (units[i].key !== wanted[0]) continue;
+    let ok = true;
+    for (let j = 1; j < wanted.length && ok; j++) ok = units[i + j].key === wanted[j];
+    if (!ok) continue;
+    const start = units[i].start, end = units[i + wanted.length - 1].end;
+    if (japanese || (!wordCharacter(canonical[start]) || !wordCharacter(canonical[start - 1])) && (!wordCharacter(canonical[end - 1]) || !wordCharacter(canonical[end]))) return {start, end};
+  }
+  return null;
+}
+// Map one model-listed form to exact chapter text. A discontinuous form such as
+// "winkte ... herüber" becomes its separately attested parts. Returns [] when
+// the chapter does not contain it, so callers drop it rather than invent evidence.
+export function resolveGlossaryForms(canonical, form) {
+  if (typeof form !== 'string' || !form.trim()) return [];
+  if (hasGlossaryForm(canonical, form)) return [form];
+  const whole = tolerantRange(canonical, form);
+  if (whole) return [canonical.slice(whole.start, whole.end)];
+  const parts = form.split(/\s*(?:\.{2,}|\u2026)\s*/u).map(part => part.trim()).filter(Boolean);
+  if (parts.length < 2) return [];
+  const resolved = parts.map(part => hasGlossaryForm(canonical, part) ? part : (() => { const range = tolerantRange(canonical, part); return range ? canonical.slice(range.start, range.end) : null; })());
+  return resolved.every(Boolean) ? [...new Set(resolved)] : [];
+}
 export function findGlossaryMatches(canonical, glossary = []) {
   // Group repeated forms before scanning. Process one length at a time so a
   // larger glossary does not allocate every candidate across every length.

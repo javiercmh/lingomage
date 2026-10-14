@@ -9,7 +9,8 @@ assert.equal(firstGlossaryMatches(prose.story,glossary).length,250);
 const raw=JSON.stringify({x:'a'.repeat(MAX_CONTENT_UNITS-8)});assert.equal(raw.length,MAX_CONTENT_UNITS);assert.equal(parseContent(raw).x.length,MAX_CONTENT_UNITS-8);
 assert.throws(()=>parseContent(raw+' '),/technical size/);
 assert.throws(()=>validateContentSize({x:'a'.repeat(MAX_CONTENT_UNITS)}),/technical size/);
-assert.throws(()=>validateNotes({glossary:[{...glossary[0],forms:['Wort0','missing']}]},prose,'de'),/does not appear/);
+assert.deepEqual(validateNotes({glossary:[{...glossary[0],forms:['Wort0','missing']}]},prose,'de').glossary[0].forms,['Wort0']);
+assert.throws(()=>validateNotes({glossary:[{...glossary[0],word:'Nichts',forms:['missing']}]},prose,'de'),/None of the AI vocabulary notes/);
 // More repeated notes no longer multiplies the match-candidate allocation.
 const repeated=Array.from({length:1500},(_,i)=>({word:'町',meaning:'meaning '+i,forms:['町']}));
 assert.equal(firstGlossaryMatches('町。'.repeat(1000),repeated).length,1);

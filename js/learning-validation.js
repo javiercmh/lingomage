@@ -1,6 +1,6 @@
-import { hasGlossaryForm } from './reader-text.js';
+import { resolveGlossaryForms } from './reader-text.js';
 
-export const SAFEGUARD_VERSION = '2026-10-13.4';
+export const SAFEGUARD_VERSION = '2026-10-14.1';
 // A generous transport/storage bound, independent of note count and reading level.
 export const MAX_CONTENT_UNITS = 1000000;
 export function validateContentSize(value) {
@@ -32,21 +32,28 @@ export function validateNotes(value, prose, language) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => key !== 'glossary')) invalid('Vocabulary notes must contain only a glossary, without rewriting the chapter.');
   validateContentSize({...canonical,...value});
   if (!Array.isArray(value.glossary) || value.glossary.length < 1) invalid('The chapter needs at least one useful learning note.');
-  const attested=new Map();
+  // Notes are repaired, never trusted: only forms found in the chapter survive, and a note
+  // with no attested form is dropped instead of failing a chapter whose prose is already saved.
+  const glossary=[], resolved=new Map();
+  const resolve=form=>{ if(!resolved.has(form)) resolved.set(form,resolveGlossaryForms(canonical.story,form)); return resolved.get(form); };
+  const article=new Set(({de:'der die das den dem des ein eine einen einem einer eines',es:'el la los las un una unos unas'})[String(language).split('-')[0]]?.split(' ')||[]);
   for (const note of value.glossary) {
     if (!note || typeof note !== 'object') invalid('A learning note is malformed.');
     boundedText(note.word, 500, 'Note headword'); boundedText(note.meaning, 4000, 'English explanation');
     validateScript(note.word, language);
     if (!/[A-Za-z]/.test(note.meaning)) invalid('A learning note needs an English explanation.');
     if (!Array.isArray(note.forms) || !note.forms.length || note.forms.length > 20) invalid('Each learning note needs 1–20 exact chapter forms.');
-    for (const form of note.forms) {
-      boundedText(form, 500, 'Note form'); validateScript(form, language);
-      if (!attested.has(form)) attested.set(form,hasGlossaryForm(canonical.story,form));
-      if (!attested.get(form)) invalid('The AI included a vocabulary note for a word or phrase that does not appear in the chapter. The completed prose is preserved; the chapter is not ready yet.');
+    for (const form of note.forms) { boundedText(form, 500, 'Note form'); validateScript(form, language); }
+    let forms=[...new Set(note.forms.flatMap(resolve))];
+    if (!forms.length) { // Common model slip: only an inflection absent from the chapter. Accept the headword if the chapter itself contains it.
+      const words=note.word.trim().split(/\s+/u), bare=words.length>1&&article.has(words[0].toLowerCase())?words.slice(1).join(' '):note.word;
+      forms=[...new Set([note.word,bare].flatMap(resolve))];
     }
+    if (forms.length) glossary.push({word:note.word, meaning:note.meaning, forms:forms.slice(0,20)});
   }
+  if (!glossary.length) invalid('None of the AI vocabulary notes matched words or phrases that appear in the chapter. The completed prose is preserved; the chapter is not ready yet.');
   // Model annotations are ignored: the app owns Japanese boundaries.
-  return { ...canonical, glossary: value.glossary.map(n => ({word:n.word, meaning:n.meaning, forms:[...n.forms]})) };
+  return { ...canonical, glossary };
 }
 export function validateStory(value, language, unusedLegacyLength) {
   return validateNotes({glossary:value?.glossary}, validateProse(value, language), language);

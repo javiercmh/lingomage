@@ -28,7 +28,9 @@ for (const language of ['ja','ru']) {
 }
 validateScript('街へ。カフェー𠮷', 'ja'); validateScript('Го́род, Москва и ёлка.', 'ru'); tested('LANG-002');
 const good=story();
-for (const glossary of [[],null,[{word:'Stadt',meaning:'city',forms:['absent']}],[{word:'Stadt',meaning:'',forms:['Stadt']}],[{word:'Stadt',meaning:'city',forms:[]}],[{word:'Stadt',meaning:'市',forms:['Stadt']}],[{word:'Stadt',meaning:'city',forms:['Sta']}]] ) assert.throws(()=>validateStory({...good,glossary},'de'));
+for (const glossary of [[],null,[{word:'Stadt',meaning:'',forms:['Stadt']}],[{word:'Stadt',meaning:'city',forms:[]}],[{word:'Stadt',meaning:'市',forms:['Stadt']}]] ) assert.throws(()=>validateStory({...good,glossary},'de'));
+for (const form of ['absent','Sta']) assert.deepEqual(validateStory({...good,glossary:[{word:'Stadt',meaning:'city',forms:[form]}]},'de').glossary[0].forms,['Stadt']); // only exact chapter text survives; partial forms are never kept
+assert.throws(()=>validateStory({...good,glossary:[{word:'Fluss',meaning:'river',forms:['Sta']}]},'de'),/None of the AI vocabulary notes/);
 assert.ok(validateStory(good,'de')); tested('LANG-003');
 for (const [field,max] of [['title',500],['story',30000]]) {const bad=structuredClone(good);bad[field]='x'.repeat(max+1);assert.throws(()=>validateStory(bad,'de'),/at most/);}
 for (const [field,max] of [['word',500],['meaning',4000]]) {const bad=structuredClone(good);bad.glossary[0][field]='x'.repeat(max+1);assert.throws(()=>validateStory(bad,'de'),/at most/);}

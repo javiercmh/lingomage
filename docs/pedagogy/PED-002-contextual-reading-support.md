@@ -91,3 +91,8 @@ New chapters use a separate vocabulary-note request after canonical prose is val
 This breadth is the learner's requested product preference, not an evidence-based optimum. Existing `yanagisawaWebbUchihara2020Glossing`, `liZhang2021SelfAssessment` and `tigchelaarEtAl2017CanDoValidity` evidence and limitations apply. Structural validation cannot prove semantic accuracy, useful coverage or level suitability. A failed note request retains the completed prose for an explicit note-only retry; existing chapters and their original provenance remain unchanged. Japanese readings follow successful notes. Examples and selected-text Explain retain their existing workflows.
 
 Live prompt/model comparisons and preliminary AI review are recorded under [generation evaluation](../validation/generation-evaluation/README.md); qualified human review is separately pending.
+
+
+### Tolerant note-form matching — 2026-10-14
+
+Note forms listed by the model are resolved to exact chapter text before they are saved; forms the chapter does not contain are dropped and a note with no attested form is discarded, rather than failing the chapter. This changes validation only, not the prompt or learner-facing behavior, and adds no claim about note quality or learning effectiveness. See [language safeguards](../architecture/language-safeguards.md).
