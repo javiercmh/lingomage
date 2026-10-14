@@ -345,3 +345,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px
 .reader-listen { flex: 0 0 44px; }
 
 .recovery-panel > button { margin: 6px 0; }
+
+.help-card.reveal-pulse { animation: reveal-pulse 1.4s ease-out; }
+.help-card:focus { outline: none; }
+@keyframes reveal-pulse { 0%, 60% { border-color: var(--accent-strong); box-shadow: 0 0 0 3px rgba(59,130,246,.35); } 100% { box-shadow: 0 0 0 0 transparent; } }

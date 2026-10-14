@@ -91,9 +91,27 @@ $('reader-generation-action').addEventListener('click', async () => {
   state.readerChapter = path.entries.findIndex(entry => entry.chapterId === status.chapterId && entry.versionId === status.versionId);
   updateReader();
   const target = status.helpId ? [...$('reader-help').querySelectorAll('.help-card')].find(card => card.dataset.helpId === status.helpId) : $('reader-title');
-  target?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   setReaderGeneration(null);
+  if (status.helpId) revealCard(target); else target?.scrollIntoView({ block: 'start', behavior: 'smooth' });
 });
+// Scroll the reader only as far as needed to show the bottom of a card; taller cards align at their top.
+function revealCard(card) {
+  if (!card) return;
+  const panel = document.querySelector('.reader-panel');
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  requestAnimationFrame(() => {
+    const bars = [...document.querySelectorAll('.reader-generation-bar, .reader-panel .explanation-selection-toolbar')].filter(bar => !bar.hidden && bar.offsetParent !== null);
+    const barTop = Math.min(window.innerHeight, ...bars.map(bar => bar.getBoundingClientRect().top));
+    const rect = card.getBoundingClientRect(), margin = 12, topEdge = 12;
+    let delta = 0;
+    if (rect.height + margin * 2 > barTop - topEdge) delta = rect.top - topEdge;
+    else if (rect.bottom + margin > barTop) delta = rect.bottom + margin - barTop;
+    else if (rect.top < topEdge) delta = rect.top - topEdge;
+    if (delta) panel.scrollBy({ top: delta, behavior: reduce ? 'auto' : 'smooth' });
+    card.setAttribute('tabindex', '-1'); card.focus({ preventScroll: true });
+    card.classList.add('reveal-pulse'); setTimeout(() => card.classList.remove('reveal-pulse'), 1400);
+  });
+}
 
 function readJson(path, fallback) {
   try { const text = readFile(path); return text.trim() ? JSON.parse(text) : fallback; }

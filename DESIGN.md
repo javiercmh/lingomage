@@ -79,3 +79,7 @@ Reader checkpoint recovery belongs below the edit panel, beside chapter request 
 
 
 Chapter generation shows Planning suitable language, Writing your story, Adding vocabulary notes and (for Japanese) Adding kanji readings as separate progress messages. Active reader requests use their existing chapter status card without a duplicate checkpoint card; idle recovery remains below the edit panel. Notes failure explains that completed prose is preserved and Retry reuses it. Broad notes retain subtle first-occurrence links and concise English popovers. Partial prose is never displayed as a completed chapter.
+
+## Reader redesign — Show, title section, explained expressions, swipe actions
+
+Show / View result scrolls only as far as needed to reveal the bottom of the new explanation card (with 12px clearance above floating bars and the safe area); a card already visible does not scroll, and a card taller than the viewport aligns at its top. The status bar is dismissed before scrolling, the card is focused without scrolling, and its border pulses briefly (no animation under reduced motion).
