@@ -1,6 +1,6 @@
 # Text selection audit and plan
 
-Status: **plan only, nothing implemented.** Awaiting approval.
+Status: **implemented 2026-10-14** in dc16e68 (text unselectable by default, selection menus routed by zone). Below is the original plan, kept as rationale; `DESIGN.md` is authoritative. Android menu behavior is pending device verification.
 
 ## Problem
 

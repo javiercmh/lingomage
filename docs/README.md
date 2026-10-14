@@ -27,6 +27,7 @@ use the current validation status in the product and App² runtime documents.
 - [Furigana rendering](architecture/furigana.md): Legacy Android annotation structure, layout and accessibility.
 - [Text selection and reasoning preferences](architecture/selection-and-reasoning.md): Earlier Android implementation details.
 - [Physical-device checklist](validation/device-checklist.md): Current App² host checks.
+- [Plans](plans/): Dated interface plans (reader redesign, text selection) with implementation status; `DESIGN.md` is authoritative for shipped behavior.
 - [Language safeguard audit](architecture/language-safeguards.md): Current requirements, legacy decisions and regression coverage.
 - [Story implementation checks](validation/2026-10-09-stories.md): Historical Android build, device and generation outcomes.
 - [Initial language samples](validation/sample-review.md): Historical sample review and limitations.
