@@ -16,6 +16,8 @@ The reader is full-screen, with a centered column no wider than 780px and no top
 
 Disable spelling correction only on the canonical reader story body and title with `spellcheck="false"`. Editable fields retain normal spelling suggestions and editing menus; do not disable correction on surrounding reader containers. Android correction-menu behavior requires device verification.
 
+The Android native selection menu is suppressed only over story text and the reader title; `js/app.js` toggles the page-wide host flag on `pointerdown` so every input, textarea, select and contenteditable keeps Cut, Copy and Paste.
+
 Selecting text offers Explain in the LingoMage toolbar. In App², Copy and Speak remain in Android’s native selection menu; Speak uses the selected text’s language and Android’s configured voice. Keep the Explain toolbar available in every environment. Stop native playback when the reader closes or its chapter/version changes.
 Selecting text offers Translate, Explain and a leading Speak speaker icon in the LingoMage toolbar. The Speak icon uses the shared icon-button styling and an accessible “Speak selected text” label. Speak uses canonical selected text and the story locale through the existing App² speech wrapper; browser previews disable it with an availability explanation. In App², Copy and Speak remain in Android’s native selection menu; Speak uses the selected text’s language and Android’s configured voice. Keep the Explain toolbar available in every environment. Stop native playback when the reader closes or its chapter/version changes.
 

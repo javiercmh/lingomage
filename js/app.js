@@ -1666,8 +1666,18 @@ $('reader-copy').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(activeVersion(activeChapter(story)).story); toast('Chapter copied'); }
   catch { toast('Could not copy the chapter.'); }
 });
-// Android's own selection menu would compete with this bar; the bar remains the fallback elsewhere.
-selectionMenu.setSuppressed(true);
+// Android's own selection menu would compete with this bar on story text, but fields need Cut/Copy/Paste.
+// The host flag is page-wide, so toggle it by touch target; pointerdown precedes a long-press menu and focus.
+const FIELD_SELECTOR = 'input, textarea, select, [contenteditable]:not([contenteditable="false"])';
+let selectionMenuSuppressed = null;
+function suppressSelectionMenu(suppressed) {
+  if (selectionMenuSuppressed === suppressed) return;
+  selectionMenuSuppressed = suppressed;
+  selectionMenu.setSuppressed(suppressed);
+}
+suppressSelectionMenu(true);
+document.addEventListener('pointerdown', event => suppressSelectionMenu(!event.target.closest?.(FIELD_SELECTOR)), true);
+document.addEventListener('focusout', event => { if (event.target.closest?.(FIELD_SELECTOR) && !event.relatedTarget?.closest?.(FIELD_SELECTOR)) suppressSelectionMenu(true); }, true);
 $('reader-copy').addEventListener('click', () => closeReaderActions());
 $('reader-actions-toggle').addEventListener('click', toggleReaderActions);
 $('reader-remove-chapters').addEventListener('click', () => confirmReaderRemoval('chapters'));
