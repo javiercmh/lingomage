@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {validateNotes} from '../js/learning-validation.js';
 import {findGlossaryMatches} from '../js/reader-text.js';
-// Cases are taken from real model responses in docs/validation/generation-evaluation that
+// Cases are taken from real model responses (archived in Git history at 7fd046c, docs/validation/generation-evaluation) that
 // previously failed the whole chapter with "vocabulary note for a word ... that does not appear".
 const note=(word,forms,meaning='an English explanation')=>({word,meaning,forms});
 const run=(language,story,glossary)=>validateNotes({glossary},{title:language==='ru'?'Билет':'Titel',story},language).glossary;

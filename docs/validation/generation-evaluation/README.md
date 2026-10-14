@@ -2,6 +2,10 @@
 
 This development-only evaluation uses public fictional briefs through the explicit `dev_server.py --chatgpt` path and the existing local Codex login. It uses ChatGPT plan allowance. It neither configures production App² models nor reads learner stories/settings/checkpoints. Evaluation outputs and stage checkpoints stay in this directory, outside packaged app files.
 
+## Evidence and archived raw runs
+
+Interpreted results, limits and the preliminary review tables are in the [broad contextual notes record](../2026-10-14-broad-notes.md); that summary and the frozen [contextual-notes corpus](contextual-notes/README.md) are the tracked evidence. The raw per-attempt records (`models/`, `pilot/`, `followups/`, `exploratory-gpt6-sol/` and their `reviews/`, about 9 MB) were removed from the working tree and remain in Git history at commit `7fd046c`. Inspect or restore them with `git show 7fd046c:docs/validation/generation-evaluation/pilot/de-A1-0-revised.json` or `git checkout 7fd046c -- docs/validation/generation-evaluation/pilot` (needed for `compare-notes.mjs --pilot` and the `followups` suite, which read the pilot). New runs write to these directories again and should not be committed wholesale; summarize them instead.
+
 ## Matrix and provenance
 
 - Model comparison: 24 chapter attempts, German/Russian/Spanish A1/B1/C1 and Japanese N5/N3/N1, one railway-ticket brief, GPT-6.1 Sol low versus GPT-6 Luna high. This is a small representative comparison, not a model benchmark.
