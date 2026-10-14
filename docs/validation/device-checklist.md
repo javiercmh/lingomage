@@ -37,3 +37,5 @@ Install/import LingoMage through the App² library; there is no LingoMage APK or
 Record date, device and host versions, tested app commit, the items checked, actual outcomes and sanitized error categories. Passing a mock or browser test establishes neither native device behavior nor language or learning quality.
 
 - 2026-10-12, Samsung SM-S921B, existing App² install, synthetic test subapp built from the translation-recovery change (33b48f9): 20 consecutive launches of the reader Translate button opened Google Translate each time and the button stayed enabled after every return. Native timeout/failure injection was not performed. Original subapps were byte-identical after the test. Every other item above is unverified on device.
+
+- Pending Android verification: language-settings disclosure, automatic expansion on checking, Move up/down touch controls and persisted Create language order.

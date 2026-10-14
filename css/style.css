@@ -405,3 +405,9 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px
 .recovery-panel:focus-visible, .failure-details summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 .recovery-panel { scroll-margin-bottom: calc(100px + var(--sa-bottom, 0px)); }
+
+.target-language-header { display: flex; align-items: center; gap: 4px; }
+.target-language-header .target-language-toggle { flex: 1; min-width: 0; }
+.language-disclosure, .language-move { width: 44px; min-width: 44px; min-height: 44px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-size: 22px; cursor: pointer; }
+.language-disclosure:hover, .language-move:hover { background: rgba(255,255,255,.07); }
+.language-move:disabled { opacity: .3; cursor: default; }

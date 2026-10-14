@@ -51,7 +51,7 @@ function fillScopeOptions(input, selected = 'scene', describe) {
 
 const PREFERRED_MODEL = 'gpt-6-luna';
 const $ = id => document.getElementById(id);
-const state = { standardizedLevels: {}, checkpointBlocked: false, stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, revealedStoryId: null, deleteStoryIds: new Set(), storySelectionMode: false, selectedStoryIds: new Set(), storySelectionFocusId: '', explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', readerHistoryEntry: false, speechVersionKey: '', wordNoteTrigger: null, readerEditBusy: false, activeChapterRequest: null, readerEditDraft: null };
+const state = { languageOrder: Object.keys(LANGUAGES), standardizedLevels: {}, checkpointBlocked: false, stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, revealedStoryId: null, deleteStoryIds: new Set(), storySelectionMode: false, selectedStoryIds: new Set(), storySelectionFocusId: '', explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', readerHistoryEntry: false, speechVersionKey: '', wordNoteTrigger: null, readerEditBusy: false, activeChapterRequest: null, readerEditDraft: null };
 
 let readerSpeechRun = 0;
 let readerSpeechKey = '';
@@ -132,7 +132,7 @@ function persistReaderStory(story) {
   catch (error) { if (!alreadySaved) state.stories = state.stories.filter(item => item.id !== story.id); throw error; }
 }
 function persistSettings() {
-  const value = { providerId: state.providerId, model: state.model, reasoning: state.reasoning, targetLanguages: state.targetLanguages, learnerProfiles: state.learnerProfiles, languageExpectations: state.languageExpectations, languageSetupDismissed: state.languageSetupDismissed, standardizedLevels: state.standardizedLevels, readingPreferences: { furigana: state.furigana, fontSize: state.readerFontSize }, theme: 'dark' };
+  const value = { providerId: state.providerId, model: state.model, reasoning: state.reasoning, targetLanguages: state.targetLanguages, languageOrder: state.languageOrder, learnerProfiles: state.learnerProfiles, languageExpectations: state.languageExpectations, languageSetupDismissed: state.languageSetupDismissed, standardizedLevels: state.standardizedLevels, readingPreferences: { furigana: state.furigana, fontSize: state.readerFontSize }, theme: 'dark' };
   if (!writeFile('data/settings.json', value)) throw new Error('Could not save settings.');
 }
 function toast(message) {
@@ -148,6 +148,7 @@ function setView(name) {
   });
   document.querySelectorAll('.view').forEach(view => view.classList.toggle('active', view.id === `view-${name}`));
   if (name === 'library') renderLibrary();
+  if (name === 'settings') renderTargetLanguageSettings();
   window.scrollTo(0, 0);
 }
 document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => setView(tab.dataset.view)));
@@ -347,7 +348,7 @@ function populateDifficulty(selected = '') {
 function populateTargetPicker(preferred = '') {
   const select = $('language'), previous = preferred || select.value;
   select.textContent = '';
-  const allLanguages = Object.keys(LANGUAGES);
+  const allLanguages = state.languageOrder;
   const selectedLanguages = allLanguages.filter(code => state.targetLanguages[code]);
   const availableLanguages = selectedLanguages.length ? selectedLanguages : allLanguages;
   $('language-setup').hidden = Boolean(selectedLanguages.length) || state.languageSetupDismissed;
@@ -357,14 +358,42 @@ function populateTargetPicker(preferred = '') {
   $('generate').disabled = Boolean(state.checkpointBlocked || pipeline?.records.length);
   populateDifficulty();
 }
-function renderTargetLanguageSettings() {
+function renderTargetLanguageSettings(expanded = new Set()) {
   const container = $('target-language-options'); container.textContent = '';
-  Object.keys(LANGUAGES).forEach(code => {
+  state.languageOrder.forEach((code, index) => {
     const row = document.createElement('div'); row.className = 'target-language-row';
+    const header = document.createElement('div'); header.className = 'target-language-header';
     const top = document.createElement('label'); top.className = 'target-language-toggle';
     const input = document.createElement('input'); input.type = 'checkbox'; input.name = 'target-language'; input.value = code; input.checked = Boolean(state.targetLanguages[code]);
     const name = document.createElement('span'); name.textContent = LANGUAGES[code]; top.append(input,name);
-    const settings = document.createElement('div'); settings.className = 'target-language-settings'; settings.hidden = !input.checked;
+    const settings = document.createElement('div'); settings.className = 'target-language-settings'; settings.hidden = !expanded.has(code);
+    settings.id = `language-settings-${code}`;
+    const disclosure = document.createElement('button'); disclosure.type = 'button'; disclosure.className = 'language-disclosure';
+    disclosure.setAttribute('aria-controls', settings.id);
+    const updateDisclosure = () => {
+      disclosure.textContent = settings.hidden ? '⌄' : '⌃';
+      disclosure.setAttribute('aria-expanded', String(!settings.hidden));
+      disclosure.setAttribute('aria-label', `${LANGUAGES[code]} settings`);
+    };
+    disclosure.addEventListener('click', () => { settings.hidden = !settings.hidden; updateDisclosure(); });
+    updateDisclosure();
+    header.append(top, disclosure);
+    for (const [direction, offset, symbol] of [['up', -1, '↑'], ['down', 1, '↓']]) {
+      const move = document.createElement('button'); move.type = 'button'; move.className = 'language-move'; move.textContent = symbol;
+      move.setAttribute('aria-label', `Move ${LANGUAGES[code]} ${direction}`);
+      move.dataset.direction = direction;
+      move.disabled = index + offset < 0 || index + offset >= state.languageOrder.length;
+      move.addEventListener('click', () => {
+        const open = new Set([...container.querySelectorAll('.target-language-settings')].filter(panel => !panel.hidden).map(panel => panel.id.slice('language-settings-'.length)));
+        [state.languageOrder[index], state.languageOrder[index + offset]] = [state.languageOrder[index + offset], state.languageOrder[index]];
+        try { persistSettings(); } catch (error) { toast(error.message); }
+        renderTargetLanguageSettings(open); populateTargetPicker();
+        const moved = container.children[index + offset];
+        const button = moved.querySelector(`[data-direction="${direction}"]`);
+        (button.disabled ? moved.querySelector('.language-disclosure') : button).focus();
+      });
+      header.append(move);
+    }
     const level = document.createElement('select'); level.className = 'field target-level'; level.setAttribute('aria-label', `${LANGUAGES[code]} reading level`);
     const levelLabel = document.createElement('label'); levelLabel.className = 'field-label'; level.id = `starting-point-${code}`; levelLabel.htmlFor = level.id; levelLabel.textContent = 'Reading starting point';
     levelLabel.textContent = 'Reading level';
@@ -375,6 +404,7 @@ function renderTargetLanguageSettings() {
     input.addEventListener('change', () => {
       if (input.checked) state.targetLanguages[code] = state.targetLanguages[code] || 'enabled'; else delete state.targetLanguages[code];
       settings.hidden = !input.checked;
+      updateDisclosure();
       try { persistSettings(); } catch (error) { toast(error.message); }
       populateTargetPicker();
     });
@@ -391,7 +421,7 @@ function renderTargetLanguageSettings() {
     expectations.addEventListener('change', () => { try { persistSettings(); } catch (error) { toast(error.message); } });
     const expectationsHint = document.createElement('p'); expectationsHint.className = 'helper'; expectationsHint.textContent = 'Regional variety, tone, or spelling.';
     settings.append(levelLabel,level,description,expectationsLabel,expectations,expectationsHint);
-    row.append(top,settings); container.append(row);
+    row.append(header,settings); container.append(row);
   });
 }
 function decodeResponse(text, languageCode) { return validateStory(parseContent(text),languageCode); }
@@ -1907,6 +1937,7 @@ const settings = readJson('data/settings.json', {}); state.providerId = settings
 state.furigana = settings.readingPreferences?.furigana !== false;
 state.readerFontSize = Math.max(15, Math.min(30, Number(settings.readingPreferences?.fontSize) || 19));
 state.languageSetupDismissed = settings.languageSetupDismissed === true;
+state.languageOrder = [...new Set([...(Array.isArray(settings.languageOrder) ? settings.languageOrder : []), ...Object.keys(LANGUAGES)])].filter(code => Object.hasOwn(LANGUAGES, code));
 state.targetLanguages = Object.fromEntries(Object.entries(settings.targetLanguages || {}).filter(([code]) => LEVELS[code]));
 state.standardizedLevels = Object.fromEntries(Object.entries(settings.standardizedLevels || {}).filter(([code,level]) => levelDefinition(code,level)));
 fillScopeOptions($('reading-scope'), 'scene', $('scope-description'));
