@@ -6,6 +6,16 @@ Follow the App² starter template and host slate palette. The reference is App²
 
 Use the shared CSS tokens: `--paper` (#090d16), slate reader surface (#0f172a), `--card`, `--line`, `--field`, `--ink`, `--muted` (#94a3b8), `--accent`, and `--accent-strong` (#3b82f6). Use 18px card corners, 12px field/button corners, subtle borders and restrained elevation. Avoid introducing a separate reader color theme.
 
+## Interface copy and visual cues
+
+Use interface text for information learners need to decide or recover: what happened, what content is preserved, what an action will do, and any consequence or requirement they cannot infer from the control. Use concise labels that name the action or content. Add helper text when it resolves an actual ambiguity; omit instructions that merely describe an obvious control.
+
+Show familiar interaction mechanics visually. A labelled expandable section uses a downward chevron when collapsed and an upward chevron when expanded. “Technical details” plus this state cue replaces “Open Technical details for the information supplied by the service.” Keep the error summary focused on the failure and saved progress; let the disclosure reveal diagnostics on demand.
+
+Visual cues supplement accessible labels and semantic state. Use native disclosure behavior or equivalent keyboard operation and announced expanded/collapsed state. Do not rely on a chevron, color or icon alone to communicate an action, error cause, destructive consequence or unavailable feature. Keep the cue near its label and make the whole control a touch target of at least 44px.
+
+Before adding explanatory copy, ask whether a clearer label, visible state, spacing or familiar symbol would communicate the same interaction. Keep words when they explain meaning or consequences; use a visual cue when it explains how a familiar control behaves. This convention follows the learner’s feedback on generation recovery and the [disclosure inspection](docs/validation/2026-10-14-generation-recovery.md#disclosure-affordance-follow-up); it is a product preference, not a measured usability finding.
+
 ## Layout and controls
 
 Create leads with one optional multiline Story idea and topics field (premise, genre, tone or format, plus domains, communication situations, concepts or expressions), then Reading scope, then Language and Reading level. Keep the learning-preferences setup notice beside the language fields. These story-first choices are product assumptions.
@@ -90,3 +100,9 @@ The reader title is its own section: a bordered header card (rounded top, contin
 Saved explanations are linked to the story text: each explained range gets a `mark` with a soft blue background and a solid 2px underline, distinct from the dotted glossary underline. Where explanations overlap, the newest owns the shared text. Tapping a highlight (not part of a text selection, and not a glossary word) scrolls to its explanation card with the minimal-scroll rule above and pulses it; the first fragment of each highlight is keyboard focusable (role button, Enter or Space). Each card has a labelled 44px “Show in text” button that scrolls the highlight to the middle of the screen and pulses it, so the tap affordance is an explicit control rather than a whole-card tap (long-press still starts selection; card text stays selectable). Highlights are recomputed whenever saved explanations change. They support returning to context; no learning effect is claimed.
 
 Requesting an explanation for a selection that overlaps a saved explanation in the same chapter version first shows an app-styled confirmation naming the overlapped passages and warning that the new explanation replaces them with their follow-ups and examples. Cancel (initially focused) makes no AI request; Continue runs the request and replaces the overlapping explanations only when the new one is saved. Follow-ups on an existing card never trigger the warning.
+
+## Generation recovery — 2026-10-14
+
+Create displays one checkpoint recovery panel immediately above Generate, retaining its captured brief, language, level and scope after reload. Checkpoint failures do not also appear as a separate red form error. Chapter recovery follows the edit panel; example recovery follows Explanations; explanation and detail failures offer Retry beside their source content or question. The reader status bar offers View recovery and keeps its wording brief. Recovery scrolling accounts for fixed status bars, which have no offset parent, and bottom navigation.
+
+Use a wrapping flex action row with a 12px gap and 44px minimum targets. Summaries identify the action, failed stage when known, and preserved content. Technical details use a keyboard-accessible disclosure with a downward chevron when closed and an upward chevron when open with bounded, redacted error text and an available host error code. An unidentified service failure remains unidentified. Retry explicitly requests a failed stage; Resume continues saved progress; Save response saves completed content; Finish request retries release without inference. Incompatible saved definitions explain why Discard is required. These are interface choices, not validated usability or learning-effectiveness claims.

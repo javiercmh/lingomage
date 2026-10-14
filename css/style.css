@@ -393,3 +393,15 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px
 .story-menu-toggle svg { width: 20px; height: 20px; }
 .story-menu-toggle circle { fill: currentColor; stroke: none; }
 .story-card:not(.selecting) .story-open { padding-right: 52px; }
+
+.recovery-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 12px; }
+.recovery-actions > button { margin: 0; }
+.failure-details { margin: 10px 0; overflow-wrap: anywhere; font-size: 13px; }
+.failure-details summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; gap: 8px; list-style: none; }
+.failure-details summary::-webkit-details-marker { display: none; }
+.failure-details summary::after { content: ''; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); margin-top: -4px; }
+.failure-details[open] summary::after { transform: rotate(225deg); margin-top: 4px; }
+.failure-details pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; user-select: text; }
+.recovery-panel:focus-visible, .failure-details summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.recovery-panel { scroll-margin-bottom: calc(100px + var(--sa-bottom, 0px)); }

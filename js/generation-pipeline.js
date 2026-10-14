@@ -1,3 +1,4 @@
+import { failureInfo } from './generation-errors.js';
 import { PLAN_INSTRUCTIONS, decodePlan } from './story-generation.js';
 import { parseContent, validateContentSize, validateProse, validateNotes, validateStory, validateExamples, readingPlan, attachReadings, NOTES_INSTRUCTIONS, READING_INSTRUCTIONS, SAFEGUARD_VERSION } from './learning-validation.js';
 
@@ -5,10 +6,13 @@ import { parseContent, validateContentSize, validateProse, validateNotes, valida
 // the final application is idempotent via operationId on saved records.
 export function createPipeline({ records, persist, ai, apply, changed = () => {} }) {
   let busy = false;
-  const save = () => { persist(records); changed(); };
+  let phase = '';
+  const mark = value => { phase=value; };
+  const save = () => { mark('checkpoint'); persist(records); changed(); };
   const validate = op => op.kind === 'examples' ? validateExamples(op.prose, op.language) : validateStory(op.prose, op.language, op.length);
   async function release(op) {
     if (!op.request) return;
+    mark('release');
     try { await ai.acknowledge(op.request.id); }
     catch (error) { if (error.code !== 'not_found') throw error; }
     op.request = null; save();
@@ -34,7 +38,8 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
     },
     async run(op) {
       if (busy) throw new Error('A generation is already running.');
-      busy=true; op.error=''; op.cancelRequested=false; changed();
+      if (!records.includes(op)) throw new Error('This saved operation is no longer pending.');
+      busy=true; op.error=''; delete op.failure; phase=''; op.cancelRequested=false; changed();
       try {
         // Also retries failed checkpoint writes before touching inference.
         save();
@@ -48,21 +53,27 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
           const input = stage === 'plan' ? {...op.input,kind:'language-plan'} : stage === 'prose' ? {...op.input,kind:op.kind,languagePlan:op.plan} : stage === 'notes' ? {...op.input,kind:'notes',languagePlan:op.plan,chapter:validateProse(op.prose,op.language)} : {kind:'readings',languageCode:'ja',spans:readingPlan(op.prose,op.kind).spans};
           const instructions = stage === 'plan' ? PLAN_INSTRUCTIONS : stage === 'prose' ? op.instructions : stage === 'notes' ? NOTES_INSTRUCTIONS : READING_INSTRUCTIONS;
           if (!op.request) {
+            mark('start');
             const id = await ai.start({providerId:op.config.providerId,model:op.config.model,reasoningEffort:op.config.reasoning || undefined,instructions,input:JSON.stringify(input)});
             op.request={id,stage,completed:false}; save();
           }
           await checkCancelled(op);
           let response;
-          try { const raw = await ai.wait(op.request.id); await checkCancelled(op); response = stage === 'plan' ? decodePlan(raw,op.language) : parseContent(raw); }
+          try { mark('wait'); const raw = await ai.wait(op.request.id); await checkCancelled(op); response = stage === 'plan' ? decodePlan(raw,op.language) : parseContent(raw); }
           catch (error) {
-            if (op.request) { op.request.completed=true; op.request.invalid=true; save(); await release(op); } throw error;
+            const failure=failureInfo(error,stage,phase);
+            if (op.request) { op.request.completed=true; op.request.invalid=true; save(); await release(op); }
+            error.generationFailure=failure; throw error;
           }
           let content;
+          mark('validation');
           try {
             content = stage === 'plan' ? response : stage === 'prose' ? (op.kind === 'examples' ? validateExamples(response,op.language) : validateProse(response,op.language)) : stage === 'notes' ? validateNotes(response,op.prose,op.language) : attachReadings(validate(op),readingPlan(op.prose,op.kind),response,op.kind);
             validateContentSize(content);
           } catch (error) {
-            if (op.request) { op.request.completed=true; op.request.invalid=true; save(); await release(op); } throw error;
+            const failure=failureInfo(error,stage,phase);
+            if (op.request) { op.request.completed=true; op.request.invalid=true; save(); await release(op); }
+            error.generationFailure=failure; throw error;
           }
           if (stage === 'plan') { op.plan=content; op.stage='prose'; }
           else if (stage === 'prose') {
@@ -81,6 +92,7 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
         }
         await checkCancelled(op);
         if (op.stage === 'ready') {
+          mark('apply');
           await apply(op); // Must persist final content, checking operationId first.
           op.stage='applied'; save();
         }
@@ -88,10 +100,18 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
         try { save(); } catch (error) { records.push(op); throw error; }
         return op.result;
       } catch (error) {
-        op.error=error.message;
+        op.failure=error.generationFailure || failureInfo(error,op.stage,phase);
+        op.error=op.failure.message;
         try { save(); } catch { /* Preserve the in-memory result and request for explicit retry. */ }
         throw error;
       } finally { busy=false; changed(); }
+    },
+    async finishRequest(op) {
+      if (busy || !records.includes(op)) return;
+      busy=true; changed();
+      try { save(); await release(op); op.error=''; delete op.failure; save(); }
+      catch (error) { op.failure=failureInfo(error,op.stage,phase); op.error=op.failure.message; try { save(); } catch {} throw error; }
+      finally { busy=false; changed(); }
     },
     async cancel() {
       const op=records[0]; if (!op || !busy) return;
@@ -102,6 +122,7 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
       }
     },
     async discard(op) {
+      if (!records.includes(op)) return;
       if (busy) throw new Error('Cancel the active request before discarding.');
       // Persist completed content before release even when choosing Discard.
       save();
@@ -111,7 +132,7 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
         }
         await release(op);
       }
-      const index=records.indexOf(op); records.splice(index,1);
+      const index=records.indexOf(op); if (index < 0) return; records.splice(index,1);
       try { save(); } catch (error) { records.splice(index,0,op); throw error; }
     }
   };

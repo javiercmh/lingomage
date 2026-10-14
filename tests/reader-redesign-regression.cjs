@@ -12,7 +12,7 @@ function section(start, end) { const at = source.indexOf(start); assert(at >= 0,
   const panel = { scrollBy: options => scrolls.push(options) };
   const classes = new Set();
   const make = rect => ({ getBoundingClientRect: () => rect, setAttribute() {}, focus() {}, classList: { add: name => classes.add(name), remove: name => classes.delete(name) } });
-  const context = { document: { querySelector: () => panel, querySelectorAll: () => [{ hidden: false, offsetParent: {}, getBoundingClientRect: () => ({ top: 700 }) }] }, window: { innerHeight: 800, matchMedia: () => ({ matches: false }) }, requestAnimationFrame: fn => fn(), setTimeout: () => 0 };
+  const context = { document: { querySelector: () => panel, querySelectorAll: () => [{ hidden: false, offsetParent: null, getClientRects: () => [{}], getBoundingClientRect: () => ({ top: 700 }) }] }, window: { innerHeight: 800, matchMedia: () => ({ matches: false }) }, requestAnimationFrame: fn => fn(), setTimeout: () => 0 };
   vm.createContext(context); vm.runInContext(section('function revealCard(', '\nfunction readJson('), context);
   const reveal = rect => { scrolls.length = 0; context.revealCard(make(rect)); return scrolls[0]; };
   assert.equal(reveal({ top: 100, bottom: 400, height: 300 }), undefined, 'fully visible card does not scroll');

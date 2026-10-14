@@ -3,6 +3,7 @@ import { speakSelection, speakChapter } from './reader-speech.js';
 import { annotatedText, applyExplainedMarks, getCanonicalSelection, japaneseSegments } from './reader-text.js';
 import { createPipeline } from './generation-pipeline.js';
 import { SAFEGUARD_VERSION, parseContent, validateStory } from './learning-validation.js';
+import { failureInfo, recoverySummary, appendFailureDetails } from './generation-errors.js';
 import { saveBeforeAcknowledge } from './request-lifecycle.js';
 
 const LANGUAGES = {de:'German',ja:'Japanese',ru:'Russian','es-CL':'Spanish'};
@@ -70,8 +71,8 @@ function renderReaderGeneration() {
   const recovery = pending?.story.id === status.storyId;
   $('reader-generation-message').textContent = recovery ? (pending.saved ? 'Response saved. Finish request.' : 'Response needs saving.') : status.message;
   const button = $('reader-generation-action');
-  button.hidden = !recovery && !['working', 'ready'].includes(status.phase);
-  button.textContent = recovery ? (pending.saved ? 'Finish request' : 'Save response') : status.phase === 'ready' ? 'View result' : 'Cancel request';
+  button.hidden = !recovery && !['working', 'ready', 'error'].includes(status.phase);
+  button.textContent = recovery ? (pending.saved ? 'Finish request' : 'Save response') : status.phase === 'error' ? 'View recovery' : status.phase === 'ready' ? 'View result' : 'Cancel request';
   button.disabled = status.phase === 'working' && !document.querySelector('.reader-ai-cancel');
   $('reader-generation-dismiss').hidden = status.phase === 'working' || recovery;
 }
@@ -82,6 +83,12 @@ $('reader-generation-action').addEventListener('click', async () => {
     try { await savePendingReaderResult(); updateReader(); }
     catch (error) { status.message = error.message; renderReaderGeneration(); }
     return;
+  }
+  if (status.phase === 'error') {
+    const op=pipeline?.records[0];
+    if (op?.target?.storyId === state.readerId) { revealRecovery(op); return; }
+    const target=document.querySelector('.help-request-recovery') || $('reader-edit-panel');
+    revealCard(target); return;
   }
   if (status.phase === 'working') { document.querySelector('.reader-ai-cancel')?.click(); return; }
   const story = readerStory();
@@ -100,7 +107,7 @@ function revealCard(card) {
   const panel = document.querySelector('.reader-panel');
   const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   requestAnimationFrame(() => {
-    const bars = [...document.querySelectorAll('.reader-generation-bar, .reader-panel .explanation-selection-toolbar')].filter(bar => !bar.hidden && bar.offsetParent !== null);
+    const bars = [...document.querySelectorAll('.reader-generation-bar, .reader-panel .explanation-selection-toolbar')].filter(bar => !bar.hidden && bar.getClientRects().length > 0);
     const barTop = Math.min(window.innerHeight, ...bars.map(bar => bar.getBoundingClientRect().top));
     const rect = card.getBoundingClientRect(), margin = 12, topEdge = 12;
     let delta = 0;
@@ -174,22 +181,28 @@ let pipeline;
 function renderCheckpointRecovery() {
   if (!pipeline) return;
   const op = pipeline.records[0];
+  $('generate').disabled = Boolean(state.checkpointBlocked || op || pipeline.busy);
+  for (const id of ['topic','language','difficulty','reading-scope']) $(id).disabled = Boolean(op?.kind === 'create' || pipeline.busy);
+  setScopeDisabled($('reading-scope'), Boolean(op?.kind === 'create' || pipeline.busy));
   const readerFrozen = !!(state.readerEditBusy || op && op.target?.storyId === state.readerId && ['continue','rewrite'].includes(op.kind));
   for (const id of ['reader-prompt','reader-level','reader-edit-submit','continue-story','rewrite-chapter','reader-menu-continue','reader-menu-rewrite','path-select']) $(id).disabled=readerFrozen;
   setScopeDisabled($('reader-scope'), readerFrozen);
-  const stageMessage=op?.stage === 'plan' ? 'Planning suitable language…' : op?.stage === 'notes' ? 'Adding vocabulary notes…' : op?.stage === 'readings' ? 'Adding kanji readings…' : 'Writing your story…';
+  const stageMessage=op?.kind === 'examples' && op.stage === 'prose' ? 'Generating examples…' : op?.stage === 'plan' ? 'Planning suitable language…' : op?.stage === 'notes' ? 'Adding vocabulary notes…' : op?.stage === 'readings' ? 'Adding kanji readings…' : 'Writing your story…';
   if (op && pipeline.busy) {
     if (op.kind === 'create') $('generation-status').textContent=stageMessage;
     if (readerGeneration && readerGeneration.storyId === op.target?.storyId) { readerGeneration.phase='working'; readerGeneration.message=stageMessage; renderReaderGeneration(); }
     if (state.activeChapterRequest && state.activeChapterRequest.storyId === op.target?.storyId) state.activeChapterRequest.loading.querySelector('strong').textContent=stageMessage;
   }
   for (const id of ['checkpoint-recovery-create','checkpoint-recovery-settings','checkpoint-recovery-reader']) {
-    const box = $(id); box.textContent='';
+    const box = $(id);
+    if (id === 'checkpoint-recovery-reader') (op?.kind === 'examples' ? $('reader-help-section') : $('reader-edit-panel')).after?.(box);
+    box.textContent='';
     box.hidden = !op || id === 'checkpoint-recovery-reader' && (op.target?.storyId !== state.readerId || pipeline.busy && state.activeChapterRequest?.storyId === op.target?.storyId) || id === 'checkpoint-recovery-create' && pipeline.busy && !$('loading-card').hidden;
     if (box.hidden) continue;
     const message = document.createElement('p'); message.className='helper'; message.setAttribute('role','status');
-    message.textContent = pipeline.busy ? stageMessage : op.error ? `${op.error.replace(/ Explicitly retry or discard this request\.$/, '')} Use ${op.stage === 'ready' || op.stage === 'applied' ? 'Save / finish' : 'Retry'} below, or Discard to abandon this attempt.` : 'A generation is unfinished. Resume its saved progress or discard it.';
-    const resume = document.createElement('button'); resume.type='button'; resume.className='secondary-btn'; resume.textContent=op.stage === 'ready' || op.stage === 'applied' ? 'Save / finish' : op.error ? 'Retry' : 'Resume'; resume.disabled=pipeline.busy;
+    message.textContent = pipeline.busy ? stageMessage : op.promptVersion !== PROMPT_VERSION || op.safeguardVersion !== SAFEGUARD_VERSION ? 'This saved request belongs to an older app definition. Discard it to start with the current requirements.' : recoverySummary(op);
+    if (op.error) message.setAttribute('role', 'alert');
+    const resume = document.createElement('button'); resume.type='button'; resume.className='secondary-btn'; resume.textContent=op.stage === 'applied' || op.request?.completed ? 'Finish request' : op.stage === 'ready' ? 'Save response' : op.error ? 'Retry' : 'Resume'; resume.disabled=pipeline.busy || /older app definition|destination.*no longer|source explanation changed|destination path changed/i.test(op.error || '') || op.promptVersion !== PROMPT_VERSION || op.safeguardVersion !== SAFEGUARD_VERSION;
     resume.addEventListener('click', () => resumeCheckpoint(op));
     const discard = document.createElement('button'); discard.type='button'; discard.className=pipeline.busy ? 'small-btn reader-ai-cancel' : 'small-btn'; discard.textContent=pipeline.busy ? 'Cancel request' : 'Discard';
     discard.addEventListener('click', async () => {
@@ -198,23 +211,32 @@ function renderCheckpointRecovery() {
           discard.disabled=true;
           await pipeline.cancel();
         } else { await pipeline.discard(op); if (readerGeneration?.storyId === op.target?.storyId && readerGeneration?.phase !== 'ready') setReaderGeneration(null); toast('Unfinished generation discarded'); }
-      } catch (error) { op.error=error.message; }
+      } catch (error) { op.failure=failureInfo(error,op.stage); op.error=op.failure.message; }
       finally { discard.disabled=false; renderCheckpointRecovery(); }
     });
-    box.append(message,resume,discard);
+    box.append(message);
+    if (op.error) appendFailureDetails(box, op.failure || failureInfo(new Error(op.error), op.stage));
+    const actions = document.createElement('div'); actions.className='recovery-actions'; actions.append(resume,discard); box.append(actions);
   }
 }
 async function resumeCheckpoint(op) {
+  if (!pipeline.records.includes(op) || pipeline.busy) return;
   if (state.requestId || state.readerEditBusy || state.readerHelpBusy || state.pendingReaderResult || state.pendingGeneration) { toast('Finish the active request first.'); return; }
   try {
     if (op.promptVersion !== PROMPT_VERSION || op.safeguardVersion !== SAFEGUARD_VERSION) throw new Error('This saved operation belongs to an older app definition. Discard it to start with the current requirements.');
-    if (state.readerEditDraft?.storyId === op.target?.storyId) {
+    if (state.readerEditDraft && state.readerEditDraft.storyId === op.target?.storyId) {
       state.readerEditDraft.error = '';
       $('reader-edit-error').textContent = '';
     }
     if (op.target?.storyId) setReaderGeneration({storyId:op.target.storyId,phase:'working',message:'Resuming saved progress…'});
+    if (op.request?.completed && !['ready','applied'].includes(op.stage)) { await pipeline.finishRequest(op); return; }
     await pipeline.run(op); showOperationResult(op);
-  } catch (error) { op.error=error.message; if (readerGeneration?.storyId === op.target?.storyId) setReaderGeneration({...readerGeneration,phase:'error',message:op.stage === 'notes' ? 'Vocabulary notes stopped. Completed prose is preserved. Use Retry or Discard below.' : error.message}); toast(error.message); renderCheckpointRecovery(); }
+  } catch (error) { op.error=failureInfo(error,op.stage).message; if (op.failure?.message !== failureInfo(error,op.stage).message) op.failure = failureInfo(error, op.stage); if (readerGeneration && readerGeneration.storyId === op.target?.storyId) setReaderGeneration({...readerGeneration,phase:'error',message:'Generation stopped. View recovery below.'}); renderCheckpointRecovery(); revealRecovery(op); }
+}
+function revealRecovery(op) {
+  const box = op?.target?.storyId === state.readerId && $('reader-dialog').open ? $('checkpoint-recovery-reader') : $('checkpoint-recovery-create');
+  if (box.id === 'checkpoint-recovery-reader') { revealCard(box); return; }
+  requestAnimationFrame(() => { if (!box.hidden) { box.tabIndex=-1; box.focus({preventScroll:true}); box.scrollIntoView({block:'nearest',behavior:'smooth'}); } });
 }
 async function runContentOperation(spec) {
   if (pipeline.records.length) throw new Error('Resume or discard the pending generation before starting another.');
@@ -293,6 +315,14 @@ function initializePipeline() {
     wait:async id=>{state.requestId=id; try {const text=await ai.wait(id); return text;} finally {state.requestId=null;}},
     acknowledge:id=>ai.acknowledge(id), cancel:id=>ai.cancel(id)
   }});
+  const pendingCreate=records.find(op=>op.kind === 'create');
+  if (pendingCreate) {
+    $('topic').value=pendingCreate.input.topic || '';
+    $('language').value=pendingCreate.language;
+    fillLevelOptions($('difficulty'),pendingCreate.language,pendingCreate.input.difficulty);
+    $('difficulty-description').textContent=readingDescription(pendingCreate.language,pendingCreate.input.difficulty);
+    setScope($('reading-scope'),pendingCreate.input.scope,$('scope-description'));
+  }
   renderCheckpointRecovery();
 }
 
@@ -369,7 +399,7 @@ function decodeResponse(text, languageCode) { return validateStory(parseContent(
 $('reader-level').addEventListener('change', () => { $('reader-level-description').textContent = readingDescription(readerStory().language, $('reader-level').value); });
 
 async function generate(event) {
-  event.preventDefault(); $('form-error').textContent = '';
+  event.preventDefault(); $('form-error').textContent = ''; $('create-error-details').textContent='';
   if (state.checkpointBlocked || pipeline?.records.length) { $('form-error').textContent='Resume or discard saved generation progress first.'; return; }
   if (state.pendingReaderResult) { $('form-error').textContent = 'Save the completed reader response before generating another story.'; return; }
   if (state.pendingGeneration) { $('form-error').textContent = 'Finish saving the completed story before generating another.'; return; }
@@ -402,7 +432,10 @@ async function generate(event) {
       try { await ai.acknowledge(state.requestId); state.requestId = null; state.pendingStoryRequestId = null; }
       catch (releaseError) { error.message = `${error.message} The AI result still needs release: ${releaseError.message}`; }
     }
-    $('form-error').textContent = error.message || 'Could not generate a story. Please try again.';
+    const op = pipeline?.records[0];
+    $('form-error').textContent = op ? '' : recoverySummary({kind:'create',stage:'setup',error:error.message,failure:failureInfo(error,'setup')});
+    if (!op) appendFailureDetails($('create-error-details'), failureInfo(error,'setup'));
+    else revealRecovery(op);
   } finally { $('loading-card').hidden = true; $('story-form').hidden = false; }
 }
 $('story-form').addEventListener('submit', generate);
@@ -1473,14 +1506,18 @@ async function readerAi(kind, input, instructions, requestPanel, config = { prov
   panel.append(cancel);
   renderReaderGeneration();
   try { const result = await ai.wait(id); if (cancelled) throw new Error('Request cancelled.'); state.pendingReaderRequestId = id; return result; }
-  catch (error) { try { await ai.acknowledge(id); } catch {} throw cancelled ? new Error('Request cancelled.') : error; }
+  catch (error) {
+    state.pendingReaderRequestId = id;
+    try { await releaseInvalidReaderResponse(); } catch (releaseError) { error.releaseFailure = releaseError.message; }
+    throw cancelled ? new Error('Request cancelled.') : error;
+  }
   finally { if (state.requestId === id) state.requestId = null; cancel.remove(); }
 }
 async function acknowledgeReaderResult() {
   if (!state.pendingReaderRequestId) return;
   if (!state.pendingReaderResult?.saved) throw new Error('Save the completed response before starting another request.');
   const id = state.pendingReaderRequestId;
-  await ai.acknowledge(id);
+  try { await ai.acknowledge(id); } catch (error) { if (error.code !== 'not_found') throw error; }
   state.pendingReaderRequestId = null; state.pendingReaderResult = null;
 }
 async function releaseSavedInference() {
@@ -1498,7 +1535,8 @@ async function releaseSavedInference() {
 }
 async function releaseInvalidReaderResponse() {
   if (!state.pendingReaderRequestId || state.pendingReaderResult) return;
-  await ai.acknowledge(state.pendingReaderRequestId); state.pendingReaderRequestId = null;
+  try { await ai.acknowledge(state.pendingReaderRequestId); } catch (error) { if (error.code !== 'not_found') throw error; }
+  state.pendingReaderRequestId = null;
 }
 async function savePendingReaderResult() {
   const pending = state.pendingReaderResult; if (!pending) return;
@@ -1513,10 +1551,11 @@ async function savePendingReaderResult() {
       acknowledge: acknowledgeReaderResult
     });
     if (readerGeneration?.storyId === pending.story.id) { readerGeneration.phase = 'ready'; readerGeneration.message = 'Ready'; }
-  } finally { pending.saving = false; renderReaderGeneration(); }
+  } catch (error) { pending.failure=failureInfo(error,'saving',pending.saved ? 'release' : 'save'); throw error; }
+  finally { pending.saving = false; renderReaderGeneration(); }
 }
 function renderPendingReaderResult() {
-  document.querySelectorAll('.save-generated-retry').forEach(button => button.remove());
+  document.querySelectorAll('.reader-response-recovery').forEach(panel => panel.remove());
   const pending = state.pendingReaderResult;
   if (!pending || pending.story.id !== state.readerId) return;
   const location = pending.readerLocation;
@@ -1524,16 +1563,19 @@ function renderPendingReaderResult() {
   if (location && (location.chapterId !== chapter.id || location.versionId !== version.id)) return;
   const box = $('reader-help'); $('reader-help-section').hidden = false;
   const host = location?.helpId ? [...box.querySelectorAll('.help-card')].find(card => card.dataset.helpId === location.helpId) || box : box;
-  if (location?.followUp) { const question = document.createElement('p'); question.className = 'help-question help-text-selectable'; question.textContent = location.followUp; host.append(question); }
+  const recovery=document.createElement('section'); recovery.className='recovery-panel reader-response-recovery';
+  if (location?.followUp) { const question = document.createElement('p'); question.className = 'help-question help-text-selectable'; question.textContent = location.followUp; recovery.append(question); }
   const note = document.createElement('p'); note.textContent = pending.saved ? 'Response saved. Finish releasing the AI request to continue.' : `${pending.preview}\n\nThis completed response still needs saving.`;
-  host.append(note);
+  recovery.append(note);
+  if (pending.failure) appendFailureDetails(recovery,pending.failure);
+  const actions=document.createElement('div'); actions.className='recovery-actions';
   const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'secondary-btn save-generated-retry'; retry.textContent = pending.saved ? 'Finish request' : 'Save response';
   retry.addEventListener('click', async () => {
     retry.disabled = true;
     try { await savePendingReaderResult(); if (state.readerId === pending.story.id) updateReader(); toast('Response saved'); }
     catch (error) { note.textContent = `${pending.preview}\n\n${error.message}`; retry.disabled = false; }
   });
-  host.append(retry);
+  actions.append(retry); recovery.append(actions); host.append(recovery);
 }
 function decodeHelp(text, action = 'initial') {
   if (action === 'detail') {
@@ -1629,7 +1671,7 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
       toast('Explanation saved');
     } catch (error) {
       clearLoading();
-      if (readerGeneration) setReaderGeneration({ ...readerGeneration, phase: 'error', message: error.message });
+      if (readerGeneration) setReaderGeneration({ ...readerGeneration, phase: 'error', message: 'Request stopped. View recovery below.' });
       try { await releaseInvalidReaderResponse(); } catch {}
       if (state.readerId === story.id && activeChapter().id === chapter.id && activeVersion().id === version.id) {
         renderSavedHelp(chapter, version);
@@ -1640,10 +1682,30 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
           const input = form.querySelector('input'); if (input) input.value = followUp;
           const button = card.querySelector('.help-actions button'); if (button) { button.hidden = true; button.setAttribute('aria-expanded', 'true'); }
         }
+        if (pipeline?.records.length) { renderCheckpointRecovery(); return; }
         if (error.message === 'Request cancelled.') { toast('Request cancelled'); return; }
-        const note = document.createElement('p'); note.className = 'form-error help-text-selectable'; note.setAttribute('role', 'alert'); note.textContent = `${error.message} Use the action again to retry.`;
-        if (form) form.append(note);
-        else (card || box).append(note);
+        const recovery = document.createElement('section'); recovery.className='recovery-panel help-request-recovery';
+        const note = document.createElement('p'); note.setAttribute('role','alert');
+        note.textContent = recoverySummary({kind:action === 'initial' ? 'explain' : action,error:error.message,failure:failureInfo(error,action)}); recovery.append(note);
+        appendFailureDetails(recovery, failureInfo(error,action));
+        const actions=document.createElement('div'); actions.className='recovery-actions';
+        const retry=document.createElement('button'); retry.type='button'; retry.className='secondary-btn'; retry.textContent=state.pendingReaderRequestId ? 'Finish request' : 'Retry';
+        const retrySelection=JSON.parse(JSON.stringify(passage));
+        retry.addEventListener('click', async () => {
+          if (state.readerHelpBusy || state.requestId) return;
+          if (state.readerId !== retrySelection.storyId) return;
+          retry.disabled=true;
+          try {
+            const finishing=retry.textContent === 'Finish request';
+            await releaseInvalidReaderResponse();
+            if (finishing) { retry.textContent='Retry'; note.textContent='Previous request finished. Retry to request a new response.'; return; }
+            recovery.remove();
+            await explainSelection(kind,action,followUp,retrySelection);
+          } catch (releaseError) { note.textContent='Could not finish the previous request. Try Finish request again.'; }
+          finally { retry.disabled=false; }
+        });
+        actions.append(retry); recovery.append(actions);
+        if (form) form.append(recovery); else (card || box).append(recovery);
         $('reader-help-section').hidden = false;
       }
     } finally { clearLoading(); }
@@ -1767,8 +1829,8 @@ $('reader-edit-submit').addEventListener('click', async () => {
     showOperationResult(op);
   } catch (error) {
     try { await releaseInvalidReaderResponse(); } catch {}
-    if (readerGeneration) setReaderGeneration({ ...readerGeneration, phase: 'error', message: pipeline?.records[0]?.stage === 'notes' ? 'Vocabulary notes stopped. Completed prose is preserved. Use Retry or Discard below.' : error.message });
-    const message = error.message === 'Request cancelled.' ? 'Generation cancelled.' : pipeline?.records.length ? 'The request stopped. Use Retry in the recovery panel below, or Discard. Your existing chapter is unchanged.' : `${error.message} Submit again to retry.`;
+    if (readerGeneration) setReaderGeneration({ ...readerGeneration, phase: 'error', message: 'Generation stopped. View recovery below.' });
+    const message = error.message === 'Request cancelled.' ? 'Generation cancelled.' : pipeline?.records.length ? '' : `${error.message} Submit again to retry.`;
     state.readerEditDraft = { storyId: story.id, pathId: path.id, chapterId: chapter.id, mode, prompt, error: message };
     if (state.readerId === story.id) {
       state.readerChapter = chapters.indexOf(chapter); updateReader();
@@ -1842,7 +1904,6 @@ document.documentElement.style.colorScheme = 'dark';
 state.stories = readJson('data/stories.json', []);
 if (!Array.isArray(state.stories)) state.stories = [];
 const settings = readJson('data/settings.json', {}); state.providerId = settings.providerId || ''; state.model = settings.model || PREFERRED_MODEL; state.reasoning = settings.reasoning || '';
-initializePipeline();
 state.furigana = settings.readingPreferences?.furigana !== false;
 state.readerFontSize = Math.max(15, Math.min(30, Number(settings.readingPreferences?.fontSize) || 19));
 state.languageSetupDismissed = settings.languageSetupDismissed === true;
@@ -1852,4 +1913,5 @@ fillScopeOptions($('reading-scope'), 'scene', $('scope-description'));
 state.learnerProfiles = Object.fromEntries(Object.entries(settings.learnerProfiles || {}).filter(([code,value]) => STORY_GUIDES[code] && typeof value === 'string').map(([code,value]) => [code,value.slice(0,600)]));
 state.languageExpectations = Object.fromEntries(Object.entries(settings.languageExpectations || {}).filter(([code,value]) => STORY_GUIDES[code] && typeof value === 'string').map(([code,value]) => [code,value.slice(0,600)]));
 renderTargetLanguageSettings(); populateTargetPicker();
+initializePipeline();
 updateCount(); refreshModels();
