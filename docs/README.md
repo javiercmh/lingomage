@@ -4,8 +4,8 @@ This directory contains product rationale, language decisions, research and
 validation. The current App² workspace is at the repository root; the earlier
 native Android implementation is retired and remains in Git history.
 
-The architecture documents for Android authentication, generation, furigana, and
-text selection/reasoning preserve details of that earlier implementation. The
+The retired native Android implementation and its architecture and validation
+documents remain only in Git history (see the commit before 28c5a04). The
 current workspace behavior is in [App² runtime migration](architecture/app2-runtime.md).
 Dated validation records describe only the build and checks named in each record;
 use the current validation status in the product and App² runtime documents.
@@ -21,16 +21,11 @@ use the current validation status in the product and App² runtime documents.
 - [Level-guided generation checks](validation/2026-10-13-level-guided-generation.md): Offline stage recovery, compatibility, functional and screenshot checks.
 - [Reading and glossing review](research/reading-and-glossing.md): Initial research records and applicability limits.
 - [Japanese furigana discovery](research/japanese-furigana.md): Preliminary evidence and verification gaps.
-- [Authentication architecture](architecture/authentication.md): Legacy Android sign-in and inference components.
-- [Generation and local storage](architecture/generation.md): Legacy Android prompts, validation, persistence and failure behavior.
 - [App² runtime migration](architecture/app2-runtime.md): Current runtime, workspace data and validation limits.
-- [Furigana rendering](architecture/furigana.md): Legacy Android annotation structure, layout and accessibility.
-- [Text selection and reasoning preferences](architecture/selection-and-reasoning.md): Earlier Android implementation details.
 - [Physical-device checklist](validation/device-checklist.md): Current App² host checks.
+- [Generation evaluation summary](validation/2026-10-14-broad-notes.md): Interpreted live-evaluation results, limits and verification.
 - [Language safeguard audit](architecture/language-safeguards.md): Current requirements, legacy decisions and regression coverage.
-- [Story implementation checks](validation/2026-10-09-stories.md): Historical Android build, device and generation outcomes.
 - [Initial language samples](validation/sample-review.md): Historical sample review and limitations.
-- [Initial implementation checks](validation/2026-10-09-authentication.md): Historical Android results and pending checks.
 
 ## Documentation conventions
 
