@@ -1,0 +1,15 @@
+const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
+const app = fs.readFileSync('js/app.js', 'utf8');
+const start = app.indexOf('const FIELD_SELECTOR'), end = app.indexOf('\n$(\'reader-copy\').addEventListener(\'click\', () => closeReaderActions())');
+assert.ok(start > 0 && end > start, 'selection menu block found');
+const calls = [], listeners = {};
+const c = {selectionMenu: {setSuppressed: value => calls.push(value)}, document: {addEventListener: (type, fn) => { listeners[type] = fn; }}};
+vm.createContext(c); vm.runInContext(app.slice(start, end), c);
+const field = {closest: selector => selector.includes('textarea') ? field : null}, story = {closest: () => null};
+assert.deepEqual(calls, [true], 'suppressed by default');
+listeners.pointerdown({target: field}); assert.deepEqual(calls, [true, false], 'field pointerdown shows the native menu');
+listeners.pointerdown({target: field}); assert.equal(calls.length, 2, 'repeat touches do not call the host again');
+listeners.focusout({target: field, relatedTarget: field}); assert.equal(calls.length, 2, 'moving between fields keeps the menu');
+listeners.focusout({target: field, relatedTarget: null}); assert.deepEqual(calls, [true, false, true], 'leaving a field suppresses again');
+listeners.pointerdown({target: field}); listeners.pointerdown({target: story}); assert.deepEqual(calls.slice(-2), [false, true], 'story text pointerdown suppresses');
+console.log('PASS native selection menu is suppressed only outside input, textarea and contenteditable fields');
