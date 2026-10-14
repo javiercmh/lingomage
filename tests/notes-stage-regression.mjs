@@ -5,7 +5,8 @@ const prose={title:'Am Bahnhof',story:'Mia kauft Brot. Mia geht zum Bahnhof.'};
 const glossary=[{word:'kaufen',meaning:'buy; kauft is singular present',forms:['kauft']},{word:'Brot',meaning:'bread',forms:['Brot']},{word:'Bahnhof',meaning:'railway station',forms:['Bahnhof']}];
 assert.deepEqual(validateProse({...prose,glossary:[{forms:['absent']}]},'de'),prose);
 assert.throws(()=>validateNotes({glossary,story:'rewritten'},prose,'de'),/without rewriting/);
-assert.throws(()=>validateNotes({glossary:[{...glossary[0],forms:['kauft','kaufen']}]},prose,'de'),/does not appear/);
+assert.deepEqual(validateNotes({glossary:[{...glossary[0],forms:['kauft','kaufen']}]},prose,'de').glossary[0].forms,['kauft']);
+assert.throws(()=>validateNotes({glossary:[{...glossary[0],forms:['kaufen']},{word:'Zug',meaning:'train',forms:['Zug']}]},prose,'de'),/None of the AI vocabulary notes/);
 assert.throws(()=>validateNotes({glossary:[]},prose,'de'),/at least one/);
 assert.throws(()=>validateNotes({glossary:[{word:'дом',meaning:'home',forms:['Latin']}]},{title:'Дом',story:'Дом'},'ru'),/target script/);
 for(const term of ['including common words','Skip routine proper names','Group alternate forms','not a list of dictionary senses','do not assume words are known'])assert.ok(NOTES_INSTRUCTIONS.includes(term));
@@ -19,7 +20,7 @@ function harness(fail='') {
   pipeline=createPipeline(io);const op=pipeline.create({planned:true,kind:'create',language:'de',input:{difficulty:'A1',practice:''},instructions:'prose only',config:{model:'fixture'}});
   return {pipeline,op,events,io,get durable(){return durable;},repair(){invalid=false;stop=false;}};
 }
-let h=harness('invalid');await assert.rejects(h.pipeline.run(h.op),/does not appear/);assert.equal(h.op.stage,'notes');assert.deepEqual(h.durable[0].prose,prose);assert.ok(!h.events.includes('apply'));
+let h=harness('invalid');await assert.rejects(h.pipeline.run(h.op),/None of the AI vocabulary notes/);assert.equal(h.op.stage,'notes');assert.deepEqual(h.durable[0].prose,prose);assert.ok(!h.events.includes('apply'));
 h.repair();const records=structuredClone(h.durable);const reloaded=createPipeline({...h.io,records});await reloaded.run(records[0]);assert.deepEqual(h.events,['language-plan','create','notes','notes','apply']);
 for(const failure of ['ack','save']){h=harness(failure);await assert.rejects(h.pipeline.run(h.op),failure==='ack'?/notes release/:/notes disk/);await h.pipeline.run(h.op);assert.deepEqual(h.events,['language-plan','create','notes','apply']);}
 h=harness('cancel');await assert.rejects(h.pipeline.run(h.op),/cancelled/);assert.equal(h.op.stage,'notes');assert.deepEqual(h.op.prose,prose);h.repair();await h.pipeline.run(h.op);assert.deepEqual(h.events,['language-plan','create','notes','cancel notes','notes','apply']);
