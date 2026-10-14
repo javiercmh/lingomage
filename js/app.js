@@ -1,5 +1,5 @@
 import { ai, readFile, writeFile, speech, translation, selectionMenu } from './bridge.js';
-import { speakSelection, speakChapter } from './reader-speech.js';
+import { speakSelection, speakChapter, chapterSpeechText } from './reader-speech.js';
 import { annotatedText, applyExplainedMarks, getCanonicalSelection, japaneseSegments } from './reader-text.js';
 import { createPipeline } from './generation-pipeline.js';
 import { SAFEGUARD_VERSION, parseContent, validateStory } from './learning-validation.js';
@@ -11,7 +11,7 @@ const SPEECH_LANGUAGES = { de: 'de-DE', ja: 'ja-JP', ru: 'ru-RU', 'es-CL': 'es-C
 const PROFILE_DEFINITIONS = readJson('data/learning-profiles.json', {});
 const STORY_GUIDES = PROFILE_DEFINITIONS.generationGuides;
 const JOURNEY_DESCRIPTIONS = PROFILE_DEFINITIONS.languages;
-const PROMPT_VERSION = '2026-10-13.20';
+const PROMPT_VERSION = '2026-10-14.21';
 const LEVELS = PROFILE_DEFINITIONS.standardizedLevels;
 const SCOPES = PROFILE_DEFINITIONS.scopes;
 function levelDefinition(language, id) { return LEVELS[language]?.levels.find(level => level.id === id); }
@@ -744,6 +744,46 @@ function closeReaderActions(restoreFocus = false) {
   $('reader-actions-menu').hidden = true; $('reader-actions-toggle').setAttribute('aria-expanded', 'false');
   if (restoreFocus) $('reader-actions-toggle').focus();
 }
+// Nonmodal reader panels share dismissal and viewport-safe positioning.
+const READER_PANELS = ['navigation', 'preferences'];
+let restoringPathPosition = false;
+function closeReaderPanels(restoreFocus = false) {
+  for (const name of READER_PANELS) {
+    const panel = $(`reader-${name}-panel`), toggle = $(`reader-${name}-toggle`);
+    const wasOpen = !panel.hidden;
+    panel.hidden = true; toggle.setAttribute('aria-expanded', 'false');
+    if (restoreFocus && wasOpen) toggle.focus();
+  }
+}
+function positionReaderPanel(name) {
+  const panel = $(`reader-${name}-panel`), rect = $(`reader-${name}-toggle`).getBoundingClientRect();
+  // Measure within the dialog's safe-area-aware content bounds.
+  const bounds = readerPanel().getBoundingClientRect(), style = getComputedStyle(readerPanel());
+  const left = Math.max(12, bounds.left + parseFloat(style.paddingLeft || 0));
+  const right = Math.min(window.innerWidth - 12, bounds.right - parseFloat(style.paddingRight || 0));
+  const top = Math.max(12, bounds.top + parseFloat(style.paddingTop || 0));
+  const bottom = Math.min(window.innerHeight - 12, bounds.bottom - parseFloat(style.paddingBottom || 0));
+  panel.style.width = `${Math.min(280, right - left)}px`;
+  panel.style.maxHeight = `${Math.max(44, bottom - top)}px`;
+  const { width, height } = panel.getBoundingClientRect();
+  panel.style.left = `${Math.max(left, Math.min(rect.left, right - width))}px`;
+  panel.style.top = `${Math.max(top, Math.min(rect.bottom + height + 6 > bottom ? rect.top - height - 6 : rect.bottom + 6, bottom - height))}px`;
+}
+function toggleReaderPanel(name) {
+  const panel = $(`reader-${name}-panel`), wasOpen = !panel.hidden;
+  closeReaderPanels(); closeReaderActions(); closeWordNote();
+  if (wasOpen) return;
+  panel.hidden = false; $(`reader-${name}-toggle`).setAttribute('aria-expanded', 'true');
+  positionReaderPanel(name);
+  const first = name === 'preferences' ? $('reader-text-size') : !$('path-control').hidden ? $('path-select') : $('chapter-select');
+  first.focus({ preventScroll: true });
+}
+function setReaderTextSize(value) {
+  state.readerFontSize = Math.max(15, Math.min(30, Number(value) || 19));
+  $('reader-story').style.fontSize = `${state.readerFontSize}px`;
+  $('reader-text-size').value = String(state.readerFontSize);
+  $('reader-text-size').setAttribute('aria-valuetext', `${state.readerFontSize} pixels`);
+}
 function renderReaderActions() {
   const story = readerStory(); if (!story) return;
   const path = selectedPath(story), index = state.readerChapter, blocked = pendingDeletionBlocked();
@@ -754,6 +794,7 @@ function renderReaderActions() {
 }
 function toggleReaderActions() {
   if (!$('reader-actions-menu').hidden) { closeReaderActions(true); return; }
+  closeReaderPanels(); closeWordNote();
   renderReaderActions(); $('reader-actions-menu').hidden = false;
   $('reader-actions-toggle').setAttribute('aria-expanded', 'true');
   const rect = $('reader-actions-toggle').getBoundingClientRect();
@@ -976,8 +1017,9 @@ function profileSnapshot(story) {
   const level = version?.difficulty || state.standardizedLevels[story.language] || story.readingStartingPoint || story.difficulty || 'beginner';
   return { language: story.language, readingStartingPoint: level, readingSelfReport: readingDescription(story.language, level), languageExpectations: state.languageExpectations[story.language] || '', profileVersion: PROFILE_DEFINITIONS.version };
 }
-function updateReader() {
+function updateReader(keepNavigation = false) {
   renderCheckpointRecovery();
+  if (!keepNavigation) closeReaderPanels();
   closeReaderActions();
   const story = readerStory(); if (!story) return;
   const chapters = pathChapters(story); state.readerChapter = Math.min(state.readerChapter, chapters.length - 1);
@@ -989,7 +1031,14 @@ function updateReader() {
   $('reader-listen').title = speech.available ? 'Listen to this chapter' : 'Listening requires App²';
   $('reader-title').textContent = version.title || story.title;
   $('reader-title').lang = SPEECH_LANGUAGES[story.language] || 'en';
-  $('reader-title-meta').textContent = [LANGUAGES[story.language] || story.language, `Chapter ${state.readerChapter + 1} of ${chapters.length}`, story.paths.length > 1 ? selectedPath(story).name : ''].filter(Boolean).join(' · ');
+  const meta = $('reader-title-meta'); meta.textContent = '';
+  const summary = document.createElement('span'); summary.className = 'reader-meta-summary';
+  summary.textContent = `${LANGUAGES[story.language] || story.language} · Chapter ${state.readerChapter + 1} of ${chapters.length}`; meta.append(summary);
+  if (story.paths.length > 1) {
+    const name = document.createElement('span'); name.className = 'reader-meta-path';
+    name.textContent = `· ${selectedPath(story).name}`; name.title = selectedPath(story).name; meta.append(name);
+  }
+  $('reader-chapter-label').textContent = `Chapter ${state.readerChapter + 1}`;
   const select = $('chapter-select'); select.textContent = '';
   chapters.forEach((item, index) => { const option = document.createElement('option'); option.value = String(index); option.textContent = `Chapter ${index + 1}`; select.append(option); });
   select.value = String(state.readerChapter);
@@ -1005,13 +1054,14 @@ function updateReader() {
     glossary: version.glossary || [],
     onNote: (event, trigger, notes) => showWordNote(trigger, notes)
   });
-  $('reader-story').style.fontSize = `${state.readerFontSize}px`;
+  setReaderTextSize(state.readerFontSize);
   $('reader-story').classList.toggle('hide-furigana', story.language === 'ja' && !state.furigana);
   $('furigana-control').hidden = story.language !== 'ja'; $('furigana-toggle').checked = state.furigana;
   renderSavedHelp(chapter, version);
   $('selection-toolbar').hidden = true; state.readerSelection = null;
   renderPendingReaderResult();
   renderChapterRequest(); renderReaderActions(); renderReaderGeneration();
+  if (keepNavigation && !$('reader-navigation-panel').hidden) positionReaderPanel('navigation');
 }
 function renderChapterRequest() {
   const request = state.activeChapterRequest;
@@ -1081,14 +1131,14 @@ function openReader(story) {
 $('reader-dialog').addEventListener('close', () => {
   if (state.readerHistoryEntry) { state.readerHistoryEntry = false; history.back(); }
   if ($('reader-removal-dialog').open) $('reader-removal-dialog').close();
-  closeReaderActions(); stopSpeech(); state.speechVersionKey = ''; closeWordNote(); rememberReaderPosition(); clearExplanationSelection(); setView('library');
+  closeReaderPanels(); closeReaderActions(); stopSpeech(); state.speechVersionKey = ''; closeWordNote(); rememberReaderPosition(); clearExplanationSelection(); setView('library');
 });
 window.addEventListener('popstate', () => {
   if (!$('reader-dialog').open) return;
   state.readerHistoryEntry = false;
   $('reader-dialog').close();
 });
-readerPanel().addEventListener('scroll', () => { closeReaderActions(); rememberReaderPosition(); });
+readerPanel().addEventListener('scroll', event => { if (event.target !== readerPanel()) return; if (!restoringPathPosition) closeReaderPanels(); closeReaderActions(); rememberReaderPosition(); });
 function sentenceContext(text, start, end) {
   const boundary = /[.!?。！？\n]/u;
   let left = Math.min(start, text.length) - 1;
@@ -1247,7 +1297,8 @@ $('reader-listen').addEventListener('click', async () => {
   readerSpeechKey = key;
   const button = $('reader-listen'); button.disabled = true;
   const isCurrent = () => run === readerSpeechRun && key === state.speechVersionKey && $('reader-dialog').open;
-  try { await speakChapter(speech, version.story, SPEECH_LANGUAGES[story.language], isCurrent); }
+  const text = chapterSpeechText(version, story.title);
+  try { await speakChapter(speech, text, SPEECH_LANGUAGES[story.language], isCurrent); }
   catch (error) { if (isCurrent()) toast(`Could not play audio: ${error.message}`); }
   finally { if (run === readerSpeechRun) { readerSpeechKey = ''; button.disabled = !speech.available; } }
 });
@@ -1793,8 +1844,8 @@ document.addEventListener('click', event => { if (!event.target.closest?.('#read
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && !$('reader-actions-menu').hidden) { event.preventDefault(); event.stopPropagation(); closeReaderActions(true); }
 }, true);
-window.addEventListener('resize', () => { closeReaderActions(); closeWordNote(); });
-$('chapter-select').addEventListener('change', () => { state.readerChapter = Number($('chapter-select').value); state.readerVersion = 0; clearExplanationSelection(); updateReader(); });
+window.addEventListener('resize', () => { closeReaderPanels(); closeReaderActions(); closeWordNote(); });
+$('chapter-select').addEventListener('change', () => { closeReaderPanels(true); state.readerChapter = Number($('chapter-select').value); state.readerVersion = 0; clearExplanationSelection(); updateReader(); });
 $('path-select').addEventListener('change', () => {
   if (state.readerEditBusy) { $('path-select').value = selectedPath().id; return; }
   rememberReaderPosition(); closeWordNote(); clearExplanationSelection();
@@ -1802,12 +1853,24 @@ $('path-select').addEventListener('change', () => {
   try { persistReaderStory(story); } catch (error) { story.activePathId = previous; toast(error.message); }
   const position = state.readerPositions[`${story.id}:${selectedPath(story).id}`];
   state.readerChapter = Math.max(0, pathChapters(story).findIndex(chapter => chapter.id === position?.chapterId));
-  $('reader-edit-panel').hidden = true; state.readerEditDraft = null; updateReader(); readerPanel().scrollTop = position?.scrollTop || 0;
+  const keepNavigation = !$('reader-navigation-panel').hidden;
+  $('reader-edit-panel').hidden = true; state.readerEditDraft = null; updateReader(keepNavigation);
+  restoringPathPosition = true; readerPanel().scrollTop = position?.scrollTop || 0;
+  requestAnimationFrame(() => { restoringPathPosition = false; if (keepNavigation && !$('reader-navigation-panel').hidden) positionReaderPanel('navigation'); });
 });
 $('chapter-prev').addEventListener('click', () => { if (state.readerChapter > 0) { state.readerChapter--; clearExplanationSelection(); } updateReader(); });
 $('chapter-next').addEventListener('click', () => { if (state.readerChapter < pathChapters(readerStory()).length - 1) { state.readerChapter++; clearExplanationSelection(); } updateReader(); });
-$('text-smaller').addEventListener('click', () => { state.readerFontSize = Math.max(15, state.readerFontSize - 1); $('reader-story').style.fontSize = `${state.readerFontSize}px`; try { persistSettings(); } catch (error) { toast(error.message); } });
-$('text-larger').addEventListener('click', () => { state.readerFontSize = Math.min(30, state.readerFontSize + 1); $('reader-story').style.fontSize = `${state.readerFontSize}px`; try { persistSettings(); } catch (error) { toast(error.message); } });
+for (const name of READER_PANELS) $(`reader-${name}-toggle`).addEventListener('click', () => toggleReaderPanel(name));
+$('reader-text-size').addEventListener('input', () => setReaderTextSize($('reader-text-size').value));
+$('reader-text-size').addEventListener('change', () => { try { persistSettings(); } catch (error) { toast(error.message); } });
+document.addEventListener('pointerdown', event => {
+  if (!event.target.closest?.('.reader-floating-panel, #reader-navigation-toggle, #reader-preferences-toggle')) closeReaderPanels();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && READER_PANELS.some(name => !$(`reader-${name}-panel`).hidden)) {
+    event.preventDefault(); event.stopPropagation(); closeReaderPanels(true);
+  }
+}, true);
 $('furigana-toggle').addEventListener('change', () => { state.furigana = $('furigana-toggle').checked; $('reader-story').classList.toggle('hide-furigana', !state.furigana); document.querySelectorAll('#reader-help .story-text').forEach(node => node.classList.toggle('hide-furigana', !state.furigana)); try { persistSettings(); } catch (error) { toast(error.message); } });
 function showEditPanel(mode) {
   if (state.readerEditBusy) return;
