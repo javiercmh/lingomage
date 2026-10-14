@@ -6,6 +6,7 @@
   --muted: #94a3b8;
   --paper: #090d16;
   --card: rgba(25, 35, 54, .92);
+  --card-solid: #19233a; /* --card at full opacity */
   --line: rgba(203, 213, 225, .14);
   --field: rgba(10, 16, 29, .78);
   --tint: rgba(255,255,255,.055);
@@ -128,7 +129,7 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 .library-list { display: grid; gap: 10px; }
 /* The reading surface slides over the destructive action underneath. */
 .story-card { position: relative; display: grid; grid-template-columns: 1fr; padding: 0; overflow: hidden; touch-action: pan-y; isolation: isolate; }
-.story-open { position: relative; z-index: 1; width: 100%; min-width: 0; border: 0; border-radius: 17px; background: #19233a; color: var(--ink); padding: 15px; text-align: left; } /* opaque so the tray never shows through while sliding */
+.story-open { position: relative; z-index: 1; width: 100%; min-width: 0; border: 0; border-radius: 17px; background: var(--card-solid); color: var(--ink); padding: 15px; text-align: left; } /* opaque so the tray never shows through while sliding */
 .story-card { --swipe-x: 0px; }
 .story-card.swipe-revealed { --swipe-x: -168px; }
 .story-open, .story-menu-toggle { transform: translateX(var(--swipe-x)); transition: transform .2s ease; }
