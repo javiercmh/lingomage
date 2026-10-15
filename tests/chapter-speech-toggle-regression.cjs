@@ -23,7 +23,7 @@ function harness({story = 'Chapter body', language = 'de', delayVoices = false} 
   return {c, button, dialog, speech, speaks, stops, voices, errors, click: handlers.click};
 }
 function idle(h) {
-  assert.equal(h.button.disabled, false); assert.equal(h.button.attributes['data-playing'], 'false');
+  assert.equal(h.button.disabled, false); assert.equal(h.button.attributes['data-playing'], 'false'); assert.equal(h.button.attributes['aria-pressed'], 'false');
   assert.equal(h.button.attributes['aria-label'], 'Listen to this chapter'); assert.equal(h.button.attributes['aria-busy'], 'false');
 }
 (async () => {
@@ -31,7 +31,7 @@ function idle(h) {
   const h = harness({story: 'Long prose '.repeat(800)});
   const play = h.click(); await flush();
   assert.equal(h.speaks.length, 1); assert.equal(h.button.disabled, false);
-  assert.equal(h.button.attributes['aria-label'], 'Stop reading this chapter'); assert.equal(h.button.attributes['data-playing'], 'true');
+  assert.equal(h.button.attributes['aria-label'], 'Stop reading this chapter'); assert.equal(h.button.attributes['data-playing'], 'true'); assert.equal(h.button.attributes['aria-pressed'], 'true');
   const stop = h.click(); await flush();
   assert.equal(h.stops.length, 1); assert.equal(h.button.disabled, true); assert.equal(h.button.attributes['aria-busy'], 'true');
   await h.click(); assert.equal(h.speaks.length, 1); assert.equal(h.stops.length, 1, 'rapid taps cannot queue conflicting commands');
