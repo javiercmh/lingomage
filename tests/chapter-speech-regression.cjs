@@ -12,12 +12,12 @@ const c={Intl};vm.createContext(c);vm.runInContext(fs.readFileSync('js/reader-sp
  count=0;await c.speakChapter({speak:async()=>{count++;}},text,'ja-JP',()=>false);assert.equal(count,0);
  const app=fs.readFileSync('js/app.js','utf8');assert.ok(app.includes('const text = chapterSpeechText(version, story.title);'));assert.ok(app.includes('speakChapter(speech, text, SPEECH_LANGUAGES[story.language], isCurrent)'));
  // Invoke the actual Listen listener, not only the speech helper.
- const handlers={}, button={disabled:false,addEventListener:(name,fn)=>handlers[name]=fn}, dialog={open:true};
+ const handlers={}, button={disabled:false,setAttribute(){},addEventListener:(name,fn)=>handlers[name]=fn}, dialog={open:true};
  const fixture={title:'',story:'本文😀',storySegments:[{text:'本文',reading:'ほんぶん'}]};
  const original=JSON.stringify(fixture);calls.length=0;
  Object.assign(c,{state:{speechVersionKey:'S:C:V'},readerStory:()=>({title:'章の名前',language:'ja'}),activeChapter:()=>({}),activeVersion:()=>fixture,
  speech:{available:true,speak:speech.speak},SPEECH_LANGUAGES:{ja:'ja-JP'},$:id=>id==='reader-listen'?button:dialog,toast:message=>{throw Error(message);}});
- vm.runInContext("let readerSpeechRun=0, readerSpeechKey='';\n"+app.slice(app.indexOf("$('reader-listen').addEventListener"),app.indexOf("$('reader-dialog').addEventListener('pointerdown'")),c);
+ vm.runInContext("let readerSpeechRun=0, readerSpeechKey='', readerSpeechOwner=0, readerSpeechStop=null;\n"+app.slice(app.indexOf("function renderReaderListen("),app.indexOf("$('reader-dialog').addEventListener('pointerdown'")),c);
  await handlers.click();assert.equal(calls.map(x=>x.text).join(''),'章の名前\n\n本文😀');
  assert.ok(calls.every(x=>x.language==='ja-JP'));assert.equal(button.disabled,false);assert.equal(JSON.stringify(fixture),original);
  console.log('PASS whole chapter speech: complete canonical text, bounded Unicode-safe chunks, locale, cancellation and navigation guard');
