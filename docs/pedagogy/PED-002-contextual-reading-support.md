@@ -109,3 +109,6 @@ This is an evaluation candidate, not a shipped prompt iteration. Production `NOT
 ### Compact reader and titled chapter listening
 
 Listen now reads the displayed canonical chapter title followed by a blank line and the complete body; readings, glossary and explanations remain excluded. This is the learner's requested reading-support preference, not a claim of learning effectiveness. The icon-only Listen button retains its accessible scope label. A floating Aa panel groups text size and Japanese furigana; saved preferences retain their existing schema. Copy, stored canonical prose and explanation offsets are unchanged. Prompt version `2026-10-14.21` records the changed reading support; inference instructions are unchanged, existing saved provenance is preserved, and incompatible unfinished checkpoints follow existing explicit recovery rules. Existing citations and evidence limitations remain applicable.
+
+
+Chapter Listen is also a Stop control while playback is active, including before the first utterance starts. A stop invalidates queued chunks immediately; restarting begins at the title. This is a learner-requested playback-control refinement with no new learning-effect claim. Spoken canonical content, inference prompts, prompt version and saved provenance are unchanged. Native engine timing and cancellation still require Android verification.
