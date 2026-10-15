@@ -37,7 +37,7 @@ function section(start, end) { const at = source.indexOf(start); assert(at >= 0,
   assert(header.includes('aria-label="Listen to this chapter"'), 'icon-only Listen retains its accessible scope');
   assert(!header.includes('Listen to chapter</span>'));
   for (const id of ['reader-navigation-panel', 'reader-preferences-panel', 'reader-text-size']) assert(header.includes(`id="${id}"`));
-  const navStart = html.indexOf('<div id="reader-navigation-bar"'), navigation = html.slice(navStart, html.indexOf('<div id="reader-story"', navStart));
+  const navStart = html.indexOf('<div id="reader-navigation-bar"'), navigation = html.slice(navStart, html.indexOf('<div id="reader-player-anchor"', navStart));
   for (const id of ['chapter-prev', 'reader-navigation-toggle', 'chapter-next', 'reader-preferences-toggle']) assert(navigation.includes(`id="${id}"`));
   assert(!navigation.includes('id="reader-listen"'), 'Listen stays with the expanded title');
   assert.equal((navigation.match(/<svg/g) || []).length, 3, 'navigation and picker use stroked chevrons');
