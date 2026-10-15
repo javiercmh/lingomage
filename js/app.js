@@ -1040,6 +1040,7 @@ function updateReader(keepNavigation = false) {
   state.speechVersionKey = speechVersionKey;
   renderReaderListen();
   $('reader-title').textContent = version.title || story.title;
+  requestAnimationFrame(fitReaderTitle);
   $('reader-title').lang = SPEECH_LANGUAGES[story.language] || 'en';
   const meta = $('reader-title-meta'); meta.textContent = '';
   const summary = document.createElement('span'); summary.className = 'reader-meta-summary';
@@ -1301,6 +1302,18 @@ window.visualViewport?.addEventListener('resize', () => { if (!$('selection-tool
 let selectionTimer;
 document.addEventListener('selectionchange', () => { clearTimeout(selectionTimer); selectionTimer = setTimeout(showSelectionToolbar, 180); });
 $('selection-toolbar').addEventListener('pointerdown', event => { event.preventDefault(); clearTimeout(selectionTimer); });
+// Flex sizing retains empty space after wrapped lines. Shrink the title box to
+// its widest rendered line so Listen stays beside the words at every width.
+function fitReaderTitle() {
+  const title = $('reader-title');
+  title.style.maxWidth = '';
+  if (!title.getClientRects().length || !title.firstChild) return;
+  const range = document.createRange();
+  range.selectNodeContents(title);
+  const width = Math.max(0, ...Array.from(range.getClientRects(), rect => rect.width));
+  if (width) title.style.maxWidth = `${Math.ceil(width)}px`;
+}
+new ResizeObserver(fitReaderTitle).observe($('reader-title').parentElement);
 function renderReaderListen() {
   const button = $('reader-listen');
   const playing = Boolean(readerSpeechKey && readerSpeechKey === state.speechVersionKey);
@@ -1311,6 +1324,7 @@ function renderReaderListen() {
   button.setAttribute('aria-label', label);
   button.setAttribute('aria-busy', String(stopping));
   button.setAttribute('data-playing', String(playing));
+  button.setAttribute('aria-pressed', String(playing));
 }
 function stopSpeech(reportError = false) {
   // Invalidate queued utterances before sending Stop, including pending voice lookup.

@@ -46,4 +46,4 @@ Record date, device and host versions, tested app commit, the items checked, act
 
 - Pending Android verification: hold and drag the text-size slider through several sizes in expanded and pinned reader states; live reflow must not dismiss or move the panel, settings save on release, repeated adjustment remains available, and outside tap/Escape still dismiss it.
 
-- Pending Android verification: brighter/larger title Listen icon; tap Listen then tap the stop icon during voice lookup, within an utterance and between long-chapter chunks; no later chunks may start. Check native Stop, rapid stop/start, natural completion, stop errors and navigation/reader closure while stopping.
+- Pending Android verification: brighter/larger title Listen icon, close spacing beside wrapped titles and grey pressed state; tap Listen then tap the pressed grey speaker during voice lookup, within an utterance and between long-chapter chunks; no later chunks may start. Check native Stop, rapid stop/start, natural completion, stop errors and navigation/reader closure while stopping.

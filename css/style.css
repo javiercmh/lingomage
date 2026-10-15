@@ -365,10 +365,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px
 .reader-panel .gloss-note-trigger, .reader-panel .explained-expression, .reader-panel .help-card { scroll-margin-top: calc(var(--sa-top) + 90px); }
 .reader-title-row .reader-listen { flex: 0 0 44px; width: 44px; height: 44px; border: 0; background: transparent; color: #bfdbfe; }
 .reader-title-row .reader-listen svg { width: 28px; height: 28px; stroke-width: 2.2; }
-.reader-title-row .reader-listen .reader-listen-stop { display: none; fill: currentColor; stroke: none; }
-.reader-title-row .reader-listen[data-playing="true"] { color: var(--ink); }
-.reader-title-row .reader-listen[data-playing="true"] .reader-listen-speaker { display: none; }
-.reader-title-row .reader-listen[data-playing="true"] .reader-listen-stop { display: block; }
+.reader-title-row .reader-listen[data-playing="true"] { color: var(--muted); }
 .reader-chevron { display: block; width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 .reader-title-controls > button { display: inline-flex; align-items: center; justify-content: center; }
 .reader-title-controls .reader-picker-chevron { flex: 0 0 18px; width: 18px; height: 18px; }
