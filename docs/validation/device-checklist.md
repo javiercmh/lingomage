@@ -43,3 +43,5 @@ Record date, device and host versions, tested app commit, the items checked, act
 - Pending Android verification: compact reader toolbar at narrow widths and safe areas; borderless Story actions touch/focus behavior; chapter/path and Aa floating panels, outside dismissal and Back behavior; native range adjustment with TalkBack; Japanese furigana persistence; Listen speaks canonical title followed by the complete chapter and stops on navigation/background interruption.
 
 - Pending Android verification: expanded reader with Listen vertically centered beside multiline titles; clear Previous/Next chevrons; reduced sticky navigation at the top safe area, expansion on scrolling back, popover anchors while pinned, and keyboard/TalkBack focus clearance under the bar.
+
+- Pending Android verification: hold and drag the text-size slider through several sizes in expanded and pinned reader states; live reflow must not dismiss or move the panel, settings save on release, repeated adjustment remains available, and outside tap/Escape still dismiss it.

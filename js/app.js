@@ -1148,7 +1148,13 @@ window.addEventListener('popstate', () => {
   state.readerHistoryEntry = false;
   $('reader-dialog').close();
 });
-readerPanel().addEventListener('scroll', event => { if (event.target !== readerPanel()) return; if (!restoringPathPosition) closeReaderPanels(); closeReaderActions(); updateReaderNavigation(); rememberReaderPosition(); });
+readerPanel().addEventListener('scroll', event => {
+  if (event.target !== readerPanel()) return;
+  // Resizing prose can emit scroll events through reflow/scroll anchoring.
+  // Keep the native range mounted and still while its preferences panel is open.
+  if (!restoringPathPosition && $('reader-preferences-panel').hidden) closeReaderPanels();
+  closeReaderActions(); updateReaderNavigation(); rememberReaderPosition();
+});
 function sentenceContext(text, start, end) {
   const boundary = /[.!?。！？\n]/u;
   let left = Math.min(start, text.length) - 1;
@@ -1876,6 +1882,10 @@ $('reader-text-size').addEventListener('change', () => { try { persistSettings()
 document.addEventListener('pointerdown', event => {
   if (!event.target.closest?.('.reader-floating-panel, #reader-navigation-toggle, #reader-preferences-toggle')) closeReaderPanels();
 });
+// Wheel scrolling outside a floating panel is deliberate dismissal; layout scrolls are not.
+document.addEventListener('wheel', event => {
+  if (!event.target.closest?.('.reader-floating-panel')) closeReaderPanels();
+}, { passive: true });
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && READER_PANELS.some(name => !$(`reader-${name}-panel`).hidden)) {
     event.preventDefault(); event.stopPropagation(); closeReaderPanels(true);
