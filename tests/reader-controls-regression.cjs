@@ -67,11 +67,26 @@ vm.runInContext(slice("$('chapter-select').addEventListener", "$('path-select').
 box('chapter-select').value = '1'; box('chapter-select').events.change();
 assert.equal(c.state.readerChapter, 1); assert.equal(box('reader-navigation-panel').hidden, true);
 assert.equal(box('reader-navigation-toggle').focused, true);
-// Scrolling panel contents leaves them open; reader scrolling dismisses them.
+// Prose reflow must not unmount the range during a continuous adjustment.
 vm.runInContext(slice("readerPanel().addEventListener('scroll'", 'function sentenceContext('), c);
 c.state.readerEditBusy = false; box('reader-preferences-toggle').events.click();
 reader.events.scroll({target: box('reader-preferences-panel')}); assert.equal(box('reader-preferences-panel').hidden, false);
-reader.events.scroll({target: reader}); assert.equal(box('reader-preferences-panel').hidden, true);
+const savesBeforeDrag = saved;
+for (const size of [17, 22, 30, 24, 19]) {
+  box('reader-text-size').value = String(size); box('reader-text-size').events.input();
+  reader.events.scroll({target: reader});
+  assert.equal(box('reader-preferences-panel').hidden, false, 'reflow leaves the native range available for the next drag input');
+  assert.equal(c.state.readerFontSize, size);
+  assert.equal(saved, savesBeforeDrag, 'intermediate drag values are previews only');
+}
+box('reader-text-size').events.change(); assert.equal(saved, savesBeforeDrag + 1, 'release saves once');
+reader.events.scroll({target: reader}); assert.equal(box('reader-preferences-panel').hidden, false, 'late reflow after release does not dismiss preferences');
+documentEvents.wheel({target: {closest: () => true}}); assert.equal(box('reader-preferences-panel').hidden, false);
+documentEvents.wheel({target: {closest: () => null}}); assert.equal(box('reader-preferences-panel').hidden, true);
+box('reader-preferences-toggle').events.click();
+documentEvents.pointerdown({target: {closest: () => null}}); assert.equal(box('reader-preferences-panel').hidden, true, 'outside tap still dismisses preferences');
+box('reader-navigation-toggle').events.click(); reader.events.scroll({target: reader});
+assert.equal(box('reader-navigation-panel').hidden, true, 'reader scrolling still dismisses chapter navigation');
 assert(notesClosed > 0);
 // Pinned styling follows geometry and safe areas without changing content or scroll position.
 box('reader-dialog').open = true; reader.scrollTop = 300; navigationTop = 12;
