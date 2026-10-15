@@ -12,12 +12,18 @@ function section(start, end) { const at = source.indexOf(start); assert(at >= 0,
   const panel = { scrollBy: options => scrolls.push(options) };
   const classes = new Set();
   const make = rect => ({ getBoundingClientRect: () => rect, setAttribute() {}, focus() {}, classList: { add: name => classes.add(name), remove: name => classes.delete(name) } });
-  const context = { document: { querySelector: () => panel, querySelectorAll: () => [{ hidden: false, offsetParent: null, getClientRects: () => [{}], getBoundingClientRect: () => ({ top: 700 }) }] }, window: { innerHeight: 800, matchMedia: () => ({ matches: false }) }, requestAnimationFrame: fn => fn(), setTimeout: () => 0 };
+  let navigation = null;
+  const context = { getComputedStyle: () => ({top: '24px'}), document: { querySelector: selector => selector === '.reader-panel' ? panel : navigation, querySelectorAll: () => [{ hidden: false, offsetParent: null, getClientRects: () => [{}], getBoundingClientRect: () => ({ top: 700 }) }] }, window: { innerHeight: 800, matchMedia: () => ({ matches: false }) }, requestAnimationFrame: fn => fn(), setTimeout: () => 0 };
   vm.createContext(context); vm.runInContext(section('function revealCard(', '\nfunction readJson('), context);
   const reveal = rect => { scrolls.length = 0; context.revealCard(make(rect)); return scrolls[0]; };
   assert.equal(reveal({ top: 100, bottom: 400, height: 300 }), undefined, 'fully visible card does not scroll');
   assert.equal(reveal({ top: 500, bottom: 900, height: 400 }).top, 900 + 12 - 700, 'partly hidden card scrolls only to reveal its bottom');
   assert.equal(reveal({ top: 300, bottom: 1400, height: 1100 }).top, 300 - 12, 'card taller than the viewport aligns its top');
+  navigation = {offsetHeight: 66};
+  assert.equal(reveal({top: 80, bottom: 280, height: 200}).top, 80 - 102, 'cards clear the pinned bar and top safe area');
+  assert.equal(reveal({top: 300, bottom: 1400, height: 1100}).top, 300 - 102, 'tall cards align beneath pinned navigation');
+  context.getComputedStyle = element => element === panel ? {paddingTop: '36px'} : {top: '0px'};
+  assert.equal(reveal({top: 80, bottom: 280, height: 200}).top, 80 - 114, 'clearance includes scroll-container padding and host safe area');
   assert(classes.has('reveal-pulse'));
   console.log('PASS Show reveals only the bottom of an explanation, aligns tall cards at the top and skips needless scrolling');
 }
@@ -30,7 +36,12 @@ function section(start, end) { const at = source.indexOf(start); assert(at >= 0,
     assert(header.includes(`id="${id}"`), `${id} belongs to the title section`);
   assert(header.includes('aria-label="Listen to this chapter"'), 'icon-only Listen retains its accessible scope');
   assert(!header.includes('Listen to chapter</span>'));
-  for (const id of ['reader-navigation-toggle', 'reader-navigation-panel', 'reader-preferences-toggle', 'reader-preferences-panel', 'reader-text-size']) assert(header.includes(`id="${id}"`));
+  for (const id of ['reader-navigation-panel', 'reader-preferences-panel', 'reader-text-size']) assert(header.includes(`id="${id}"`));
+  const navStart = html.indexOf('<div id="reader-navigation-bar"'), navigation = html.slice(navStart, html.indexOf('<div id="reader-story"', navStart));
+  for (const id of ['chapter-prev', 'reader-navigation-toggle', 'chapter-next', 'reader-preferences-toggle']) assert(navigation.includes(`id="${id}"`));
+  assert(!navigation.includes('id="reader-listen"'), 'Listen stays with the expanded title');
+  assert.equal((navigation.match(/<svg/g) || []).length, 3, 'navigation and picker use stroked chevrons');
+  assert(header.indexOf('id="reader-listen"') > header.indexOf('id="reader-title"'));
   assert(!html.includes('id="text-smaller"') && !html.includes('class="reader-toolbar"'));
   assert.equal((html.match(/id="reader-copy"/g) || []).length, 1);
   const titleContext = { window: { getSelection: () => ({ getRangeAt: () => ({ getBoundingClientRect: () => ({ left: 1, top: 2 }) }) }) }, getCanonicalSelection: () => ({ text: 'Titel', start: 0, end: 5 }), $: () => ({}), readerStory: () => ({ id: 's', language: 'de' }), activeChapter: () => ({ id: 'c' }), activeVersion: () => ({ id: 'v' }), SPEECH_LANGUAGES: { de: 'de-DE' } };

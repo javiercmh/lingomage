@@ -109,7 +109,9 @@ function revealCard(card) {
   requestAnimationFrame(() => {
     const bars = [...document.querySelectorAll('.reader-generation-bar, .reader-panel .explanation-selection-toolbar')].filter(bar => !bar.hidden && bar.getClientRects().length > 0);
     const barTop = Math.min(window.innerHeight, ...bars.map(bar => bar.getBoundingClientRect().top));
-    const rect = card.getBoundingClientRect(), margin = 12, topEdge = 12;
+    const navigation = document.querySelector('#reader-navigation-bar');
+    const topEdge = 12 + (navigation ? navigation.offsetHeight + (parseFloat(getComputedStyle(navigation).top) || 0) + (parseFloat(getComputedStyle(panel).paddingTop) || 0) : 0);
+    const rect = card.getBoundingClientRect(), margin = 12;
     let delta = 0;
     if (rect.height + margin * 2 > barTop - topEdge) delta = rect.top - topEdge;
     else if (rect.bottom + margin > barTop) delta = rect.bottom + margin - barTop;
@@ -752,7 +754,7 @@ function closeReaderPanels(restoreFocus = false) {
     const panel = $(`reader-${name}-panel`), toggle = $(`reader-${name}-toggle`);
     const wasOpen = !panel.hidden;
     panel.hidden = true; toggle.setAttribute('aria-expanded', 'false');
-    if (restoreFocus && wasOpen) toggle.focus();
+    if (restoreFocus && wasOpen) toggle.focus({ preventScroll: true });
   }
 }
 function positionReaderPanel(name) {
@@ -783,6 +785,13 @@ function setReaderTextSize(value) {
   $('reader-story').style.fontSize = `${state.readerFontSize}px`;
   $('reader-text-size').value = String(state.readerFontSize);
   $('reader-text-size').setAttribute('aria-valuetext', `${state.readerFontSize} pixels`);
+}
+function updateReaderNavigation() {
+  if (!$('reader-dialog').open) return;
+  const bar = $('reader-navigation-bar');
+  const inset = (parseFloat(getComputedStyle(bar).top) || 0) + (parseFloat(getComputedStyle(readerPanel()).paddingTop) || 0);
+  const pinned = readerPanel().scrollTop > 0 && bar.getBoundingClientRect().top <= readerPanel().getBoundingClientRect().top + inset + .5;
+  bar.classList.toggle('is-floating', pinned);
 }
 function renderReaderActions() {
   const story = readerStory(); if (!story) return;
@@ -1062,6 +1071,7 @@ function updateReader(keepNavigation = false) {
   renderPendingReaderResult();
   renderChapterRequest(); renderReaderActions(); renderReaderGeneration();
   if (keepNavigation && !$('reader-navigation-panel').hidden) positionReaderPanel('navigation');
+  updateReaderNavigation();
 }
 function renderChapterRequest() {
   const request = state.activeChapterRequest;
@@ -1126,7 +1136,7 @@ function openReader(story) {
   updateReader();
   if (draft) { showEditPanel(draft.mode); $('reader-prompt').value = draft.prompt; $('reader-edit-error').textContent = draft.error; }
   history.pushState({ ...(history.state && typeof history.state === 'object' ? history.state : {}), lingomageReader: story.id }, ''); state.readerHistoryEntry = true;
-  $('reader-dialog').showModal(); readerPanel().scrollTop = position?.scrollTop || 0; renderGenerationRecovery();
+  $('reader-dialog').showModal(); readerPanel().scrollTop = position?.scrollTop || 0; updateReaderNavigation(); renderGenerationRecovery();
 }
 $('reader-dialog').addEventListener('close', () => {
   if (state.readerHistoryEntry) { state.readerHistoryEntry = false; history.back(); }
@@ -1138,7 +1148,7 @@ window.addEventListener('popstate', () => {
   state.readerHistoryEntry = false;
   $('reader-dialog').close();
 });
-readerPanel().addEventListener('scroll', event => { if (event.target !== readerPanel()) return; if (!restoringPathPosition) closeReaderPanels(); closeReaderActions(); rememberReaderPosition(); });
+readerPanel().addEventListener('scroll', event => { if (event.target !== readerPanel()) return; if (!restoringPathPosition) closeReaderPanels(); closeReaderActions(); updateReaderNavigation(); rememberReaderPosition(); });
 function sentenceContext(text, start, end) {
   const boundary = /[.!?。！？\n]/u;
   let left = Math.min(start, text.length) - 1;
@@ -1844,7 +1854,7 @@ document.addEventListener('click', event => { if (!event.target.closest?.('#read
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && !$('reader-actions-menu').hidden) { event.preventDefault(); event.stopPropagation(); closeReaderActions(true); }
 }, true);
-window.addEventListener('resize', () => { closeReaderPanels(); closeReaderActions(); closeWordNote(); });
+window.addEventListener('resize', () => { closeReaderPanels(); closeReaderActions(); closeWordNote(); updateReaderNavigation(); });
 $('chapter-select').addEventListener('change', () => { closeReaderPanels(true); state.readerChapter = Number($('chapter-select').value); state.readerVersion = 0; clearExplanationSelection(); updateReader(); });
 $('path-select').addEventListener('change', () => {
   if (state.readerEditBusy) { $('path-select').value = selectedPath().id; return; }

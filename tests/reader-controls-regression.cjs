@@ -4,16 +4,17 @@ const source = fs.readFileSync('js/app.js', 'utf8');
 const slice = (start, end) => source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)));
 const elements = new Map(), documentEvents = {};
 const box = id => {
-  if (!elements.has(id)) elements.set(id, {hidden: true, style: {}, attributes: {}, events: {}, value: '',
-    setAttribute(k, v) { this.attributes[k] = v; }, focus() { this.focused = true; },
+  if (!elements.has(id)) elements.set(id, {hidden: true, classList: {toggle(name, enabled) { enabled ? navigationClasses.add(name) : navigationClasses.delete(name); }}, style: {}, attributes: {}, events: {}, value: '',
+    setAttribute(k, v) { this.attributes[k] = v; }, focus(options) { this.focused = true; this.focusOptions = options; },
     addEventListener(k, fn) { this.events[k] = fn; },
-    getBoundingClientRect() { return id.endsWith('-toggle') ? {left: 230, top: 200, bottom: 244} : {width: 280, height: 160}; }});
+    getBoundingClientRect() { if (id === 'reader-navigation-bar') return {top: navigationTop, height: 66}; return id.endsWith('-toggle') ? {left: 230, top: 200, bottom: 244} : {width: 280, height: 160}; }});
   return elements.get(id);
 };
 const story = {id: 'S', activePathId: 'original'}, positions = {
   'S:original': {chapterId: 'B', scrollTop: 120}, 'S:alt': {chapterId: 'A', scrollTop: 20}
 };
-let saved = 0, failed = false, updates = [], notesClosed = 0, messages = [];
+let saved = 0, failed = false, updates = [], notesClosed = 0, messages = [], navigationTop = 160;
+const navigationClasses = new Set();
 const reader = {events: {}, addEventListener(key, fn) { this.events[key] = fn; }, scrollTop: 0, getBoundingClientRect: () => ({left: 0, right: 320, top: 0, bottom: 640})};
 const c = {state: {readerFontSize: 19, readerEditBusy: false, readerPositions: positions}, $: box,
   window: {innerWidth: 320, innerHeight: 640}, getComputedStyle: () => ({paddingLeft: '14', paddingRight: '14', paddingTop: '12', paddingBottom: '24'}), readerPanel: () => reader,
@@ -47,6 +48,7 @@ let prevented = false, stopped = false;
 documentEvents.keydown({key: 'Escape', preventDefault() { prevented = true; }, stopPropagation() { stopped = true; }});
 assert(prevented && stopped, 'Escape is consumed before reader dismissal');
 assert.equal(box('reader-preferences-panel').hidden, true); assert.equal(box('reader-preferences-toggle').focused, true);
+assert.equal(box('reader-preferences-toggle').focusOptions.preventScroll, true, 'returning focus must not scroll a pinned control back to its document position');
 box('path-control').hidden = false; box('reader-navigation-toggle').events.click();
 assert.equal(box('path-select').focused, true, 'multiple paths focus Story path');
 documentEvents.pointerdown({target: {closest: () => true}}); assert.equal(box('reader-navigation-panel').hidden, false);
@@ -71,4 +73,10 @@ c.state.readerEditBusy = false; box('reader-preferences-toggle').events.click();
 reader.events.scroll({target: box('reader-preferences-panel')}); assert.equal(box('reader-preferences-panel').hidden, false);
 reader.events.scroll({target: reader}); assert.equal(box('reader-preferences-panel').hidden, true);
 assert(notesClosed > 0);
+// Pinned styling follows geometry and safe areas without changing content or scroll position.
+box('reader-dialog').open = true; reader.scrollTop = 300; navigationTop = 12;
+c.updateReaderNavigation(); assert(navigationClasses.has('is-floating')); assert.equal(reader.scrollTop, 300);
+navigationTop = 100; c.updateReaderNavigation(); assert(!navigationClasses.has('is-floating'));
+c.getComputedStyle = element => element === reader ? {paddingTop: '36px'} : {top: '0px'}; navigationTop = 36; c.updateReaderNavigation(); assert(navigationClasses.has('is-floating'));
+reader.scrollTop = 0; c.updateReaderNavigation(); assert(!navigationClasses.has('is-floating'));
 console.log('PASS compact reader: panel exclusivity, viewport bounds, focus/dismissal, live size/persistence, path positions/write rollback and generation lock');
