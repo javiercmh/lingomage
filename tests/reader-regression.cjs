@@ -343,7 +343,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   const detailLoading=loadingContract.createHelpLoading('detail','explain prefixes');
   assert.equal(detailLoading.attributes.role,'status');assert.equal(detailLoading.attributes['aria-live'],'polite');
   assert.ok(detailLoading.textContent.includes('Adding more detail…'));assert.ok(detailLoading.textContent.includes('Answering: explain prefixes'));
-  assert.ok(htmlSource.includes('Saves on this device. Text saves when you leave the field.'));
+  assert.ok(htmlSource.includes('Saved on this device automatically.'));
   assert.ok(htmlSource.includes('<h3 id="reader-help-title">Explanations</h3>'));
   assert.ok(cssSource.includes('.help-examples { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line);'));
   console.log('PASS settings feedback, single Explanations heading, accessible loading, and in-card example divider');
