@@ -363,71 +363,137 @@ function populateTargetPicker(preferred = '') {
   $('generate').disabled = Boolean(state.checkpointBlocked || pipeline?.records.length);
   populateDifficulty();
 }
-function renderTargetLanguageSettings(expanded = new Set()) {
-  const container = $('target-language-options'); container.textContent = '';
-  state.languageOrder.forEach((code, index) => {
-    const row = document.createElement('div'); row.className = 'target-language-row';
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function languageIcon(className, viewBox, shapes) {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', className); svg.setAttribute('viewBox', viewBox); svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('focusable', 'false');
+  shapes.forEach(([tag, attributes]) => { const node = document.createElementNS(SVG_NS, tag); Object.entries(attributes).forEach(([key, value]) => node.setAttribute(key, value)); svg.append(node); });
+  return svg;
+}
+const CHEVRON_SHAPES = [['path', { d: 'M6 9l6 6 6-6' }]];
+const GRIP_SHAPES = [[6, 4], [12, 4], [6, 9], [12, 9], [6, 14], [12, 14]].map(([cx, cy]) => ['circle', { cx, cy, r: 1.6 }]);
+function enabledLanguages() { return state.languageOrder.filter(code => state.targetLanguages[code]); }
+function setLanguageOrder(enabledOrder) { state.languageOrder = [...enabledOrder, ...state.languageOrder.filter(code => !enabledOrder.includes(code))]; }
+function levelSummary(code) { return levelDefinition(code, state.standardizedLevels[code])?.label || 'Choose a reading level'; }
+function openLanguagePanels() { return new Set([...document.querySelectorAll('.target-language-settings')].filter(panel => !panel.hidden).map(panel => panel.id.slice('language-settings-'.length))); }
+function savePreferences() { try { persistSettings(); } catch (error) { toast(error.message); } }
+function moveLanguage(code, newIndex, grip) {
+  const order = enabledLanguages(), from = order.indexOf(code);
+  if (from < 0 || newIndex < 0 || newIndex >= order.length) return;
+  const open = openLanguagePanels();
+  order.splice(newIndex, 0, order.splice(from, 1)[0]);
+  setLanguageOrder(order); savePreferences();
+  renderTargetLanguageSettings(open); populateTargetPicker();
+  $('language-order-status').textContent = `${LANGUAGES[code]} moved to position ${newIndex + 1} of ${order.length}.`;
+  document.querySelector(`.language-grip[data-code="${code}"]`)?.focus();
+}
+function startLanguageDrag(event, code, container) {
+  if (event.button > 0) return;
+  event.preventDefault();
+  const grip = event.currentTarget, open = openLanguagePanels();
+  grip.setPointerCapture(event.pointerId);
+  container.classList.add('reordering');
+  const rows = [...container.querySelectorAll('.target-language-row')], from = rows.findIndex(row => row.dataset.code === code);
+  const rects = rows.map(row => { const box = row.getBoundingClientRect(); return { top: box.top + window.scrollY, height: box.height }; });
+  const gap = rects[1].top - rects[0].top - rects[0].height, step = rects[from].height + gap;
+  const grab = Math.min(Math.max(event.pageY - rects[from].top, 0), rects[from].height);
+  const dragged = rows[from]; dragged.classList.add('lifted');
+  let clientY = event.clientY, target = from, frame = 0;
+  const place = () => {
+    const edge = 70, bottomEdge = window.innerHeight - 110;
+    if (clientY < edge) window.scrollBy(0, -12); else if (clientY > bottomEdge) window.scrollBy(0, 12);
+    const top = clientY + window.scrollY - grab, center = top + rects[from].height / 2;
+    target = from;
+    rects.forEach((rect, index) => { const middle = rect.top + rect.height / 2; if (index < from && center < middle) target = Math.min(target, index); if (index > from && center > middle) target = Math.max(target, index); });
+    dragged.style.transform = `translateY(${Math.min(Math.max(top, rects[0].top), rects.at(-1).top) - rects[from].top}px)`;
+    rows.forEach((row, index) => { if (index === from) return; const shift = from < target && index > from && index <= target ? -step : from > target && index < from && index >= target ? step : 0; row.style.transform = shift ? `translateY(${shift}px)` : ''; });
+    frame = requestAnimationFrame(place);
+  };
+  const finish = commit => {
+    cancelAnimationFrame(frame);
+    grip.removeEventListener('pointermove', onMove); grip.removeEventListener('pointerup', onUp); grip.removeEventListener('pointercancel', onCancel); document.removeEventListener('keydown', onKey);
+    rows.forEach(row => { row.style.transform = ''; row.classList.remove('lifted'); });
+    container.classList.remove('reordering');
+    if (commit && target !== from) moveLanguage(code, target); else grip.focus();
+  };
+  const onMove = move => { clientY = move.clientY; };
+  const onUp = () => finish(true), onCancel = () => finish(false);
+  const onKey = key => { if (key.key === 'Escape') finish(false); };
+  grip.addEventListener('pointermove', onMove); grip.addEventListener('pointerup', onUp); grip.addEventListener('pointercancel', onCancel); document.addEventListener('keydown', onKey);
+  place();
+}
+function renderTargetLanguageSettings(expanded = new Set(), focusAfter = '') {
+  const container = $('target-language-options'), addList = $('target-language-add'); container.textContent = ''; addList.textContent = '';
+  const enabled = enabledLanguages(), available = state.languageOrder.filter(code => !state.targetLanguages[code]);
+  container.hidden = !enabled.length; $('language-add-heading').hidden = addList.hidden = !available.length;
+  $('language-learning-heading').hidden = !enabled.length;
+  $('language-empty').hidden = Boolean(enabled.length);
+  enabled.forEach(code => {
+    const row = document.createElement('div'); row.className = 'target-language-row'; row.dataset.code = code;
     const header = document.createElement('div'); header.className = 'target-language-header';
-    const top = document.createElement('label'); top.className = 'target-language-toggle';
-    const input = document.createElement('input'); input.type = 'checkbox'; input.name = 'target-language'; input.value = code; input.checked = Boolean(state.targetLanguages[code]);
-    const name = document.createElement('span'); name.textContent = LANGUAGES[code]; top.append(input,name);
-    const settings = document.createElement('div'); settings.className = 'target-language-settings'; settings.hidden = !expanded.has(code);
-    settings.id = `language-settings-${code}`;
-    const disclosure = document.createElement('button'); disclosure.type = 'button'; disclosure.className = 'language-disclosure';
-    disclosure.setAttribute('aria-controls', settings.id);
-    const updateDisclosure = () => {
-      disclosure.textContent = settings.hidden ? '⌄' : '⌃';
-      disclosure.setAttribute('aria-expanded', String(!settings.hidden));
-      disclosure.setAttribute('aria-label', `${LANGUAGES[code]} settings`);
-    };
-    disclosure.addEventListener('click', () => { settings.hidden = !settings.hidden; updateDisclosure(); });
-    updateDisclosure();
-    header.append(top, disclosure);
-    for (const [direction, offset, symbol] of [['up', -1, '↑'], ['down', 1, '↓']]) {
-      const move = document.createElement('button'); move.type = 'button'; move.className = 'language-move'; move.textContent = symbol;
-      move.setAttribute('aria-label', `Move ${LANGUAGES[code]} ${direction}`);
-      move.dataset.direction = direction;
-      move.disabled = index + offset < 0 || index + offset >= state.languageOrder.length;
-      move.addEventListener('click', () => {
-        const open = new Set([...container.querySelectorAll('.target-language-settings')].filter(panel => !panel.hidden).map(panel => panel.id.slice('language-settings-'.length)));
-        [state.languageOrder[index], state.languageOrder[index + offset]] = [state.languageOrder[index + offset], state.languageOrder[index]];
-        try { persistSettings(); } catch (error) { toast(error.message); }
-        renderTargetLanguageSettings(open); populateTargetPicker();
-        const moved = container.children[index + offset];
-        const button = moved.querySelector(`[data-direction="${direction}"]`);
-        (button.disabled ? moved.querySelector('.language-disclosure') : button).focus();
+    const settings = document.createElement('div'); settings.className = 'target-language-settings'; settings.hidden = !expanded.has(code); settings.id = `language-settings-${code}`;
+    if (enabled.length > 1) {
+      const grip = document.createElement('button'); grip.type = 'button'; grip.className = 'language-grip'; grip.dataset.code = code;
+      grip.setAttribute('aria-label', `Reorder ${LANGUAGES[code]}. Drag, or use the up and down arrow keys.`);
+      grip.append(languageIcon('language-grip-icon', '0 0 18 18', GRIP_SHAPES));
+      grip.addEventListener('pointerdown', event => startLanguageDrag(event, code, container));
+      grip.addEventListener('keydown', event => {
+        if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+        event.preventDefault(); moveLanguage(code, enabledLanguages().indexOf(code) + (event.key === 'ArrowUp' ? -1 : 1));
       });
-      header.append(move);
+      header.append(grip);
     }
+    const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'language-toggle'; toggle.setAttribute('aria-controls', settings.id);
+    const text = document.createElement('span'); text.className = 'language-toggle-text';
+    const name = document.createElement('strong'); name.textContent = LANGUAGES[code];
+    const summary = document.createElement('small'); summary.textContent = levelSummary(code);
+    text.append(name, summary);
+    const chevron = document.createElement('span'); chevron.className = 'language-chevron'; chevron.append(languageIcon('language-chevron-icon', '0 0 24 24', CHEVRON_SHAPES));
+    toggle.append(text, chevron);
+    const updateToggle = () => { toggle.setAttribute('aria-expanded', String(!settings.hidden)); toggle.setAttribute('aria-label', `${LANGUAGES[code]}, ${summary.textContent}. ${settings.hidden ? 'Show' : 'Hide'} settings`); row.classList.toggle('open', !settings.hidden); };
+    toggle.addEventListener('click', () => { settings.hidden = !settings.hidden; updateToggle(); });
+    updateToggle();
+    header.append(toggle);
     const level = document.createElement('select'); level.className = 'field target-level'; level.setAttribute('aria-label', `${LANGUAGES[code]} reading level`);
-    const levelLabel = document.createElement('label'); levelLabel.className = 'field-label'; level.id = `starting-point-${code}`; levelLabel.htmlFor = level.id; levelLabel.textContent = 'Reading starting point';
-    levelLabel.textContent = 'Reading level';
+    const levelLabel = document.createElement('label'); levelLabel.className = 'field-label'; level.id = `starting-point-${code}`; levelLabel.htmlFor = level.id; levelLabel.textContent = 'Reading level';
     fillLevelOptions(level, code, state.standardizedLevels[code]);
     const description = document.createElement('p'); description.className = 'helper target-description'; description.id = `journey-${code}`; level.setAttribute('aria-describedby', description.id);
     const updateDescription = () => { description.textContent = readingDescription(code, level.value) || 'Choose the description closest to what you can comfortably read. You can change it anytime.'; };
     updateDescription();
-    input.addEventListener('change', () => {
-      if (input.checked) state.targetLanguages[code] = state.targetLanguages[code] || 'enabled'; else delete state.targetLanguages[code];
-      settings.hidden = !input.checked;
-      updateDisclosure();
-      try { persistSettings(); } catch (error) { toast(error.message); }
-      populateTargetPicker();
-    });
     level.addEventListener('change', () => {
       if (level.value) state.standardizedLevels[code] = level.value; else delete state.standardizedLevels[code];
-      updateDescription();
+      updateDescription(); summary.textContent = levelSummary(code); updateToggle();
       if ($('language').value === code) populateDifficulty(level.value);
-      try { persistSettings(); } catch (error) { toast(error.message); }
+      savePreferences();
     });
     const expectationsLabel = document.createElement('label'); expectationsLabel.className = 'field-label knowledge-label'; expectationsLabel.htmlFor = `expectations-${code}`; expectationsLabel.textContent = 'Language preferences (optional)';
     const expectations = document.createElement('textarea'); expectations.id = `expectations-${code}`; expectations.className = 'field knowledge-field'; expectations.maxLength = 600; expectations.value = state.languageExpectations[code] || '';
     expectations.placeholder = code === 'es-CL' ? 'E.g. Mexican Spanish, informal tone.' : 'E.g. Regional variety, tone, or spelling.';
     expectations.addEventListener('input', () => { state.languageExpectations[code] = expectations.value.trim(); });
-    expectations.addEventListener('change', () => { try { persistSettings(); } catch (error) { toast(error.message); } });
+    expectations.addEventListener('change', savePreferences);
     const expectationsHint = document.createElement('p'); expectationsHint.className = 'helper'; expectationsHint.textContent = 'Regional variety, tone, or spelling.';
-    settings.append(levelLabel,level,description,expectationsLabel,expectations,expectationsHint);
-    row.append(header,settings); container.append(row);
+    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'language-remove'; remove.textContent = 'Stop learning'; remove.setAttribute('aria-label', `Stop learning ${LANGUAGES[code]}`);
+    remove.addEventListener('click', () => {
+      delete state.targetLanguages[code]; setLanguageOrder(enabledLanguages()); savePreferences();
+      renderTargetLanguageSettings(openLanguagePanels(), `add-${code}`); populateTargetPicker();
+    });
+    settings.append(levelLabel, level, description, expectationsLabel, expectations, expectationsHint, remove);
+    row.append(header, settings); container.append(row);
   });
+  available.forEach(code => {
+    const add = document.createElement('button'); add.type = 'button'; add.className = 'language-add'; add.dataset.code = code;
+    const label = document.createElement('span'); label.textContent = LANGUAGES[code];
+    const action = document.createElement('span'); action.className = 'language-add-action'; action.textContent = '+ Add';
+    add.setAttribute('aria-label', `Add ${LANGUAGES[code]}`);
+    add.append(label, action);
+    add.addEventListener('click', () => {
+      state.targetLanguages[code] = state.targetLanguages[code] || 'enabled'; setLanguageOrder([...enabledLanguages().filter(item => item !== code), code]); savePreferences();
+      renderTargetLanguageSettings(new Set([...openLanguagePanels(), code]), `toggle-${code}`); populateTargetPicker();
+    });
+    addList.append(add);
+  });
+  if (focusAfter.startsWith('toggle-')) container.querySelector(`.target-language-row[data-code="${focusAfter.slice(7)}"] .language-toggle`)?.focus();
+  if (focusAfter.startsWith('add-')) (addList.querySelector(`[data-code="${focusAfter.slice(4)}"]`) || container.querySelector('.language-toggle'))?.focus();
 }
 function decodeResponse(text, languageCode) { return validateStory(parseContent(text),languageCode); }
 
