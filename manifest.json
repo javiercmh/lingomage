@@ -1,7 +1,7 @@
 {
   "name": "LingoMage",
   "short_name": "LingoMage",
-  "version": "1.2.29",
+  "version": "1.2.30",
   "templateVersion": 3,
   "description": "Create AI-powered stories tailored to your story ideas, topics, and reading level.",
   "main": "index.html",
@@ -49,6 +49,7 @@
       "js/reader-text.js",
       "js/request-lifecycle.js",
       "js/reader-speech.js",
+      "js/reader-player.js",
       "manifest.json",
       "data/learning-profiles.json",
       "AGENTS.md",

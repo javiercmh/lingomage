@@ -405,7 +405,7 @@ function startLanguageDrag(event, code, container) {
     const top = clientY + window.scrollY - grab, center = top + rects[from].height / 2;
     target = from;
     rects.forEach((rect, index) => { const middle = rect.top + rect.height / 2; if (index < from && center < middle) target = Math.min(target, index); if (index > from && center > middle) target = Math.max(target, index); });
-    dragged.style.transform = `translateY(${Math.min(Math.max(top, rects[0].top), rects[rects.length - 1].top) - rects[from].top}px)`;
+    dragged.style.transform = `translateY(${Math.min(Math.max(top, rects[0].top), rects.at(-1).top) - rects[from].top}px)`;
     rows.forEach((row, index) => { if (index === from) return; const shift = from < target && index > from && index <= target ? -step : from > target && index < from && index >= target ? step : 0; row.style.transform = shift ? `translateY(${shift}px)` : ''; });
     frame = requestAnimationFrame(place);
   };
@@ -422,10 +422,7 @@ function startLanguageDrag(event, code, container) {
   grip.addEventListener('pointermove', onMove); grip.addEventListener('pointerup', onUp); grip.addEventListener('pointercancel', onCancel); document.addEventListener('keydown', onKey);
   place();
 }
-function renderTargetLanguageSettings(...args) {
-  try { renderLanguageList(...args); } catch (error) { console.error('Could not render language settings', error); }
-}
-function renderLanguageList(expanded = new Set(), focusAfter = '') {
+function renderTargetLanguageSettings(expanded = new Set(), focusAfter = '') {
   const container = $('target-language-options'), addList = $('target-language-add'); container.textContent = ''; addList.textContent = '';
   const enabled = enabledLanguages(), available = state.languageOrder.filter(code => !state.targetLanguages[code]);
   container.hidden = !enabled.length; $('language-add-heading').hidden = addList.hidden = !available.length;
