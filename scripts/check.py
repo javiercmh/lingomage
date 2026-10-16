@@ -39,6 +39,9 @@ def main():
     for name in update['managedFiles'] + update['seedFiles']:
         assert name in files, 'Owned file is not packaged: ' + name
     assert not set(update['managedFiles']) & set(update['seedFiles'])
+    for name in files:
+        if name.endswith(('.js', '.css', '.html')):
+            assert name in update['managedFiles'], 'Code file would not ship in updates: ' + name
     for name in ['data/stories.json', 'data/settings.json', 'data/generation-checkpoints.json']:
         assert name in update['seedFiles']
     assert update['seedDefaults']['data/generation-checkpoints.json'] == []
