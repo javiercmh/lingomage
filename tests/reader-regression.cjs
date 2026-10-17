@@ -184,9 +184,14 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.equal(listen.attributes['aria-label'],'Listen to 買う');assert.equal(popover.focused,true);
   await listen.events.click();assert.equal(heard.text,'買う');assert.equal(heard.language,'ja-JP');
   noteUi.closeWordNote(true);assert.equal(trigger.focused,true);assert.equal(popover.hidden,true);
-  noteUi.speech.available=false;noteUi.showWordNote(trigger,[{word:'買う',meaning:'to buy'}]);
+  noteUi.closeWordNote();noteUi.showWordNote(trigger,[{word:'買う',meaning:'to buy'}],'買います');
+  const surfaceItem=popover.childNodes[0];
+  assert.equal(surfaceItem.childNodes[0].childNodes[0].textContent,'買います');
+  assert.equal(surfaceItem.childNodes[1].textContent,'Dictionary form: 買う');
+  await surfaceItem.childNodes[0].childNodes[1].events.click();assert.equal(heard.text,'買います');
+  noteUi.closeWordNote();noteUi.speech.available=false;noteUi.showWordNote(trigger,[{word:'買う',meaning:'to buy'}]);
   assert.equal(popover.childNodes[0].childNodes[0].childNodes[1].disabled,true);
-  console.log('PASS glossary Listen speaks canonical headword with source locale, restores focus and disables browser playback');
+  console.log('PASS glossary Listen speaks the text form (dictionary form follows) with source locale, restores focus and disables browser playback');
 
   const chapterStatus=sandbox({state:{readerId:'A',activeChapterRequest:{storyId:'A',loading:{textContent:'Writing…'}}}});
   vm.runInContext(section('function renderChapterRequest(', 'function closeWordNote('),chapterStatus);

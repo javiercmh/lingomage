@@ -1162,24 +1162,25 @@ function showWordNote(trigger, notes, surface = '') {
   closeWordNote(); popover.textContent = '';
   for (const note of notes) {
     const item = document.createElement('p'); item.className = 'word-note-entry';
-    const word = document.createElement('strong'); word.textContent = note.word || 'Word note';
+    // Lead with the wording as it appears in the text, so Listen plays the real text; the dictionary form follows.
+    const shown = surface.trim() || note.word || '';
+    const word = document.createElement('strong'); word.textContent = shown || 'Word note';
     const meaning = document.createElement('span'); meaning.textContent = note.meaning;
     const heading = document.createElement('span'); heading.className = 'word-note-heading';
     const listen = document.createElement('button'); listen.type = 'button'; listen.className = 'icon-btn word-note-listen';
-    listen.setAttribute('aria-label', `Listen to ${note.word || 'expression'}`);
+    listen.setAttribute('aria-label', `Listen to ${shown || 'expression'}`);
     listen.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4zM15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14"/></svg>';
-    listen.disabled = !speech.available || !note.word;
+    listen.disabled = !speech.available || !shown;
     listen.title = speech.available ? 'Listen' : 'Listening requires App²';
     listen.addEventListener('click', async () => {
       listen.disabled = true;
-      try { await speakSelection(speech, note.word, SPEECH_LANGUAGES[readerStory().language]); }
+      try { await speakSelection(speech, shown, SPEECH_LANGUAGES[readerStory().language]); }
       catch (error) { toast(`Could not play audio: ${error.message}`); }
       finally { listen.disabled = !speech.available; }
     });
     heading.append(word, listen); item.append(heading);
-    // Show the exact wording in the text when the note names a different (base) form.
-    if (surface && surface.trim().toLowerCase() !== (note.word || '').trim().toLowerCase()) {
-      const form = document.createElement('span'); form.className = 'word-note-form'; form.textContent = `In the text: «${surface}»`; item.append(form);
+    if (note.word && shown.toLowerCase() !== note.word.trim().toLowerCase()) {
+      const form = document.createElement('span'); form.className = 'word-note-form'; form.textContent = `Dictionary form: ${note.word}`; item.append(form);
     }
     item.append(meaning); popover.append(item);
   }
