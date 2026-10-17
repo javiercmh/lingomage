@@ -77,6 +77,11 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   ]);
   assert.deepEqual(JSON.parse(JSON.stringify(matches.map(item=>[item.start,item.end,item.notes.length]))),[[0,5,2],[12,17,2]]);
   assert.equal(glossary.findGlossaryMatches('美しい', [{word:'美しい',meaning:'beautiful',forms:['美しい']}])[0].end,3);
+  // A longer phrase must not hide a shorter listed form nested inside it.
+  const nestedText='У Нади в руках билеты.';
+  const nestedNotes=[{word:'у кого есть',meaning:'possession',forms:['У Нади в руках билеты']},{word:'в руках',meaning:'in hands',forms:['в руках']}];
+  assert.deepEqual(JSON.parse(JSON.stringify(glossary.findGlossaryMatches(nestedText,nestedNotes).map(item=>item.form))),['У Нади в руках билеты']);
+  assert.deepEqual(JSON.parse(JSON.stringify(glossary.firstGlossaryMatches(nestedText,nestedNotes,{nested:true}).map(item=>[item.form,!!item.inner]))),[['У Нади в руках билеты',false],['в руках',true]]);
   console.log('PASS exact glossary forms match repeated occurrences, group shared ranges and prefer longer overlaps');
   const furigana = sandbox();
   const normalize = (text, reading, strict = true) => JSON.parse(JSON.stringify(furigana.japaneseSegments(text, [{text, reading}], strict)));

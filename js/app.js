@@ -1130,7 +1130,7 @@ function updateReader(keepNavigation = false) {
   annotatedText($('reader-story'), version.story, version.storySegments, {
     language: SPEECH_LANGUAGES[story.language] || 'en',
     glossary: version.glossary || [],
-    onNote: (event, trigger, notes) => showWordNote(trigger, notes)
+    onNote: (event, trigger, notes, surface) => showWordNote(trigger, notes, surface)
   });
   setReaderTextSize(state.readerFontSize);
   $('reader-story').classList.toggle('hide-furigana', story.language === 'ja' && !state.furigana);
@@ -1156,7 +1156,7 @@ function closeWordNote(restoreFocus = false) {
   state.wordNoteTrigger = null;
   document.querySelectorAll('.gloss-note-trigger[aria-expanded="true"]').forEach(button => { button.removeAttribute('aria-expanded'); button.removeAttribute('aria-controls'); });
 }
-function showWordNote(trigger, notes) {
+function showWordNote(trigger, notes, surface = '') {
   const popover = $('word-note-popover');
   if (!popover.hidden && trigger.getAttribute('aria-expanded') === 'true') { closeWordNote(); return; }
   closeWordNote(); popover.textContent = '';
@@ -1176,7 +1176,12 @@ function showWordNote(trigger, notes) {
       catch (error) { toast(`Could not play audio: ${error.message}`); }
       finally { listen.disabled = !speech.available; }
     });
-    heading.append(word, listen); item.append(heading, meaning); popover.append(item);
+    heading.append(word, listen); item.append(heading);
+    // Show the exact wording in the text when the note names a different (base) form.
+    if (surface && surface.trim().toLowerCase() !== (note.word || '').trim().toLowerCase()) {
+      const form = document.createElement('span'); form.className = 'word-note-form'; form.textContent = `In the text: «${surface}»`; item.append(form);
+    }
+    item.append(meaning); popover.append(item);
   }
   trigger.setAttribute('aria-expanded', 'true'); trigger.setAttribute('aria-controls', 'word-note-popover'); state.wordNoteTrigger = trigger; popover.hidden = false; popover.focus();
   const rect = trigger.getBoundingClientRect();
