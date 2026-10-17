@@ -108,7 +108,7 @@ export function resolveGlossaryForms(canonical, form) {
   const resolved = parts.map(part => hasGlossaryForm(canonical, part) ? part : (() => { const range = tolerantRange(canonical, part); return range ? canonical.slice(range.start, range.end) : null; })());
   return resolved.every(Boolean) ? [...new Set(resolved)] : [];
 }
-export function findGlossaryMatches(canonical, glossary = []) {
+export function findGlossaryMatches(canonical, glossary = [], { nested = false } = {}) {
   // Group repeated forms before scanning. Process one length at a time so a
   // larger glossary does not allocate every candidate across every length.
   const forms=new Map();
@@ -125,25 +125,36 @@ export function findGlossaryMatches(canonical, glossary = []) {
     if(!lengths.has(group.form.length))lengths.set(group.form.length,[]);
     lengths.get(group.form.length).push(group);
   }
-  const occupied=new Uint8Array(canonical.length),chosen=[];
+  const occupied=new Uint8Array(canonical.length),chosen=[],leftover=[];
   for(const length of [...lengths.keys()].sort((a,b)=>b-a)) {
     const candidates=[];
     for(const group of lengths.get(length))for(const range of glossaryRanges(canonical,group.form))candidates.push({...range,form:group.form,notes:group.notes});
     candidates.sort((a,b)=>a.start-b.start);
     for(const candidate of candidates){
-      if(occupied.subarray(candidate.start,candidate.end).some(value=>value))continue;
+      if(occupied.subarray(candidate.start,candidate.end).some(value=>value)){leftover.push(candidate);continue;}
       chosen.push(candidate);occupied.fill(1,candidate.start,candidate.end);
     }
   }
-  return chosen.sort((a,b)=>a.start-b.start);
+  if(nested){
+    // A longer phrase must not hide a shorter listed form inside it: the learner who
+    // selects "в руках" needs that form's note, not the enclosing phrase's.
+    const outers=[...chosen],taken=new Uint8Array(canonical.length);
+    leftover.sort((a,b)=>(b.end-b.start)-(a.end-a.start)||a.start-b.start);
+    for(const candidate of leftover){
+      if(!outers.some(outer=>outer.start<=candidate.start&&candidate.end<=outer.end&&(outer.end-outer.start)>(candidate.end-candidate.start)))continue;
+      if(taken.subarray(candidate.start,candidate.end).some(value=>value))continue;
+      chosen.push({...candidate,inner:true});taken.fill(1,candidate.start,candidate.end);
+    }
+  }
+  return chosen.sort((a,b)=>a.start-b.start||(b.end-b.start)-(a.end-a.start));
 }
 
 // PED-002: display each explanation once; validation still uses every occurrence.
-export function firstGlossaryMatches(canonical, glossary = []) {
+export function firstGlossaryMatches(canonical, glossary = [], options = {}) {
   const seen = new Set();
   const seenGroups = new WeakSet();
   const normalize = value => String(value || '').normalize('NFC').trim().replace(/\s+/gu, ' ');
-  return findGlossaryMatches(canonical, glossary).flatMap(match => {
+  return findGlossaryMatches(canonical, glossary, options).flatMap(match => {
     if (seenGroups.has(match.notes)) return [];
     seenGroups.add(match.notes);
     const notes = match.notes.filter(note => {
@@ -159,7 +170,18 @@ export function annotatedText(container, canonical, segments, { glossary = [], l
   container.textContent = '';
   container.lang = language;
   const valid = Array.isArray(segments) && segments.every(part => part && typeof part.text === 'string') && segments.map(part => part.text).join('') === canonical;
-  const matches = firstGlossaryMatches(canonical, glossary);
+  const matches = firstGlossaryMatches(canonical, glossary, { nested: true });
+  // Flatten to non-overlapping display spans; an inner match owns its own text.
+  const spans = [];
+  for (const match of matches.filter(item => !item.inner)) {
+    let from = match.start;
+    for (const inner of matches.filter(item => item.inner && item.start >= match.start && item.end <= match.end)) {
+      if (inner.start > from) spans.push({ match, start: from, end: inner.start });
+      spans.push({ match: inner, start: inner.start, end: inner.end }); from = inner.end;
+    }
+    if (from < match.end) spans.push({ match, start: from, end: match.end });
+  }
+  spans.sort((a, b) => a.start - b.start);
   const controls = new Map();
   const parts = language.startsWith('ja') ? japaneseSegments(canonical, segments) : valid ? segments : [{ text: canonical }];
   let offset = 0;
@@ -174,18 +196,18 @@ export function annotatedText(container, canonical, segments, { glossary = [], l
       trigger.setAttribute('aria-haspopup', 'dialog');
       trigger.addEventListener('keydown', event => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
-        event.preventDefault(); onNote(event, trigger, match.notes);
+        event.preventDefault(); onNote(event, trigger, match.notes, canonical.slice(match.start, match.end));
       });
     }
-    trigger.addEventListener('click', event => onNote(event, controls.get(match), match.notes));
+    trigger.addEventListener('click', event => onNote(event, controls.get(match), match.notes, canonical.slice(match.start, match.end)));
     return trigger;
   };
   for (const part of parts) {
     const partStart = offset, partEnd = offset + part.text.length;
     const target = part.reading ? document.createElement('ruby') : container;
     let cursor = partStart;
-    for (const match of matches) {
-      const start = Math.max(partStart, match.start), end = Math.min(partEnd, match.end);
+    for (const { match, start: spanStart, end: spanEnd } of spans) {
+      const start = Math.max(partStart, spanStart), end = Math.min(partEnd, spanEnd);
       if (end <= start) continue;
       if (start > cursor) target.append(document.createTextNode(canonical.slice(cursor, start)));
       target.append(triggerFor(match, start, end)); cursor = end;
