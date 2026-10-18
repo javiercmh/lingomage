@@ -37,6 +37,7 @@
 - For every interface or copy change, visually inspect screenshots from the development server at desktop and narrow mobile widths before declaring it complete. Check spacing, wrapping, hierarchy, field/helper grouping, clipping, and touch targets; DOM checks alone do not establish layout quality. Record what was actually inspected in the commit message.
 - Use the development server for browser checks. Native AI, alarms, Android insets and install shortcuts require App² on Android and should be marked pending unless actually verified there.
 - Record only checks actually run, in the commit message. Add anything that needs Android verification to `docs/validation/device-checklist.md`. Do not export credentials or log tokens, callback URLs or account identifiers.
+- Learning-quality AI evals (`scripts/ai-eval.mjs`) are opt-in, development-only and never part of checks, hooks, CI or packaging. Without `--live` they print help or a plan and make no request. Live runs need explicit OpenAI generator/judge settings, a request budget and the `--chatgpt` bridge; see `docs/validation/generation-evaluation/README.md`.
 - The Python server requires Python 3.9 or newer and no dependencies.
 
 ## App updates

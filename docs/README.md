@@ -27,7 +27,7 @@ Product rationale, learning decisions, research evidence and the checks that are
 - [App² runtime](architecture/app2-runtime.md): runtime, workspace data and validation limits.
 - [Language safeguard audit](architecture/language-safeguards.md): registered safeguards and their regression coverage.
 - [Device checklist](validation/device-checklist.md): pending Android checks and recorded device results.
-- [Generation evaluation](validation/generation-evaluation/README.md) and its [summary](validation/generation-evaluation/summary.md): live-model comparisons, prompt pilot and limits.
+- [Generation evaluation](validation/generation-evaluation/README.md) and its [summary](validation/generation-evaluation/summary.md): live-model comparisons, prompt pilot and limits, and the opt-in [AI evals](validation/generation-evaluation/README.md#learning-quality-evaluations-ai-evals) (implemented, not yet run live).
 - [Initial language samples](validation/sample-review.md): early sample review and its limitations.
 
 ## Documentation policy
