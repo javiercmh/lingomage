@@ -13,7 +13,7 @@ Create, Continue and Rewrite use the same frozen input/configuration and checkpo
 Only `js/bridge.js` calls host capabilities. App² owns production AI configuration, credentials, speech, device translation and update installation. Choose providers/models in App² Settings → AI; the workspace never stores credentials or request headers.
 
 - `data/stories.json`: canonical stories, ordered chapters, immutable alternate versions and paths, rolling memory and version-scoped explanations/examples. Old one-story records are interpreted additively and keep their provenance.
-- `data/settings.json`: models/reasoning, language enablement, standardized reading targets, retained legacy self-assessments, regional preferences and reading preferences.
+- `data/settings.json`: models/reasoning, language enablement, standardized reading targets, retained legacy self-assessments, regional preferences, reading preferences and per-story-path reading positions.
 - `data/generation-checkpoints.json`: at most one unfinished content operation, seeded empty. Captures ID, kind, destination/path lineage, learner input, prompt and safeguard versions, AI configuration, scope, stage, validated language plan/content and outstanding request ID. No credentials are included.
 - `data/learning-profiles.json` and `data/language-safeguards.json`: shipped managed definitions.
 

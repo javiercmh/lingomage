@@ -137,7 +137,7 @@ function persistReaderStory(story) {
   catch (error) { if (!alreadySaved) state.stories = state.stories.filter(item => item.id !== story.id); throw error; }
 }
 function persistSettings() {
-  const value = { providerId: state.providerId, model: state.model, reasoning: state.reasoning, targetLanguages: state.targetLanguages, languageOrder: state.languageOrder, learnerProfiles: state.learnerProfiles, languageExpectations: state.languageExpectations, languageSetupDismissed: state.languageSetupDismissed, standardizedLevels: state.standardizedLevels, readingPreferences: { furigana: state.furigana, fontSize: state.readerFontSize, speechRate: state.speechRate, followAlong: state.followAlong }, theme: 'dark' };
+  const value = { providerId: state.providerId, model: state.model, reasoning: state.reasoning, targetLanguages: state.targetLanguages, languageOrder: state.languageOrder, learnerProfiles: state.learnerProfiles, languageExpectations: state.languageExpectations, languageSetupDismissed: state.languageSetupDismissed, standardizedLevels: state.standardizedLevels, readingPreferences: { furigana: state.furigana, fontSize: state.readerFontSize, speechRate: state.speechRate, followAlong: state.followAlong }, readerPositions: state.readerPositions, theme: 'dark' };
   if (!writeFile('data/settings.json', value)) throw new Error('Could not save settings.');
 }
 function toast(message) {
@@ -1216,7 +1216,7 @@ function openReader(story) {
 $('reader-dialog').addEventListener('close', () => {
   if (state.readerHistoryEntry) { state.readerHistoryEntry = false; history.back(); }
   if ($('reader-removal-dialog').open) $('reader-removal-dialog').close();
-  closeReaderPanels(); closeReaderActions(); stopSpeech(); state.speechVersionKey = ''; closeWordNote(); rememberReaderPosition(); clearExplanationSelection(); setView('library');
+  closeReaderPanels(); closeReaderActions(); stopSpeech(); state.speechVersionKey = ''; closeWordNote(); rememberReaderPosition(); savePreferences(); clearExplanationSelection(); setView('library');
 });
 window.addEventListener('popstate', () => {
   if (!$('reader-dialog').open) return;
@@ -2220,6 +2220,7 @@ state.readerFontSize = Math.max(15, Math.min(30, Number(settings.readingPreferen
 state.speechRate = SPEECH_RATES.includes(Number(settings.readingPreferences?.speechRate)) ? Number(settings.readingPreferences.speechRate) : 1;
 state.followAlong = settings.readingPreferences?.followAlong !== false;
 state.languageSetupDismissed = settings.languageSetupDismissed === true;
+state.readerPositions = Object.fromEntries(Object.entries(settings.readerPositions || {}).filter(([key,value]) => typeof value?.chapterId === 'string' && Number.isFinite(value.scrollTop)).map(([key,value]) => [key,{chapterId:value.chapterId,scrollTop:Math.max(0,value.scrollTop)}]));
 state.languageOrder = [...new Set([...(Array.isArray(settings.languageOrder) ? settings.languageOrder : []), ...Object.keys(LANGUAGES)])].filter(code => Object.hasOwn(LANGUAGES, code));
 state.targetLanguages = Object.fromEntries(Object.entries(settings.targetLanguages || {}).filter(([code]) => LEVELS[code]));
 state.standardizedLevels = Object.fromEntries(Object.entries(settings.standardizedLevels || {}).filter(([code,level]) => levelDefinition(code,level)));
@@ -2227,5 +2228,8 @@ fillScopeOptions($('reading-scope'), 'scene', $('scope-description'));
 state.learnerProfiles = Object.fromEntries(Object.entries(settings.learnerProfiles || {}).filter(([code,value]) => STORY_GUIDES[code] && typeof value === 'string').map(([code,value]) => [code,value.slice(0,600)]));
 state.languageExpectations = Object.fromEntries(Object.entries(settings.languageExpectations || {}).filter(([code,value]) => STORY_GUIDES[code] && typeof value === 'string').map(([code,value]) => [code,value.slice(0,600)]));
 renderTargetLanguageSettings(); populateTargetPicker();
+// Positions update in memory while scrolling; write them when the reader closes or the page is hidden.
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && $('reader-dialog').open) { rememberReaderPosition(); savePreferences(); } });
+window.addEventListener('pagehide', () => { if ($('reader-dialog').open) { rememberReaderPosition(); savePreferences(); } });
 initializePipeline();
 updateCount(); refreshModels();
