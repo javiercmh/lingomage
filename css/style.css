@@ -239,6 +239,7 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 .word-note-entry { display: grid; gap: 3px; margin: 0; }
 .word-note-entry + .word-note-entry { margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--line); }
 .word-note-entry strong { color: #c8d8ff; }
+.word-note-form { opacity: 0.75; font-size: 0.85em; }
 .recovery-panel { margin: 12px 0; padding: 14px 16px; border: 1px solid rgba(250,204,21,.32); border-radius: 14px; background: rgba(120,80,10,.18); }
 .recovery-panel p { margin: 0 0 10px; }
 .recovery-panel button { width: auto; min-height: 44px; padding: 8px 14px; }

@@ -79,6 +79,11 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   ]);
   assert.deepEqual(JSON.parse(JSON.stringify(matches.map(item=>[item.start,item.end,item.notes.length]))),[[0,5,2],[12,17,2]]);
   assert.equal(glossary.findGlossaryMatches('美しい', [{word:'美しい',meaning:'beautiful',forms:['美しい']}])[0].end,3);
+  // A longer phrase must not hide a shorter listed form nested inside it.
+  const nestedText='У Нади в руках билеты.';
+  const nestedNotes=[{word:'у кого есть',meaning:'possession',forms:['У Нади в руках билеты']},{word:'в руках',meaning:'in hands',forms:['в руках']}];
+  assert.deepEqual(JSON.parse(JSON.stringify(glossary.findGlossaryMatches(nestedText,nestedNotes).map(item=>item.form))),['У Нади в руках билеты']);
+  assert.deepEqual(JSON.parse(JSON.stringify(glossary.firstGlossaryMatches(nestedText,nestedNotes,{nested:true}).map(item=>[item.form,!!item.inner]))),[['У Нади в руках билеты',false],['в руках',true]]);
   console.log('PASS exact glossary forms match repeated occurrences, group shared ranges and prefer longer overlaps');
   const furigana = sandbox();
   const normalize = (text, reading, strict = true) => JSON.parse(JSON.stringify(furigana.japaneseSegments(text, [{text, reading}], strict)));
@@ -181,9 +186,14 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.equal(listen.attributes['aria-label'],'Listen to 買う');assert.equal(popover.focused,true);
   await listen.events.click();assert.equal(heard.text,'買う');assert.equal(heard.language,'ja-JP');
   noteUi.closeWordNote(true);assert.equal(trigger.focused,true);assert.equal(popover.hidden,true);
-  noteUi.speech.available=false;noteUi.showWordNote(trigger,[{word:'買う',meaning:'to buy'}]);
+  noteUi.closeWordNote();noteUi.showWordNote(trigger,[{word:'買う',meaning:'to buy'}],'買います');
+  const surfaceItem=popover.childNodes[0];
+  assert.equal(surfaceItem.childNodes[0].childNodes[0].textContent,'買います');
+  assert.equal(surfaceItem.childNodes[1].textContent,'Dictionary form: 買う');
+  await surfaceItem.childNodes[0].childNodes[1].events.click();assert.equal(heard.text,'買います');
+  noteUi.closeWordNote();noteUi.speech.available=false;noteUi.showWordNote(trigger,[{word:'買う',meaning:'to buy'}]);
   assert.equal(popover.childNodes[0].childNodes[0].childNodes[1].disabled,true);
-  console.log('PASS glossary Listen speaks canonical headword with source locale, restores focus and disables browser playback');
+  console.log('PASS glossary Listen speaks the text form (dictionary form follows) with source locale, restores focus and disables browser playback');
 
   const chapterStatus=sandbox({state:{readerId:'A',activeChapterRequest:{storyId:'A',loading:{textContent:'Writing…'}}}});
   vm.runInContext(section('function renderChapterRequest(', 'function closeWordNote('),chapterStatus);
