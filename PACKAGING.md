@@ -31,7 +31,8 @@ confirmation. Browser previews hide the button. App² follows
 `data/stories.json`, `data/settings.json` and `data/generation-checkpoints.json` are user files seeded only when absent.
 `data/learning-profiles.json` and `data/language-safeguards.json` are shipped managed definitions and updates with the
 code. All other unowned files remain untouched. Keep these declarations current.
-Existing saved records must remain readable; v1 has no automatic data migration.
+Existing saved records must remain readable; v1 has no general data migration. The one exception is a temporary
+glossary-alias migration in `js/workspace-storage.js` (`term`/`text` → `word` in `data/stories.json`); remove it in the next major release.
 Increment the app version for a published update. Commit and push require explicit
 user instructions; local changes are unavailable to GitHub updates until published.
 

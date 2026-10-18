@@ -11,6 +11,41 @@ function version(value) {
     && (absent(value.title) || typeof value.title === 'string')
     && (absent(value.glossary) || list(value.glossary, note => object(note) && typeof note.word === 'string' && typeof note.meaning === 'string' && (absent(note.forms) || list(note.forms, form => typeof form === 'string'))));
 }
+
+// --- Temporary one-time migration (remove in the next major release) ---------------------------
+// Some saved stories carry glossary notes whose headword key is `term` or `text` instead of
+// `word`. Before strict validation, `migrateGlossaryAliases` rewrites an alias-only key to `word`
+// in place (key order kept) and drops the alias. It is idempotent: canonical data is untouched and
+// reports no change. A note holding `word` plus a different alias value, or two different aliases,
+// throws so the load fails closed and the original file is never rewritten. To remove: delete this
+// block and the `migrate` entry on the stories definition below.
+const GLOSSARY_ALIASES = ['term', 'text'];
+function migrateGlossaryAliases(stories) {
+  if (!Array.isArray(stories)) return false;
+  let changed = false;
+  const normalize = glossary => {
+    if (!Array.isArray(glossary)) return;
+    glossary.forEach((note, index) => {
+      if (!object(note)) return;
+      const present = GLOSSARY_ALIASES.filter(key => Object.hasOwn(note, key));
+      if (!present.length) return;
+      const values = ['word', ...present].filter(key => Object.hasOwn(note, key)).map(key => note[key]);
+      if (values.some(item => item !== values[0])) throw Object.assign(new Error('Conflicting glossary headword keys.'), {userMessage:'Could not update data/stories.json: a glossary note has conflicting headword values. The original file has been preserved. Repair the file, then retry loading.'});
+      const rebuilt = {};
+      for (const [key, item] of Object.entries(note)) {
+        if (GLOSSARY_ALIASES.includes(key)) { if (!('word' in rebuilt) && !Object.hasOwn(note, 'word')) rebuilt.word = item; } else rebuilt[key] = item;
+      }
+      glossary[index] = rebuilt; changed = true;
+    });
+  };
+  for (const story of stories) {
+    if (!object(story)) continue;
+    normalize(story.glossary);
+    if (Array.isArray(story.chapters)) for (const chapter of story.chapters) if (object(chapter) && Array.isArray(chapter.versions)) for (const item of chapter.versions) if (object(item)) normalize(item.glossary);
+  }
+  return changed;
+}
+// --- End temporary migration --------------------------------------------------------------------
 export function validStories(value) {
   if (!list(value, story => {
     if (!object(story) || !id(story.id) || !id(story.language)) return false;
@@ -43,7 +78,7 @@ export function validCheckpoints(value) {
     && (op.request == null || object(op.request) && id(op.request.id)));
 }
 const definitions = {
-  'data/stories.json': {fallback:[], validate:validStories},
+  'data/stories.json': {fallback:[], validate:validStories, migrate:migrateGlossaryAliases},
   'data/settings.json': {fallback:{}, validate:validSettings},
   'data/generation-checkpoints.json': {fallback:[], validate:validCheckpoints}
 };
@@ -59,11 +94,19 @@ export function createWorkspaceStorage({read, write, exists}) {
       // existing file is invalid; if existence cannot be established, fail closed.
       const missing = raw === '' && exists(path) === false;
       const value = missing ? clone(definition.fallback) : JSON.parse(raw);
+      const migrated = !missing && definition.migrate ? definition.migrate(value) : false;
       if (!definition.validate(value)) throw new Error('Unexpected saved-data shape.');
+      // Persist only valid migrated data. If the write fails the store stays invalid (and so
+      // unwritable) with the original bytes untouched; a later load retries the migration.
+      if (migrated) {
+        let written = false;
+        try { written = write(path, value); } catch { written = false; }
+        if (!written) throw Object.assign(new Error('Migration write failed.'), {userMessage:`Could not update ${path} to the current format. Your data was not changed and the original file has been preserved. Retry loading.`});
+      }
       entry = {path, status:missing ? 'missing' : 'valid', value, error:''};
     } catch (error) {
       if (error.code === 'not_found' || /ENOENT|not[ _]?found|does not exist/i.test(error.message)) entry = {path,status:'missing',value:clone(definition.fallback),error:''};
-      else entry = {path,status:'invalid',value:clone(definition.fallback),error:`Could not load ${path}. Repair the file, then retry loading. The original file has been preserved.`};
+      else entry = {path,status:'invalid',value:clone(definition.fallback),error:error.userMessage || `Could not load ${path}. Repair the file, then retry loading. The original file has been preserved.`};
     }
     entries.set(path, entry); return entry;
   }
