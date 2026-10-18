@@ -1043,7 +1043,7 @@ function updateReader(keepNavigation = false) {
   annotatedText($('reader-story'), version.story, version.storySegments, {
     language: SPEECH_LANGUAGES[story.language] || 'en',
     glossary: version.glossary || [],
-    onNote: (event, trigger, notes) => showWordNote(trigger, notes)
+    onNote: (event, trigger, notes, surface) => showWordNote(trigger, notes, surface)
   });
   setReaderTextSize(state.readerFontSize);
   $('reader-story').classList.toggle('hide-furigana', story.language === 'ja' && !state.furigana);
@@ -1069,27 +1069,33 @@ function closeWordNote(restoreFocus = false) {
   state.wordNoteTrigger = null;
   document.querySelectorAll('.gloss-note-trigger[aria-expanded="true"]').forEach(button => { button.removeAttribute('aria-expanded'); button.removeAttribute('aria-controls'); });
 }
-function showWordNote(trigger, notes) {
+function showWordNote(trigger, notes, surface = '') {
   const popover = $('word-note-popover');
   if (!popover.hidden && trigger.getAttribute('aria-expanded') === 'true') { closeWordNote(); return; }
   closeWordNote(); popover.textContent = '';
   for (const note of notes) {
     const item = document.createElement('p'); item.className = 'word-note-entry';
-    const word = document.createElement('strong'); word.textContent = note.word || 'Word note';
+    // Lead with the wording as it appears in the text, so Listen plays the real text; the dictionary form follows.
+    const shown = surface.trim() || note.word || '';
+    const word = document.createElement('strong'); word.textContent = shown || 'Word note';
     const meaning = document.createElement('span'); meaning.textContent = note.meaning;
     const heading = document.createElement('span'); heading.className = 'word-note-heading';
     const listen = document.createElement('button'); listen.type = 'button'; listen.className = 'icon-btn word-note-listen';
-    listen.setAttribute('aria-label', `Listen to ${note.word || 'expression'}`);
+    listen.setAttribute('aria-label', `Listen to ${shown || 'expression'}`);
     listen.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4zM15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14"/></svg>';
-    listen.disabled = !speech.available || !note.word;
+    listen.disabled = !speech.available || !shown;
     listen.title = speech.available ? 'Listen' : 'Listening requires App²';
     listen.addEventListener('click', async () => {
       listen.disabled = true;
-      try { await speakSelection(speech, note.word, SPEECH_LANGUAGES[readerStory().language]); }
+      try { await speakSelection(speech, shown, SPEECH_LANGUAGES[readerStory().language]); }
       catch (error) { toast(`Could not play audio: ${error.message}`); }
       finally { listen.disabled = !speech.available; }
     });
-    heading.append(word, listen); item.append(heading, meaning); popover.append(item);
+    heading.append(word, listen); item.append(heading);
+    if (note.word && shown.toLowerCase() !== note.word.trim().toLowerCase()) {
+      const form = document.createElement('span'); form.className = 'word-note-form'; form.textContent = `Dictionary form: ${note.word}`; item.append(form);
+    }
+    item.append(meaning); popover.append(item);
   }
   trigger.setAttribute('aria-expanded', 'true'); trigger.setAttribute('aria-controls', 'word-note-popover'); state.wordNoteTrigger = trigger; popover.hidden = false; popover.focus();
   const rect = trigger.getBoundingClientRect();
@@ -1105,6 +1111,21 @@ function readerPanel() { return $('reader-dialog').querySelector('.reader-panel'
 function rememberReaderPosition() {
   const story = readerStory(); if (!story) return;
   state.readerPositions[`${story.id}:${selectedPath(story).id}`] = { chapterId: activeChapter(story).id, scrollTop: readerPanel().scrollTop };
+}
+// Positions live in memory while scrolling; they are saved with the story when the reader closes or the page is hidden.
+function persistReaderPosition() {
+  const story = readerStory(); if (!story || !state.stories.includes(story)) return;
+  const saved = {};
+  for (const path of story.paths || []) { const position = state.readerPositions[`${story.id}:${path.id}`]; if (position) saved[path.id] = position; }
+  if (JSON.stringify(saved) === JSON.stringify(story.readerPositions || {})) return;
+  const before = story.readerPositions;
+  story.readerPositions = saved;
+  try { persistStories(); } catch (error) { story.readerPositions = before; console.warn(error); }
+}
+function loadReaderPositions() {
+  for (const story of state.stories) for (const [pathId, value] of Object.entries(story?.readerPositions || {})) {
+    if (typeof value?.chapterId === 'string' && Number.isFinite(value.scrollTop)) state.readerPositions[`${story.id}:${pathId}`] = { chapterId: value.chapterId, scrollTop: Math.max(0, value.scrollTop) };
+  }
 }
 function openReader(story) {
   closeStoryReveal();
@@ -1125,7 +1146,7 @@ $('reader-dialog').addEventListener('close', () => {
   settingsFeedback.sync();
   if (state.readerHistoryEntry) { state.readerHistoryEntry = false; history.back(); }
   if ($('reader-removal-dialog').open) $('reader-removal-dialog').close();
-  closeReaderPanels(); closeReaderActions(); stopSpeech(); state.speechVersionKey = ''; closeWordNote(); rememberReaderPosition(); clearExplanationSelection(); setView('library');
+  closeReaderPanels(); closeReaderActions(); stopSpeech(); state.speechVersionKey = ''; closeWordNote(); rememberReaderPosition(); persistReaderPosition(); clearExplanationSelection(); setView('library');
 });
 window.addEventListener('popstate', () => {
   if (!$('reader-dialog').open) return;
@@ -2111,6 +2132,7 @@ window.addEventListener('pageshow', () => { if (document.visibilityState === 'vi
 
 document.documentElement.style.colorScheme = 'dark';
 state.stories = workspaceStorage.load('data/stories.json').value;
+loadReaderPositions();
 const settings = workspaceStorage.load('data/settings.json').value; state.providerId = settings.providerId || ''; state.model = settings.model || PREFERRED_MODEL; state.reasoning = settings.reasoning || '';
 state.furigana = settings.readingPreferences?.furigana !== false;
 state.readerFontSize = Math.max(15, Math.min(30, Number(settings.readingPreferences?.fontSize) || 19));
@@ -2126,6 +2148,9 @@ state.learnerProfiles = Object.fromEntries(admitted('learnerProfiles', settings.
 state.languageExpectations = Object.fromEntries(admitted('languageExpectations', settings.languageExpectations).map(([code,value]) => [code,value.slice(0,600)]));
 settingsPersistence.remember();
 renderTargetLanguageSettings(); populateTargetPicker();
+// Positions update in memory while scrolling; write them when the reader closes or the page is hidden.
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && $('reader-dialog').open) { rememberReaderPosition(); persistReaderPosition(); } });
+window.addEventListener('pagehide', () => { if ($('reader-dialog').open) { rememberReaderPosition(); persistReaderPosition(); } });
 initializePipeline();
 showStorageErrors();
 updateCount(); refreshModels();
