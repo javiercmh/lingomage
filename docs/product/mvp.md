@@ -53,9 +53,11 @@ app has proven learning effectiveness.
 3. Validate real generation through App²'s managed AI connection.
 4. Review content separately in each featured language and record results.
 
+Native App² speech supports selected text, vocabulary headwords and chapter listening. Browser previews show its availability limits; native behavior remains subject to the device checklist.
+
 ## Deferred features
 
-Audio, images, quizzes, spaced repetition, cloud sync, formal learning trials,
+Images, quizzes, spaced repetition, cloud sync, formal learning trials,
 and additional languages.
 
 The result Copy action includes the canonical title and story plus glossary

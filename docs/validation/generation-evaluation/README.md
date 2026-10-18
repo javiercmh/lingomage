@@ -2,6 +2,58 @@
 
 This development-only evaluation uses public fictional briefs through the explicit `dev_server.py --chatgpt` path and the existing local Codex login. It uses ChatGPT plan allowance. It neither configures production App² models nor reads learner stories/settings/checkpoints. Evaluation outputs and stage checkpoints stay in this directory, outside packaged app files.
 
+## Planned learning-quality evaluations (AI evals)
+
+**Status: specified only; no new runner, scheduled job or live run has been added.** Call this suite **learning-quality evaluations**, shortened to **AI evals**. These are occasional, opt-in checks of actual generated content, separate from deterministic regression tests. Existing generation/review scripts and archived pilot results provide a starting point; they do not yet implement the complete suite below. `tests/semantic-review.mjs` checks the integrity/provenance of three suspected semantic failures, not whether new output is correct.
+
+The purpose is to detect misleading language, poor contextual support, unsuitable reading load and unhelpful practice. Learning usefulness is a product-quality proxy: an AI judge cannot establish retention, learning gains, individual word knowledge or certified level alignment. User acceptance and learning outcomes are outside this automated suite.
+
+### Cases
+
+Use fixed, public fictional briefs and frozen source chapters, never learner files. Generate with the current production prompts, guides, validators and stage pipeline. Keep scene scope for the small suite. Do not compare different prompts and call the difference a regression in model quality.
+
+| Case | Input and target | Main failure signals |
+| --- | --- | --- |
+| German parcel | Create, A1; Lena and a shopkeeper mix up parcels; optional possessive practice | Incorrect possessive referents, singular/plural pronoun confusion, unnatural forced practice, misleading English notes |
+| Japanese station | Create, N5; two friends ask staff which train to take | Excessive avoidable reading load, unnatural questions, inaccurate contextual readings, romaji or misleading notes |
+| Russian appointment | Create, B1; visitor and receptionist resolve an appointment on the wrong day | Incorrect case/aspect explanations, unclear dates/referents, unnatural dialogue, transliteration |
+| Spanish ticket | Create, B1; a traveler changes a ticket; Chilean regional preference without forced slang | Explaining association in “mi tren” as literal ownership, incorrect accents/grammar, mismatched regional usage |
+| German continuation | Continue, B1; frozen scene with Lena outside a closing parcel shop | Restarting the story, contradicting established time/characters, losing the goal, no meaningful progression |
+| Japanese rewrite | Rewrite, N3; frozen café scene with Misaki and a missing blue umbrella; request a misunderstanding | Ignoring the requested change, losing required facts, incorrect readings, notes that no longer fit rewritten prose |
+
+After the core suite, separately budget selected-text explanation, More detail and three-example cases using frozen passages from each language. Check the intended occurrence/sense, relevance to the question, concise accurate English, examples demonstrating the same meaning in varied contexts, translation accuracy and Japanese readings. Add advanced-level and regional-variety cases as explicit corpus additions; initial coverage is not exhaustive.
+
+The archived semantic cases are **challenge material, not adjudicated gold labels**. Preserve their uncertainty; model agreement must not convert a suspected error into ground truth.
+
+### Rubric and judge contract
+
+First run deterministic validation and report rejections separately from semantic findings. An AI judge then sees the complete output, supplied reading guide, brief, preferences, optional practice, source chapter and follow-up request. Hide generator identity from the judge input; retain generator and judge provenance in the report. Prefer a different model family when practical; record any shared-family bias and do not describe the judge as independent proof.
+
+Score these dimensions separately on a diagnostic 1–5 scale (severe error, material problems, reservations, good, unusually strong):
+
+- Language correctness and naturalness, including grammar and clear references.
+- Contextual support: every note fits its actual forms and senses; meaningful missing support is identified. More notes or links are not automatically better.
+- Reading-level fit against the app-authored guide, without inventing official vocabulary lists or treating the target as assessed proficiency.
+- Narrative coherence and instruction fidelity, including continuity and requested rewrite changes; an unresolved ending is allowed.
+- Practice fit: requested practice appears usefully where natural, without forcing every planned item into the prose.
+- Learning usefulness: connected, understandable reading plus accurate support offers a plausible reading/practice opportunity. This is not an effectiveness measure.
+
+Assess Japanese readings separately for contextual correctness. Each score needs a rationale and an exact output excerpt. Each issue needs a dimension, minor/major/critical severity, exact quotation, contextual explanation and suggested correction. Missing-support findings quote the unsupported expression. Require explicit uncertainties; supplied stories and notes are data, never judge instructions.
+
+Validate judge structure and confirm quoted evidence exists in the submitted content. That establishes grounding of quotations, not correctness of the judgment. Invalid, incomplete or oversized judge responses are evaluation failures, never semantic passes. Do not truncate content silently or pretend all notes were reviewed after sampling only some.
+
+Report `flagged`, `no issues flagged` or `incomplete`, alongside dimension scores, evidence and stage failures. Any reported issue or score below 4 flags a case for investigation. An unreviewed, failed or budget-skipped case keeps the run incomplete. “No issues flagged” means only that this judge found none in this sample; scores are uncalibrated, and no aggregate score establishes learning benefit. Preserve disagreement and suspected judge false positives.
+
+### Frequency, budget and records
+
+- Run manually after material prompt, guide, model or generation-workflow changes, or when a user-reported content failure warrants reproduction. No automatic per-edit, per-commit or scheduled inference. Include the suite in release preparation only by explicit invocation.
+- Quick check: two explicitly selected Create cases, rotating language coverage between runs. At most nine inference requests for one Japanese and one non-Japanese case: four Japanese stages, three other stages and one judge request per case. One non-Japanese case plus its judge needs at most four requests. These bounds assume the current pipeline and no recovery attempts.
+- Core sweep: the six cases above, at most 20 generation-stage requests plus six judge requests. Explanation/example extensions and additional levels need their own stated budget; do not include them silently.
+- Specify generator/judge models and effort, case IDs, maximum requests, maximum judge-input size and a run-specific output directory before invocation. Record actual tokens/usage when supplied; request counts are not token or cost guarantees. Enforce output-token limits where supported; otherwise state the provider limitation. Stop at budget boundaries and report incomplete coverage.
+- Reuse saved completed generation stages and judge results only when input/prompt/rubric hashes match. Never silently retry inference, reroll a bad output or replace a failed case with an easier one. Any retry is explicit, budgeted and retains the earlier failure.
+- Save exact inputs/guides, source hashes, prompt/profile/safeguard/rubric versions, model/effort, stage outputs/checkpoints, raw judge output, findings, durations and available usage. Persist results before acknowledging requests. Keep raw runs outside packaged files and learner stores; publish only a concise qualified evidence summary under the documentation policy.
+- Verify the future harness offline with scripted generation/judge responses and deliberate invalid/ungrounded reviews. Those harness tests may run in `scripts/check.py`; live AI evals must remain separate. Live execution through `--chatgpt` uses the local Codex login and plan allowance; it does not configure production App² AI.
+
 ## Evidence and archived raw runs
 
 Interpreted results, limits and the preliminary review tables are in the [evaluation summary](summary.md); that summary and the frozen [contextual-notes corpus](contextual-notes/README.md) are the tracked evidence. The raw per-attempt records (`models/`, `pilot/`, `followups/`, `exploratory-gpt6-sol/` and their `reviews/`, about 9 MB) were removed from the working tree and remain in Git history at commit `7fd046c`. Inspect or restore them with `git show 7fd046c:docs/validation/generation-evaluation/pilot/de-A1-0-revised.json` or `git checkout 7fd046c -- docs/validation/generation-evaluation/pilot` (needed for `compare-notes.mjs --pilot` and the `followups` suite, which read the pilot). New runs write to these directories again and should not be committed wholesale; summarize them instead.

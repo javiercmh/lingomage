@@ -1,3 +1,4 @@
+import { bindGeneration } from './support/controllers.mjs';
 import { failureInfo, recoverySummary } from '../js/generation-errors.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -6,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { validateProse, validateNotes, NOTES_INSTRUCTIONS, validateStory, validateExamples, validateScript, wordCount, sentenceCount, readingPlan, attachReadings, SAFEGUARD_VERSION } from '../js/learning-validation.js';
 import { createPipeline } from '../js/generation-pipeline.js';
 import { annotatedText, getCanonicalSelection, japaneseSegments } from '../js/reader-text.js';
+import {MEMORY_VERSION} from '../js/story-memory.js';
 const tested = id => console.log(`SAFEGUARD ${id}`);
 const story = (language='de', length='short') => {
   const count=language === 'ja' ? 8 : 100;
@@ -99,12 +101,12 @@ h=harness();op=h.pipeline.create(h.spec);h.flags.invalidReadings=true;await asse
 h=harness();op=h.pipeline.create(h.spec);h.flags.cancelled=true;await assert.rejects(h.pipeline.run(op),/cancelled/);assert.equal(h.starts,1);await h.pipeline.discard(op);assert.equal(h.pipeline.records.length,0);
 tested('GEN-003');
 h=harness();op=h.pipeline.create({...h.spec,input:{storyLength:'short',learnerKnowledge:'snapshot'},config:{providerId:'old',model:'old'}});h.spec.input.storyLength='long';assert.equal(op.input.storyLength,'short');assert.equal(op.config.model,'old');assert.equal(op.safeguardVersion,SAFEGUARD_VERSION);assert.throws(()=>h.pipeline.create(h.spec),/pending/);
-const appContext={state:{stories:[],current:null},normalizeChapters:s=>s.chapters,ensureStoryPaths(){},persistReaderStory:s=>{if(!appContext.state.stories.some(a=>a.id===s.id))appContext.state.stories.push(s);},savedFollowUps:h=>h.followUps||[],MEMORY_VERSION:'test',structuredClone};vm.createContext(appContext);
-vm.runInContext(source.slice(source.indexOf('function operationProvenance('),source.indexOf('function showOperationResult(')),appContext);
+const appContext={state:{stories:[],current:null},normalizeChapters:s=>s.chapters,ensureStoryPaths(){},persistReaderStory:s=>{if(!appContext.state.stories.some(a=>a.id===s.id))appContext.state.stories.push(s);},savedFollowUps:h=>h.followUps||[],structuredClone};vm.createContext(appContext);
+bindGeneration(appContext);
 const create={...op,result:story('de'),kind:'create',input:{difficulty:'beginner'}};appContext.applyContentOperation(create);appContext.applyContentOperation(create);assert.equal(appContext.state.stories.length,1);
 const stored=appContext.state.stories[0];stored.paths=[{id:'original',name:'Original',entries:[{chapterId:stored.chapters[0].id,versionId:stored.chapters[0].versions[0].id}]}];stored.nextAlternateNumber=1;
 const base=structuredClone(stored);
-for (const kind of ['continue','rewrite']) {const sample=structuredClone(base);appContext.state.stories=[sample];const entries=structuredClone(sample.paths[0].entries);const follow={...create,id:`op-${kind}`,kind,target:{storyId:sample.id,pathId:'original',chapterId:sample.chapters[0].id,sourceVersionId:entries[0].versionId,entries,index:0},input:{prompt:'',learnerProfile:{}}};appContext.applyContentOperation(follow);appContext.applyContentOperation(follow);assert.equal(sample.chapters.reduce((n,c)=>n+c.versions.filter(v=>v.operationId===follow.id).length,0),1);assert.equal(sample.chapters[0].versions[0].story,base.story);}
+for (const kind of ['continue','rewrite']) {const sample=structuredClone(base);appContext.state.stories=[sample];const entries=structuredClone(sample.paths[0].entries);const follow={...create,id:`op-${kind}`,kind,target:{storyId:sample.id,pathId:'original',chapterId:sample.chapters[0].id,sourceVersionId:entries[0].versionId,entries,index:0},input:{prompt:'',learnerProfile:{}}};appContext.applyContentOperation(follow);appContext.applyContentOperation(follow);assert.equal(sample.chapters.reduce((n,c)=>n+c.versions.filter(v=>v.operationId===follow.id).length,0),1);assert.equal(sample.chapters[0].versions[0].story,base.story);assert.equal(sample.chapters.flatMap(c=>c.versions).find(v=>v.operationId===follow.id).memoryVersion,MEMORY_VERSION,'saved provenance uses the single memory version');}
 const sample=structuredClone(base);sample.chapters[0].help=[{id:'help',followUps:[]}];appContext.state.stories=[sample];const exampleOp={...create,id:'example-op',kind:'examples',result:{examples:[example,example,example]},input:{profile:{}},target:{storyId:sample.id,chapterId:sample.chapters[0].id,versionId:sample.chapters[0].versions[0].id,helpId:'help',start:0,end:5,passage:'Stadt'}};appContext.applyContentOperation(exampleOp);appContext.applyContentOperation(exampleOp);assert.equal(sample.chapters[0].help[0].followUps.length,1);
 tested('GEN-004');
 // The actual Python fixtures pass the same production validators as live results.
@@ -129,9 +131,9 @@ from dev_server import Handler
 print(Handler.mock_readings(SimpleNamespace(server=SimpleNamespace(workspace=Path('.'))),json.load(sys.stdin)))`],{encoding:'utf8',input:JSON.stringify({spans:fixturePlan.spans})}));
 attachReadings(japaneseFixture.content,fixturePlan,fixtureReadings);
 // UI recovery must work for a fresh Create operation with no reader status.
-const boxes=new Map();const box=id=>{if(!boxes.has(id)){const b=element('section');b.hidden=true;boxes.set(id,b);}return boxes.get(id);};
+const boxes=new Map();const box=id=>{if(!boxes.has(id)){const b=element('section');b.hidden=true;b.dataset={};boxes.set(id,b);}return boxes.get(id);};
 const recovery={failureInfo,recoverySummary,appendFailureDetails(){},PROMPT_VERSION:'test',SAFEGUARD_VERSION:'test',pipeline:{records:[{kind:'create',stage:'readings'}],busy:true},readerGeneration:null,state:{readerId:null},$:box,document:{createElement:element},renderReaderGeneration(){},resumeCheckpoint(){},setScopeDisabled(){}};
-vm.createContext(recovery);vm.runInContext(source.slice(source.indexOf('function renderCheckpointRecovery('),source.indexOf('async function resumeCheckpoint(')),recovery);recovery.renderCheckpointRecovery();
+vm.createContext(recovery);vm.runInContext(source.slice(source.indexOf('function applyGenerationLocks('),source.indexOf('async function resumeCheckpoint(')),recovery);recovery.renderCheckpointRecovery();
 assert.equal(box('generation-status').textContent,'Adding kanji readings…');assert.equal(box('checkpoint-recovery-reader').hidden,true);
 recovery.pipeline.records[0]={kind:'continue',stage:'notes',target:{storyId:'story'}};recovery.state.readerId='story';recovery.readerGeneration={storyId:'story',phase:'ready'};
 recovery.renderCheckpointRecovery();assert.equal(box('reader-edit-submit').disabled,true);assert.equal(box('reader-prompt').disabled,true);assert.equal(recovery.readerGeneration.phase,'working');assert.equal(recovery.readerGeneration.message,'Adding vocabulary notes…');
@@ -145,6 +147,8 @@ recovery.renderCheckpointRecovery();
 assert.equal(box('checkpoint-recovery-create').children.at(-1).children[0].textContent,'Retry');
 assert.ok(box('checkpoint-recovery-create').children[0].textContent.includes('Story generation stopped during vocabulary notes'));
 assert.ok(!box('checkpoint-recovery-create').textContent.includes('Explicitly retry'));
+// An unchanged panel is not rebuilt: focus survives and an existing alert is not announced again.
+const renderedActions=box('checkpoint-recovery-create').children.at(-1);recovery.renderCheckpointRecovery();assert.equal(box('checkpoint-recovery-create').children.at(-1),renderedActions,'unchanged recovery panel was rebuilt');
 recovery.pipeline.records[0].stage='ready';recovery.renderCheckpointRecovery();
 assert.equal(box('checkpoint-recovery-create').children.at(-1).children[0].textContent,'Save response');
 recovery.pipeline.records[0].promptVersion='old';recovery.renderCheckpointRecovery();

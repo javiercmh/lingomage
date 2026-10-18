@@ -1,3 +1,5 @@
+(async()=>{
+const {bindStory, bindGeneration, bindPanels}=await import('./support/controllers.mjs');
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
 const source=fs.readFileSync('js/app.js','utf8');
 const slice=(start,end)=>source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start)));
@@ -18,7 +20,7 @@ function harness(story=fixture()){
  const c={pipeline:null,state:{readerId:'S',readerChapter:1,stories:[story],readerPositions:{'S:original':{chapterId:'C'},'S:alt1':{chapterId:'B'},'S:alt3':{chapterId:'A'}},readerEditDraft:{storyId:'S',pathId:'original',chapterId:'C'}},$,console,window:{innerWidth:390,innerHeight:844},
  readerStory:()=>c.state.stories.find(x=>x.id===c.state.readerId),persistReaderStory(s){assert.equal(s,c.state.stories[0]);if(failed)throw Error('disk');saves++;},
  clearExplanationSelection(){},closeWordNote(){},updateReader(){},readerPanel:()=>({scrollTop:0}),toast(){},setView(){},confirmStoryDeletion(ids){deleted=ids;}};
- vm.createContext(c);vm.runInContext(slice('function pendingDeletionBlocked(', 'function syncStorySelection('),c);vm.runInContext(slice('function closeReaderActions(', 'function readerStory('),c);
+ vm.createContext(c);vm.runInContext(slice('function pendingDeletionBlocked(', 'function syncStorySelection('),c);bindStory(c); bindPanels(c); vm.runInContext(slice('function renderReaderActions(', 'const { normalizeChapters'),c);
  return {c,story,$,fail:value=>failed=value,saves:()=>saves,deleted:()=>deleted};
 }
 function target(story,pathId,kind,index=1){return {storyId:story.id,pathId,kind,index,entries:JSON.stringify(story.paths.find(p=>p.id===pathId).entries)};}
@@ -66,8 +68,7 @@ console.log('PASS chapter/path removal, shared content and memory, mirrors, name
  c.document={createElement:element,querySelectorAll:()=>[]};c.crypto={randomUUID:()=>`generated-${++sequence}`};c.PROMPT_VERSION='test';c.LANGUAGES={de:'German'};c.STORY_GUIDES={de:{beginner:'Simple'}};c.profileSnapshot=()=>({});c.decodeResponse=JSON.parse;c.state.model='mock';c.state.providerId='mock';story.language='de';story.difficulty='beginner';
  c.readerGeneration=null;c.renderReaderGeneration=()=>{};c.setReaderGeneration=value=>{c.readerGeneration=value;};c.renderChapterRequest=()=>{};c.renderCheckpointRecovery=()=>{};vm.runInContext(fs.readFileSync('js/request-lifecycle.js','utf8').replaceAll('export async function ','async function '),c);
  c.LENGTHS={short:{words:[100,150],sentences:[8,12]}};c.lengthPreference=()=> 'short';c.structuredClone=structuredClone;
- c.operationProvenance=op=>({operationId:op.id,promptVersion:'test'});
- vm.runInContext(slice('function applyContentOperation(', 'function showOperationResult('),c);
+ bindGeneration(c);
  c.runContentOperation=async spec=>{const op={...spec,id:`operation-${++sequence}`,createdAt:'test',result:JSON.parse(await c.readerAi(spec.kind,spec.input))};c.applyContentOperation(op);return op;};c.showOperationResult=()=>{};
  c.ai={acknowledge:async()=>{}};c.readerAi=async(kind,input)=>{c.state.pendingReaderRequestId='request';if(kind==='summary')return JSON.stringify({...input.previousMemory,plot:[input.chapterChunk]});requested=input;return JSON.stringify({title:'New',story:'Next scene',glossary:[]});};
  vm.runInContext(slice('async function acknowledgeReaderResult(', 'function decodeHelp(')+slice('function storyInstructions(', 'function storyInput(')+slice('function createHelpLoading(', 'function renderSavedHelp('),c);
@@ -81,4 +82,6 @@ console.log('PASS chapter/path removal, shared content and memory, mirrors, name
  $('reader-edit-panel').dataset.mode='rewrite';c.state.readerChapter=1;await submit();assert.equal(c.selectedPath(story).name,'Alternate 4');assert.equal(c.selectedPath(story).parentPathId,'original');assert.equal(story.nextAlternateNumber,5);
  c.removeReaderContent(target(story,story.activePathId,'path'));c.state.readerChapter=1;await submit();assert.equal(c.selectedPath(story).name,'Alternate 5');assert.equal(story.nextAlternateNumber,6);
  console.log('PASS production generation continues from truncated ending and rewrite never reuses a deleted alternate name');
+})().catch(error=>{console.error(error);process.exitCode=1;});
+
 })().catch(error=>{console.error(error);process.exitCode=1;});

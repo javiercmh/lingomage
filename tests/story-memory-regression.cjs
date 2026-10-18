@@ -1,10 +1,11 @@
+(async()=>{
+const {bindStory, bindGeneration, bindPanels}=await import('./support/controllers.mjs');
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
-const source = fs.readFileSync('js/app.js','utf8');
-const code = source.slice(source.indexOf('function ensureStoryPaths('),source.indexOf('function readerStory('));
+
 const story = {id:'S',chapters:[{id:'A',activeVersionId:'a2',versions:[{id:'a1',story:'Original'},{id:'a2',sourceVersionId:'a1',story:'Alternate'}]}, {id:'B',basedOnVersionId:'a1',activeVersionId:'b',versions:[{id:'b',sourceVersionId:'a1',story:'Following original'}]}]};
 let calls=0, saves=0, failSave=false, failAck=false;
 const c={state:{providerId:'mock',model:'mock'},PROMPT_VERSION:'test',normalizeChapters:s=>s.chapters,readerStory:()=>story,console};
-vm.createContext(c);vm.runInContext(code,c);
+bindStory(c);
 c.readerAi=async(kind,input)=>{calls++;assert.equal(kind,'summary');assert.ok(input.chapterChunk.length<=8000);return JSON.stringify({...input.previousMemory,plot:[input.chapterChunk.slice(-100)]});};
 c.savePendingReaderResult=async()=>{const p=c.state.pendingReaderResult;if(!p.saved){const undo=p.apply();if(failSave){undo();throw Error('disk');}p.saved=true;saves++;}if(failAck)throw Error('release');c.state.pendingReaderResult=null;};
 const loading={querySelector:()=>({textContent:''})};
@@ -20,3 +21,5 @@ const loading={querySelector:()=>({textContent:''})};
  story.memories=[];let stages=0;c.readerAi=async()=>{if(++stages===2)throw Error('cancelled');return JSON.stringify({characters:[],facts:[],plot:[],unresolved:[],uncertainties:[],situation:[]});};await assert.rejects(c.prepareStoryMemory(story,entries,loading),/cancelled/);assert.equal(story.memories.length,1);
  console.log('PASS lineage, bounded chunks, memory validation, shared-cache reuse, save/release recovery and staged cancellation');
 })().catch(e=>{console.error(e);process.exitCode=1;});
+
+})().catch(error=>{console.error(error);process.exitCode=1;});

@@ -6,13 +6,13 @@ This workspace is a plain HTML/CSS/JavaScript subapp. `manifest.json` lists the 
 
 - `data/stories.json` contains saved story records, including language, canonical title and story, app-owned Japanese reading segments, glossary, vocabulary, topic, model, prompt version and creation time.
 - `data/settings.json` stores the selected model and reasoning preference. ChatGPT credentials remain in App² and are not exposed to the subapp.
-- Japanese uses a canonical prose request followed by an app-owned kanji reading request; validated stages save before acknowledgement. Japanese `story` and `title` remain the canonical strings. `storySegments` and `titleSegments` add optional reading annotations for display. Copying uses canonical text and excludes readings.
+- Japanese uses language planning, canonical prose, contextual notes and app-owned kanji reading requests; validated stages save before acknowledgement. Japanese `story` and `title` remain the canonical strings. `storySegments` and `titleSegments` add optional reading annotations for display. Copying uses canonical text and excludes readings.
 - `data/generation-checkpoints.json` stores unfinished generation stages and captured context; seed it empty. `data/language-safeguards.json` is a managed definition.
 - Russian output is validated as Cyrillic. English glossary meanings are retained for all four target languages.
 
 ## AI
 
-The app imports `ai`, `readFile` and `writeFile` from `js/bridge.js`. It discovers providers and models at runtime, sends a versioned profile-aware learning instruction and freeform wishes, validates chapter length, scripts, field bounds and nonempty inline learning notes, saves completed stories locally, then acknowledges the completed request. Generation errors do not trigger automatic retries.
+The app imports `ai`, `readFile` and `writeFile` from `js/bridge.js`. It discovers providers and models at runtime, sends a versioned profile-aware learning instruction and freeform wishes, validates technical chapter bounds, scripts, field bounds and nonempty inline learning notes, saves completed stories locally, then acknowledges the completed request. Generation errors do not trigger automatic retries.
 
 Connect ChatGPT through App² library **Settings → AI**. Browser preview supports the explicitly enabled offline `--mock-ai` responses. For optional live desktop testing, sign in with `codex login` and run `python3 dev_server.py --chatgpt`; this uses Codex's ChatGPT account and may use plan allowance. The development server keeps no credentials, uses ephemeral threads in a temporary directory and does not retain pending requests across restart. This local development mode is an exception to the App²-only connection rule; released app behavior still uses App²'s managed AI bridge. Mock outputs are fixed examples and do not establish translation quality or learning effectiveness.
 

@@ -1,10 +1,12 @@
+(async()=>{
+const {bindStory, bindGeneration, bindPanels}=await import('./support/controllers.mjs');
 // Exercise compact reader controls through production helpers and event handlers.
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
 const source = fs.readFileSync('js/app.js', 'utf8');
 const slice = (start, end) => source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)));
 const elements = new Map(), documentEvents = {};
 const box = id => {
-  if (!elements.has(id)) elements.set(id, {hidden: true, classList: {toggle(name, enabled) { enabled ? navigationClasses.add(name) : navigationClasses.delete(name); }}, style: {}, attributes: {}, events: {}, value: '',
+  if (!elements.has(id)) elements.set(id, {hidden: true, classList: {toggle(name, enabled) { enabled ? navigationClasses.add(name) : navigationClasses.delete(name); }}, style: {}, attributes: {}, events: {}, removeEventListener() {}, value: '',
     setAttribute(k, v) { this.attributes[k] = v; }, focus(options) { this.focused = true; this.focusOptions = options; },
     addEventListener(k, fn) { this.events[k] = fn; },
     getBoundingClientRect() { if (id === 'reader-navigation-bar') return {top: navigationTop, height: 66}; return id.endsWith('-toggle') ? {left: 230, top: 200, bottom: 244} : {width: 280, height: 160}; }});
@@ -18,16 +20,16 @@ const navigationClasses = new Set();
 const reader = {events: {}, addEventListener(key, fn) { this.events[key] = fn; }, scrollTop: 0, getBoundingClientRect: () => ({left: 0, right: 320, top: 0, bottom: 640})};
 const c = {state: {readerFontSize: 19, readerEditBusy: false, readerPositions: positions}, $: box,
   window: {innerWidth: 320, innerHeight: 640}, getComputedStyle: () => ({paddingLeft: '14', paddingRight: '14', paddingTop: '12', paddingBottom: '24'}), readerPanel: () => reader,
-  document: {addEventListener: (key, fn) => documentEvents[key] = fn}, closeWordNote() { notesClosed++; },
+  document: {removeEventListener() {}, addEventListener: (key, fn) => documentEvents[key] = fn}, closeWordNote() { notesClosed++; },
   persistSettings() { saved++; }, toast(message) { messages.push(message); },
   readerStory: () => story, selectedPath: () => ({id: story.activePathId}),
   pathChapters: () => [{id: 'A'}, {id: 'B'}], rememberReaderPosition() {}, clearExplanationSelection() {},
   persistReaderStory() { if (failed) throw Error('disk'); saved++; },
   updateReader(keep) { updates.push(keep); }, requestAnimationFrame: fn => fn()
 };
-vm.createContext(c);
-vm.runInContext(slice('function closeReaderActions(', 'function renderReaderActions('), c);
-vm.runInContext(slice('for (const name of READER_PANELS) $', "$('furigana-toggle').addEventListener"), c);
+c.restoringPathPosition=false; vm.createContext(c);
+const panels=bindPanels(c);
+panels.initialize();
 box('path-control').hidden = true;
 box('reader-navigation-toggle').events.click();
 assert.equal(box('reader-navigation-panel').hidden, false);
@@ -95,3 +97,5 @@ navigationTop = 100; c.updateReaderNavigation(); assert(!navigationClasses.has('
 c.getComputedStyle = element => element === reader ? {paddingTop: '36px'} : {top: '0px'}; navigationTop = 36; c.updateReaderNavigation(); assert(navigationClasses.has('is-floating'));
 reader.scrollTop = 0; c.updateReaderNavigation(); assert(!navigationClasses.has('is-floating'));
 console.log('PASS compact reader: panel exclusivity, viewport bounds, focus/dismissal, live size/persistence, path positions/write rollback and generation lock');
+
+})().catch(error=>{console.error(error);process.exitCode=1;});

@@ -30,7 +30,13 @@
     "data/generation-checkpoints.json",
     "js/story-generation.js",
     "data/reader-note-fixtures.json",
-    "js/generation-errors.js"
+    "js/generation-errors.js",
+    "js/workspace-storage.js",
+    "js/settings-feedback.js",
+    "js/story-model.js",
+    "js/story-memory.js",
+    "js/generation-controller.js",
+    "js/reader-panels.js"
   ],
   "app2Update": {
     "appId": "com.wynh.lingomage",
@@ -61,7 +67,13 @@
       "data/language-safeguards.json",
       "js/story-generation.js",
       "data/reader-note-fixtures.json",
-      "js/generation-errors.js"
+      "js/generation-errors.js",
+      "js/workspace-storage.js",
+      "js/settings-feedback.js",
+      "js/story-model.js",
+      "js/story-memory.js",
+      "js/generation-controller.js",
+      "js/reader-panels.js"
     ],
     "seedFiles": [
       "data/stories.json",

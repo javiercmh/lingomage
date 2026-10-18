@@ -1,0 +1,161 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LingoMage offline browser checks</title>
+<style>body{font:16px system-ui;margin:20px;background:#0f172a;color:#f8fafc}button{font:inherit;min-height:44px;padding:10px}iframe{width:min(100%,780px);height:800px;border:1px solid #94a3b8}li{margin:8px 0}#status{white-space:pre-wrap}</style>
+<h1>Offline browser checks</h1><p>Runs against disposable mock data only. This checks browser integration, not native Android behavior or linguistic accuracy.</p>
+<button id="run">Run smoke checks</button><p id="status" role="status">Ready</p><ol id="results"></ol><iframe id="app" title="LingoMage test workspace" src="/"></iframe>
+<script type="module">
+const frame=document.querySelector('#app'), status=document.querySelector('#status'), results=document.querySelector('#results');
+const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const doc=()=>frame.contentDocument;
+const field=id=>doc().getElementById(id);
+function assert(value,message){if(!value)throw Error(message);}
+async function until(predicate,message){for(let i=0;i<500;i++){if(predicate())return;await delay(50);}throw Error(message);}
+function pass(message){const li=document.createElement('li');li.textContent=`PASS ${message}`;results.append(li);status.textContent=message;}
+function change(id,value){const control=field(id);control.value=value;control.dispatchEvent(new Event('change',{bubbles:true}));}
+async function write(name,value){const response=await fetch('/__bridge/writeFile?'+new URLSearchParams({name}),{method:'POST',body:typeof value==='string'?value:JSON.stringify(value)});assert(response.ok,'Test file write failed');}
+async function read(name){const response=await fetch('/__bridge/readFile?'+new URLSearchParams({name}));assert(response.ok,'Test file read failed');return response.text();}
+async function reload(){const loaded=new Promise(resolve=>frame.addEventListener('load',resolve,{once:true}));frame.contentWindow.location.reload();await loaded;await until(()=>field('language')?.options.length && (!field('storage-recovery').hidden || field('model-select').value==='development-mock' && !field('model-select').disabled),'App did not finish startup');}
+// Real click on Retry loading; the frame reloads itself as it does for a learner.
+async function retryLoading(){const loaded=new Promise(resolve=>frame.addEventListener('load',resolve,{once:true}));field('storage-retry').click();await loaded;await until(()=>field('language')?.options.length && (!field('storage-recovery').hidden || field('model-select').value==='development-mock' && !field('model-select').disabled),'App did not finish startup after Retry loading');}
+// Simulates an unavailable disk for settings.json only, through the app's real write path (the bridge request fails).
+function failSettingsWrites(on){const win=frame.contentWindow;win.__failSettings=on;const proto=win.XMLHttpRequest.prototype;if(proto.__plainOpen)return;proto.__plainOpen=proto.open;proto.open=function(method,url,...rest){if(win.__failSettings&&/writeFile\?/.test(url)&&decodeURIComponent(url).includes('name=data/settings.json'))url='/__bridge/unavailable';return proto.__plainOpen.call(this,method,url,...rest);};}
+const fire=(control,type)=>control.dispatchEvent(new Event(type,{bubbles:true}));
+async function closeReader(){frame.contentWindow.history.back();await until(()=>!field('reader-dialog').open,'Reader did not close');}
+function tab(name){doc().querySelector(`[data-view="${name}"]`).click();}
+async function completeGeneration(){await until(()=>field('reader-dialog').open && field('reader-story').textContent.trim(),'Generation did not open the reader');await until(()=>!field('generate').disabled,'Generation remained blocked');}
+document.querySelector('#run').addEventListener('click',async event=>{
+ event.target.disabled=true;results.textContent='';status.textContent='Running…';
+ try{
+  const marker=await fetch('/data/browser-test-workspace.json').then(response=>response.json());
+  const info=await fetch('/__bridge/info').then(response=>response.json());
+  assert(marker.disposable===true && info.mockAi===true && !info.liveAi,'Use scripts/browser_smoke.py; existing workspaces are not safe test targets');
+  // Each run starts fresh; the marker and mock guard above are mandatory.
+  for(const [path,value] of [['data/stories.json',[]],['data/settings.json',{}],['data/generation-checkpoints.json',[]]])await write(path,value);
+  await reload();await until(()=>field('model-select').value==='development-mock','Mock model did not initialize');pass('Startup discovers the offline model');
+  const viewport=doc().querySelector('meta[name="viewport"]').content;
+  assert(!/user-scalable=no|maximum-scale=1(?:,|$)/.test(viewport),'Zoom remains restricted');
+  pass('Page allows browser zoom');
+  for(const language of ['de','ja','ru','es-CL']){
+   tab('create');change('language',language);change('difficulty',language==='ja'?'N5':'A1');field('generate').click();await completeGeneration();
+   assert(field('reader-story').getAttribute('lang'), 'Canonical prose needs a language');
+   const trigger=doc().querySelector('.gloss-note-trigger');assert(trigger,'Missing contextual note');trigger.click();assert(!field('word-note-popover').hidden,'Note did not open');
+   await closeReader();pass(`${language}: generation, reader and contextual note`);
+  }
+  tab('library');doc().querySelector('.story-open').click();await until(()=>field('reader-dialog').open,'Saved story did not reopen');pass('Saved story reopens from the library');
+  const walker=doc().createTreeWalker(field('reader-story'),4);let node;
+  while((node=walker.nextNode()) && (!node.textContent.trim() || node.parentElement.closest('rt'))){}
+  assert(node,'No canonical text to select');
+  const range=doc().createRange();range.setStart(node,0);range.setEnd(node,Math.min(node.textContent.length,3));
+  const selection=frame.contentWindow.getSelection();selection.removeAllRanges();selection.addRange(range);doc().dispatchEvent(new Event('selectionchange'));
+  await until(()=>!field('selection-toolbar').hidden,'Selection toolbar did not open');field('selection-explain').click();
+  await until(()=>field('reader-help').querySelector('.help-card') && !field('reader-help').querySelector('.reader-ai-cancel'),'Explanation did not save');
+  selection.removeAllRanges();pass('Canonical selection creates a saved contextual explanation');
+  for(const [button,mode] of [['continue-story','continue'],['rewrite-chapter','rewrite']]){
+   field(button).click();assert(field('reader-edit-panel').dataset.mode===mode,'Wrong edit mode');field('reader-edit-submit').click();
+   await until(()=>field('reader-edit-panel').hidden && !field('reader-edit-submit').disabled,'Chapter edit did not finish');
+   assert(field('reader-story').textContent.trim(),'Chapter edit cleared prose');pass(`${mode}: saves and refreshes the reader`);
+  }
+  await closeReader();tab('create');change('language','de');change('difficulty','A1');field('generate').click();await until(()=>!field('loading-card').hidden,'Request did not start');field('cancel-generation').click();
+  await until(()=>!field('checkpoint-recovery-create').hidden && field('loading-card').hidden,'Cancelled generation did not offer recovery');
+  await reload();await until(()=>!field('checkpoint-recovery-create').hidden,'Checkpoint missing after reload');pass('Cancellation and reload retain explicit recovery');
+  {
+   // Unrelated settings saves, successful or failed, leave the recovery panel (and its focused button) alone.
+   const panel=field('checkpoint-recovery-create'),button=[...panel.querySelectorAll('button')].find(item=>/Resume|Retry/.test(item.textContent));
+   button.focus();const before=[...panel.children],furigana=field('furigana-toggle'),intact=()=>button.isConnected && doc().activeElement===button && before.every((node,index)=>panel.children[index]===node);
+   furigana.checked=!furigana.checked;fire(furigana,'change');assert(intact(),'A successful settings save rebuilt the recovery panel');
+   failSettingsWrites(true);furigana.checked=!furigana.checked;fire(furigana,'change');assert(intact(),'A failed settings save rebuilt the recovery panel');
+   failSettingsWrites(false);field('settings-write-error').querySelector('button').click();assert(field('settings-write-error').hidden && intact(),'Retry save disturbed the recovery panel');
+   pass('Unrelated settings saves, including a failed one and its retry, do not rebuild or refocus checkpoint recovery');
+  }
+  const checkpoint=JSON.parse(await read('data/generation-checkpoints.json'));assert(checkpoint.length===1,'Pending operation missing');
+  const resume=[...field('checkpoint-recovery-create').querySelectorAll('button')].find(button=>/Resume|Retry/.test(button.textContent));assert(resume,'Missing resume action');resume.click();await completeGeneration();await closeReader();pass('Explicit resume completes the saved operation');
+  const storiesBefore=await read('data/stories.json');
+  // Unreadable stores: malformed and blank bytes are preserved, work is blocked, and a real click on Retry loading recovers after repair.
+  for(const [path,bad,label] of [['data/settings.json','{broken settings','malformed'],['data/stories.json','[null]','malformed'],['data/generation-checkpoints.json','{broken progress','malformed'],['data/settings.json','','blank'],['data/stories.json','','blank'],['data/generation-checkpoints.json','','blank']]){
+   const original=await read(path);await write(path,bad);await reload();await until(()=>!field('storage-recovery').hidden,'No persistent storage error');
+   assert(field('storage-recovery-message').textContent.includes(path),'The storage error does not name the file');
+   assert(field('generate').disabled,'Generation enabled with invalid data');tab('settings');await delay(100);
+   assert(await read(path)===bad,'Invalid data was overwritten');
+   await write(path,original);await retryLoading();
+   assert(field('storage-recovery').hidden,'Retry loading left the storage error visible after repair');assert(!field('generate').disabled,'Generation stayed blocked after repair');
+   pass(`${path}: ${label} bytes preserved; Retry loading recovers after repair`);
+  }
+  assert(await read('data/stories.json')===storiesBefore,'Storage recovery changed saved stories');
+  {
+   // Intact stories stay readable while settings are unreadable; preference edits cannot save and say why inside the modal reader.
+   await write('data/settings.json','{broken settings');await reload();await until(()=>!field('storage-recovery').hidden,'No persistent storage error');
+   tab('library');await until(()=>doc().querySelector('.story-open'),'Saved stories are hidden while settings are unreadable');
+   doc().querySelector('.story-open').click();await until(()=>field('reader-dialog').open && field('reader-story').textContent.trim(),'A saved story did not open while settings were unreadable');
+   field('reader-preferences-toggle').click();const slider=field('reader-text-size');slider.focus();const previous=slider.value;
+   slider.value='27';fire(slider,'input');fire(slider,'change');
+   const notice=field('reader-settings-error');
+   assert(!notice.hidden && field('reader-dialog').contains(notice),'No visible settings error inside the reader');
+   assert(notice.getAttribute('role')==='alert','The reader settings error is not announced');
+   assert(notice.textContent.includes('data/settings.json') && !notice.querySelector('button'),'Unreadable settings offered Retry save');
+   assert(slider.value===previous && doc().activeElement===slider,'A blocked preference save did not restore the control and its focus');
+   assert(await read('data/settings.json')==='{broken settings','A reader preference edit overwrote unreadable settings');
+   await closeReader();assert(field('reader-settings-error').hidden,'The reader notice remained after closing the reader');
+   await write('data/settings.json','{}');await retryLoading();
+   // With a different store unreadable, Settings stay readable but cannot be edited.
+   await write('data/stories.json','[null]');await write('data/settings.json',JSON.stringify({targetLanguages:{de:'enabled'},standardizedLevels:{de:'A1'}}));await reload();await until(()=>!field('storage-recovery').hidden,'No persistent storage error');
+   tab('settings');const toggle=doc().querySelector('.language-toggle');assert(toggle && !toggle.disabled,'Settings cannot be read while a store is unreadable');
+   toggle.click();assert(doc().querySelector('.target-language-settings').hidden===false,'The language disclosure did not expand');
+   assert([...doc().querySelectorAll('#view-settings select, #view-settings textarea, .language-remove, #model-select')].every(item=>item.disabled),'Settings stay editable while a store is unreadable');
+   await write('data/stories.json',storiesBefore);await write('data/settings.json','{}');await retryLoading();
+   pass('Stories stay readable while settings are unreadable; preference edits are blocked with an in-modal explanation; Settings are read-only');
+  }
+  {
+   // A failed settings write: every control, focus and unrelated typing are restored; Retry repeats the intended change.
+   await write('data/settings.json',JSON.stringify({targetLanguages:{de:'enabled',ja:'enabled'},standardizedLevels:{de:'A1',ja:'N5'},readingPreferences:{followAlong:false}}));await reload();
+   const stored=await read('data/settings.json');
+   tab('library');doc().querySelector('.story-open').click();await until(()=>field('reader-dialog').open && field('reader-story').textContent.trim(),'The saved story did not open');
+   field('reader-preferences-toggle').click();const slider=field('reader-text-size'),furigana=field('furigana-toggle');slider.focus();
+   const startSize=slider.value,startFurigana=furigana.checked,typing=field('expectations-ja');typing.value='informal tone';fire(typing,'input');
+   failSettingsWrites(true);
+   slider.value='27';fire(slider,'input');fire(slider,'change');
+   furigana.checked=!startFurigana;fire(furigana,'change');
+   change('player-rate','1.5');field('player-follow').click();
+   const notice=field('reader-settings-error'),retry=notice.querySelector('button');
+   assert(!notice.hidden && field('reader-dialog').contains(notice) && notice.getAttribute('role')==='alert','No visible, announced settings error inside the reader');
+   assert(retry && retry.textContent==='Retry save' && retry.offsetHeight>=44,'A failed write offers no 44px Retry save');
+   assert(slider.value===startSize && furigana.checked===startFurigana && field('player-rate').value==='1' && field('player-follow').getAttribute('aria-pressed')==='false','A failed save left a reader control out of step with the saved preferences');
+   assert(doc().activeElement===slider,'A failed save moved keyboard focus');
+   assert(field('expectations-ja').value==='informal tone','A failed save discarded unrelated typing');
+   assert(await read('data/settings.json')===stored,'A failed write changed the file');
+   assert(notice.querySelector('button')===retry,'Repeated failures rebuilt the notice');
+   failSettingsWrites(false);retry.click();
+   assert(notice.hidden,'Retry save did not clear the notice');
+   const saved=JSON.parse(await read('data/settings.json')).readingPreferences;
+   assert(saved.fontSize===27 && saved.speechRate===1.5 && saved.followAlong===true && saved.furigana===!startFurigana,'Retry save did not write the intended changes');
+   assert(slider.value==='27' && furigana.checked===!startFurigana && field('player-rate').value==='1.5','Retry save did not apply the intended changes to the controls');
+   await closeReader();
+   // Page-level failures: Add and Stop learning keep focus and report in the page; one Retry repeats both.
+   tab('settings');const add=doc().querySelector('.language-add[data-code="ru"]');add.focus();failSettingsWrites(true);add.click();
+   const pageNotice=field('settings-write-error');
+   assert(!pageNotice.hidden && pageNotice.getAttribute('role')==='alert' && pageNotice.querySelector('button'),'No announced page error with Retry save');
+   assert(!doc().querySelector('.target-language-row[data-code="ru"]') && doc().activeElement===doc().querySelector('.language-add[data-code="ru"]'),'A failed Add was not rolled back with focus kept');
+   doc().querySelector('.target-language-row[data-code="de"] .language-toggle').click();const stop=doc().querySelector('.target-language-row[data-code="de"] .language-remove');stop.focus();stop.click();
+   assert(doc().querySelector('.target-language-row[data-code="de"]') && doc().activeElement.classList.contains('language-remove'),'A failed Stop learning was not rolled back with focus kept');
+   failSettingsWrites(false);pageNotice.querySelector('button').click();
+   const languages=JSON.parse(await read('data/settings.json')).targetLanguages;
+   assert(pageNotice.hidden && languages.ru==='enabled' && languages.ja==='enabled' && !languages.de,'Retry save did not repeat the Add and Stop learning');
+   pass('A failed settings write restores every control, focus and typing; Retry save repeats the intended changes without a reload');
+  }
+  {
+   // Unknown future and legacy nested settings survive ordinary saves; deliberate removals still apply.
+   const future={futureTop:{keep:true},targetLanguages:{de:'enabled',fr:'enabled'},standardizedLevels:{de:'A1',fr:'B1',ja:'N0'},languageOrder:['fr','de','ja','ru','es-CL','xx'],learnerProfiles:{fr:'future',de:'y'.repeat(900)},readingPreferences:{fontSize:14,futurePreference:7}};
+   await write('data/settings.json',future);await reload();
+   const furigana=field('furigana-toggle');furigana.checked=!furigana.checked;fire(furigana,'change');
+   let saved=JSON.parse(await read('data/settings.json'));
+   assert(saved.futureTop.keep && saved.targetLanguages.fr==='enabled' && saved.standardizedLevels.fr==='B1' && saved.standardizedLevels.ja==='N0','Unknown nested settings were dropped');
+   assert(saved.languageOrder[0]==='fr' && saved.languageOrder.at(-1)==='xx' && saved.learnerProfiles.de.length===900 && saved.readingPreferences.fontSize===14 && saved.readingPreferences.futurePreference===7,'Legacy values were rewritten by an ordinary save');
+   tab('settings');doc().querySelector('.target-language-row[data-code="de"] .language-toggle').click();doc().querySelector('.target-language-row[data-code="de"] .language-remove').click();
+   saved=JSON.parse(await read('data/settings.json'));
+   assert(!saved.targetLanguages.de && saved.targetLanguages.fr==='enabled','Stop learning was not honoured, or removed the future language');
+   pass('Unknown and legacy nested settings survive ordinary saves; Stop learning still removes only the chosen language');
+  }
+  status.textContent='PASS — all offline browser smoke checks completed.';document.documentElement.dataset.result='passed';
+ }catch(error){status.textContent=`FAIL — ${error.message}`;document.documentElement.dataset.result='failed';}
+ finally{event.target.disabled=false;}
+});
+</script></html>

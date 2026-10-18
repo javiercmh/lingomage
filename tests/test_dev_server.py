@@ -4,11 +4,12 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import patch
 import urllib.error
 import urllib.request
 from pathlib import Path
 
-from dev_server import DevServer, Handler
+from dev_server import DevServer, Handler, atomic_write
 
 
 FAKE_CODEX = r'''#!/usr/bin/env python3
@@ -98,6 +99,17 @@ class DevelopmentServerTests(unittest.TestCase):
         return self.ai(server, 'start', data={
             'providerId': 'chatgpt', 'model': 'fake-model', 'instructions': 'Be concise.', 'input': text,
         })
+
+    def test_atomic_workspace_write_preserves_original_on_failure(self):
+        path = self.root / 'data' / 'stories.json'
+        atomic_write(path, b'original')
+        with patch('dev_server.os.replace', side_effect=OSError('simulated replacement failure')):
+            with self.assertRaises(OSError):
+                atomic_write(path, b'replacement')
+        self.assertEqual(path.read_bytes(), b'original')
+        self.assertEqual(list(path.parent.iterdir()), [path])
+        atomic_write(path, '日本語'.encode('utf-8'))
+        self.assertEqual(path.read_text('utf-8'), '日本語')
 
     def test_mock_mode_and_origin_guard(self):
         status, result = self.ai(self.mock_server, 'providers')

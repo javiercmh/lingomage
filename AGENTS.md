@@ -28,7 +28,7 @@
 
 - The current App² product is the specification. Consult `docs/architecture/language-safeguards.md` and `data/language-safeguards.json` before changing generation, validation or migrating runtime behavior. Legacy code is not a curriculum specification.
 - Account for every registered safeguard during a migration. Weakening or retiring one requires an explicit documented product decision and corresponding test changes; do not replace enforcement with a prompt silently.
-- Every active deterministic safeguard needs behavioral tests; prompt requirements need prompt-contract tests and stated semantic limitations. Run `python3 scripts/check.py` (Node 22, Python 3.9+) before completion.
+- Every active deterministic safeguard needs behavioral tests; prompt requirements need prompt-contract tests and stated semantic limitations. Run `python3 scripts/check.py` (Node 22.12 or newer, Python 3.9+) before completion.
 - Completed intermediate prose/readings belong in `data/generation-checkpoints.json` before releasing requests. Never publish or package learner checkpoints; seed them empty. Resume/retry is explicit and completed stages must not regenerate.
 
 ## Development and verification

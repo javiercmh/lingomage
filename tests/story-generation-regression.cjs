@@ -1,6 +1,5 @@
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
-const source = fs.readFileSync('js/story-generation.js', 'utf8').replace(/^import .*;\n/gm, '').replaceAll('export ', '');
-const c = {}; vm.createContext(c); vm.runInContext(fs.readFileSync('js/reader-text.js','utf8').replaceAll('export ', ''), c); vm.runInContext(source, c);
+const c = {...require('../js/story-generation.js'),...require('../js/reader-text.js')};
 const valid = JSON.stringify({ vocabulary: [{word:'Markt',meaning:'market'}], grammar: [], guidance: 'Clear context.' });
 assert.equal(c.decodePlan(valid).vocabulary.length, 1);
 assert.throws(()=>c.decodePlan(valid,'ru'),/script/);
@@ -10,19 +9,16 @@ assert.throws(() => c.decodePlan('{}'));
 assert.throws(() => c.decodePlan(JSON.stringify({vocabulary:Array(6).fill({word:'a',meaning:'a'}),grammar:[],guidance:''})));
 assert.throws(() => c.decodePlan(JSON.stringify({vocabulary:[],grammar:Array(3).fill({focus:'a',explanation:'a'}),guidance:''})));
 const story={title:'A market',story:'A Markt. '+'word '.repeat(300),glossary:[{word:'Markt',meaning:'market',forms:['Markt']}]};
-c.validateGlossary(story,'de');
-assert.throws(()=>c.validateGlossary({...story,story:'Marktplatz.'},'de'));
-assert.throws(()=>c.validateGlossary({...story,glossary:[{word:'Markt',meaning:'market',forms:['missing']}]},'de'));
-c.validateGlossary({title:'公園',story:'公園へ行きます。',glossary:[{word:'行く',meaning:'go',forms:['行きます']}]},'ja');
-assert.throws(()=>c.validateGlossary({title:'рынок',story:'Latin',glossary:[]},'ru'));
-assert.throws(()=>c.validateGlossary({title:'рынок',story:'市場',glossary:[]},'ru'));
-assert.throws(()=>c.validateGlossary({title:'рынок',story:'αβγ',glossary:[]},'ru'));
-c.validateGlossary({title:'рынок',story:'ры́нок',glossary:[]},'ru');
-assert.throws(()=>c.validateGlossary({...story,story:'_Markt_'},'de'));
-assert.throws(()=>c.validateGlossary({title:'数字',story:'13',glossary:[{word:'三',meaning:'three',forms:['3']}]},'ja'));
+// Equivalent script/form checks exercise the validator used by the live pipeline.
+const {validateStory}=require('../js/learning-validation.js');
+validateStory(story,'de');
+assert.throws(()=>validateStory({...story,story:'Marktplatz.'},'de'));
+assert.deepEqual(validateStory({...story,glossary:[{word:'Markt',meaning:'market',forms:['missing']}]},'de').glossary[0].forms,['Markt'], 'production repairs unattested forms from an attested headword');
+for (const text of ['Latin','市場','αβγ']) assert.throws(()=>validateStory({title:'рынок',story:text,glossary:[{word:'рынок',meaning:'market',forms:['рынок']}]},'ru'));
+validateStory({title:'рынок',story:'ры́нок',glossary:[{word:'ры́нок',meaning:'market',forms:['ры́нок']}]},'ru');
+assert.throws(()=>validateStory({...story,story:'_Markt_'},'de'));
 assert.throws(()=>c.decodePlan(JSON.stringify({vocabulary:[{word:'市場',meaning:'market'}],grammar:[],guidance:''}),'ru'),/script/);
 assert.throws(()=>c.decodePlan(JSON.stringify({vocabulary:[{word:'αβγ',meaning:'letters'}],grammar:[],guidance:''}),'ja'),/script/);
-c.validateGlossary({title:'スーパー',story:'スーパーへ行きます。',glossary:[]},'ja');
 const notes=['Brot','Markt','Fluss'].map(word=>({word,meaning:'fixture note',forms:[word]}));
 const shortText='Mia kauft Brot. Mia sieht den Markt. Mia geht zum Fluss. Brot liegt am Markt. Der Fluss ist sehr ruhig.';
 const longText=shortText+' '+Array(10).fill('Sie geht weiter und sieht ihre Freundin dort.').join(' ');
@@ -35,41 +31,11 @@ for(const lang of ['de','es-CL','ru']) assert.deepEqual(defs.standardizedLevels[
 assert.deepEqual(defs.standardizedLevels.ja.levels.map(x=>x.id),['N5','N4','N3','N2','N1']);
 assert.deepEqual(Object.keys(defs.scopes),['scene','chapter']);
 (async()=>{
-  let events=[], failPersist=false, failAck=false, failWait=false, durable;
-  const job={input:{difficulty:'A1',scope:'scene'}};
-  const io={status(){}, persist(){events.push('persist');if(failPersist)throw Error('disk');durable=JSON.parse(JSON.stringify(job));}, async start(stage,input){events.push('start '+stage);if(stage==='write')assert.equal(input.languagePlan.vocabulary[0].word,'Markt');return stage;},async wait(id){events.push('wait '+id);if(failWait)throw Error('provider');return id==='plan'?valid:JSON.stringify(story);},async acknowledge(id){events.push('ack '+id);assert.ok(durable.plan);if(failAck)throw Error('release');}};
-  const response=await c.runStoryJob(job,io);assert.equal(JSON.parse(response).story,story.story);
-  assert.deepEqual(events.filter(x=>x!=='persist'),['start plan','wait plan','ack plan','start write','wait write']);
-  assert.equal(durable.writeResponse,response);assert.ok(!events.includes('ack write'));
-  events=[];await c.runStoryJob(JSON.parse(JSON.stringify(job)),io);assert.deepEqual(events,[]);
-  const job2={input:{}};failPersist=true;await assert.rejects(c.runStoryJob(job2,io),/disk/);assert.equal(job2.planRequestId,'plan');failPersist=false;
-  // A failed response checkpoint must not acknowledge or start writing.
-  let checkpointFail=true;const job3={input:{}};let ackCount=0;
-  const io3={...io,persist(){if(job3.planResponse&&checkpointFail)throw Error('disk');},acknowledge:async()=>{ackCount++;}};
-  await assert.rejects(c.runStoryJob(job3,io3),/disk/);assert.equal(ackCount,0);assert.ok(!job3.writeRequestId);
-  checkpointFail=false;await c.runStoryJob(job3,io3);assert.equal(ackCount,1);
-  const job4={input:{}};let releaseFail=true, starts=[];
-  const io4={...io,persist(){},start:async(stage)=>{starts.push(stage);return stage;},acknowledge:async()=>{if(releaseFail)throw Error('release');}};
-  await assert.rejects(c.runStoryJob(job4,io4),/release/);assert.deepEqual(starts,['plan']);releaseFail=false;await c.runStoryJob(job4,io4);assert.deepEqual(starts,['plan','write']);
-  const job5={input:{}};await assert.rejects(c.runStoryJob(job5,{...io,persist(){},wait:async()=>'{invalid'}));assert.ok(!job5.writeRequestId);
-  const job6={input:{}};await assert.rejects(c.runStoryJob(job6,{...io,persist(){},wait:async()=>{throw Error('cancelled');}}),/cancelled/);assert.equal(job6.failedStage,'plan');assert.ok(!job6.writeRequestId);
-  // Cancelling while a stage is starting or while plan acknowledgement is in
-  // progress must not consume a writing inference.
-  const cancelling=(job,id)=>{if(job.cancelRequested)throw Error('cancelled');};
-  const transitionJob={input:{}};let transitionStarts=[];
-  await assert.rejects(c.runStoryJob(transitionJob,{...io,persist(){},start:async stage=>{transitionStarts.push(stage);return stage;},acknowledge:async()=>{transitionJob.cancelRequested=true;},checkCancelled:id=>cancelling(transitionJob,id)}),/cancelled/);
-  assert.deepEqual(transitionStarts,['plan']);
-  const startingJob={input:{}};let startingWaits=0;
-  await assert.rejects(c.runStoryJob(startingJob,{...io,persist(){},start:async stage=>{startingJob.cancelRequested=true;return stage;},wait:async()=>{startingWaits++;return valid;},checkCancelled:id=>cancelling(startingJob,id)}),/cancelled/);
-  assert.equal(startingWaits,0);assert.equal(startingJob.planRequestId,'plan');
-  const writerCancelJob={input:{}};let writingWaits=0;
-  await assert.rejects(c.runStoryJob(writerCancelJob,{...io,persist(){},start:async stage=>{if(stage==='write')writerCancelJob.cancelRequested=true;return stage;},wait:async id=>{if(id==='write')writingWaits++;return valid;},acknowledge:async()=>{},checkCancelled:id=>cancelling(writerCancelJob,id)}),/cancelled/);
-  assert.ok(writerCancelJob.plan);assert.equal(writingWaits,0);
   const bridgeSource=fs.readFileSync('js/bridge.js','utf8');
   const bridgeContext={AI:null,DEV:{mockAi:true},aiResults:new Map(),setTimeout,aiCall:async(action,args)=>{assert.equal(action,'result');assert.equal(args.requestId,'persisted-id');return 'retained text';}};
   vm.createContext(bridgeContext);vm.runInContext(bridgeSource.slice(bridgeSource.indexOf('export const ai ='),bridgeSource.indexOf('// --- Preferences')).replace('export const ai =','globalThis.ai ='),bridgeContext);
   assert.equal(await bridgeContext.ai.wait('persisted-id'),'retained text');
-  console.log('PASS standardized levels, bounded plans, glossary forms, long stories, sequential checkpoints, reload reuse, save/release failures, malformed plans and cancellation');
+  console.log('PASS standardized levels, bounded plans, production glossary/script validation and persisted request lookup; staged recovery covered by pipeline suites');
 })().catch(error=>{console.error(error);process.exitCode=1;});
 {
   const html = fs.readFileSync('index.html', 'utf8'), form = html.slice(html.indexOf('id="story-form"'), html.indexOf('</form>'));

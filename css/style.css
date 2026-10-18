@@ -486,3 +486,20 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px
 #reasoning-select[hidden] ~ #reasoning-hint { display: none; }
 #reasoning-hint { margin-bottom: 0; }
 .settings-footer { margin: 0 0 14px; text-align: center; }
+
+/* Storage failures stay visible and selectable without covering navigation. */
+.storage-recovery h2 { margin: 0 0 10px; font-size: 20px; }
+.storage-recovery .form-error { user-select: text; -webkit-user-select: text; }
+.storage-recovery button { min-height: 44px; }
+
+/* Preference-save errors: one in the page, one inside the modal reader (fixed so it stays visible while scrolling). */
+.settings-notice { padding: 14px 16px; border: 1px solid rgba(248,113,113,.5); border-radius: 14px; background: var(--card-solid); }
+.settings-notice[hidden] { display: none; }
+.settings-notice strong { display: block; margin-bottom: 6px; }
+.settings-notice .form-error { margin: 0 0 4px; user-select: text; -webkit-user-select: text; }
+.settings-notice .helper { margin: 8px 0 0; }
+.settings-notice button { min-height: 44px; }
+.settings-notice-reader { position: fixed; z-index: 10; right: max(12px, var(--sa-right)); bottom: calc(12px + var(--sa-bottom)); left: max(12px, var(--sa-left)); max-width: 756px; margin: auto; box-shadow: 0 6px 20px #0008; }
+.reader-panel.has-settings-notice { padding-bottom: calc(var(--settings-notice-height, 220px) + 36px + var(--sa-bottom)); }
+.reader-panel.has-settings-notice.has-generation-status { padding-bottom: calc(var(--settings-notice-height, 220px) + 120px + var(--sa-bottom)); }
+.reader-panel.has-generation-status .settings-notice-reader { bottom: calc(84px + var(--sa-bottom)); }

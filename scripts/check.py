@@ -9,7 +9,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def require_node():
+    """Some tests require() ES modules, which is unflagged from Node 22.12."""
+    version = subprocess.run(['node', '--version'], text=True, stdout=subprocess.PIPE).stdout.strip()
+    major, minor = (int(part) for part in version.lstrip('v').split('.')[:2])
+    assert (major, minor) >= (22, 12), 'Node 22.12 or newer is required (found ' + version + ')'
+
+
 def main():
+    require_node()
     assert not (ROOT / 'android/app/build.gradle.kts').exists() and not list((ROOT / 'android/app/src').rglob('*.kt')), 'Native implementation must not return to the subapp'
     # Ignored local IDE/build artifacts may remain after Git removes native source.
     observed = set()
@@ -42,6 +50,12 @@ def main():
     for name in files:
         if name.endswith(('.js', '.css', '.html')):
             assert name in update['managedFiles'], 'Code file would not ship in updates: ' + name
+    for path in sorted((ROOT / 'js').glob('*.js')):
+        assert 'js/' + path.name in files, 'Module is not in the manifest: ' + path.name
+    for name in files:
+        if name.startswith('js/') and name.endswith('.js'):
+            for imported in re.findall(r"from\s+'\./([^']+)'", (ROOT / name).read_text(encoding='utf-8')):
+                assert 'js/' + imported in files, name + ' imports a module outside the manifest: ' + imported
     for name in ['data/stories.json', 'data/settings.json', 'data/generation-checkpoints.json']:
         assert name in update['seedFiles']
     assert update['seedDefaults']['data/generation-checkpoints.json'] == []

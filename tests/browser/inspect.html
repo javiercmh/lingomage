@@ -1,0 +1,35 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LingoMage layout inspection</title>
+<style>body{margin:0;background:#0f172a;color:#f8fafc;font:16px system-ui}header{padding:12px}button{font:inherit;min-height:44px;margin:0 8px 8px 0}iframe{display:block;width:100%;height:calc(100vh - 220px);border:0}#note{margin:4px 0}</style>
+<header><button id="normal">100% layout scale</button><button id="large">200% layout scale</button><p>CSS zoom emulation for screenshot inspection; actual device zoom and system font scaling require separate verification.</p>
+<p id="note" role="status">Recovery fixtures overwrite the disposable workspace served by <code>python3 scripts/browser_smoke.py</code> and refuse to run anywhere else. Each button resets the workspace, then leaves the app in the named state for a screenshot.</p>
+<button data-fixture="unreadable-settings">Unreadable settings + reader notice</button><button data-fixture="write-failure-reader">Write failure in reader</button><button data-fixture="write-failure-page">Write failure on Settings page</button><button data-fixture="blank-stories">Blank stories file</button><button id="allow">Allow writes (then press Retry save)</button></header>
+<iframe id="app" title="LingoMage layout preview" src="/"></iframe>
+<script type="module">
+const frame=document.querySelector('#app'),note=document.querySelector('#note');
+for(const [id,scale] of [['normal','1'],['large','2']])document.getElementById(id).addEventListener('click',()=>{frame.contentDocument.documentElement.style.zoom=scale;});
+const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms)),doc=()=>frame.contentDocument,field=id=>doc().getElementById(id);
+async function until(predicate,message){for(let i=0;i<200;i++){if(predicate())return;await delay(50);}throw Error(message);}
+async function write(name,value){const response=await fetch('/__bridge/writeFile?'+new URLSearchParams({name}),{method:'POST',body:typeof value==='string'?value:JSON.stringify(value)});if(!response.ok)throw Error('Fixture write failed');}
+async function reload(){if(field('reader-dialog')?.open){frame.contentWindow.history.back();await until(()=>!field('reader-dialog').open,'Reader did not close before resetting the fixture');}const loaded=new Promise(resolve=>frame.addEventListener('load',resolve,{once:true}));frame.contentWindow.location.reload();await loaded;await until(()=>field('language')?.options.length && (!field('storage-recovery').hidden || field('model-select').value==='development-mock' && !field('model-select').disabled),'App did not finish startup');}
+function failSettingsWrites(on){const win=frame.contentWindow;win.__failSettings=on;const proto=win.XMLHttpRequest.prototype;if(proto.__plainOpen)return;proto.__plainOpen=proto.open;proto.open=function(method,url,...rest){if(win.__failSettings&&/writeFile\?/.test(url)&&decodeURIComponent(url).includes('name=data/settings.json'))url='/__bridge/unavailable';return proto.__plainOpen.call(this,method,url,...rest);};}
+const fire=(control,type)=>control.dispatchEvent(new Event(type,{bubbles:true}));
+const story={id:'fixture-story',language:'de',title:'Der Markt',story:'Anna geht zum Markt. Sie kauft frisches Brot und lächelt. Dann geht sie nach Hause und liest ein Buch.',difficulty:'A1',glossary:[],createdAt:'2026-01-01T00:00:00.000Z'};
+const settings={targetLanguages:{de:'enabled',ja:'enabled'},standardizedLevels:{de:'A1',ja:'N5'},readingPreferences:{followAlong:false}};
+async function openReaderPreferences(){doc().querySelector('[data-view="library"]').click();await until(()=>doc().querySelector('.story-open'),'Story missing');doc().querySelector('.story-open').click();await until(()=>field('reader-dialog').open,'Reader did not open');field('reader-preferences-toggle').click();field('reader-text-size').focus();}
+function changeSlider(){const slider=field('reader-text-size');slider.value='27';fire(slider,'input');fire(slider,'change');}
+const fixtures={
+ async 'unreadable-settings'(){await write('data/stories.json',[story]);await write('data/settings.json','{broken settings');await write('data/generation-checkpoints.json',[]);await reload();await openReaderPreferences();changeSlider();},
+ async 'write-failure-reader'(){await write('data/stories.json',[{...story,story:(story.story+'\n\n').repeat(12)}]);await write('data/settings.json',settings);await write('data/generation-checkpoints.json',[]);await reload();failSettingsWrites(true);await openReaderPreferences();changeSlider();fire(field('furigana-toggle'),'change');field('reader-preferences-toggle').click();const panel=doc().querySelector('.reader-panel');panel.scrollTop=panel.scrollHeight;await delay(100);if(field('rewrite-chapter').getBoundingClientRect().bottom>field('reader-settings-error').getBoundingClientRect().top-8)throw Error('Preference notice covers final chapter actions');},
+ async 'write-failure-page'(){await write('data/stories.json',[story]);await write('data/settings.json',settings);await write('data/generation-checkpoints.json',[]);await reload();failSettingsWrites(true);doc().querySelector('[data-view="settings"]').click();const add=doc().querySelector('.language-add[data-code="ru"]');add.focus();add.click();},
+ async 'blank-stories'(){await write('data/stories.json','');await write('data/settings.json',settings);await write('data/generation-checkpoints.json',[]);await reload();doc().querySelector('[data-view="library"]').click();}
+};
+document.querySelectorAll('[data-fixture]').forEach(button=>button.addEventListener('click',async()=>{
+ try{
+  const marker=await fetch('/data/browser-test-workspace.json').then(response=>response.json()),info=await fetch('/__bridge/info').then(response=>response.json());
+  if(marker.disposable!==true||info.mockAi!==true||info.liveAi)throw Error('Refusing to write: not the disposable offline workspace');
+  note.textContent='Preparing…';await fixtures[button.dataset.fixture]();note.textContent=`Ready: ${button.textContent}. Inspect, then press the buttons again to reset.`;
+ }catch(error){note.textContent=`Fixture failed — ${error.message}`;}
+}));
+document.querySelector('#allow').addEventListener('click',()=>{if(frame.contentWindow.XMLHttpRequest.prototype.__plainOpen)failSettingsWrites(false);note.textContent='Writes allowed. Press Retry save in the app.';});
+</script></html>

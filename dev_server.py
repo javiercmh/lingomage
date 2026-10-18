@@ -5,6 +5,7 @@ import argparse
 import base64
 import binascii
 import json
+import os
 import queue
 import subprocess
 import tempfile
@@ -16,6 +17,22 @@ from concurrent.futures import ThreadPoolExecutor
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlsplit
+
+
+def atomic_write(path, content):
+    """Replace a workspace file only after its complete contents reach disk."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, prefix='.' + path.name + '-', delete=False) as output:
+            temporary = Path(output.name)
+            output.write(content)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 class DevServer(HTTPServer):
@@ -308,8 +325,7 @@ class Handler(SimpleHTTPRequestHandler):
                         body = base64.b64decode(text, validate=True)
                     else:
                         body.decode('utf-8')
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_bytes(body)
+                    atomic_write(path, body)
                     return self.reply(True)
             if action in {'loadState', 'saveState', 'removeState'}:
                 path = self.workspace_path('data/dev-preferences.json')
@@ -321,8 +337,7 @@ class Handler(SimpleHTTPRequestHandler):
                         prefs[param('key')] = body.decode('utf-8')
                     else:
                         prefs.pop(param('key'), None)
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_text(json.dumps(prefs, indent=2), 'utf-8')
+                    atomic_write(path, json.dumps(prefs, indent=2).encode('utf-8'))
                     return self.reply(True)
             if action == 'listFiles' and not post:
                 return self.reply(self.files())

@@ -1,3 +1,5 @@
+(async()=>{
+const {bindStory, bindGeneration, bindPanels}=await import('./support/controllers.mjs');
 // Dependency-free regression harness; exercises production functions with isolated DOM/AI stubs.
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -15,7 +17,7 @@ function sandbox(extra = {}) {
   const element = (tag = 'div') => ({tagName:tag,hidden:false,dataset:{},childNodes:[],events:{},attributes:{},
     get textContent(){return this.childNodes.map(node=>node.textContent).join('');},set textContent(value){this.childNodes=value ? [{tagName:'#text',textContent:String(value)}] : [];},
     append(...nodes){this.childNodes.push(...nodes);},addEventListener(name,fn){this.events[name]=fn;},setAttribute(name,value){this.attributes[name]=value;},focus(){this.focused=true;},scrollIntoView(){},remove(){},querySelector(selector){return this.childNodes.find(node=>node.tagName===selector) || this.childNodes.map(node=>node.querySelector?.(selector)).find(Boolean) || null;},querySelectorAll(){return [];},classList:{add(){},remove(){},toggle(){}}});
-  const c = {pipeline:null,state:{},console,crypto:{randomUUID:(()=>{let id=0;return ()=>`help-test-${++id}`;})()},PROMPT_VERSION:'test',STORY_GUIDES:{de:{beginner:'Simple sentences'}},renderChapterRequest(){},updateReaderNavigation(){},renderCheckpointRecovery(){},LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},SPEECH_LANGUAGES:{de:'de-DE',ja:'ja-JP',ru:'ru-RU','es-CL':'es-CL'},renderGenerationRecovery(){},readerPanel:()=>({classList:{toggle(){}}}),$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{createElement:element,createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},...extra};
+  const c = {workspaceStorage:{assertWritable(){}},settingsFeedback:{sync(){}},pipeline:null,state:{},console,crypto:{randomUUID:(()=>{let id=0;return ()=>`help-test-${++id}`;})()},PROMPT_VERSION:'test',STORY_GUIDES:{de:{beginner:'Simple sentences'}},renderChapterRequest(){},updateReaderNavigation(){},renderCheckpointRecovery(){},LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},SPEECH_LANGUAGES:{de:'de-DE',ja:'ja-JP',ru:'ru-RU','es-CL':'es-CL'},renderGenerationRecovery(){},readerPanel:()=>({classList:{toggle(){}}}),$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{createElement:element,createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},...extra};
   c.readerGeneration = null; c.renderReaderGeneration = () => {}; c.setReaderGeneration = value => { c.readerGeneration = value; };
   vm.createContext(c);
   vm.runInContext(fs.readFileSync('js/generation-errors.js','utf8').replaceAll('export function ', 'function '), c);
@@ -450,7 +452,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   // Durable examples/save/release regressions now exercise the production
   // generation pipeline in learning-safeguards.mjs.
 
-  const normalized=sandbox();vm.runInContext(section('function normalizeChapters(', 'function profileSnapshot('),normalized);
+  const normalized=sandbox();bindStory(normalized);
   const legacy={id:'legacy',title:'Title',story:'Text',providerId:'provider',promptVersion:'original'};
   const chapters=normalized.normalizeChapters(legacy);
   assert.equal(chapters[0].versions[0].story,'Text');assert.equal(chapters[0].versions[0].promptVersion,'original');assert.equal(legacy.chapters,undefined);
@@ -470,13 +472,13 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   };
   gen.showOperationResult=()=>{};
   gen.structuredClone=structuredClone;
-  gen.operationProvenance=op=>({operationId:op.id,promptVersion:'test'});
-  vm.runInContext(section('function applyContentOperation(', 'function showOperationResult('),gen);
+  bindGeneration(gen);
   gen.state.stories=[story3];
   gen.document.createElement = sandbox().document.createElement;
   gen.$('reader-edit-submit').addEventListener=(_,fn)=>submit=fn;
   gen.$('reader-prompt').value='Next';gen.$('reader-edit-panel').dataset.mode='continue';
-  vm.runInContext(section('function normalizeChapters(', 'function readerStory(')+section('function storyInstructions(', 'function storyInput(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section("$('reader-edit-submit').addEventListener", "$('reader-dialog').addEventListener"),gen);
+  bindStory(gen);
+  vm.runInContext(section('function storyInstructions(', 'function storyInput(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section("$('reader-edit-submit').addEventListener", "$('reader-dialog').addEventListener"),gen);
   await submit();
   assert.ok(requested.storyMemory.plot.includes('Text three'));assert.equal(requested.recentProse,'Text three');assert.equal(requested.priorActiveChapters,undefined);assert.equal(requested.precedingChapters,undefined);
   assert.equal(story3.chapters.length,4);assert.equal(story3.chapters[3].basedOnVersionId,'threev');assert.equal(story3.chapters[1].versions.length,1);
@@ -550,7 +552,8 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   const panel={scrollTop:321,addEventListener(){}};
   const pos=sandbox({state:{readerId:'S',readerChapter:2,readerPositions:{}},readerStory:()=>story3,activeChapter:()=>story3.chapters[pos.state.readerChapter],normalizeChapters:s=>s.chapters,closeStoryReveal(){},updateReader(){},clearExplanationSelection(){},window:{addEventListener(){}},history:{pushState(){}}});
   pos.$('reader-dialog').querySelector=()=>panel;pos.$('reader-dialog').showModal=()=>{};
-  vm.runInContext(section('function normalizeChapters(', 'function readerStory(')+section('function readerPanel(', 'function sentenceContext('),pos);story3.activePathId='original';
+  bindStory(pos);
+  vm.runInContext(section('function readerPanel(', 'function sentenceContext('),pos);story3.activePathId='original';
   pos.rememberReaderPosition();panel.scrollTop=0;pos.openReader(story3);
   assert.equal(pos.state.readerChapter,2);assert.equal(panel.scrollTop,321);
   console.log('PASS actual scroll panel and chapter restored on reopen');
@@ -559,4 +562,12 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.equal(pos.state.readerChapter,0);assert.equal(restoredMode,'rewrite');
   assert.equal(pos.$('reader-prompt').value,'Keep a clue');assert.equal(pos.$('reader-edit-error').textContent,'Provider failed');
   console.log('PASS reopening a failed chapter request restores its original chapter and prompt');
+  // A legacy story with an empty chapters array gets real chapters, so synthesized paths resolve and later saves validate.
+  const {validStories}=await import('../js/workspace-storage.js');
+  const emptyChapters={id:'E',language:'de',title:'T',story:'Text.',chapters:[]};
+  pos.state.readerPositions={};pos.openReader(emptyChapters);
+  assert.equal(emptyChapters.chapters.length,1);assert.equal(emptyChapters.paths[0].entries[0].chapterId,emptyChapters.chapters[0].id);assert.ok(validStories([emptyChapters]));
+  console.log('PASS legacy story with an empty chapters array opens with saved chapters matching its paths');
+})().catch(error=>{console.error(error);process.exitCode=1;});
+
 })().catch(error=>{console.error(error);process.exitCode=1;});

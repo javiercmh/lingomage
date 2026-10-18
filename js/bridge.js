@@ -212,12 +212,13 @@ export function deleteFile(name) {
   return true;
 }
 
-export function listFiles() {
+export function listFiles({ strict = false } = {}) {
   if (DEV) return JSON.parse(devRequest('listFiles'));
   if (N) {
     try {
       return JSON.parse(N.listFiles());
     } catch (err) {
+      if (strict) throw err;
       console.error('[bridge] Could not parse listFiles():', err);
       return [];
     }

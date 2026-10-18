@@ -12,7 +12,7 @@ function fixture(providerId, storedProvider, storedModel, models) {
     return fields.get(id);
   };
   const state = {providerId:storedProvider,model:storedModel,reasoning:'high',models:[]};
-  const context = vm.createContext({state,$,modelRefreshVersion:0,ai:{available:true,providers:async()=>({providers:[{id:providerId,connected:true}]}),models:async id=>{assert.equal(id,providerId);return {models};}},document:{createElement:()=>({})},PREFERRED_MODEL:'preferred',persistSettings:()=>saves++,Event:class{}});
+  const context = vm.createContext({state,$,modelRefreshVersion:0,ai:{available:true,providers:async()=>({providers:[{id:providerId,connected:true}]}),models:async id=>{assert.equal(id,providerId);return {models};}},document:{createElement:()=>({})},PREFERRED_MODEL:'preferred',trySaveSettings:()=>{saves++;return true;},Event:class{}});
   vm.runInContext(refreshSource, context);
   return {context,state,$,saves:()=>saves};
 }

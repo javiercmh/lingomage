@@ -45,4 +45,9 @@ This development-only connection uses the model catalog and ChatGPT account mana
 
 See the [runtime guide](docs/architecture/app2-runtime.md) and [pedagogical decisions](docs/pedagogy/README.md). The native app has been retired; historical Kotlin is preserved in Git. See the [safeguard audit](docs/architecture/language-safeguards.md).
 
-Run `python3 scripts/check.py` with Node.js 22 and Python 3.9+ for the full regression, server and manifest checks. CI runs the same command; the released subapp still has no dependencies or build step. Unfinished generation is saved in inspectable JSON and offers explicit Resume/Discard recovery.
+Run `python3 scripts/check.py` with Node.js 22.12 or newer and Python 3.9+ for the full regression, server and manifest checks. CI runs the same command; the released subapp still has no dependencies or build step. Unfinished generation is saved in inspectable JSON and offers explicit Resume/Discard recovery.
+
+For repeatable browser integration checks, run `python3 scripts/browser_smoke.py`
+and open the printed smoke-runner URL. It creates a disposable offline workspace,
+requires no browser-test dependency and never uses a live provider. See the
+[runtime guide](docs/architecture/app2-runtime.md#storage-boundaries-and-controller-modules).

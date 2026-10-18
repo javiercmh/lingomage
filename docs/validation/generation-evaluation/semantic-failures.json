@@ -1,0 +1,112 @@
+{
+  "purpose": "Offline review of documented semantic failures; no new model requests or semantic pass assertions.",
+  "cases": [
+    {
+      "id": "de-possessive",
+      "language": "de",
+      "source": {
+        "commit": "7fd046c",
+        "path": "docs/validation/generation-evaluation/pilot/de-B1-1-revised.json",
+        "promptVersion": "2026-10-13.20"
+      },
+      "originalNote": {
+        "word": "mein",
+        "meaning": "My; mein, meine and ihrem related context mark possession by the speaker. meine agrees with feminine nouns here.",
+        "forms": [
+          "mein",
+          "meine"
+        ]
+      },
+      "sourceExcerpts": [
+        {
+          "text": "„Guten Tag. Ich möchte mein Paket abholen“, sagte Lena und zeigte ihm die Nachricht auf ihrem Handy.",
+          "start": 147,
+          "end": 247
+        },
+        {
+          "text": "Herr König schaute auf den Aufkleber und wurde rot. „Sie haben recht. Ich erwarte auch ein kleines Paket, weil ich neue Preisschilder bestellt habe. Als ich vorhin den Karton gesehen habe, dachte ich, dass es meine Bestellung ist.“",
+          "start": 1026,
+          "end": 1257
+        },
+        {
+          "text": "Lena nahm ihr Buchpaket und ging zur Tür. Hinter ihr fragte Martin Berger: „Und ist vielleicht auch ein kleines Paket für meine Frau da?“",
+          "start": 1751,
+          "end": 1888
+        }
+      ],
+      "suspectedError": "The explanation groups ihrem with first-person possessives, although its referent is Lena.",
+      "review": {
+        "status": "unreviewed",
+        "qualification": null,
+        "disposition": null,
+        "rationale": null
+      }
+    },
+    {
+      "id": "de-pronoun-senses",
+      "language": "de",
+      "source": {
+        "commit": "7fd046c",
+        "path": "docs/validation/generation-evaluation/pilot/de-B1-1-revised.json",
+        "promptVersion": "2026-10-13.20"
+      },
+      "originalNote": {
+        "word": "sie",
+        "meaning": "They; lowercase sie refers to Lena and the shopkeeper together, unlike polite Sie meaning you.",
+        "forms": [
+          "sie"
+        ]
+      },
+      "sourceExcerpts": [
+        {
+          "text": "Für einen Augenblick sahen sie sich schweigend an.",
+          "start": 901,
+          "end": 951
+        }
+      ],
+      "suspectedError": "The note explains plural they but does not distinguish singular she occurrences.",
+      "review": {
+        "status": "unreviewed",
+        "qualification": null,
+        "disposition": null,
+        "rationale": null
+      }
+    },
+    {
+      "id": "es-associated-train",
+      "language": "es-CL",
+      "source": {
+        "commit": "7fd046c",
+        "path": "docs/validation/generation-evaluation/pilot/es-CL-A1-0-revised.json",
+        "promptVersion": "2026-10-13.20"
+      },
+      "originalNote": {
+        "word": "mi",
+        "meaning": "My; shows that the ticket or train belongs to the speaker. Mi is capitalized at the start of a sentence.",
+        "forms": [
+          "mi",
+          "Mi"
+        ]
+      },
+      "sourceExcerpts": [
+        {
+          "text": "—Mi tren sale a las diez. ¿Y tu tren?",
+          "start": 216,
+          "end": 253
+        },
+        {
+          "text": "—Mi tren también sale a las diez.",
+          "start": 299,
+          "end": 332
+        }
+      ],
+      "suspectedError": "Belongs to the speaker suggests ownership; the train here is the service the speaker intends to take.",
+      "review": {
+        "status": "unreviewed",
+        "qualification": null,
+        "disposition": null,
+        "rationale": null
+      }
+    }
+  ]
+}
