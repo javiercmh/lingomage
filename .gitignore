@@ -27,3 +27,6 @@ android/build/
 
 # Packaged build outputs
 dist/
+
+# Raw learning-quality evaluation runs (development-only; never packaged or committed)
+docs/validation/generation-evaluation/ai-evals/runs/

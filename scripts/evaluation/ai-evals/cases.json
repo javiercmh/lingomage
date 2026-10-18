@@ -1,0 +1,114 @@
+{
+  "version": "1",
+  "note": "Public fictional briefs and frozen source chapters written for this suite. They contain no learner data. 'failureSignals' document why a case exists; they are not shown to the judge and are not gold labels.",
+  "cases": [
+    {
+      "id": "de-a1-parcel-create",
+      "title": "German parcel (create, A1)",
+      "kind": "create",
+      "language": "de",
+      "difficulty": "A1",
+      "scope": "scene",
+      "topic": "Lena and a shopkeeper mix up two parcels in a small post shop.",
+      "practiceRequest": "Possessive words such as mein, dein, sein and ihr, only where they fit naturally.",
+      "languageExpectations": "",
+      "prompt": "",
+      "source": null,
+      "failureSignals": ["Incorrect possessive referents", "Singular/plural pronoun confusion", "Unnatural forced practice", "Misleading English notes"]
+    },
+    {
+      "id": "ja-n5-station-create",
+      "title": "Japanese station (create, N5)",
+      "kind": "create",
+      "language": "ja",
+      "difficulty": "N5",
+      "scope": "scene",
+      "topic": "Two friends ask station staff which train to take to the zoo.",
+      "practiceRequest": "",
+      "languageExpectations": "",
+      "prompt": "",
+      "source": null,
+      "failureSignals": ["Excessive avoidable reading load", "Unnatural questions", "Inaccurate contextual readings", "Romaji or misleading notes"]
+    },
+    {
+      "id": "ru-b1-appointment-create",
+      "title": "Russian appointment (create, B1)",
+      "kind": "create",
+      "language": "ru",
+      "difficulty": "B1",
+      "scope": "scene",
+      "topic": "A visitor arrives at a clinic reception for an appointment that was booked for a different day, and the receptionist helps resolve it.",
+      "practiceRequest": "",
+      "languageExpectations": "",
+      "prompt": "",
+      "source": null,
+      "failureSignals": ["Incorrect case or aspect explanations", "Unclear dates or referents", "Unnatural dialogue", "Transliteration"]
+    },
+    {
+      "id": "es-cl-b1-ticket-create",
+      "title": "Spanish ticket with Chilean preference (create, B1)",
+      "kind": "create",
+      "language": "es-CL",
+      "difficulty": "B1",
+      "scope": "scene",
+      "topic": "A traveler asks at a railway ticket office to change a ticket to an earlier train, and the clerk explains the options.",
+      "practiceRequest": "",
+      "languageExpectations": "Prefer Chilean Spanish vocabulary and usage where natural. Do not force slang.",
+      "prompt": "",
+      "source": null,
+      "failureSignals": ["Explaining association in 'mi tren' as literal ownership", "Incorrect accents or grammar", "Mismatched regional usage"]
+    },
+    {
+      "id": "de-b1-parcel-continue",
+      "title": "German continuation from a frozen chapter (continue, B1)",
+      "kind": "continue",
+      "language": "de",
+      "difficulty": "B1",
+      "scope": "scene",
+      "topic": "Lena tries to collect a parcel for her sister before the parcel shop closes.",
+      "practiceRequest": "",
+      "languageExpectations": "",
+      "prompt": "",
+      "source": {
+        "title": "Das Paket für die Schwester",
+        "story": "Lena stand vor dem kleinen Paketladen in der Lindenstraße. Es war kurz nach sechs, und Herr Kaya, der Besitzer, zog schon das Rollgitter herunter. „Wir schließen heute früher“, rief er durch die Tür. „Mein Sohn hat Geburtstag.“ Lena hielt den gelben Abholzettel fest in der Hand. Seit drei Tagen versuchte sie, das Paket ihrer Schwester abzuholen, aber immer war etwas dazwischengekommen. Heute hatte sie die Straßenbahn verpasst und war den ganzen Weg gerannt. „Bitte, nur eine Minute“, sagte sie. Herr Kaya sah auf die Uhr und dann auf den Zettel. Er seufzte. „Kommen Sie morgen um acht. Ich verspreche es.“ Lena nickte, aber sie war nicht sicher, ob ihre Schwester so lange warten konnte. In dem Paket lagen nämlich die Schlüssel für die neue Wohnung.",
+        "storyMemory": {
+          "characters": ["Lena: wants to collect a parcel for her sister", "Herr Kaya: owner of the small parcel shop in der Lindenstraße"],
+          "facts": ["The parcel contains the keys to the sister's new flat", "Lena has tried for three days to collect the parcel", "Herr Kaya closes early because his son has a birthday"],
+          "plot": ["Lena arrives just after six as the shop is closing and is told to come back at eight the next morning"],
+          "unresolved": ["Whether the sister can wait until tomorrow for the keys"],
+          "uncertainties": [],
+          "situation": ["Lena stands outside the closed shop in the evening, holding the yellow pickup slip"]
+        },
+        "precedingProse": ""
+      },
+      "failureSignals": ["Restarting the story", "Contradicting established time or characters", "Losing the goal", "No meaningful progression"]
+    },
+    {
+      "id": "ja-n3-umbrella-rewrite",
+      "title": "Japanese rewrite of a frozen chapter (rewrite, N3)",
+      "kind": "rewrite",
+      "language": "ja",
+      "difficulty": "N3",
+      "scope": "scene",
+      "topic": "Misaki waits for her friend Kenta in a small café and discovers that her blue umbrella is missing.",
+      "practiceRequest": "",
+      "languageExpectations": "",
+      "prompt": "Rewrite the scene so that a misunderstanding about the missing blue umbrella creates a little tension between Misaki and Kenta. Keep the café, the rain, the blue umbrella and their trip plans.",
+      "source": {
+        "title": "傘のゆくえ",
+        "story": "土曜日の午後、美咲は駅の近くの小さなカフェで友達の健太を待っていた。窓の外では雨が降っていて、店の入り口の傘立てには色とりどりの傘が並んでいる。美咲は青い傘を一番奥に立てかけた。去年、姉からもらった大切な傘だ。三十分ほどして、健太が来た。二人はコーヒーを飲みながら、来月の旅行について話した。話が終わるころ、雨はもう小さくなっていた。美咲が傘立てを見ると、青い傘がなかった。店員に聞いても、誰も見ていないと言う。美咲は困って、入り口をもう一度見た。",
+        "storyMemory": {
+          "characters": [],
+          "facts": [],
+          "plot": [],
+          "unresolved": [],
+          "uncertainties": [],
+          "situation": []
+        },
+        "precedingProse": ""
+      },
+      "failureSignals": ["Ignoring the requested change", "Losing required facts", "Incorrect readings", "Notes that no longer fit the rewritten prose"]
+    }
+  ]
+}
