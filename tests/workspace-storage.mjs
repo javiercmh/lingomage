@@ -22,6 +22,11 @@ assert(!validStories([{...legacy,words:{}}]));assert(!validStories([{...legacy,t
 assert(!validStories([null]));assert(!validStories([legacy,legacy]));
 assert(!validStories([{...legacy,chapters:[{id:'c',versions:[]}]}]));
 assert(!validStories([{...legacy,paths:[{id:'p',name:'Original',entries:[{chapterId:'missing',versionId:'v'}]}]}]));
+for (const key of ['term','text']) {
+  const alias={...legacy,chapters:[{id:'c',versions:[{id:'v',story:'Text',glossary:[{[key]:'headword',meaning:'meaning'}]}]}]};
+  assert(!validStories([alias]),`strict validation no longer accepts glossary alias ${key}`);
+}
+assert(!validStories([{...legacy,chapters:[{id:'c',versions:[{id:'v',story:'Text',glossary:[{meaning:'missing headword'}]}]}]}]));
 assert(!validSettings({languageOrder:'de'}));assert(!validSettings({readingPreferences:[]}));
 assert(!validCheckpoints([{id:'op',kind:'create',stage:'ready',input:{},config:{}}]));
 const h=fixture({'data/stories.json':JSON.stringify([legacy]),'data/settings.json':'{"futureSetting":true}'});
@@ -146,3 +151,59 @@ function mergeFixture(change=()=>{}) {
   assert.equal(h.files.get('data/settings.json'),'{broken');assert.equal(h.writes(),0);
 }
 console.log('PASS settings merge keeps unknown nested/legacy values and honours learner edits; write failures keep the intended change for Retry; unreadable stores are non-retryable');
+
+// One-time glossary alias migration (temporary; delete with the migration block in the next major release).
+{
+  const STORIES='data/stories.json';
+  const story=(id,glossary,extra={})=>({id,language:'de',title:'T',topic:'x',custom:{keep:[1,{a:null}]},chapters:[{id:'c',help:[{any:1}],versions:[{id:'v',story:'Text',reading:'r',glossary,unknown:{k:true}}]}],memories:[{m:1}],...extra});
+  const canonical=story('ok',[{word:'Haus',meaning:'house',forms:['Häuser']}]);
+  const original=[story('a',[{term:'Katze',meaning:'cat',extra:5},{word:'Hund',meaning:'dog'}]),story('b',[{meaning:'tree',text:'Baum'}]),canonical];
+  const expected=[story('a',[{word:'Katze',meaning:'cat',extra:5},{word:'Hund',meaning:'dog'}]),story('b',[{meaning:'tree',word:'Baum'}]),canonical];
+  const bytes=JSON.stringify(original);
+
+  // term and text are normalized, every other field is preserved, aliases are gone and the file is rewritten once.
+  const h=fixture({[STORIES]:bytes});
+  const entry=h.storage.load(STORIES);
+  assert.equal(entry.status,'valid');assert.deepEqual(entry.value,expected);assert.equal(h.writes(),1);
+  assert.deepEqual(JSON.parse(h.files.get(STORIES)),expected);
+  const notes=entry.value.flatMap(item=>item.chapters[0].versions[0].glossary);
+  assert(notes.every(note=>!('term' in note)&&!('text' in note)&&typeof note.word==='string'));
+  h.storage.save(STORIES,entry.value);// the migrated store is writable
+  // Reloading normalized data is idempotent: no further migration write, identical value.
+  const writesBefore=h.writes();
+  const again=h.storage.load(STORIES);
+  assert.equal(again.status,'valid');assert.deepEqual(again.value,expected);assert.equal(h.writes(),writesBefore);
+
+  // Top-level (unchaptered) glossary is normalized too; an alias equal to `word` is simply dropped.
+  const flat={id:'flat',language:'ja',story:'Text',glossary:[{term:'x',meaning:'m'},{word:'y',text:'y',meaning:'n'}]};
+  const flatFixture=fixture({[STORIES]:JSON.stringify([flat])});
+  assert.deepEqual(flatFixture.storage.load(STORIES).value,[{...flat,glossary:[{word:'x',meaning:'m'},{word:'y',meaning:'n'}]}]);
+
+  // Conflicting values fail closed and the original bytes are preserved, with no write attempted.
+  for (const note of [{word:'a',term:'b',meaning:'m'},{word:'a',text:'b',meaning:'m'},{term:'a',text:'b',meaning:'m'}]) {
+    const bad=JSON.stringify([story('c',[note])]);
+    const c=fixture({[STORIES]:bad});
+    assert.equal(c.storage.load(STORIES).status,'invalid');assert.match(c.storage.entries.get(STORIES).error,/preserved/);
+    assert.equal(c.files.get(STORIES),bad);assert.equal(c.writes(),0);
+    assert.throws(()=>c.storage.save(STORIES,[]),error=>error.code==='store_invalid');assert.equal(c.files.get(STORIES),bad);
+  }
+
+  // A failed migration write (false or thrown) is not reported as success, loses nothing and is retried by the next load.
+  const failing=fixture({[STORIES]:bytes});failing.failWrite(true);
+  const failed=failing.storage.load(STORIES);
+  assert.equal(failed.status,'invalid');assert.match(failed.error,/not changed/);assert.deepEqual(failed.value,[]);
+  assert.equal(failing.files.get(STORIES),bytes);assert.equal(failing.writes(),1);
+  assert.throws(()=>failing.storage.assertWritable([STORIES]),error=>error.code==='store_invalid');
+  assert.throws(()=>failing.storage.save(STORIES,[]),error=>error.code==='store_invalid');assert.equal(failing.files.get(STORIES),bytes);
+  failing.failWrite(false);
+  assert.deepEqual(failing.storage.load(STORIES).value,expected);assert.deepEqual(JSON.parse(failing.files.get(STORIES)),expected);
+  const throwing=createWorkspaceStorage({read:()=>bytes,exists:()=>true,write:()=>{throw Error('disk full');}});
+  assert.equal(throwing.load(STORIES).status,'invalid');
+
+  // Migration applies only to stories; invalid data is not persisted by it.
+  const unrelated=fixture({[STORIES]:JSON.stringify([{id:'u',language:'de',story:'Text',glossary:[{term:'t'}]}])});
+  assert.equal(unrelated.storage.load(STORIES).status,'invalid');assert.equal(unrelated.writes(),0);
+  const settings=fixture({'data/settings.json':'{"glossary":[{"term":"x"}]}'});
+  settings.storage.load('data/settings.json');assert.equal(settings.writes(),0);
+}
+console.log('PASS glossary alias migration: term/text normalized once, conflicts fail closed, reload is idempotent, failed writes keep the original file');
