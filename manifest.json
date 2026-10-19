@@ -1,7 +1,7 @@
 {
   "name": "LingoMage",
   "short_name": "LingoMage",
-  "version": "1.2.31",
+  "version": "1.2.32",
   "templateVersion": 3,
   "description": "Create AI-powered stories tailored to your story ideas, topics, and reading level.",
   "main": "index.html",
@@ -37,7 +37,9 @@
     "js/story-model.js",
     "js/story-memory.js",
     "js/generation-controller.js",
-    "js/reader-panels.js"
+    "js/reader-panels.js",
+    "js/selection-menu.js",
+    "js/reader-activation.js"
   ],
   "app2Update": {
     "appId": "com.wynh.lingomage",
@@ -75,7 +77,9 @@
       "js/story-model.js",
       "js/story-memory.js",
       "js/generation-controller.js",
-      "js/reader-panels.js"
+      "js/reader-panels.js",
+      "js/selection-menu.js",
+      "js/reader-activation.js"
     ],
     "seedFiles": [
       "data/stories.json",

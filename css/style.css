@@ -236,6 +236,11 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 .gloss-note-trigger { display: inline; margin: 0; padding: 0; border: 0; border-bottom: 1px dotted rgba(169,197,255,.62); border-radius: 0; background: transparent; color: inherit; font: inherit; line-height: inherit; text-align: inherit; text-decoration: underline dotted rgba(169,197,255,.48); text-underline-offset: 3px; cursor: pointer; }
 .gloss-note-trigger:hover, .gloss-note-trigger:focus-visible { color: #dbeafe; border-bottom-color: var(--accent); outline: none; }
 .word-note-popover { position: fixed; z-index: 30; width: min(280px, calc(100vw - 24px)); max-height: min(45vh, 260px); overflow: auto; padding: 12px 14px; border: 1px solid rgba(169,197,255,.28); border-radius: 14px; background: #263854; color: var(--ink); box-shadow: 0 12px 36px #000b; font-size: 13px; line-height: 1.45; }
+.source-chooser { position: fixed; z-index: 31; display: grid; gap: 4px; width: min(220px, calc(100vw - 24px)); padding: 6px; border: 1px solid rgba(169,197,255,.28); border-radius: 14px; background: #263854; box-shadow: 0 12px 36px #000b; }
+.source-chooser[hidden] { display: none; }
+.source-chooser-option { min-height: 44px; padding: 0 14px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font: inherit; font-size: 14px; font-weight: 650; text-align: left; }
+.source-chooser-option:hover, .source-chooser-option:focus-visible { background: rgba(122,167,255,.2); outline: none; }
+.source-chooser-option:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
 .word-note-entry { display: grid; gap: 3px; margin: 0; }
 .word-note-entry + .word-note-entry { margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--line); }
 .word-note-entry strong { color: #c8d8ff; }

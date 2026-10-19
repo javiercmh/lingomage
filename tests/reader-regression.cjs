@@ -179,7 +179,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   console.log('PASS speech uses explicit source locale and prefers Chilean, then Latin American, then available Spanish voices');
 
   let heard;
-  const noteUi = sandbox({state:{},readerStory:()=>({language:'ja'}),speech:{available:true,speak:async options=>{heard=options;}},window:{innerWidth:390,innerHeight:800},requestAnimationFrame:fn=>fn()});
+  const noteUi = sandbox({sourceChooser:{close(){}},state:{},readerStory:()=>({language:'ja'}),speech:{available:true,speak:async options=>{heard=options;}},window:{innerWidth:390,innerHeight:800},requestAnimationFrame:fn=>fn()});
   const popover=noteUi.$('word-note-popover');popover.hidden=true;popover.style={};popover.getBoundingClientRect=()=>({bottom:150});
   const trigger=noteUi.document.createElement('span');trigger.getAttribute=name=>trigger.attributes[name];trigger.getBoundingClientRect=()=>({left:20,top:80,bottom:100});
   vm.runInContext(section('function closeWordNote(', 'function readerPanel('), noteUi);
@@ -377,7 +377,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.throws(()=>contract.decodeHelp('   ','detail'),/invalid/);
   console.log('PASS explanation/example contracts reject malformed counts, ranges, translations and annotations');
 
-  const rendered=sandbox({state:{furigana:true,explanationSelectionMode:false,selectedExplanationIds:new Set()},readerStory:()=>({id:'S'}),profileSnapshot:()=>({})});
+  const rendered=sandbox({normalizeReaderControls(){},createReaderActivation:()=>()=>{},sourceChooser:{},glossaryForTrigger:()=>null,state:{furigana:true,explanationSelectionMode:false,selectedExplanationIds:new Set()},readerStory:()=>({id:'S'}),profileSnapshot:()=>({})});
   vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function wireLongPress(', 'function renderLibrary(')+section('function renderHighlightedText(', 'async function readerAi('),rendered);
   const formatted=rendered.document.createElement('div');
   rendered.renderDetailText(formatted, 'In “al salir,” **al** contracts **a + el**.\n\nUse **bold with *italic* inside** and `a él`. <img src=x> Unmatched **marker');
@@ -562,7 +562,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
 
 
   const panel={scrollTop:321,addEventListener(){}};
-  const pos=sandbox({state:{readerId:'S',readerChapter:2,readerPositions:{}},readerStory:()=>story3,activeChapter:()=>story3.chapters[pos.state.readerChapter],normalizeChapters:s=>s.chapters,closeStoryReveal(){},updateReader(){},clearExplanationSelection(){},window:{addEventListener(){}},history:{pushState(){}}});
+  const pos=sandbox({selectionMenuRouter:{reset(){}},state:{readerId:'S',readerChapter:2,readerPositions:{}},readerStory:()=>story3,activeChapter:()=>story3.chapters[pos.state.readerChapter],normalizeChapters:s=>s.chapters,closeStoryReveal(){},updateReader(){},clearExplanationSelection(){},window:{addEventListener(){}},history:{pushState(){}}});
   pos.$('reader-dialog').querySelector=()=>panel;pos.$('reader-dialog').showModal=()=>{};
   bindStory(pos);
   vm.runInContext(section('function readerPanel(', 'function sentenceContext('),pos);story3.activePathId='original';

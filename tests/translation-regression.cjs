@@ -23,7 +23,7 @@ function harness(channel) { const c = {window: {AppTranslation: channel}, setTim
  let passage = {text:'大学', start:0, end:2, storyId:'s', chapterId:'c', versionId:'v', rect:{left:10,top:100}};
  const deferred = () => {let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
  const c = {document:{hidden:false,addEventListener(type,fn){events[type]=fn;}}, window:{innerWidth:400},
-   state:{readerSelection:null}, positionSelectionToolbar(){}, $:id=>buttons[id], selectedPassage:()=>passage, closeWordNote(){},
+   state:{readerSelection:null}, positionSelectionToolbar(){}, $:id=>buttons[id], selectedPassage:()=>passage, closeWordNote(){}, sourceChooser:{close(){}},
    speech:{available:true}, toast:message=>messages.push(message),
    translation:{availability(){const d=deferred();checks.push(d);return d.promise;},open(options){const d=deferred();d.options=options;launches.push(d);return d.promise;}}
  };
