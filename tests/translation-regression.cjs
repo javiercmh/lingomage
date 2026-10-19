@@ -16,7 +16,8 @@ function harness(channel) { const c = {window: {AppTranslation: channel}, setTim
 (async () => {
  const app = fs.readFileSync('js/app.js', 'utf8');
  const buttons = Object.fromEntries(['selection-toolbar', 'selection-translate', 'selection-speak'].map(id => [id, {
-   hidden: true, disabled: false, style: {}, classList: {add(){},remove(){}},
+   hidden: true, disabled: false, style: {}, attributes: {}, classList: {add(){},remove(){}},
+   setAttribute(key,value){this.attributes[key]=value;}, getAttribute(key){return this.attributes[key] ?? null;},
    addEventListener(type, fn) { this[type] = fn; }
  }]));
  const events = {}, checks = [], launches = [], messages = [];
@@ -30,19 +31,19 @@ function harness(channel) { const c = {window: {AppTranslation: channel}, setTim
  vm.createContext(c);
  vm.runInContext(app.slice(app.indexOf('function showSelectionToolbar()'),app.indexOf("window.addEventListener('resize'",app.indexOf('function showSelectionToolbar()'))),c);
  const clickStart=app.indexOf("$('selection-translate').addEventListener('click'");
- vm.runInContext(app.slice(clickStart,app.indexOf("$('selection-speak').addEventListener",clickStart)),c);
- const flush=async()=>{await Promise.resolve();await Promise.resolve();};
+ vm.runInContext(app.slice(app.indexOf('function runSelectionAction('),clickStart) + app.slice(clickStart,app.indexOf("$('selection-speak').addEventListener",clickStart)),c);
+ const flush=async()=>{await new Promise(resolve=>setTimeout(resolve,0));};
  const button=buttons['selection-translate'];
  assert.equal(checks.length,0,'no startup check');
  c.showSelectionToolbar();assert.equal(button.disabled,true);assert.equal(checks.length,1);
  c.showSelectionToolbar();assert.equal(checks.length,1,'unchanged selection deduplicated');
  checks[0].resolve({available:true});await flush();assert.equal(button.disabled,false);
  for(let i=0;i<20;i++) {
-   const run=button.click();assert.equal(button.disabled,true);
-   await button.click();assert.equal(launches.length,i+1,'duplicate launch suppressed');
+   button.click();await flush();assert.equal(button.disabled,true);
+   button.click();await flush();assert.equal(launches.length,i+1,'duplicate launch suppressed');
    assert.equal(launches[i].options.text,'大学');
    c.document.hidden=true;events.visibilitychange();
-   launches[i].resolve({opened:true});await run;
+   launches[i].resolve({opened:true});await flush();
    c.document.hidden=false;events.visibilitychange();
    assert.equal(button.disabled,false);assert.equal(checks.length,1,'no return or post-launch check');
  }
@@ -53,7 +54,7 @@ function harness(channel) { const c = {window: {AppTranslation: channel}, setTim
  checks[3].resolve({available:true});await flush();checks[2].resolve({available:false});await flush();assert.equal(button.disabled,false,'stale negative ignored');
  passage={...passage,start:8};c.showSelectionToolbar();c.document.hidden=true;events.visibilitychange();
  c.document.hidden=false;events.visibilitychange();checks[4].resolve({available:false});await flush();assert.equal(button.disabled,false,'background check invalidated');
- const failed=button.click();launches[20].reject(new Error('Launch failed'));await failed;assert.equal(button.disabled,false);assert.equal(messages.length,1);
+ button.click();await flush();launches[20].reject(new Error('Launch failed'));await flush();assert.equal(button.disabled,false);assert.equal(messages.length,1);
  passage={...passage,start:9};c.showSelectionToolbar();checks[5].resolve({available:false});await flush();assert.equal(button.disabled,true);
  passage={...passage,start:10};c.showSelectionToolbar();checks[6].reject(new Error('network'));await flush();assert.equal(button.disabled,true);
  passage={...passage,start:11};c.showSelectionToolbar();checks[7].resolve({available:true});await flush();assert.equal(button.disabled,false);
