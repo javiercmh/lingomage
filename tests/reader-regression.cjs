@@ -281,6 +281,32 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   }
   console.log('PASS explanation and more-detail error panels retry captured selection/question and save exactly once');
 
+  for (const action of ['initial','detail']) for (const cleanupFails of [false,true]) {
+    const entry={id:'H',passage:'Brot',start:0,end:4,versionId:'V',text:'Existing explanation',followUps:[]};
+    const story={id:'S',language:'de',chapters:[{id:'C',help:action==='detail'?[entry]:[],versions:[{id:'V',story:'Brot'}]}]};
+    const selected={storyId:'S',chapterId:'C',versionId:'V',helpId:'H',text:'Brot',start:0,end:4,profile:{}};
+    let shouldCancel=true;
+    const c=sandbox({state:{readerId:'S',model:'mock',providerId:'mock'},readerStory:()=>story,normalizeChapters:s=>s.chapters,activeChapter:()=>story.chapters[0],activeVersion:()=>story.chapters[0].versions[0],readerPanel:()=>({scrollTop:0}),persistReaderStory(){},readerAi:async()=>{c.state.pendingReaderRequestId='cancelled-id';if(shouldCancel)throw Error('Request cancelled.');return JSON.stringify({explanation:'New detail'});},decodeHelp:JSON.parse,renderSavedHelp(){},ai:{acknowledge:async()=>{if(cleanupFails)throw Error('offline');}}});
+    vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(',"$('selection-translate')"),c);
+    await c.explainSelection('explain',action,'Why this form?',selected);
+    assert.equal(c.readerGeneration?.phase,cleanupFails?'cleanup':undefined);
+    assert.equal(c.state.readerHelpBusy,false);
+    assert.equal(c.$('reader-help').childNodes.some(node=>node.className==='recovery-panel help-request-recovery'),false);
+    assert.equal(entry.text,'Existing explanation');assert.equal(entry.followUps.length,0);
+    if(!cleanupFails){shouldCancel=false;await c.explainSelection('explain',action,'Why this form?',selected);assert.equal(action==='detail'?entry.followUps.length:story.chapters[0].help.length,1);}
+  }
+  console.log('PASS intentional explanation cancellation clears status, preserves help, permits next request and exposes cleanup failures without recovery');
+  {
+    let failCleanup=true, releases=0;
+    const c=sandbox({state:{readerId:'S',pendingReaderRequestId:'cancelled'},ai:{acknowledge:async()=>{releases++;if(failCleanup)throw Error('offline');}}});
+    vm.runInContext(lifecycle+section('function setReaderGeneration(', '// Scroll the reader only'),c);
+    c.setReaderGeneration({storyId:'S',phase:'cleanup',message:'Could not finish cancelled request.'});
+    assert.equal(c.$('reader-generation-action').textContent,'Finish request');
+    await c.$('reader-generation-action').events.click();assert.equal(c.state.pendingReaderRequestId,'cancelled');
+    failCleanup=false;await c.$('reader-generation-action').events.click();
+    assert.equal(c.state.pendingReaderRequestId,null);assert.equal(c.$('reader-generation-bar').hidden,true);assert.equal(releases,2);
+  }
+
   const text=value=>({nodeType:3,nodeValue:value,childNodes:[]});
   const element=(tag,...children)=>({nodeType:1,childNodes:children,matches:name=>name===tag,closest:()=>null,contains:()=>true});
   const a=text('日'),reading=text('にち'),b=text('本。'),ruby=element('ruby',a,element('rt',reading));

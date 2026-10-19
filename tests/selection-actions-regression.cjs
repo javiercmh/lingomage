@@ -32,6 +32,8 @@ const context = {
   state: { readerSelection: { kind: 'body', text: 'Hallo', languageTag: 'de-DE' } },
   $: id => buttons[id],
   document: { execCommand: () => false },
+  window: { getSelection: () => ({removeAllRanges() { context.selectionCleared = true; }}) },
+  clearTimeout() {}, selectionTimer: null,
   navigator: { clipboard: { writeText: () => pending.copy.promise } },
   translationLaunching: false,
   translationAvailability: 'available',
@@ -45,7 +47,7 @@ const context = {
     onTaskStarted();
     return pending.generation.promise;
   },
-  toast: message => toasts.push(message)
+  toast: (message, duration) => { toasts.push(message); context.toastDuration = duration; }
 };
 vm.createContext(context);
 vm.runInContext(app.slice(helperStart, actionsStart) + app.slice(actionsStart, actionsEnd), context);
@@ -64,6 +66,13 @@ async function clickAndCheck(id, operation) {
 
 (async () => {
   await clickAndCheck('selection-copy', pending.copy);
+  assert.equal(context.state.readerSelection, null);
+  assert.equal(buttons['selection-toolbar'].hidden, true);
+  assert.equal(context.selectionCleared, true);
+  assert.equal(toasts.at(-1), 'Copied');
+  assert.equal(context.toastDuration, 1000);
+  context.state.readerSelection = {kind:'body',text:'Hallo',languageTag:'de-DE'};
+  buttons['selection-toolbar'].hidden = false;
   await clickAndCheck('selection-translate', pending.translate);
   await clickAndCheck('selection-speak', pending.speak);
 
@@ -74,6 +83,13 @@ async function clickAndCheck(id, operation) {
   assert.equal(buttons['selection-toolbar'].hidden, true, 'Explain toolbar closes at AI task handoff');
   pending.generation.resolve({});
 
+  context.navigator.clipboard.writeText = async text => { assert.equal(text, 'Hallo'); throw Error('clipboard denied'); };
+  buttons['selection-toolbar'].hidden = false;
+  buttons['selection-copy'].listeners.click(); await flush();
+  assert.equal(buttons['selection-toolbar'].hidden, false, 'failed copy keeps toolbar');
+  assert.equal(context.state.readerSelection.text, 'Hallo', 'failed copy keeps selection');
+  assert.equal(toasts.at(-1), 'Could not copy the selection.');
+
   const failedButton = button();
   const failedAction = deferred();
   const failedRun = context.runSelectionAction(failedButton, () => failedAction.promise);
@@ -83,6 +99,37 @@ async function clickAndCheck(id, operation) {
   await assert.rejects(failedRun, /simulated failure/);
   assert.equal(failedButton.attributes['aria-busy'], 'false', 'failure clears busy state');
   assert(!failedButton.classes.has('selection-action-active'), 'failure clears the action highlight');
+
+  // Exercise production pointer handlers, including implicit touch capture releasing outside.
+  const events = {}, docEvents = {}, winEvents = {};
+  const toolbar = {addEventListener(type, fn) { events[type] = fn; }};
+  const pressed = button(); pressed.getBoundingClientRect = () => ({left:10,right:54,top:10,bottom:54});
+  const pressContext = { $: () => toolbar, clearTimeout() {}, selectionTimer:null,
+    document:{addEventListener(type, fn) {docEvents[type]=fn;}}, window:{addEventListener(type,fn){winEvents[type]=fn;}} };
+  vm.createContext(pressContext);
+  vm.runInContext(app.slice(app.indexOf('let selectionPressedButton = null;'),app.indexOf('// Flex sizing')),pressContext);
+  const down = () => events.pointerdown({button:0,preventDefault(){},target:{closest:()=>pressed}});
+  down(); assert(pressed.classes.has('selection-action-pressed'));
+  docEvents.pointerup({clientX:30,clientY:30}); assert(!pressed.classes.has('selection-action-pressed'));
+  let blocked=0;
+  const click = detail => events.click({detail,preventDefault(){blocked++;},stopPropagation(){}});
+  click(1);assert.equal(blocked,0);
+  down();docEvents.pointerup({clientX:100,clientY:30});click(1);assert.equal(blocked,1);
+  down();docEvents.pointercancel();click(1);assert.equal(blocked,2);
+  assert(!pressed.classes.has('selection-action-pressed'));
+  click(0);assert.equal(blocked,2,'keyboard activation is not blocked by a previous cancelled pointer');
+  down();winEvents.blur();assert(!pressed.classes.has('selection-action-pressed'));
+
+  // Toasts use the frontmost open dialog and retain the default duration elsewhere.
+  let scheduled, parent;
+  const toastNode = {};
+  const toastContext = {state:{}, $:()=>toastNode, clearTimeout(){},setTimeout(fn,ms){scheduled={fn,ms};},
+    document:{querySelectorAll:()=>[{append(){throw Error('behind reader');}},{append(node){parent=node;}}],body:{append(){throw Error('behind dialogs');}}}};
+  vm.createContext(toastContext);
+  vm.runInContext(app.slice(app.indexOf('function toast('),app.indexOf('function setView(')),toastContext);
+  toastContext.toast('Copied',1000);assert.equal(parent,toastNode);assert.equal(scheduled.ms,1000);assert.equal(toastNode.hidden,false);
+  scheduled.fn();assert.equal(toastNode.hidden,true);
+  toastContext.toast('Request cancelled');assert.equal(scheduled.ms,2600);
 
   const source = fs.readFileSync('js/app.js', 'utf8');
   const start = source.indexOf('async function readerAi(');

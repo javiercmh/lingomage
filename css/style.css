@@ -217,9 +217,9 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 .selection-toolbar .icon-btn { width: 44px; height: 44px; }
 .selection-toolbar .icon-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .selection-toolbar button:focus-visible { outline: 2px solid #93c5fd; outline-offset: 1px; }
-.selection-toolbar button.selection-action-active { background: rgba(96,165,250,.2); }
+.selection-toolbar button.selection-action-active, .selection-toolbar button.selection-action-pressed, .selection-toolbar button:active:not(:disabled) { background: rgba(96,165,250,.2); }
 @media (hover: hover) {
-  .selection-toolbar button:hover:not(:disabled):not(.selection-action-active) { background: var(--pop-hover); }
+  .selection-toolbar button:hover:not(:disabled):not(.selection-action-active):not(.selection-action-pressed):not(:active) { background: var(--pop-hover); }
 }
 .selection-toolbar button:disabled:not(.selection-action-active) { opacity: .4; }
 .selection-toolbar #selection-explain { font-weight: 700; }
