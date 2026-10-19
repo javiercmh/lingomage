@@ -1,4 +1,5 @@
 import { failureInfo } from './generation-errors.js';
+import { aiNotification } from './ai-notification.js';
 import { PLAN_INSTRUCTIONS, decodePlan } from './story-generation.js';
 import { parseContent, validateContentSize, validateProse, validateNotes, validateStory, validateExamples, readingPlan, attachReadings, NOTES_INSTRUCTIONS, READING_INSTRUCTIONS, SAFEGUARD_VERSION } from './learning-validation.js';
 
@@ -54,7 +55,7 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
           const instructions = stage === 'plan' ? PLAN_INSTRUCTIONS : stage === 'prose' ? op.instructions : stage === 'notes' ? NOTES_INSTRUCTIONS : READING_INSTRUCTIONS;
           if (!op.request) {
             mark('start');
-            const id = await ai.start({providerId:op.config.providerId,model:op.config.model,reasoningEffort:op.config.reasoning || undefined,instructions,input:JSON.stringify(input)});
+            const id = await ai.start({providerId:op.config.providerId,model:op.config.model,reasoningEffort:op.config.reasoning || undefined,instructions,input:JSON.stringify(input),...aiNotification(op.kind,stage)});
             op.request={id,stage,completed:false}; save();
           }
           await checkCancelled(op);

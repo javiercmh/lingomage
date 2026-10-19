@@ -19,7 +19,7 @@
 - Follow the plain-file starter structure: `index.html`, `css/style.css`, `js/app.js`, `js/bridge.js`, `manifest.json`, and `data/`.
 - Keep the host API calls in `js/bridge.js`; app logic uses its exported wrappers. Keep the project dependency-free and do not add a build step.
 - Keep `manifest.json`'s `main` and `files` entries current. Domain records, preferences and unfinished generation belong in `data/stories.json`, `data/settings.json` and `data/generation-checkpoints.json`, not opaque host preferences.
-- Released app behavior uses the App² managed `ai` bridge. Connect and choose models only through App² library Settings → AI. Never store credentials or request headers in the workspace. The local development server may offer an explicit `--chatgpt` mode through the Codex CLI login for desktop testing; this exception must remain development-only.
+- Released app behavior uses the App² managed `ai` bridge. Connect and choose models only through App² library Settings → AI. Never store credentials or request headers in the workspace. Every `ai.start` caller passes concise task-specific `title`/`body` from `js/ai-notification.js` for App²'s running-request notification; it is presentation only and must not change prompts, prompt versions, saved schema or provenance. The local development server may offer an explicit `--chatgpt` mode through the Codex CLI login for desktop testing; this exception must remain development-only.
 - Save completed story data before acknowledging an AI request. Do not silently retry inference.
 - Respect edge-to-edge safe-area variables, provide touch targets of at least 44px, and do not use system `alert()` or `confirm()` dialogs.
 - Keep user-generated text rendered with `textContent` or text nodes.

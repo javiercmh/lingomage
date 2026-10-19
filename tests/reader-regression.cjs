@@ -11,6 +11,7 @@ const readerTextSource = fs.readFileSync(require('node:path').join(__dirname, '.
 const learningSource = fs.readFileSync(require('node:path').join(__dirname, '../js/learning-validation.js'), 'utf8').replace(/^import .*;\n/m, '').replaceAll('export ', '');
 const requestLifecycleSource = fs.readFileSync(require('node:path').join(__dirname, '../js/request-lifecycle.js'), 'utf8').replaceAll('export async function ', 'async function ');
 const speechSource = fs.readFileSync(require('node:path').join(__dirname, '../js/reader-speech.js'), 'utf8').replaceAll('export function ', 'function ').replaceAll('export async function ', 'async function ');
+const notificationSource = fs.readFileSync(require('node:path').join(__dirname, '../js/ai-notification.js'), 'utf8').replaceAll('export function ', 'function ');
 function section(start, end) { return source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start))); }
 function sandbox(extra = {}) {
   const elements = new Map();
@@ -20,6 +21,7 @@ function sandbox(extra = {}) {
   const c = {workspaceStorage:{assertWritable(){}},settingsFeedback:{sync(){}},pipeline:null,state:{},console,crypto:{randomUUID:(()=>{let id=0;return ()=>`help-test-${++id}`;})()},PROMPT_VERSION:'test',STORY_GUIDES:{de:{beginner:'Simple sentences'}},renderChapterRequest(){},updateReaderNavigation(){},renderCheckpointRecovery(){},LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},SPEECH_LANGUAGES:{de:'de-DE',ja:'ja-JP',ru:'ru-RU','es-CL':'es-CL'},renderGenerationRecovery(){},readerPanel:()=>({classList:{toggle(){}}}),$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{createElement:element,createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},...extra};
   c.readerGeneration = null; c.renderReaderGeneration = () => {}; c.setReaderGeneration = value => { c.readerGeneration = value; };
   vm.createContext(c);
+  vm.runInContext(notificationSource, c);
   vm.runInContext(fs.readFileSync('js/generation-errors.js','utf8').replaceAll('export function ', 'function '), c);
   vm.runInContext(readerTextSource, c);
   vm.runInContext(learningSource, c);
@@ -541,7 +543,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   console.log('PASS failed chapter request clears loading and retains an anchored prompt for explicit retry');
 
   let cancelAction, rejectWait, cancelCalls=0;
-  const cancelContext=sandbox({state:{models:[{id:'mock'}],model:'mock'},ai:{available:true,providers:async()=>({providers:[{id:'openrouter',connected:true}]}),start:async args=>{assert.equal(args.providerId,'openrouter');return 'cancel-id';},wait:()=>new Promise((_,reject)=>rejectWait=reject),cancel:async()=>{cancelCalls++;rejectWait(Error('cancelled'));},acknowledge:async()=>{}},document:{createElement:()=>({addEventListener:(_,fn)=>cancelAction=fn,remove(){}})}});
+  const cancelContext=sandbox({state:{models:[{id:'mock'}],model:'mock'},ai:{available:true,providers:async()=>({providers:[{id:'openrouter',connected:true}]}),start:async args=>{assert.equal(args.providerId,'openrouter');assert.deepEqual({title:args.title,body:args.body},{title:'Explaining your selection',body:'Safe to switch apps. LingoMage keeps going.'});return 'cancel-id';},wait:()=>new Promise((_,reject)=>rejectWait=reject),cancel:async()=>{cancelCalls++;rejectWait(Error('cancelled'));},acknowledge:async()=>{}},document:{createElement:()=>({addEventListener:(_,fn)=>cancelAction=fn,remove(){}})}});
   vm.runInContext(lifecycle + section('async function readerAi(', 'async function acknowledgeReaderResult('),cancelContext);
   const cancellation=cancelContext.readerAi('explain',{},'test');
   await new Promise(resolve=>setImmediate(resolve));await cancelAction();

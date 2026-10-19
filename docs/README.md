@@ -23,7 +23,7 @@ Product rationale, learning decisions, research evidence and the checks that are
 - [MVP specification](product/mvp.md): shared requirements and delivery sequence.
 - [Language decisions](languages/README.md): language-specific requirements and research questions.
 - [Research and evidence policy](research/README.md): how findings become documented decisions.
-- [Level-guided generation evidence](research/level-guided-generation.md), [reading and glossing](research/reading-and-glossing.md), [Japanese furigana](research/japanese-furigana.md), [level descriptors](research/level-descriptors.md), [self-assessment](research/self-assessment.md).
+- [Level-guided generation evidence](research/level-guided-generation.md), [reading and glossing](research/reading-and-glossing.md), [lexical-unit terminology](research/lexical-units.md), [Japanese furigana](research/japanese-furigana.md), [level descriptors](research/level-descriptors.md), [self-assessment](research/self-assessment.md).
 - [App² runtime](architecture/app2-runtime.md): runtime, workspace data and validation limits.
 - [Language safeguard audit](architecture/language-safeguards.md): registered safeguards and their regression coverage.
 - [Device checklist](validation/device-checklist.md): pending Android checks and recorded device results.

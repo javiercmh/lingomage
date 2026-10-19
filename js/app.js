@@ -11,6 +11,7 @@ import { SAFEGUARD_VERSION, parseContent, validateStory } from './learning-valid
 import { failureInfo, recoverySummary, appendFailureDetails } from './generation-errors.js';
 import { createWorkspaceStorage, createSettingsPersistence } from './workspace-storage.js';
 import { saveBeforeAcknowledge } from './request-lifecycle.js';
+import { aiNotification } from './ai-notification.js';
 import { createSettingsFeedback, unsavedWorkReason } from './settings-feedback.js';
 
 const LANGUAGES = {de:'German',ja:'Japanese',ru:'Russian','es-CL':'Spanish'};
@@ -1725,7 +1726,7 @@ async function readerAi(kind, input, instructions, requestPanel, config = { prov
   const providerId = provider.id;
   state.requestId = 'starting';
   let id;
-  try { id = await ai.start({ providerId, model: model.id, instructions, input: JSON.stringify({ kind, ...input }), reasoningEffort: model.reasoningLevels?.includes(config.reasoning) ? config.reasoning : undefined }); }
+  try { id = await ai.start({ providerId, model: model.id, instructions, input: JSON.stringify({ kind, ...input }), reasoningEffort: model.reasoningLevels?.includes(config.reasoning) ? config.reasoning : undefined, ...aiNotification(kind) }); }
   catch (error) { state.requestId = null; throw error; }
   state.requestId = id;
   const panel = requestPanel || (['continue','rewrite'].includes(kind) ? $('reader-edit-panel') : $('reader-help'));
