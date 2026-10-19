@@ -55,10 +55,13 @@ app has proven learning effectiveness.
 
 Native App² speech supports selected text, vocabulary headwords and chapter listening. Browser previews show its availability limits; native behavior remains subject to the device checklist.
 
-## Deferred features
+## Deferred features and research candidates
 
-Images, quizzes, spaced repetition, cloud sync, formal learning trials,
-and additional languages.
+**Deferred product features** (not planned for the current version): images, cloud sync and additional languages.
+
+**Research candidates** (investigated before any commitment; not features, schedules or promises): optional retrieval or spaced review of story words, reuse across stories, contextual instruction, story-linked listening, writing or speaking tasks and learner-language feedback. Prototype work needs evidence review, qualified language review and usability checks; claims of learning benefits need the learning evaluations defined in the strategy. See the [evidence-informed strategy](evidence-informed-strategy.md) and its evaluation gates; intended learner outcomes and the future optional in-app evaluation direction (none of it implemented) are in [learning outcomes and evaluation](learning-outcomes-and-evaluation.md). Quizzes and spaced repetition were previously listed here as deferred; they are now treated as research candidates.
+
+**Formal learning trials** have not been run. They are part of the strategy's evaluation gates, not a delivered capability.
 
 The result Copy action includes the canonical title and story plus glossary
 meanings; Japanese furigana is omitted. Settings show model-specific reasoning

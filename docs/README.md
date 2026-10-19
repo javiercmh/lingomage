@@ -9,7 +9,7 @@ Product rationale, learning decisions, research evidence and the checks that are
 | Interface conventions, layout, interaction and accessibility | [`DESIGN.md`](../DESIGN.md) | Yes, updated in the same change as the UI |
 | Contributor rules | [`AGENTS.md`](../AGENTS.md) | Yes |
 | Packaging and App² updates | [`PACKAGING.md`](../PACKAGING.md) | Yes |
-| Shared product requirements | [`product/`](product/mvp.md) | Yes |
+| Shared product requirements and long-term strategy | [`product/`](product/mvp.md), [strategy](product/evidence-informed-strategy.md) | Yes |
 | Language-specific requirements | [`languages/`](languages/README.md) | Yes |
 | Pedagogical decisions with evidence and limits | [`pedagogy/`](pedagogy/README.md) | Yes, one PED file per decision |
 | Research notes and citations | [`research/`](research/README.md), [`references.bib`](research/references.bib) | Append and correct |
@@ -21,6 +21,8 @@ Product rationale, learning decisions, research evidence and the checks that are
 
 - [Pedagogical decision log](pedagogy/README.md): stable decision IDs, implementation links, evidence limits and template.
 - [MVP specification](product/mvp.md): shared requirements and delivery sequence.
+- [Evidence-informed strategy](product/evidence-informed-strategy.md): long-term research-linked directions, limits and evaluation gates (not a plan or feature commitment).
+- [Learning outcomes and evaluation](product/learning-outcomes-and-evaluation.md): intended learner outcomes and a future optional in-app evaluation direction, measurement principles and privacy stance (nothing implemented).
 - [Language decisions](languages/README.md): language-specific requirements and research questions.
 - [Research and evidence policy](research/README.md): how findings become documented decisions.
 - [Research index](research/README.md#research-index): reviews grouped by topic and the decision each informs. [Lexical-unit terminology](research/lexical-units.md) is the single source for vocabulary-note naming.
