@@ -1,7 +1,7 @@
 {
   "name": "LingoMage",
   "short_name": "LingoMage",
-  "version": "1.2.40",
+  "version": "1.2.41",
   "templateVersion": 3,
   "description": "Create AI-powered stories tailored to your story ideas, topics, and reading level.",
   "main": "index.html",

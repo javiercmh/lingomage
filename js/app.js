@@ -302,11 +302,11 @@ $('usage-retry').addEventListener('click', () => {
   if (ok) { statsSignature = ''; renderStats(); $('usage-ranges').querySelector('[tabindex="0"]')?.focus(); }
 });
 renderUsageStatus(usage.status);
-function toast(message, duration = 2600) {
+function toast(message) {
   const el = $('toast');
   ([...document.querySelectorAll('dialog[open]')].at(-1) || document.body).append(el);
   el.textContent = message; el.hidden = false;
-  clearTimeout(state.toastTimer); state.toastTimer = setTimeout(() => { el.hidden = true; }, duration);
+  clearTimeout(state.toastTimer); state.toastTimer = setTimeout(() => { el.hidden = true; }, 2600);
 }
 function setView(name) {
   if (name !== 'library' && state.storySelectionMode) leaveStorySelection();
@@ -2194,7 +2194,6 @@ $('selection-copy').addEventListener('click', () => {
       clearTimeout(selectionTimer);
       state.readerSelection = null;
       $('selection-toolbar').hidden = true;
-      toast('Copied', 1000);
     }
     catch { toast('Could not copy the selection.'); }
   });
