@@ -63,7 +63,7 @@ function fillScopeOptions(input, selected = 'scene', describe) {
 
 const PREFERRED_MODEL = 'gpt-6-luna';
 const $ = id => document.getElementById(id);
-const state = { languageOrder: Object.keys(LANGUAGES), standardizedLevels: {}, checkpointBlocked: false, stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, revealedStoryId: null, deleteStoryIds: new Set(), storySelectionMode: false, selectedStoryIds: new Set(), storySelectionFocusId: '', explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', readerHistoryEntry: false, speechVersionKey: '', playerEnabled: false, hostHidesBar: false, player: null, playerUnits: [], speechRate: 1, followAlong: true, following: true, wordNoteTrigger: null, readerEditBusy: false, activeChapterRequest: null, readerEditDraft: null };
+const state = { languageOrder: Object.keys(LANGUAGES), standardizedLevels: {}, checkpointBlocked: false, stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, revealedStoryId: null, deleteStoryIds: new Set(), storySelectionMode: false, selectedStoryIds: new Set(), storySelectionFocusId: '', explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', readerHistoryEntry: false, speechVersionKey: '', playerEnabled: false, player: null, playerUnits: [], speechRate: 1, followAlong: true, following: true, wordNoteTrigger: null, readerEditBusy: false, activeChapterRequest: null, readerEditDraft: null };
 
 let readerSpeechRun = 0;
 let readerSpeechKey = '';
@@ -1472,7 +1472,7 @@ $('reader-listen').addEventListener('click', async () => {
 $('reader-dialog').addEventListener('pointerdown', event => {
   if (!event.target.closest?.('.gloss-note-trigger, mark.explained-expression, #word-note-popover')) closeWordNote();
 });
-// Sentence-level listening player (App² hosts that report showControl): floating controls, spoken-sentence highlight and Follow.
+// Sentence-level listening player: floating controls, spoken-sentence highlight and Follow.
 let playerCollapseTimer = 0, playerScrubbing = false;
 const PLAYER_ICON_LABELS = { paused: ['Resume', 'Resume listening'], playing: ['Pause', 'Pause listening'] };
 async function runReaderPlayer(story, version, isCurrent) {
@@ -1510,7 +1510,7 @@ function renderPlayer({ state: mode, index = 0, count = 0 }) {
 }
 function followSpeech(range) {
   const panel = readerPanel(), box = panel.getBoundingClientRect(), rect = range.getBoundingClientRect();
-  const top = $('reader-player').getBoundingClientRect().bottom + 16, bottom = box.bottom - 24 - (state.hostHidesBar ? 0 : 96);
+  const top = $('reader-player').getBoundingClientRect().bottom + 16, bottom = box.bottom - 24;
   if (rect.top >= top && rect.bottom <= bottom) return;
   const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   panel.scrollBy({ top: rect.top - (top + (bottom - top) * .2), behavior: reduce ? 'auto' : 'smooth' });
@@ -1550,10 +1550,7 @@ for (const type of ['wheel', 'touchmove']) readerPanel().addEventListener(type, 
   if (!state.player || !state.following || event.target.closest?.('#reader-player')) return;
   state.following = false; renderPlayerFollow();
 }, { passive: true });
-// The player works on every App² host that has speech. Hosts that can hide the native Speaking bar report showControl;
-// older hosts keep showing their bar, which Follow then leaves clear.
 state.playerEnabled = speech.available;
-if (speech.available) speech.capabilities().then(result => { state.hostHidesBar = Array.isArray(result?.features) && result.features.includes('showControl'); }).catch(() => {});
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && !$('word-note-popover').hidden) {
     event.preventDefault(); event.stopPropagation(); closeWordNote(true); return;

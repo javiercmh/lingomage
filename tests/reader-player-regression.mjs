@@ -1,4 +1,4 @@
-// Sentence player: segmentation, rate/showControl options, pause/resume, skipping and cancellation safety.
+// Sentence player: segmentation, rate options, pause/resume, skipping and cancellation safety.
 import assert from 'node:assert/strict';
 import { speechUnits, createReaderPlayer } from '../js/reader-player.js';
 
@@ -36,7 +36,7 @@ function harness(count = 3, { rate = 1, language = 'de-DE' } = {}) {
   let h = harness(3, { rate: 1.25 });
   h.player.play(0); await flush();
   assert.equal(h.speaks.length, 1);
-  assert.deepEqual({ ...h.speaks[0].options }, { text: 'Satz 0.', language: 'de-DE', rate: 1.25, showControl: false });
+  assert.deepEqual({ ...h.speaks[0].options }, { text: 'Satz 0.', language: 'de-DE', rate: 1.25 });
   h.speaks[0].resolve({ status: 'completed' }); await flush();
   assert.equal(h.player.snapshot.index, 1); assert.equal(h.speaks[1].options.text, 'Satz 1.');
   h.speaks[1].resolve({ status: 'completed' }); await flush(); h.speaks[2].resolve({ status: 'completed' });

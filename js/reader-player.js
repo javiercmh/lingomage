@@ -70,7 +70,7 @@ export function createReaderPlayer({ speech, units, language, rate = 1, onChange
     try {
       options ||= (await prepareSpeechOptions(speech, units[index].text, language)).options;
       while (mine === run) {
-        const result = await speech.speak({ ...options, text: units[index].text, rate, showControl: false });
+        const result = await speech.speak({ ...options, text: units[index].text, rate });
         if (mine !== run) return;
         // The host cancels on backgrounding or reload; keep the position so Resume repeats this sentence.
         if (result?.status === 'cancelled') { state = 'paused'; emit(); return; }
