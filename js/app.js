@@ -3,7 +3,7 @@ import { createStoryMemory } from './story-memory.js';
 import { createGenerationController } from './generation-controller.js';
 import { createReaderPanels } from './reader-panels.js';
 import { ai, readFile, writeFile, listFiles, speech, translation, selectionMenu } from './bridge.js';
-import { speakSelection, speakChapter, chapterSpeechText } from './reader-speech.js';
+import { speakSelection, prepareSpeechOptions, speakChapter, chapterSpeechText } from './reader-speech.js';
 import { createSelectionMenuRouter } from './selection-menu.js';
 import { createReaderActivation, glossaryForTrigger, indexGlossaryTriggers, normalizeReaderControls } from './reader-activation.js';
 import { annotatedText, applyExplainedMarks, getCanonicalSelection, japaneseSegments } from './reader-text.js';
@@ -1157,6 +1157,17 @@ function closeWordNote(restoreFocus = false) {
   state.wordNoteTrigger = null;
   document.querySelectorAll('.gloss-note-trigger[aria-expanded="true"]').forEach(button => { button.removeAttribute('aria-expanded'); button.removeAttribute('aria-controls'); });
 }
+let wordNoteSpeechRun = 0;
+let wordNoteSpeechButton = null;
+function renderWordNoteSpeech(button, playing, stopping = false) {
+  const label = stopping ? 'Stop audio' : playing ? 'Stop audio' : button.dataset.listenLabel;
+  button.disabled = !speech.available || stopping;
+  button.title = speech.available ? label : 'Listening requires App²';
+  button.setAttribute('aria-label', label);
+  button.setAttribute('aria-pressed', String(playing));
+  button.setAttribute('aria-busy', String(stopping));
+  button.dataset.playing = String(playing);
+}
 function showWordNote(trigger, notes, surface = '', helpId = '') {
   const popover = $('word-note-popover');
   if (!popover.hidden && trigger.getAttribute('aria-expanded') === 'true') { closeWordNote(); return; }
@@ -1169,15 +1180,44 @@ function showWordNote(trigger, notes, surface = '', helpId = '') {
     const meaning = document.createElement('span'); meaning.textContent = note.meaning;
     const heading = document.createElement('span'); heading.className = 'word-note-heading';
     const listen = document.createElement('button'); listen.type = 'button'; listen.className = 'icon-btn word-note-listen';
-    listen.setAttribute('aria-label', `Listen to ${shown || 'expression'}`);
+    listen.dataset.listenLabel = `Listen to ${shown || 'expression'}`;
+    renderWordNoteSpeech(listen, false);
     listen.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4zM15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14"/></svg>';
     listen.disabled = !speech.available || !shown;
-    listen.title = speech.available ? 'Listen' : 'Listening requires App²';
     listen.addEventListener('click', async () => {
-      listen.disabled = true;
-      try { await speakSelection(speech, shown, SPEECH_LANGUAGES[readerStory().language]); }
-      catch (error) { toast(`Could not play audio: ${error.message}`); }
-      finally { listen.disabled = !speech.available; }
+      if (wordNoteSpeechButton === listen) {
+        const run = ++wordNoteSpeechRun;
+        renderWordNoteSpeech(listen, true, true);
+        try {
+          await speech.stop();
+          if (run === wordNoteSpeechRun) { wordNoteSpeechButton = null; renderWordNoteSpeech(listen, false); }
+        } catch (error) {
+          if (run === wordNoteSpeechRun) { toast(`Could not stop audio: ${error.message}`); renderWordNoteSpeech(listen, true); }
+        }
+        return;
+      }
+      const run = ++wordNoteSpeechRun;
+      const previous = wordNoteSpeechButton;
+      if (previous) {
+        wordNoteSpeechButton = null;
+        renderWordNoteSpeech(previous, false);
+        try { await speech.stop(); }
+        catch (error) {
+          if (run === wordNoteSpeechRun) toast(`Could not stop audio: ${error.message}`);
+          return;
+        }
+        if (run !== wordNoteSpeechRun) return;
+      }
+      wordNoteSpeechButton = listen;
+      renderWordNoteSpeech(listen, true);
+      try {
+        const { options } = await prepareSpeechOptions(speech, shown, SPEECH_LANGUAGES[readerStory().language]);
+        if (run !== wordNoteSpeechRun) return;
+        await speech.speak(options);
+      } catch (error) { if (run === wordNoteSpeechRun) toast(`Could not play audio: ${error.message}`); }
+      finally {
+        if (run === wordNoteSpeechRun) { wordNoteSpeechButton = null; renderWordNoteSpeech(listen, false); }
+      }
     });
     heading.append(word, listen); item.append(heading);
     if (note.word && shown.toLowerCase() !== note.word.trim().toLowerCase()) {

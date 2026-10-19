@@ -178,21 +178,24 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   const german=await glossary.prepareSpeechOptions(speechStub,'Guten Tag','de-DE');assert.equal(german.options.language,'de-DE');assert.equal(german.options.voiceId,undefined);
   console.log('PASS speech uses explicit source locale and prefers Chilean, then Latin American, then available Spanish voices');
 
-  let heard;
-  const revealed=[];const noteUi = sandbox({showExplanationForHelp:id=>revealed.push(id),state:{},readerStory:()=>({language:'ja'}),speech:{available:true,speak:async options=>{heard=options;}},window:{innerWidth:390,innerHeight:800},requestAnimationFrame:fn=>fn()});
+  let heard, finishSpeech, stopped=0;
+  const revealed=[];const noteUi = sandbox({showExplanationForHelp:id=>revealed.push(id),state:{},readerStory:()=>({language:'ja'}),speech:{available:true,speak:options=>{heard=options;return new Promise(resolve=>{finishSpeech=resolve;});},stop:async()=>{stopped++;finishSpeech?.({status:'cancelled'});}},window:{innerWidth:390,innerHeight:800},requestAnimationFrame:fn=>fn()});
   const popover=noteUi.$('word-note-popover');popover.hidden=true;popover.style={};popover.getBoundingClientRect=()=>({bottom:150});
   const trigger=noteUi.document.createElement('span');trigger.getAttribute=name=>trigger.attributes[name];trigger.getBoundingClientRect=()=>({left:20,top:80,bottom:100});
   vm.runInContext(section('function closeWordNote(', 'function readerPanel('), noteUi);
   noteUi.showWordNote(trigger,[{word:'買う',meaning:'to buy',forms:['買います']}]);
   const listen=popover.childNodes[0].childNodes[0].childNodes[1];
   assert.equal(listen.attributes['aria-label'],'Listen to 買う');assert.equal(popover.focused,true);
-  await listen.events.click();assert.equal(heard.text,'買う');assert.equal(heard.language,'ja-JP');
+  const starting=listen.events.click();await Promise.resolve();await Promise.resolve();
+  assert.equal(heard.text,'買う');assert.equal(heard.language,'ja-JP');assert.equal(listen.disabled,false);assert.equal(listen.attributes['aria-pressed'],'true');
+  await listen.events.click();await starting;assert.equal(stopped,1);assert.equal(listen.attributes['aria-pressed'],'false');
   noteUi.closeWordNote(true);assert.equal(trigger.focused,true);assert.equal(popover.hidden,true);
   noteUi.closeWordNote();noteUi.showWordNote(trigger,[{word:'買う',meaning:'to buy'}],'買います');
   const surfaceItem=popover.childNodes[0];
   assert.equal(surfaceItem.childNodes[0].childNodes[0].textContent,'買います');
   assert.equal(surfaceItem.childNodes[1].textContent,'Dictionary form: 買う');
-  await surfaceItem.childNodes[0].childNodes[1].events.click();assert.equal(heard.text,'買います');
+  const surfaceListen=surfaceItem.childNodes[0].childNodes[1];const surfaceStarting=surfaceListen.events.click();await Promise.resolve();await Promise.resolve();assert.equal(heard.text,'買います');
+  await surfaceListen.events.click();await surfaceStarting;assert.equal(stopped,2);
   noteUi.closeWordNote();noteUi.speech.available=false;noteUi.showWordNote(trigger,[{word:'買う',meaning:'to buy'}]);
   assert.equal(popover.childNodes[0].childNodes[0].childNodes[1].disabled,true);
   noteUi.closeWordNote();noteUi.speech.available=true;noteUi.showWordNote(trigger,[{word:'買う',meaning:'to buy'}],'買います');
