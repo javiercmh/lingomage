@@ -5,13 +5,12 @@ import { emptyUsage } from './workspace-storage.js';
 //
 // Time is credited from monotonic deltas between observations (events or the heartbeat), never from
 // wall-clock differences, and only for the state that held during the delta. Wall time only picks the
-// local date(s). A delta longer than MAX_GAP_MS is an unexplained gap (suspension, frozen page): it is not
-// credited unless a chapter-audio utterance that finished normally accounts for it, and then only up to
-// the shortest time that utterance could have taken. Background timers are never trusted to run.
+// local date(s). A delta longer than MAX_GAP_MS is an unexplained gap (suspension, frozen page) and is
+// discarded without inventing a duration: the host reports no playback progress, so long suspended
+// playback is undercounted. Background timers are never trusted to run.
 export const HEARTBEAT_MS = 30000;
 export const MAX_GAP_MS = 2 * HEARTBEAT_MS;
 export const WALL_TOLERANCE_MS = 2000;
-export const MAX_SPEECH_CHARS_PER_SECOND = 30;
 export const READING = 'reading';
 const LANGUAGE_ID = /^[A-Za-z][A-Za-z0-9-]{0,15}$/;
 
@@ -62,15 +61,16 @@ export function createUsageTracker({clock = defaultClock, calendar = localCalend
   const readingLanguage = () => (visible && reader ? reader.language : playback?.language) || '';
 
   // Credits the time since the last observation to the state that held until now. Call before changing state.
-  function settle(explainedMs = 0) {
+  function settle() {
     const mono = clock.monotonic(), wall = clock.now(), previousWall = lastWall;
     const gap = Math.max(0, mono - lastMono);
     lastMono = mono; lastWall = wall;
     if (!gap || !(visible || playback)) return 0;
-    const credit = Math.round(gap <= MAX_GAP_MS ? gap : Math.min(gap, playback ? explainedMs : 0));
+    if (gap > MAX_GAP_MS) return 0;
+    const credit = Math.round(gap);
     if (credit <= 0) return 0;
     const language = readingLanguage();
-    const consistent = credit === Math.round(gap) && wall >= previousWall && Math.abs(wall - previousWall - gap) <= WALL_TOLERANCE_MS;
+    const consistent = wall >= previousWall && Math.abs(wall - previousWall - gap) <= WALL_TOLERANCE_MS;
     if (!consistent) { add(calendar.dateKey(wall), credit, language); return credit; }
     // Split at each local midnight inside the interval.
     let cursor = previousWall, left = credit;
@@ -99,27 +99,27 @@ export function createUsageTracker({clock = defaultClock, calendar = localCalend
     if (wanted && !stopTimer) stopTimer = scheduler.every(heartbeat, HEARTBEAT_MS);
     else if (!wanted && stopTimer) { stopTimer(); stopTimer = null; }
   }
-  function change(update, {persist = true, explainedMs = 0} = {}) {
-    settle(explainedMs); update(); reconcileTimer();
+  function change(update, {persist = true} = {}) {
+    settle(); update(); reconcileTimer();
     if (persist) save();
   }
 
   load();
   const api = {
-    setVisible(value) { value = Boolean(value); if (value === visible) settle(); else change(() => { visible = value; }); },
+    setVisible(value) { value = Boolean(value); if (value === visible) { settle(); save(); } else change(() => { visible = value; }); },
     // `context` is {storyId, language} while the reader is open, otherwise null.
     setReader(context) { change(() => { reader = context ? {storyId: context.storyId, language: context.language} : null; }); },
     // Utterances start and end without saving; the playback context outlives the reader that started it.
-    utteranceStarted({storyId, language, chars = 0, rate = 1}) {
+    utteranceStarted({storyId, language}) {
       const id = ++sequence;
-      change(() => { playback = {id, storyId, language, chars, rate: rate > 0 ? rate : 1}; }, {persist: false});
+      change(() => { playback = {id, storyId, language}; }, {persist: false});
       return id;
     },
-    // 'completed' explains a long unobserved gap, up to the utterance's fastest possible duration.
-    utteranceEnded(id, outcome) {
+    // Completion, cancellation and failure all end the in-flight interval and save now. A long unobserved
+    // gap is never credited, whatever the outcome.
+    utteranceEnded(id) {
       if (!playback || playback.id !== id) return;
-      const explainedMs = outcome === 'completed' ? Math.floor(playback.chars / (MAX_SPEECH_CHARS_PER_SECOND * playback.rate) * 1000) : 0;
-      change(() => { playback = null; }, {persist: outcome !== 'completed', explainedMs});
+      change(() => { playback = null; });
     },
     // Host acknowledged Stop (pause/stop), or the listening run finished: settle and save now.
     playbackStopped() { change(() => { playback = null; }); },
@@ -147,12 +147,12 @@ export function createUsageTracker({clock = defaultClock, calendar = localCalend
       return {
         ...speech,
         speak: async options => {
-          const id = api.utteranceStarted({...context(), chars: String(options?.text || '').length, rate: options?.rate || 1});
+          const id = api.utteranceStarted(context());
           try {
             const result = await speech.speak(options);
-            api.utteranceEnded(id, result?.status === 'cancelled' ? 'cancelled' : 'completed');
+            api.utteranceEnded(id);
             return result;
-          } catch (error) { api.utteranceEnded(id, 'error'); throw error; }
+          } catch (error) { api.utteranceEnded(id); throw error; }
         },
         stop: async () => {
           const result = await speech.stop();

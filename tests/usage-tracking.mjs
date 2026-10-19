@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createWorkspaceStorage, validUsage, emptyUsage, USAGE_PATH} from '../js/workspace-storage.js';
 import {createUsageTracker, HEARTBEAT_MS, MAX_GAP_MS} from '../js/usage-tracker.js';
-import {summarize, formatDuration, shiftDateKey, rangeBounds, localCalendar} from '../js/usage-stats.js';
+import {summarize, formatDuration, hasUsage, shiftDateKey, rangeBounds, localCalendar} from '../js/usage-stats.js';
 import {bootApp} from './support/app-harness.mjs';
 
 const SECOND = 1000, MINUTE = 60 * SECOND, HOUR = 60 * MINUTE;
@@ -69,7 +69,7 @@ const totalOf = days => Object.values(days).reduce((sum, item) => sum + item.app
 // --- Chapter audio: background counts, paused/stopped does not, no double counting ---------------------
 {
   const h = harness(); h.tracker.setVisible(true); h.tracker.setReader({storyId: 's1', language: 'es-CL'});
-  const id = h.tracker.utteranceStarted({storyId: 's1', language: 'es-CL', chars: 200, rate: 1});
+  const id = h.tracker.utteranceStarted({storyId: 's1', language: 'es-CL'});
   h.advance(seconds(10)); // visible + reader + audio: counted once
   assert.equal(day(h), undefined, 'nothing is credited until an observation'); h.tracker.observe();
   assert.equal(day(h).app, 10000); assert.equal(day(h).languages['es-CL'].reading, 10000);
@@ -77,7 +77,7 @@ const totalOf = days => Object.values(days).reduce((sum, item) => sum + item.app
   h.advance(seconds(20)); h.tick();
   h.advance(seconds(20)); h.tracker.utteranceEnded(id, 'completed');
   assert.equal(day(h).app, 50000, 'background audio counts app time'); assert.equal(day(h).languages['es-CL'].reading, 50000);
-  const id2 = h.tracker.utteranceStarted({storyId: 's1', language: 'es-CL', chars: 100, rate: 1.25});
+  const id2 = h.tracker.utteranceStarted({storyId: 's1', language: 'es-CL'});
   h.advance(seconds(10)); h.tracker.playbackStopped(); // Stop/Pause acknowledged
   assert.equal(day(h).app, 60000);
   h.advance(10 * MINUTE); h.tick();
@@ -87,14 +87,14 @@ const totalOf = days => Object.values(days).reduce((sum, item) => sum + item.app
   assert.equal(h.timers.size, 0, 'no timer survives when hidden and silent');
   // Visible + reader + audio never exceeds elapsed time.
   h.tracker.setVisible(true); h.tracker.setReader({storyId: 's1', language: 'es-CL'});
-  h.tracker.utteranceStarted({storyId: 's1', language: 'es-CL', chars: 10, rate: 1}); h.advance(seconds(40)); h.tracker.checkpoint();
+  h.tracker.utteranceStarted({storyId: 's1', language: 'es-CL'}); h.advance(seconds(40)); h.tracker.checkpoint();
   assert.equal(day(h).app, 100000); assert.equal(day(h).languages['es-CL'].reading, 100000);
 }
 
 // --- Playback story context survives the reader closing or changing --------------------------------------
 {
   const h = harness(); h.tracker.setVisible(true); h.tracker.setReader({storyId: 'a', language: 'de'});
-  h.tracker.utteranceStarted({storyId: 'a', language: 'de', chars: 500, rate: 1});
+  h.tracker.utteranceStarted({storyId: 'a', language: 'de'});
   h.tracker.setReader(null); h.advance(seconds(10)); h.tracker.checkpoint(); // reader closed, audio still stopping
   assert.deepEqual(day(h).languages, {de: {reading: 10000}});
   h.tracker.setVisible(false); h.advance(seconds(10)); h.tracker.checkpoint();
@@ -131,22 +131,28 @@ const totalOf = days => Object.values(days).reduce((sum, item) => sum + item.app
   h.tracker.setVisible(false);
   assert.equal(day(h).app, 10000, 'a long unobserved visible gap is discarded');
   h.advance(seconds(1));
-  // Playing: only a completed utterance explains a long gap, and only up to its fastest possible duration.
-  const h2 = harness(); h2.tracker.setVisible(false);
-  const a = h2.tracker.utteranceStarted({storyId: 's', language: 'de', chars: 300, rate: 1}); // >= 10 s of speech
-  h2.advance(20 * MINUTE); h2.tracker.utteranceEnded(a, 'completed');
-  assert.equal(day(h2).app, 10000);
-  const h3 = harness(); h3.tracker.setVisible(false);
-  const b = h3.tracker.utteranceStarted({storyId: 's', language: 'de', chars: 300, rate: 1});
-  h3.advance(20 * MINUTE); h3.tracker.utteranceEnded(b, 'cancelled');
-  assert.equal(totalOf(h3.tracker.data.days), 0, 'a cancelled or failed utterance explains nothing');
+  // Playing: a long gap is discarded whatever the outcome; nothing is invented from text length.
+  for (const outcome of ['completed', 'cancelled', 'error']) {
+    const g = harness(); g.tracker.setVisible(false);
+    const u = g.tracker.utteranceStarted({storyId: 's', language: 'de'});
+    g.advance(20 * MINUTE); g.tracker.utteranceEnded(u, outcome);
+    assert.equal(totalOf(g.tracker.data.days), 0, `${outcome} utterance after a long gap adds nothing`);
+  }
+  // Observed in-flight intervals before the gap stay counted once; the completed utterance adds no duplicate.
+  const w = harness(); w.tracker.setVisible(false);
+  const long = w.tracker.utteranceStarted({storyId: 's', language: 'de'});
+  w.advance(seconds(20)); w.tick(); w.advance(seconds(20)); w.tick(); // observed: 40 s
+  w.advance(20 * MINUTE); // suspended, unobserved
+  w.tracker.utteranceEnded(long, 'completed');
+  assert.equal(day(w).app, 40000, 'no fabricated or duplicate time after the gap');
+  assert.equal(day(w).languages.de.reading, 40000);
+  assert.equal(w.stored().days['2026-10-19'].app, 40000, 'completed playback is saved immediately');
   const h4 = harness(); h4.tracker.setVisible(false);
-  const c = h4.tracker.utteranceStarted({storyId: 's', language: 'de', chars: 300, rate: 1});
+  h4.tracker.utteranceStarted({storyId: 's', language: 'de'});
   h4.advance(MAX_GAP_MS + 1); h4.tracker.playbackStopped();
   assert.equal(totalOf(h4.tracker.data.days), 0, 'an explicit stop after a long gap explains nothing');
-  h4.tracker.utteranceEnded(c, 'completed');
   // A gap within the heartbeat tolerance (throttled timers) is credited in full.
-  const h5 = harness(); h5.tracker.setVisible(false); h5.tracker.utteranceStarted({storyId: 's', language: 'de', chars: 10, rate: 1});
+  const h5 = harness(); h5.tracker.setVisible(false); h5.tracker.utteranceStarted({storyId: 's', language: 'de'});
   h5.advance(MAX_GAP_MS); h5.tracker.playbackStopped();
   assert.equal(day(h5).app, MAX_GAP_MS);
 }
@@ -205,10 +211,23 @@ const totalOf = days => Object.values(days).reduce((sum, item) => sum + item.app
   };
   for (const [name, fire] of Object.entries(events)) {
     const x = harness(); x.tracker.setVisible(true); x.tracker.setReader({storyId: 's', language: 'ru'});
-    x.tracker.utteranceStarted({storyId: 's', language: 'ru', chars: 10, rate: 1});
+    x.tracker.utteranceStarted({storyId: 's', language: 'ru'});
     x.advance(seconds(12)); const before = x.disk.writes; fire(x.tracker);
     assert.equal(x.disk.writes, before + 1, name); assert.equal(x.stored().days['2026-10-19'].app, 12000, name);
   }
+  // Repeated lifecycle notifications (visibilitychange then pagehide) flush dirty time once, without double counting.
+  const r = harness(); r.tracker.setVisible(true); r.advance(seconds(10)); r.tracker.setVisible(false);
+  assert.equal(r.disk.writes, 1);
+  r.tracker.setVisible(true); r.advance(seconds(5)); r.tracker.setVisible(true); // pageshow while already visible keeps counting
+  assert.equal(r.disk.writes, 2, 'a repeated notification saves dirty time'); assert.equal(r.stored().days['2026-10-19'].app, 15000);
+  r.advance(seconds(5)); r.tracker.setVisible(false); r.tracker.setVisible(false);
+  assert.equal(r.stored().days['2026-10-19'].app, 20000); assert.equal(r.disk.writes, 3, 'the second hide has nothing new to write');
+  const repeat = harness(); repeat.tracker.setVisible(true); repeat.advance(seconds(10)); repeat.tracker.setVisible(false);
+  repeat.advance(seconds(5)); repeat.tracker.setVisible(false);
+  assert.equal(repeat.disk.writes, 1); assert.equal(repeat.stored().days['2026-10-19'].app, 10000, 'hidden time is not counted');
+  const dirtyHide = harness(); dirtyHide.tracker.setVisible(true); dirtyHide.advance(seconds(10)); dirtyHide.disk.fail = true; dirtyHide.tracker.setVisible(false);
+  dirtyHide.disk.fail = false; dirtyHide.tracker.setVisible(false);
+  assert.equal(dirtyHide.stored().days['2026-10-19'].app, 10000, 'a repeated hide retries an unsaved write once');
   // A pagehide-style hide followed by a restored page continues without double counting.
   const p = harness(); p.tracker.setVisible(true); p.advance(seconds(5)); p.tracker.setVisible(false); p.advance(MINUTE); p.tracker.setVisible(true); p.advance(seconds(5)); p.tracker.setVisible(false);
   assert.equal(p.stored().days['2026-10-19'].app, 10000);
@@ -270,11 +289,16 @@ const totalOf = days => Object.values(days).reduce((sum, item) => sum + item.app
   const bad = [
     null, [], {version: 1}, {version: '1', days: {}}, {version: 1, days: []},
     {version: 1, days: {'2026-02-30': {app: 1, languages: {}}}}, {version: 1, days: {'2026-2-3': {app: 1, languages: {}}}}, {version: 1, days: {'2026-10-19': null}},
-    {version: 1, days: {'2026-10-19': {app: -1, languages: {}}}}, {version: 1, days: {'2026-10-19': {app: 1.5, languages: {}}}}, {version: 1, days: {'2026-10-19': {app: 26 * HOUR, languages: {}}}},
-    {version: 1, days: {'2026-10-19': {app: 10, languages: {de: {reading: 11}}}}}, {version: 1, days: {'2026-10-19': {app: 10, languages: {de: {reading: 6}, ja: {reading: 6}}}}},
+    {version: 1, days: {'2026-10-19': {app: -1, languages: {}}}}, {version: 1, days: {'2026-10-19': {app: 1.5, languages: {}}}},     {version: 1, days: {'2026-10-19': {app: 10, languages: {de: {reading: 11}}}}}, {version: 1, days: {'2026-10-19': {app: 10, languages: {de: {reading: 6}, ja: {reading: 6}}}}},
     JSON.parse('{"version":1,"days":{"2026-10-19":{"app":10,"languages":{"__proto__":{"reading":1}}}}}'), {version: 1, days: {'2026-10-19': {app: 10, languages: {de: {Reading: 1}}}}},
     {version: 1, days: {'2026-10-19': {app: 10, languages: {de: {reading: '1'}}}}}, {version: 1, days: {'2026-10-19': {app: 10}}}
   ];
+  const repeated = {version: 1, days: {'2026-10-19': {app: 30 * HOUR, languages: {de: {reading: 29 * HOUR}}}}};
+  assert.ok(validUsage(repeated), 'a repeated local date may exceed 24 h');
+  assert.ok(!validUsage({version: 1, days: {'2026-10-19': {app: 30 * HOUR, languages: {de: {reading: 31 * HOUR}}}}}), 'breakdown invariant still holds');
+  assert.ok(!validUsage({version: 1, days: {'2026-10-19': {app: Number.MAX_SAFE_INTEGER + 1, languages: {}}}}));
+  const repeatTracker = harness({stored: repeated}); repeatTracker.tracker.setVisible(true); repeatTracker.advance(seconds(5)); repeatTracker.tracker.setVisible(false);
+  assert.equal(repeatTracker.stored().days['2026-10-19'].app, 30 * HOUR + 5000, 'a >25 h repeated date stays loadable and writable');
   bad.forEach((value, index) => assert.equal(validUsage(value), false, `invalid case ${index}`));
   const storage = createWorkspaceStorage({read: () => '', write: () => true, exists: () => false});
   storage.load(USAGE_PATH);
@@ -316,6 +340,11 @@ const totalOf = days => Object.values(days).reduce((sum, item) => sum + item.app
   // Historical dates do not change when the zone does.
   process.env.TZ = 'Pacific/Auckland';
   assert.equal(summarize(usage, 'today', '2026-10-19').app, 150000);
+  // Positive totals below a minute are history, not the empty state.
+  assert.equal(hasUsage(emptyUsage()), false); assert.equal(hasUsage({version: 1, days: {'2026-10-19': {app: 0, languages: {}}}}), false);
+  const brief = {version: 1, days: {'2026-10-19': {app: 4000, languages: {de: {reading: 2000}}}}};
+  assert.equal(hasUsage(brief), true); assert.equal(formatDuration(summarize(brief, 'all', '2026-10-19').app), 'Less than 1 minute');
+  assert.equal(formatDuration(summarize(brief, 'all', '2026-10-19').languages[0].total), 'Less than 1 minute');
   // Durations.
   const texts = [[0, '0 minutes'], [1, 'Less than 1 minute'], [59999, 'Less than 1 minute'], [60000, '1 minute'], [119999, '1 minute'], [5 * MINUTE, '5 minutes'], [HOUR, '1 hour'], [HOUR + MINUTE, '1 hour 1 minute'], [2 * HOUR + 30 * MINUTE + 59999, '2 hours 30 minutes'], [30 * HOUR, '30 hours'], [NaN, '0 minutes'], [-5, '0 minutes']];
   for (const [ms, text] of texts) assert.equal(formatDuration(ms), text, String(ms));
