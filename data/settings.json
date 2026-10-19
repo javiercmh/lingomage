@@ -1,1 +1,23 @@
-{}
+{
+  "providerId": "chatgpt",
+  "model": "development-mock",
+  "reasoning": "",
+  "languageSetupDismissed": false,
+  "theme": "dark",
+  "targetLanguages": {},
+  "standardizedLevels": {},
+  "learnerProfiles": {},
+  "languageExpectations": {},
+  "languageOrder": [
+    "de",
+    "ja",
+    "ru",
+    "es-CL"
+  ],
+  "readingPreferences": {
+    "furigana": true,
+    "fontSize": 19,
+    "speechRate": 1,
+    "followAlong": true
+  }
+}
