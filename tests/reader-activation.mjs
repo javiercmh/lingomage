@@ -19,7 +19,7 @@ const canonicalOf = root => { let text = ''; const visit = node => { for (const 
 // --- Native selection menu routing ---------------------------------------------------------------
 {
   const title = make('h2', { id: 'reader-title', text: 'Titel' }), story = make('div', { id: 'reader-story' });
-  const storyText = document.createTextNode('Brot'); story.append(storyText);
+  const storyText = document.createTextNode('Brot'), storyText2 = document.createTextNode(' und Käse'); story.append(storyText, storyText2);
   const textarea = make('textarea'), help = make('div', { class: 'help-text-selectable', text: 'explanation' });
   const note = make('div', { class: 'word-note-popover', text: 'note' }), error = make('p', { class: 'form-error', text: 'oops' });
   const chrome = make('button', { text: 'Create' });
@@ -49,6 +49,7 @@ const canonicalOf = root => { let text = ''; const visit = node => { for (const 
   dispatch(document, 'selectionchange'); assert.equal(router.confirmed, true, 'a story selection suppresses the native menu');
   window.selection = { isCollapsed: false, anchorNode: helpText, focusNode: helpText }; dispatch(document, 'selectionchange'); assert.equal(router.confirmed, false, 'explanation text selection keeps it');
   window.selection = { isCollapsed: false, anchorNode: storyText, focusNode: helpText }; dispatch(document, 'selectionchange'); assert.equal(router.confirmed, true, 'a selection touching the story uses the LingoMage toolbar');
+  window.selection = { isCollapsed: false, anchorNode: storyText, focusNode: storyText2 }; dispatch(document, 'selectionchange'); assert.equal(router.confirmed, true, 'multiword selection across inline text nodes suppresses the native menu');
   window.selection = { isCollapsed: false, anchorNode: title.childNodes[0], focusNode: title.childNodes[0] }; dispatch(textarea, 'pointerdown'); dispatch(document, 'selectionchange'); assert.equal(router.confirmed, true, 'title selection suppresses');
   window.selection = { isCollapsed: false, anchorNode: document.body, focusNode: document.body }; textarea.focus(); dispatch(document, 'selectionchange'); assert.equal(router.confirmed, false, 'a focused field selection keeps it');
   dispatch(story, 'pointerdown'); window.selection = { isCollapsed: true, anchorNode: null, focusNode: null }; dispatch(document, 'selectionchange'); assert.equal(router.confirmed, true, 'a collapsed selection changes nothing');
@@ -61,6 +62,9 @@ const canonicalOf = root => { let text = ''; const visit = node => { for (const 
 
   // Long-press context menus are cancelled only on story and title text.
   for (const target of [story, storyText, title]) assert.equal(dispatch(target, 'contextmenu').defaultPrevented, true, 'reader text context menu cancelled');
+  window.selection = { isCollapsed: false, anchorNode: storyText, focusNode: storyText2 };
+  assert.equal(dispatch(document.body, 'contextmenu').defaultPrevented, true, 'multiword selection menu is cancelled when Android targets the selection ancestor');
+  window.selection = { isCollapsed: true, anchorNode: null, focusNode: null };
   for (const target of [textarea, help, helpText, note, noteText, error, chrome]) assert.equal(dispatch(target, 'contextmenu').defaultPrevented, false, 'native menu untouched');
   console.log('PASS contextmenu prevention is scoped to story and title text');
   for (const node of [title, story, textarea, help, note, error, chrome]) node.remove();

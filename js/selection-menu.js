@@ -9,6 +9,10 @@ export const READER_TEXT_SELECTOR = '#reader-story, #reader-title';
 const elementOf = node => (node && node.nodeType === 3 ? node.parentElement : node) || null;
 const insideNative = node => Boolean(elementOf(node)?.closest?.(NATIVE_MENU_SELECTOR));
 const insideReaderText = node => Boolean(elementOf(node)?.closest?.(READER_TEXT_SELECTOR));
+const selectionTouchesReader = window => {
+  const selection = window.getSelection?.();
+  return Boolean(selection && !selection.isCollapsed && (insideReaderText(selection.anchorNode) || insideReaderText(selection.focusNode)));
+};
 
 export function createSelectionMenuRouter({ host, document, window }) {
   // Only a value the host acknowledged is cached; a failed or unavailable host is asked again on the next event.
@@ -39,7 +43,10 @@ export function createSelectionMenuRouter({ host, document, window }) {
   // Only the long-press menu on story and title text is cancelled; fields, notes, explanations and errors keep theirs.
   document.addEventListener('contextmenu', event => {
     const element = elementOf(event.target);
-    if (!element?.closest?.(READER_TEXT_SELECTOR) || insideNative(element)) return;
+    // Android may dispatch the menu event at the selection's common ancestor (or the document),
+    // rather than at the word that was long-pressed. Route by the live selection as well.
+    const selectedReaderText = selectionTouchesReader(window);
+    if ((!element?.closest?.(READER_TEXT_SELECTOR) && !selectedReaderText) || (insideNative(element) && !selectedReaderText)) return;
     apply(true);
     event.preventDefault();
   }, true);
