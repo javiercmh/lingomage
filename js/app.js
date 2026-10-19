@@ -1600,6 +1600,16 @@ function createHelpLoading(action, followUp) {
   const note = document.createElement('p'); note.textContent = ['continue', 'rewrite'].includes(action) ? 'Your current chapter stays available while this is prepared.' : action === 'detail' && followUp ? `Answering: ${followUp}` : 'Your saved explanations will stay here while this is prepared.';
   copy.append(title, note); panel.append(sparkle, copy); return panel;
 }
+function createShowInTextButton(item) {
+  const chars = Array.from(String(item.passage || '').replace(/\s+/g, ' ').trim());
+  const passage = chars.length > 60 ? `${chars.slice(0, 59).join('').trimEnd()}…` : chars.join('');
+  const show = document.createElement('button'); show.type = 'button'; show.className = 'help-show-in-text';
+  show.setAttribute('aria-label', passage ? `Show in text: “${passage}”` : 'Show in text');
+  const label = document.createElement('span'); label.textContent = 'Show in text';
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('focusable', 'false');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', 'M12 19V5M6 11l6-6 6 6'); svg.append(path);
+  show.append(label, svg); show.addEventListener('click', () => showPassageInText(item.id)); return show;
+}
 function renderSavedHelp(chapter, version) {
   const box = $('reader-help'), section = $('reader-help-section'); box.textContent = '';
   const orderedHelp = (chapter.help || []).map((item,index)=>({item,index})).filter(row=>row.item.versionId === version.id).sort((a,b)=>{
@@ -1643,10 +1653,10 @@ function renderSavedHelp(chapter, version) {
     const status = document.createElement('p'); status.className = 'helper help-text-selectable'; status.textContent = stale ? 'Based on an earlier reading profile.' : '';
     if (title) card.append(title);
     if (hasContext && !state.explanationSelectionMode) {
-      const show = document.createElement('button'); show.type = 'button'; show.className = 'small-btn help-show-in-text'; show.setAttribute('aria-label', `Show “${item.passage}” in the story`);
-      show.innerHTML = 'Show in text <span aria-hidden="true">↑</span>'; show.addEventListener('click', () => showPassageInText(item.id)); card.append(show);
-    }
-    card.append(quote);
+      const context = document.createElement('div'); context.className = 'help-context';
+      const footer = document.createElement('div'); footer.className = 'help-context-footer';
+      footer.append(createShowInTextButton(item)); context.append(quote, footer); card.append(context);
+    } else card.append(quote);
     if (hasContext && item.contextTranslation) { const translation = document.createElement('p'); translation.className = 'help-context-translation help-text-selectable'; translation.textContent = item.contextTranslation; card.append(translation); }
     card.append(body);
     const followUps = savedFollowUps(item);
