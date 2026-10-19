@@ -39,7 +39,10 @@
     "js/generation-controller.js",
     "js/reader-panels.js",
     "js/selection-menu.js",
-    "js/reader-activation.js"
+    "js/reader-activation.js",
+    "js/usage-stats.js",
+    "js/usage-tracker.js",
+    "data/usage.json"
   ],
   "app2Update": {
     "appId": "com.wynh.lingomage",
@@ -79,17 +82,21 @@
       "js/generation-controller.js",
       "js/reader-panels.js",
       "js/selection-menu.js",
-      "js/reader-activation.js"
+      "js/reader-activation.js",
+      "js/usage-stats.js",
+      "js/usage-tracker.js"
     ],
     "seedFiles": [
       "data/stories.json",
       "data/settings.json",
-      "data/generation-checkpoints.json"
+      "data/generation-checkpoints.json",
+      "data/usage.json"
     ],
     "seedDefaults": {
       "data/stories.json": [],
       "data/settings.json": {},
-      "data/generation-checkpoints.json": []
+      "data/generation-checkpoints.json": [],
+      "data/usage.json": {"version": 1, "days": {}}
     }
   },
   "icons": [

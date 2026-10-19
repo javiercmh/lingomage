@@ -77,10 +77,43 @@ export function validCheckpoints(value) {
     && (op.kind === 'create' || object(op.target))
     && (op.request == null || object(op.request) && id(op.request.id)));
 }
+// Usage history: compact versioned local-date aggregates in milliseconds. Languages and activities are
+// open key sets so history for a disabled or future language stays readable. Activities never overlap
+// within a moment, so their sum cannot exceed the day's app time (about 25 h bounds a DST day).
+export const USAGE_VERSION = 1;
+export const USAGE_PATH = 'data/usage.json';
+export const emptyUsage = () => ({version:USAGE_VERSION, days:{}});
+const MAX_DAY_MS = 25 * 3600000;
+const wholeMs = value => Number.isSafeInteger(value) && value >= 0;
+function dateKey(key) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+  if (!match) return false;
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  return date.toISOString().slice(0, 10) === key;
+}
+export function validUsage(value) {
+  if (!object(value) || value.version !== USAGE_VERSION || !object(value.days)) return false;
+  return Object.entries(value.days).every(([key, day]) => {
+    if (!dateKey(key) || !object(day) || !wholeMs(day.app) || day.app > MAX_DAY_MS || !object(day.languages)) return false;
+    let total = 0;
+    for (const [code, activities] of Object.entries(day.languages)) {
+      if (!/^[A-Za-z][A-Za-z0-9-]{0,15}$/.test(code) || !object(activities)) return false;
+      for (const [name, ms] of Object.entries(activities)) {
+        if (!/^[a-z][a-z0-9-]{0,31}$/.test(name) || !wholeMs(ms)) return false;
+        total += ms;
+      }
+    }
+    return total <= day.app;
+  });
+}
+// Optional stores never block generation, settings or stories when unreadable.
+export const optionalStore = path => path === USAGE_PATH;
+const CORE_STORES = ['data/stories.json', 'data/settings.json', 'data/generation-checkpoints.json'];
 const definitions = {
   'data/stories.json': {fallback:[], validate:validStories, migrate:migrateGlossaryAliases},
   'data/settings.json': {fallback:{}, validate:validSettings},
-  'data/generation-checkpoints.json': {fallback:[], validate:validCheckpoints}
+  'data/generation-checkpoints.json': {fallback:[], validate:validCheckpoints},
+  [USAGE_PATH]: {fallback:emptyUsage(), validate:validUsage}
 };
 export function createWorkspaceStorage({read, write, exists}) {
   const entries = new Map();
@@ -110,7 +143,7 @@ export function createWorkspaceStorage({read, write, exists}) {
     }
     entries.set(path, entry); return entry;
   }
-  function assertWritable(paths = Object.keys(definitions)) {
+  function assertWritable(paths = CORE_STORES) {
     for (const path of paths) {
       const entry = entries.get(path);
       if (!entry || entry.status === 'invalid') throw fault(entry?.error || `Load ${path} before saving.`, 'store_invalid');
