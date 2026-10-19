@@ -57,6 +57,9 @@ export function summarize(usage, range, today, languageOrder = []) {
   };
 }
 
+// Empty state only for no recorded time at all; any positive total is shown (as "Less than 1 minute" below 60 s).
+export const hasUsage = usage => Object.values(usage.days).some(day => day.app > 0);
+
 export function formatDuration(ms) {
   if (!(ms > 0)) return '0 minutes';
   if (ms < 60000) return 'Less than 1 minute';

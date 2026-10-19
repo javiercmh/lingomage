@@ -79,11 +79,11 @@ export function validCheckpoints(value) {
 }
 // Usage history: compact versioned local-date aggregates in milliseconds. Languages and activities are
 // open key sets so history for a disabled or future language stays readable. Activities never overlap
-// within a moment, so their sum cannot exceed the day's app time (about 25 h bounds a DST day).
+// within a moment, so their sum cannot exceed the day's app time. There is no per-day cap: a local date can
+// repeat when the clock or timezone moves backwards, so one key may legitimately exceed 24 h.
 export const USAGE_VERSION = 1;
 export const USAGE_PATH = 'data/usage.json';
 export const emptyUsage = () => ({version:USAGE_VERSION, days:{}});
-const MAX_DAY_MS = 25 * 3600000;
 const wholeMs = value => Number.isSafeInteger(value) && value >= 0;
 function dateKey(key) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
@@ -94,7 +94,7 @@ function dateKey(key) {
 export function validUsage(value) {
   if (!object(value) || value.version !== USAGE_VERSION || !object(value.days)) return false;
   return Object.entries(value.days).every(([key, day]) => {
-    if (!dateKey(key) || !object(day) || !wholeMs(day.app) || day.app > MAX_DAY_MS || !object(day.languages)) return false;
+    if (!dateKey(key) || !object(day) || !wholeMs(day.app) || !object(day.languages)) return false;
     let total = 0;
     for (const [code, activities] of Object.entries(day.languages)) {
       if (!/^[A-Za-z][A-Za-z0-9-]{0,15}$/.test(code) || !object(activities)) return false;

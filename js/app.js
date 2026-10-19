@@ -13,7 +13,7 @@ import { SAFEGUARD_VERSION, parseContent, validateStory } from './learning-valid
 import { failureInfo, recoverySummary, appendFailureDetails } from './generation-errors.js';
 import { createWorkspaceStorage, createSettingsPersistence, optionalStore, USAGE_PATH } from './workspace-storage.js';
 import { createUsageTracker } from './usage-tracker.js';
-import { RANGES, ACTIVITY_LABELS, summarize, formatDuration } from './usage-stats.js';
+import { RANGES, ACTIVITY_LABELS, summarize, formatDuration, hasUsage } from './usage-stats.js';
 import { saveBeforeAcknowledge } from './request-lifecycle.js';
 import { aiNotification } from './ai-notification.js';
 import { createSettingsFeedback, unsavedWorkReason } from './settings-feedback.js';
@@ -244,8 +244,8 @@ function renderStats() {
   if (!$('view-stats').classList.contains('active')) return;
   usage.observe();
   const summary = summarize(usage.data, state.statsRange, usage.today(), state.languageOrder);
-  // Stats itself is visible app time, so the empty state lasts until the first minute is counted.
-  const empty = Object.values(usage.data.days).reduce((sum, day) => sum + day.app, 0) < 60000;
+  // The empty state is for no recorded time at all; any positive total shows as at least "Less than 1 minute".
+  const empty = !hasUsage(usage.data);
   const activity = id => ACTIVITY_LABELS[id] || id;
   const model = empty ? { empty } : {
     total: formatDuration(summary.app),
