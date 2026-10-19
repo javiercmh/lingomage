@@ -5,7 +5,7 @@ import { createReaderPanels } from './reader-panels.js';
 import { ai, readFile, writeFile, listFiles, speech, translation, selectionMenu } from './bridge.js';
 import { speakSelection, speakChapter, chapterSpeechText } from './reader-speech.js';
 import { createSelectionMenuRouter } from './selection-menu.js';
-import { createReaderActivation, createSourceChooser, glossaryForTrigger, indexGlossaryTriggers, normalizeReaderControls } from './reader-activation.js';
+import { createReaderActivation, glossaryForTrigger, indexGlossaryTriggers, normalizeReaderControls } from './reader-activation.js';
 import { annotatedText, applyExplainedMarks, getCanonicalSelection, japaneseSegments } from './reader-text.js';
 import { SPEECH_RATES, canonicalRange, createReaderPlayer, speechUnits } from './reader-player.js';
 import { createPipeline } from './generation-pipeline.js';
@@ -890,7 +890,6 @@ $('confirm-delete-stories').addEventListener('click', () => {
 });
 // Reader management preserves exact shared versions across surviving paths.
 let restoringPathPosition = false;
-const sourceChooser = createSourceChooser({ element: $('source-chooser'), document, window });
 const readerPanels = createReaderPanels({state, $, window, document, getComputedStyle, readerPanel, closeWordNote, persistSettings: trySaveSettings, toast});
 const { closeReaderActions, closeReaderPanels, positionReaderPanel, toggleReaderPanel, setReaderTextSize, updateReaderNavigation } = readerPanels;
 function renderReaderActions() {
@@ -1067,7 +1066,6 @@ function renderChapterRequest() {
   if (!host.hidden) host.append(request.loading);
 }
 function closeWordNote(restoreFocus = false) {
-  sourceChooser.close();
   const popover = $('word-note-popover');
   if (popover.hidden) return;
   popover.hidden = true;
@@ -1075,7 +1073,7 @@ function closeWordNote(restoreFocus = false) {
   state.wordNoteTrigger = null;
   document.querySelectorAll('.gloss-note-trigger[aria-expanded="true"]').forEach(button => { button.removeAttribute('aria-expanded'); button.removeAttribute('aria-controls'); });
 }
-function showWordNote(trigger, notes, surface = '') {
+function showWordNote(trigger, notes, surface = '', helpId = '') {
   const popover = $('word-note-popover');
   if (!popover.hidden && trigger.getAttribute('aria-expanded') === 'true') { closeWordNote(); return; }
   closeWordNote(); popover.textContent = '';
@@ -1102,6 +1100,11 @@ function showWordNote(trigger, notes, surface = '') {
       const form = document.createElement('span'); form.className = 'word-note-form'; form.textContent = `Dictionary form: ${note.word}`; item.append(form);
     }
     item.append(meaning); popover.append(item);
+  }
+  if (helpId) {
+    const view = document.createElement('button'); view.type = 'button'; view.className = 'word-note-view'; view.textContent = 'View saved explanation ↓';
+    view.addEventListener('click', () => { closeWordNote(); showExplanationForHelp(helpId); });
+    popover.append(view);
   }
   trigger.setAttribute('aria-expanded', 'true'); trigger.setAttribute('aria-controls', 'word-note-popover'); state.wordNoteTrigger = trigger; popover.hidden = false; popover.focus();
   const rect = trigger.getBoundingClientRect();
@@ -1156,9 +1159,9 @@ $('reader-dialog').addEventListener('close', () => {
 });
 window.addEventListener('popstate', () => {
   if (!$('reader-dialog').open) return;
-  // Back dismisses an open chooser first and restores the reader's history entry, so a second Back leaves the reader.
-  if (sourceChooser.isOpen()) {
-    sourceChooser.close(true);
+  // Back dismisses an open vocabulary note first and restores the reader's history entry, so a second Back leaves the reader.
+  if (!$('word-note-popover').hidden) {
+    closeWordNote(true);
     history.pushState({ ...(history.state && typeof history.state === 'object' ? history.state : {}), lingomageReader: state.readerId }, '');
     return;
   }
@@ -1266,7 +1269,6 @@ function showSelectionToolbar() {
   if (!passage) { toolbar.hidden = true; state.readerSelection = null; return; }
   const translationSelectionChanged = toolbar.hidden || !state.readerSelection ||
     ['storyId', 'chapterId', 'versionId', 'start', 'end', 'text'].some(key => passage[key] !== state.readerSelection[key]);
-  sourceChooser.close();
   if (!state.readerSelection || passage.text !== state.readerSelection.text) closeWordNote();
   state.readerSelection = passage; toolbar.hidden = false;
   if (translationSelectionChanged) refreshTranslationAvailability();
@@ -1381,7 +1383,7 @@ $('reader-listen').addEventListener('click', async () => {
   }
 });
 $('reader-dialog').addEventListener('pointerdown', event => {
-  if (!event.target.closest?.('.gloss-note-trigger, mark.explained-expression, #word-note-popover, #source-chooser')) closeWordNote();
+  if (!event.target.closest?.('.gloss-note-trigger, mark.explained-expression, #word-note-popover')) closeWordNote();
 });
 // Sentence-level listening player (App² hosts that report showControl): floating controls, spoken-sentence highlight and Follow.
 let playerCollapseTimer = 0, playerScrubbing = false;
@@ -1717,11 +1719,11 @@ function showExplanationForHelp(helpId) {
   if (card) revealCard(card);
 }
 const activateReaderText = createReaderActivation({
-  root: $('reader-story'), chooser: sourceChooser, glossaryFor: glossaryForTrigger,
+  root: $('reader-story'), glossaryFor: glossaryForTrigger,
   hasExplanation: helpId => !state.explanationSelectionMode && Boolean(helpCardFor(helpId)),
   selectionCollapsed: () => window.getSelection().isCollapsed,
   closeNote: () => closeWordNote(),
-  showNote: vocab => showWordNote(vocab.trigger, vocab.notes, vocab.surface),
+  showNote: (vocab, helpId) => showWordNote(vocab.trigger, vocab.notes, vocab.surface, helpId),
   showExplanation: showExplanationForHelp
 });
 $('reader-story').addEventListener('click', activateReaderText);

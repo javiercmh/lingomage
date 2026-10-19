@@ -179,7 +179,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   console.log('PASS speech uses explicit source locale and prefers Chilean, then Latin American, then available Spanish voices');
 
   let heard;
-  const noteUi = sandbox({sourceChooser:{close(){}},state:{},readerStory:()=>({language:'ja'}),speech:{available:true,speak:async options=>{heard=options;}},window:{innerWidth:390,innerHeight:800},requestAnimationFrame:fn=>fn()});
+  const revealed=[];const noteUi = sandbox({showExplanationForHelp:id=>revealed.push(id),state:{},readerStory:()=>({language:'ja'}),speech:{available:true,speak:async options=>{heard=options;}},window:{innerWidth:390,innerHeight:800},requestAnimationFrame:fn=>fn()});
   const popover=noteUi.$('word-note-popover');popover.hidden=true;popover.style={};popover.getBoundingClientRect=()=>({bottom:150});
   const trigger=noteUi.document.createElement('span');trigger.getAttribute=name=>trigger.attributes[name];trigger.getBoundingClientRect=()=>({left:20,top:80,bottom:100});
   vm.runInContext(section('function closeWordNote(', 'function readerPanel('), noteUi);
@@ -195,6 +195,13 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   await surfaceItem.childNodes[0].childNodes[1].events.click();assert.equal(heard.text,'買います');
   noteUi.closeWordNote();noteUi.speech.available=false;noteUi.showWordNote(trigger,[{word:'買う',meaning:'to buy'}]);
   assert.equal(popover.childNodes[0].childNodes[0].childNodes[1].disabled,true);
+  noteUi.closeWordNote();noteUi.speech.available=true;noteUi.showWordNote(trigger,[{word:'買う',meaning:'to buy'}],'買います');
+  assert.equal(popover.childNodes.some(node=>node.className==='word-note-view'),false,'a vocabulary-only note has no explanation action');
+  noteUi.closeWordNote();noteUi.showWordNote(trigger,[{word:'買う',meaning:'to buy'}],'買います','h7');
+  const view=popover.childNodes[popover.childNodes.length-1];
+  assert.equal(view.className,'word-note-view');assert.equal(view.textContent,'View saved explanation ↓');assert.equal(view.type,'button');
+  await view.events.click();assert.deepEqual(revealed,['h7'],'View reuses the saved-card reveal once');assert.equal(popover.hidden,true,'View closes the note');
+  console.log('PASS note offers View saved explanation only for activated text with one, closing the note before revealing the card');
   console.log('PASS glossary Listen speaks the text form (dictionary form follows) with source locale, restores focus and disables browser playback');
 
   const chapterStatus=sandbox({state:{readerId:'A',activeChapterRequest:{storyId:'A',loading:{textContent:'Writing…'}}}});
@@ -377,7 +384,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.throws(()=>contract.decodeHelp('   ','detail'),/invalid/);
   console.log('PASS explanation/example contracts reject malformed counts, ranges, translations and annotations');
 
-  const rendered=sandbox({normalizeReaderControls(){},createReaderActivation:()=>()=>{},sourceChooser:{},glossaryForTrigger:()=>null,state:{furigana:true,explanationSelectionMode:false,selectedExplanationIds:new Set()},readerStory:()=>({id:'S'}),profileSnapshot:()=>({})});
+  const rendered=sandbox({normalizeReaderControls(){},createReaderActivation:()=>()=>{},glossaryForTrigger:()=>null,state:{furigana:true,explanationSelectionMode:false,selectedExplanationIds:new Set()},readerStory:()=>({id:'S'}),profileSnapshot:()=>({})});
   vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function wireLongPress(', 'function renderLibrary(')+section('function renderHighlightedText(', 'async function readerAi('),rendered);
   const formatted=rendered.document.createElement('div');
   rendered.renderDetailText(formatted, 'In “al salir,” **al** contracts **a + el**.\n\nUse **bold with *italic* inside** and `a él`. <img src=x> Unmatched **marker');
