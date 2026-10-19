@@ -18,7 +18,7 @@
 
 - Follow the plain-file starter structure: `index.html`, `css/style.css`, `js/app.js`, `js/bridge.js`, `manifest.json`, and `data/`.
 - Keep the host API calls in `js/bridge.js`; app logic uses its exported wrappers. Keep the project dependency-free and do not add a build step.
-- Keep `manifest.json`'s `main` and `files` entries current. Domain records, preferences and unfinished generation belong in `data/stories.json`, `data/settings.json` and `data/generation-checkpoints.json`, not opaque host preferences.
+- Keep `manifest.json`'s `main` and `files` entries current. Domain records, preferences and unfinished generation belong in `data/stories.json`, `data/settings.json` and `data/generation-checkpoints.json`, not opaque host preferences. Time-tracking history belongs in `data/usage.json` (versioned local-date aggregates written whole, never appended); it is optional data, so an unreadable usage file must never block stories, settings or generation, and it must never be overwritten while unreadable. Stories, languages and settings may be deleted or disabled without touching usage history. Time tracking needs no host API, dependency or build step.
 - Released app behavior uses the App² managed `ai` bridge. Connect and choose models only through App² library Settings → AI. Never store credentials or request headers in the workspace. Every `ai.start` caller passes concise task-specific `title`/`body` from `js/ai-notification.js` for App²'s running-request notification; it is presentation only and must not change prompts, prompt versions, saved schema or provenance. The local development server may offer an explicit `--chatgpt` mode through the Codex CLI login for desktop testing; this exception must remain development-only.
 - Save completed story data before acknowledging an AI request. Do not silently retry inference.
 - Respect edge-to-edge safe-area variables, provide touch targets of at least 44px, and do not use system `alert()` or `confirm()` dialogs.
@@ -48,7 +48,7 @@ confirmation. Browser previews hide the button. App² follows
 `javiercmh/lingomage` branch `main`, pinned to one commit during download.
 
 `manifest.json.app2Update` declares publisher identity and file ownership.
-`data/stories.json`, `data/settings.json` and `data/generation-checkpoints.json` are user files seeded only when absent.
+`data/stories.json`, `data/settings.json`, `data/generation-checkpoints.json` and `data/usage.json` are user files seeded only when absent (usage seeds `{"version":1,"days":{}}`; updates preserve it and packaging never includes local usage).
 `data/learning-profiles.json` and `data/language-safeguards.json` are shipped managed definitions and updates with the
 code. All other unowned files remain untouched. Keep these declarations current.
 Existing saved records must remain readable; v1 has no general data migration. The one exception is a temporary

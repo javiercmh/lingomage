@@ -14,7 +14,7 @@ function harness({story = 'Chapter body', language = 'de', delayVoices = false} 
     stop() { const call = deferred(); stops.push(call); return call.promise; },
     voices() { const call = deferred(); voices.push(call); if (!delayVoices) call.resolve({voices: [{id: 'cl', language: 'es-CL'}]}); return call.promise; }
   };
-  const c = {Intl, state: {speechVersionKey: 'S:C:V'}, speech, readerStory: () => ({title: 'Title', language}),
+  const c = {Intl, state: {speechVersionKey: 'S:C:V'}, speech, trackedSpeech: speech, usage: {checkpoint() {}}, readerStory: () => ({title: 'Title', language}),
     activeChapter: () => ({}), activeVersion: () => ({title: 'Title', story}), SPEECH_LANGUAGES: {de: 'de-DE', 'es-CL': 'es-CL'},
     $: id => id === 'reader-listen' ? button : dialog, toast: message => errors.push(message)};
   vm.createContext(c);

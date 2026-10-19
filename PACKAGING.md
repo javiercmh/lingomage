@@ -7,6 +7,7 @@ This workspace is a plain HTML/CSS/JavaScript subapp. `manifest.json` lists the 
 - `data/stories.json` contains saved story records, including language, canonical title and story, app-owned Japanese reading segments, glossary, vocabulary, topic, model, prompt version and creation time.
 - `data/settings.json` stores the selected model and reasoning preference. ChatGPT credentials remain in App² and are not exposed to the subapp.
 - Japanese uses language planning, canonical prose, contextual notes and app-owned kanji reading requests; validated stages save before acknowledgement. Japanese `story` and `title` remain the canonical strings. `storySegments` and `titleSegments` add optional reading annotations for display. Copying uses canonical text and excludes readings.
+- `data/usage.json` stores compact daily time aggregates (milliseconds by local date, language and activity); seed it empty.
 - `data/generation-checkpoints.json` stores unfinished generation stages and captured context; seed it empty. `data/language-safeguards.json` is a managed definition.
 - Russian output is validated as Cyrillic. English glossary meanings are retained for all four target languages.
 
@@ -28,7 +29,7 @@ confirmation. Browser previews hide the button. App² follows
 `javiercmh/lingomage` branch `main`, pinned to one commit during download.
 
 `manifest.json.app2Update` declares publisher identity and file ownership.
-`data/stories.json`, `data/settings.json` and `data/generation-checkpoints.json` are user files seeded only when absent.
+`data/stories.json`, `data/settings.json`, `data/generation-checkpoints.json` and `data/usage.json` are user files seeded only when absent. Usage is seeded as `{"version":1,"days":{}}`, preserved by updates and never packaged from local history.
 `data/learning-profiles.json` and `data/language-safeguards.json` are shipped managed definitions and updates with the
 code. All other unowned files remain untouched. Keep these declarations current.
 Existing saved records must remain readable; v1 has no general data migration. The one exception is a temporary

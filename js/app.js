@@ -11,7 +11,9 @@ import { SPEECH_RATES, canonicalRange, createReaderPlayer, speechUnits } from '.
 import { createPipeline } from './generation-pipeline.js';
 import { SAFEGUARD_VERSION, parseContent, validateStory } from './learning-validation.js';
 import { failureInfo, recoverySummary, appendFailureDetails } from './generation-errors.js';
-import { createWorkspaceStorage, createSettingsPersistence } from './workspace-storage.js';
+import { createWorkspaceStorage, createSettingsPersistence, optionalStore, USAGE_PATH } from './workspace-storage.js';
+import { createUsageTracker } from './usage-tracker.js';
+import { RANGES, ACTIVITY_LABELS, summarize, formatDuration } from './usage-stats.js';
 import { saveBeforeAcknowledge } from './request-lifecycle.js';
 import { aiNotification } from './ai-notification.js';
 import { createSettingsFeedback, unsavedWorkReason } from './settings-feedback.js';
@@ -139,6 +141,11 @@ function readJson(path, fallback) {
   catch (error) { console.error(`Could not read ${path}`, error); return fallback; }
 }
 const workspaceStorage = createWorkspaceStorage({read:readFile, write:writeFile, exists:path => { const files=listFiles({strict:true}); return files.some(file=>file.name === path); }});
+// Time tracking is optional data: an unreadable usage file never blocks stories, settings or generation.
+const usage = createUsageTracker({persistence:{load:() => workspaceStorage.load(USAGE_PATH), save:value => workspaceStorage.save(USAGE_PATH, value)}, onStatus:status => renderUsageStatus(status)});
+// Chapter audio keeps the story it started with, even if the reader changes while Stop is pending.
+let playbackContext = {storyId:'', language:''};
+const trackedSpeech = usage.trackSpeech(speech, () => playbackContext);
 // What this version loads into runtime state. Every other entry in settings.json is preserved by saves.
 const SETTINGS_ADMIT = {
   targetLanguages: code => Object.hasOwn(LEVELS, code),
@@ -200,7 +207,7 @@ function persistSettings() { settingsPersistence.save(); }
 function trySaveSettings() { try { persistSettings(); return true; } catch { return false; } }
 // Unreadable stores only; settings write failures are reported by settingsFeedback.
 function showStorageErrors() {
-  const errors=[...workspaceStorage.entries.values()].filter(entry=>entry.status === 'invalid');
+  const errors=[...workspaceStorage.entries.values()].filter(entry=>entry.status === 'invalid' && !optionalStore(entry.path));
   const text=errors.map(entry=>entry.error).join(' '), message=$('storage-recovery-message');
   $('storage-recovery').hidden=!errors.length;
   if (message.textContent !== text) message.textContent=text;
@@ -217,6 +224,79 @@ $('storage-retry').addEventListener('click', () => {
   $('storage-retry-note').textContent=reason;
   if (!reason) window.location.reload();
 });
+// Stats: totals from data/usage.json. The content region is not live and is replaced only when the
+// formatted figures change, so focus on the period buttons and screen readers are undisturbed.
+state.statsRange = 'today';
+let statsTimer = 0, statsSignature = '';
+function startStatsRefresh() { stopStatsRefresh(); statsTimer = setInterval(renderStats, 10000); }
+function stopStatsRefresh() { clearInterval(statsTimer); statsTimer = 0; }
+function statsList(rows) {
+  const list = document.createElement('ul'); list.className = 'stats-list';
+  for (const row of rows) {
+    const item = document.createElement('li'), label = document.createElement('span'), value = document.createElement('span');
+    label.textContent = row.label; value.textContent = row.value; item.append(label, value);
+    if (row.children) { item.classList.add('stats-group'); item.append(statsList(row.children)); }
+    list.append(item);
+  }
+  return list;
+}
+function renderStats() {
+  if (!$('view-stats').classList.contains('active')) return;
+  usage.observe();
+  const summary = summarize(usage.data, state.statsRange, usage.today(), state.languageOrder);
+  // Stats itself is visible app time, so the empty state lasts until the first minute is counted.
+  const empty = Object.values(usage.data.days).reduce((sum, day) => sum + day.app, 0) < 60000;
+  const activity = id => ACTIVITY_LABELS[id] || id;
+  const model = empty ? { empty } : {
+    total: formatDuration(summary.app),
+    languages: summary.languages.map(item => ({ label: LANGUAGES[item.id] || item.id, value: formatDuration(item.total), children: item.activities.map(entry => ({ label: activity(entry.id), value: formatDuration(entry.ms) })) })),
+    activities: summary.activities.map(entry => ({ label: activity(entry.id), value: formatDuration(entry.ms) }))
+  };
+  const signature = JSON.stringify([state.statsRange, model]);
+  if (signature === statsSignature) return;
+  statsSignature = signature;
+  const content = $('usage-content'); content.textContent = '';
+  const note = text => Object.assign(document.createElement('p'), { className: 'helper', textContent: text });
+  const section = (title, ...nodes) => {
+    const box = document.createElement('section'), heading = document.createElement('h3');
+    box.className = 'panel stats-section'; heading.className = 'settings-section-label'; heading.textContent = title;
+    box.append(heading, ...nodes); content.append(box);
+  };
+  if (empty) { section('No time tracked yet', note('Time appears here after you use LingoMage. Earlier use is not counted.')); return; }
+  section('Time in LingoMage', Object.assign(document.createElement('p'), { className: 'stats-total', textContent: model.total }), ...(model.languages.length ? [] : [note('No reading time in this period.')]));
+  if (!model.languages.length) return;
+  section('By language', statsList(model.languages));
+  section('By activity', statsList(model.activities));
+}
+function setStatsRange(range, focus = false) {
+  state.statsRange = range;
+  document.querySelectorAll('#usage-ranges [role="radio"]').forEach(button => { const on = button.dataset.value === range; button.setAttribute('aria-checked', String(on)); button.tabIndex = on ? 0 : -1; if (on && focus) button.focus(); });
+  renderStats();
+}
+RANGES.forEach(range => {
+  const button = document.createElement('button'); button.type = 'button'; button.className = 'segment'; button.setAttribute('role', 'radio'); button.dataset.value = range.id; button.textContent = range.label;
+  button.addEventListener('click', () => setStatsRange(range.id));
+  button.addEventListener('keydown', event => {
+    const step = ['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : ['ArrowLeft', 'ArrowUp'].includes(event.key) ? -1 : 0;
+    if (!step) return; event.preventDefault();
+    setStatsRange(RANGES[(RANGES.findIndex(item => item.id === state.statsRange) + step + RANGES.length) % RANGES.length].id, true);
+  });
+  $('usage-ranges').append(button);
+});
+setStatsRange('today');
+function renderUsageStatus(status) {
+  const message = status.blocked ? `${status.loadError} Time is still counted for this session but is not saved until the file loads.`
+    : status.saveError ? 'Time tracking could not be saved. Counted time is kept in memory and saved together once writing works.' : '';
+  $('usage-notice').hidden = !message;
+  if ($('usage-notice-message').textContent !== message) $('usage-notice-message').textContent = message;
+  $('usage-retry').textContent = status.blocked ? 'Retry loading' : 'Retry save';
+}
+$('usage-retry').addEventListener('click', () => {
+  const blocked = usage.status.blocked, ok = blocked ? usage.retryLoad() : usage.retrySave();
+  $('usage-retry-note').textContent = ok ? '' : blocked ? 'Still unreadable. Repair data/usage.json, then try again.' : 'Still could not save. Your counted time is kept.';
+  if (ok) { statsSignature = ''; renderStats(); $('usage-ranges').querySelector('[tabindex="0"]')?.focus(); }
+});
+renderUsageStatus(usage.status);
 function toast(message) {
   const el = $('toast'); el.textContent = message; el.hidden = false;
   clearTimeout(state.toastTimer); state.toastTimer = setTimeout(() => { el.hidden = true; }, 2600);
@@ -230,6 +310,7 @@ function setView(name) {
   });
   document.querySelectorAll('.view').forEach(view => view.classList.toggle('active', view.id === `view-${name}`));
   if (name === 'library') renderLibrary();
+  if (name === 'stats') { renderStats(); startStatsRefresh(); } else stopStatsRefresh();
   if (name === 'settings') { renderTargetLanguageSettings(); if (state.storageBlocked) showStorageErrors(); }
   window.scrollTo(0, 0);
 }
@@ -1152,9 +1233,10 @@ function openReader(story) {
   updateReader();
   if (draft) { showEditPanel(draft.mode); $('reader-prompt').value = draft.prompt; $('reader-edit-error').textContent = draft.error; }
   history.pushState({ ...(history.state && typeof history.state === 'object' ? history.state : {}), lingomageReader: story.id }, ''); state.readerHistoryEntry = true;
-  selectionMenuRouter.reset(); $('reader-dialog').showModal(); readerPanel().scrollTop = position?.scrollTop || 0; updateReaderNavigation(); renderGenerationRecovery(); settingsFeedback.sync();
+  selectionMenuRouter.reset(); $('reader-dialog').showModal(); usage.setReader({ storyId: story.id, language: story.language }); readerPanel().scrollTop = position?.scrollTop || 0; updateReaderNavigation(); renderGenerationRecovery(); settingsFeedback.sync();
 }
 $('reader-dialog').addEventListener('close', () => {
+  usage.setReader(null);
   settingsFeedback.sync();
   if (state.readerHistoryEntry) { state.readerHistoryEntry = false; history.back(); }
   if ($('reader-removal-dialog').open) $('reader-removal-dialog').close();
@@ -1356,7 +1438,7 @@ function stopSpeech(reportError = false) {
   if (!speech.available) { readerSpeechKey = ''; state.player?.release(); renderReaderListen(); return Promise.resolve(); }
   if (readerSpeechStop) { renderReaderListen(); return readerSpeechStop; }
   const owner = readerSpeechOwner;
-  readerSpeechStop = Promise.resolve().then(() => speech.stop()).then(() => {
+  readerSpeechStop = Promise.resolve().then(() => trackedSpeech.stop()).then(() => {
     if (owner === readerSpeechOwner) readerSpeechKey = '';
     state.player?.release();
   }).catch(error => {
@@ -1371,18 +1453,20 @@ $('reader-listen').addEventListener('click', async () => {
   if (readerSpeechKey && readerSpeechKey === state.speechVersionKey) { await stopSpeech(true); return; }
   const version = activeVersion(activeChapter(story));
   const key = state.speechVersionKey, run = ++readerSpeechRun;
+  playbackContext = { storyId: story.id, language: story.language };
   readerSpeechOwner = run; readerSpeechKey = key;
   renderReaderListen();
   const isCurrent = () => run === readerSpeechRun && key === state.speechVersionKey && $('reader-dialog').open;
   const text = chapterSpeechText(version, story.title);
   try {
     if (state.playerEnabled) await runReaderPlayer(story, version, isCurrent);
-    else await speakChapter(speech, text, SPEECH_LANGUAGES[story.language], isCurrent);
+    else await speakChapter(trackedSpeech, text, SPEECH_LANGUAGES[story.language], isCurrent);
   }
   catch (error) { if (isCurrent()) toast(`Could not play audio: ${error.message}`); }
   finally {
     // Ownership outlives cancellation, but an old completion cannot reset a new run.
     if (run === readerSpeechOwner) { readerSpeechKey = ''; renderReaderListen(); }
+    usage.checkpoint();
   }
 });
 $('reader-dialog').addEventListener('pointerdown', event => {
@@ -1394,7 +1478,7 @@ const PLAYER_ICON_LABELS = { paused: ['Resume', 'Resume listening'], playing: ['
 async function runReaderPlayer(story, version, isCurrent) {
   const language = SPEECH_LANGUAGES[story.language];
   const units = speechUnits(version.title || story.title, version.story, language);
-  const player = createReaderPlayer({ speech, units, language, rate: state.speechRate, onChange: renderPlayer,
+  const player = createReaderPlayer({ speech: trackedSpeech, units, language, rate: state.speechRate, onChange: renderPlayer,
     onError: error => { if (isCurrent()) toast(`Could not play audio: ${error.message}`); } });
   state.player = player; state.playerUnits = units; state.playerRate = state.speechRate; state.following = state.followAlong;
   $('player-rate').value = String(state.speechRate); renderPlayerFollow(); setPlayerExpanded(false);
@@ -2168,6 +2252,14 @@ renderTargetLanguageSettings(); populateTargetPicker();
 // Positions update in memory while scrolling; write them when the reader closes or the page is hidden.
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && $('reader-dialog').open) { rememberReaderPosition(); persistReaderPosition(); } });
 window.addEventListener('pagehide', () => { if ($('reader-dialog').open) { rememberReaderPosition(); persistReaderPosition(); } });
+usage.setVisible(document.visibilityState === 'visible');
+document.addEventListener('visibilitychange', () => {
+  const visible = document.visibilityState === 'visible';
+  usage.setVisible(visible);
+  if (!visible) stopStatsRefresh(); else if ($('view-stats').classList.contains('active')) { renderStats(); startStatsRefresh(); }
+});
+window.addEventListener('pagehide', () => usage.setVisible(false));
+window.addEventListener('pageshow', () => usage.setVisible(document.visibilityState === 'visible'));
 initializePipeline();
 showStorageErrors();
 updateCount(); refreshModels();
