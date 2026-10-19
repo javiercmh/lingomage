@@ -1888,6 +1888,7 @@ async function readerAi(kind, input, instructions, requestPanel, config = { prov
   try { id = await ai.start({ providerId, model: model.id, instructions, input: JSON.stringify({ kind, ...input }), reasoningEffort: model.reasoningLevels?.includes(config.reasoning) ? config.reasoning : undefined, ...aiNotification(kind) }); }
   catch (error) { state.requestId = null; throw error; }
   state.requestId = id;
+  config.onTaskStarted?.();
   const panel = requestPanel || (['continue','rewrite'].includes(kind) ? $('reader-edit-panel') : $('reader-help'));
   const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'small-btn reader-ai-cancel'; cancel.textContent = 'Cancel request';
   let cancelled = false;
@@ -1993,7 +1994,7 @@ function decodeHelp(text, action = 'initial') {
   } else if (typeof value.explanation !== 'string' || !value.explanation.trim() || (value.contextTranslation !== undefined && typeof value.contextTranslation !== 'string')) fail();
   return value;
 }
-async function explainSelection(kind = 'explain', action = 'initial', followUp = '', selected = state.readerSelection) {
+async function explainSelection(kind = 'explain', action = 'initial', followUp = '', selected = state.readerSelection, onTaskStarted) {
   const passage = selected; if (!passage) return;
   if (state.checkpointBlocked || pipeline?.records.length || state.readerHelpBusy || state.readerEditBusy || state.requestId) { toast('Another AI request is still running. Wait for it to finish.'); return; }
   const story = readerStory();
@@ -2013,7 +2014,7 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
   try {
     try { persistReaderStory(story); await releaseSavedInference(); }
     catch (error) { toast(error.message); renderPendingReaderResult(); return; }
-    $('selection-toolbar').hidden = true;
+    if (!onTaskStarted) $('selection-toolbar').hidden = true;
     const box = $('reader-help');
     const helpRequest = { storyId: story.id, chapterId: chapter.id, versionId: version.id, helpId: existingHelp?.id || '', action, loading: createHelpLoading(action, followUp) };
     state.activeHelpRequest = helpRequest;
@@ -2031,7 +2032,9 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
         const op=await runContentOperation({kind:'examples',language:story.language,input:helpInput,instructions:helpInstructions(action),config:{providerId,model,reasoning},target:{storyId:story.id,chapterId:chapter.id,versionId:version.id,helpId:existingHelp.id,start:passage.start,end:passage.end,passage:passage.text}});
         clearLoading(); showOperationResult(op); return;
       }
-      const result = decodeHelp(await readerAi(kind, helpInput, helpInstructions(action), helpRequest.loading), action);
+      const result = decodeHelp(await readerAi(kind, helpInput, helpInstructions(action), helpRequest.loading, {
+        providerId, model, reasoning, onTaskStarted
+      }), action);
       clearLoading();
       const item = { id: crypto.randomUUID?.() || `help-${Date.now()}`, kind, action, passage: passage.text, start: passage.start, end: passage.end, chapterId: passage.chapterId, versionId: passage.versionId, text: result.explanation || '', followUp, profile: passage.profile, createdAt: new Date().toISOString(), providerId, model, promptVersion: PROMPT_VERSION };
       if (action === 'examples') item.examples = result.examples;
@@ -2100,25 +2103,50 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
     } finally { clearLoading(); }
   } finally { state.readerHelpBusy = false; }
 }
-$('selection-translate').addEventListener('click', async () => {
-  const passage = state.readerSelection;
-  if (!passage || translationLaunching || translationAvailability !== 'available') return;
-  translationLaunching = true; renderTranslationButton();
-  try { await translation.open({ text: passage.text }); }
-  catch (error) { toast(`Could not open translator: ${error.message}`); }
-  finally { translationLaunching = false; renderTranslationButton(); }
+function runSelectionAction(button, action) {
+  if (button.getAttribute('aria-busy') === 'true') return Promise.resolve();
+  button.classList.add('selection-action-active');
+  button.setAttribute('aria-busy', 'true');
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    button.classList.remove('selection-action-active');
+    button.setAttribute('aria-busy', 'false');
+  };
+  return Promise.resolve().then(() => action(finish)).finally(finish);
+}
+$('selection-translate').addEventListener('click', () => {
+  void runSelectionAction($('selection-translate'), async () => {
+    const passage = state.readerSelection;
+    if (!passage || translationLaunching || translationAvailability !== 'available') return;
+    translationLaunching = true; renderTranslationButton();
+    try { await translation.open({ text: passage.text }); }
+    catch (error) { toast(`Could not open translator: ${error.message}`); }
+    finally { translationLaunching = false; renderTranslationButton(); }
+  });
 });
-$('selection-speak').addEventListener('click', async () => {
-  const passage = state.readerSelection; if (!passage || !speech.available) return;
-  try { await speakSelection(speech, passage.text, passage.languageTag); }
-  catch (error) { toast(`Could not play audio: ${error.message}`); }
+$('selection-speak').addEventListener('click', () => {
+  void runSelectionAction($('selection-speak'), async () => {
+    const passage = state.readerSelection; if (!passage || !speech.available) return;
+    try { await speakSelection(speech, passage.text, passage.languageTag); }
+    catch (error) { toast(`Could not play audio: ${error.message}`); }
+  });
 });
-$('selection-explain').addEventListener('click', () => { if (state.readerSelection?.kind !== 'title') explainSelection('explain'); });
-$('selection-copy').addEventListener('click', async () => {
-  const passage = state.readerSelection; if (!passage) return;
-  // The reader's copy listener writes the canonical text, without furigana.
-  try { if (!document.execCommand('copy')) await navigator.clipboard.writeText(passage.text); toast('Copied'); }
-  catch { toast('Could not copy the selection.'); }
+$('selection-explain').addEventListener('click', () => {
+  if (state.readerSelection?.kind === 'title') return;
+  void runSelectionAction($('selection-explain'), finish => explainSelection('explain', 'initial', '', state.readerSelection, () => {
+    $('selection-toolbar').hidden = true;
+    finish();
+  }));
+});
+$('selection-copy').addEventListener('click', () => {
+  void runSelectionAction($('selection-copy'), async () => {
+    const passage = state.readerSelection; if (!passage) return;
+    // The reader's copy listener writes the canonical text, without furigana.
+    try { if (!document.execCommand('copy')) await navigator.clipboard.writeText(passage.text); toast('Copied'); }
+    catch { toast('Could not copy the selection.'); }
+  });
 });
 $('reader-copy').addEventListener('click', async () => {
   const story = readerStory(); if (!story) return;
