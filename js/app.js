@@ -85,8 +85,8 @@ function renderReaderGeneration() {
   const recovery = pending?.story.id === status.storyId;
   $('reader-generation-message').textContent = recovery ? (pending.saved ? 'Response saved. Finish request.' : 'Response needs saving.') : status.message;
   const button = $('reader-generation-action');
-  button.hidden = !recovery && !['working', 'ready', 'error'].includes(status.phase);
-  button.textContent = recovery ? (pending.saved ? 'Finish request' : 'Save response') : status.phase === 'error' ? 'View recovery' : status.phase === 'ready' ? 'View result' : 'Cancel request';
+  button.hidden = !recovery && !['working', 'ready', 'error', 'cleanup'].includes(status.phase);
+  button.textContent = recovery ? (pending.saved ? 'Finish request' : 'Save response') : status.phase === 'cleanup' ? 'Finish request' : status.phase === 'error' ? 'View recovery' : status.phase === 'ready' ? 'View result' : 'Cancel request';
   button.disabled = status.phase === 'working' && !document.querySelector('.reader-ai-cancel');
   $('reader-generation-dismiss').hidden = status.phase === 'working' || recovery;
 }
@@ -96,6 +96,11 @@ $('reader-generation-action').addEventListener('click', async () => {
   if (state.pendingReaderResult) {
     try { await savePendingReaderResult(); updateReader(); }
     catch (error) { status.message = error.message; renderReaderGeneration(); }
+    return;
+  }
+  if (status.phase === 'cleanup') {
+    try { await releaseInvalidReaderResponse(); setReaderGeneration(null); toast('Request cancelled'); }
+    catch { toast('Could not finish cancelled request. Try again.'); }
     return;
   }
   if (status.phase === 'error') {
@@ -297,9 +302,11 @@ $('usage-retry').addEventListener('click', () => {
   if (ok) { statsSignature = ''; renderStats(); $('usage-ranges').querySelector('[tabindex="0"]')?.focus(); }
 });
 renderUsageStatus(usage.status);
-function toast(message) {
-  const el = $('toast'); el.textContent = message; el.hidden = false;
-  clearTimeout(state.toastTimer); state.toastTimer = setTimeout(() => { el.hidden = true; }, 2600);
+function toast(message, duration = 2600) {
+  const el = $('toast');
+  ([...document.querySelectorAll('dialog[open]')].at(-1) || document.body).append(el);
+  el.textContent = message; el.hidden = false;
+  clearTimeout(state.toastTimer); state.toastTimer = setTimeout(() => { el.hidden = true; }, duration);
 }
 function setView(name) {
   if (name !== 'library' && state.storySelectionMode) leaveStorySelection();
@@ -1453,7 +1460,39 @@ document.addEventListener('scroll', () => { if (!$('selection-toolbar').hidden) 
 window.visualViewport?.addEventListener('resize', () => { if (!$('selection-toolbar').hidden) showSelectionToolbar(); });
 let selectionTimer;
 document.addEventListener('selectionchange', () => { clearTimeout(selectionTimer); selectionTimer = setTimeout(showSelectionToolbar, 180); });
-$('selection-toolbar').addEventListener('pointerdown', event => { event.preventDefault(); clearTimeout(selectionTimer); });
+let selectionPressedButton = null;
+let selectionPressOrigin = null;
+let selectionPressCancelled = false;
+function clearSelectionPress() {
+  selectionPressedButton?.classList.remove('selection-action-pressed');
+  selectionPressedButton = null;
+}
+$('selection-toolbar').addEventListener('pointerdown', event => {
+  event.preventDefault(); clearTimeout(selectionTimer); clearSelectionPress();
+  selectionPressOrigin = null; selectionPressCancelled = false;
+  const button = event.target.closest('button');
+  if (event.button !== 0 || !button || button.disabled) return;
+  selectionPressOrigin = selectionPressedButton = button;
+  button.classList.add('selection-action-pressed');
+});
+$('selection-toolbar').addEventListener('pointerleave', clearSelectionPress);
+$('selection-toolbar').addEventListener('click', event => {
+  if (event.detail && selectionPressCancelled) { event.preventDefault(); event.stopPropagation(); }
+}, true);
+document.addEventListener('pointerup', event => {
+  if (selectionPressOrigin) {
+    const rect = selectionPressOrigin.getBoundingClientRect();
+    selectionPressCancelled = event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom;
+    selectionPressOrigin = null;
+  }
+  clearSelectionPress();
+});
+function cancelSelectionPress() {
+  if (selectionPressOrigin) selectionPressCancelled = true;
+  selectionPressOrigin = null; clearSelectionPress();
+}
+document.addEventListener('pointercancel', cancelSelectionPress);
+window.addEventListener('blur', cancelSelectionPress);
 // Flex sizing retains empty space after wrapped lines. Shrink the title box to
 // its widest rendered line so Listen stays beside the words at every width.
 function fitReaderTitle() {
@@ -2063,8 +2102,13 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
       toast('Explanation saved');
     } catch (error) {
       clearLoading();
-      if (readerGeneration) setReaderGeneration({ ...readerGeneration, phase: 'error', message: 'Request stopped. View recovery below.' });
+      const cancelled = error.message === 'Request cancelled.';
       try { await releaseInvalidReaderResponse(); } catch {}
+      if (readerGeneration?.storyId === story.id) {
+        setReaderGeneration(cancelled
+          ? (state.pendingReaderRequestId ? { ...readerGeneration, phase: 'cleanup', message: 'Could not finish cancelled request.' } : null)
+          : { ...readerGeneration, phase: 'error', message: 'Request stopped. View recovery below.' });
+      }
       if (state.readerId === story.id && activeChapter().id === chapter.id && activeVersion().id === version.id) {
         renderSavedHelp(chapter, version);
         const card = existingHelp ? [...box.querySelectorAll('.help-card')].find(node => node.dataset.helpId === existingHelp.id) : null;
@@ -2074,8 +2118,8 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
           const input = form.querySelector('input'); if (input) input.value = followUp;
           const button = card.querySelector('.help-actions button'); if (button) { button.hidden = true; button.setAttribute('aria-expanded', 'true'); }
         }
+        if (cancelled) { if (!state.pendingReaderRequestId) toast('Request cancelled'); return; }
         if (pipeline?.records.length) { renderCheckpointRecovery(); return; }
-        if (error.message === 'Request cancelled.') { toast('Request cancelled'); return; }
         const recovery = document.createElement('section'); recovery.className='recovery-panel help-request-recovery';
         const note = document.createElement('p'); note.setAttribute('role','alert');
         note.textContent = recoverySummary({kind:action === 'initial' ? 'explain' : action,error:error.message,failure:failureInfo(error,action)}); recovery.append(note);
@@ -2144,7 +2188,14 @@ $('selection-copy').addEventListener('click', () => {
   void runSelectionAction($('selection-copy'), async () => {
     const passage = state.readerSelection; if (!passage) return;
     // The reader's copy listener writes the canonical text, without furigana.
-    try { if (!document.execCommand('copy')) await navigator.clipboard.writeText(passage.text); toast('Copied'); }
+    try {
+      if (!document.execCommand('copy')) await navigator.clipboard.writeText(passage.text);
+      window.getSelection()?.removeAllRanges();
+      clearTimeout(selectionTimer);
+      state.readerSelection = null;
+      $('selection-toolbar').hidden = true;
+      toast('Copied', 1000);
+    }
     catch { toast('Could not copy the selection.'); }
   });
 });
