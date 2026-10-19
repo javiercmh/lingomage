@@ -1,7 +1,9 @@
 # Reading, glossary support, and repeated encounters
 
-Review date: 2026-10-09. Discovery: Consensus; publication metadata and available
-original text checked separately. This is a scoped initial review, not a systematic review.
+Review date: 2026-10-09; revised 2026-10-19 (E1 and E3 abstracts re-checked in Consensus and metadata in Crossref, E4 extensive reading added, stale product assumptions corrected). Discovery: Consensus; publication metadata and available
+original text checked separately. This is a scoped review, not a systematic review. Bibliography keys: [references.bib](references.bib). Retrieval, spacing and review ideas are in [retrieval and spacing](retrieval-and-spacing.md); instruction, feedback and listening are in [instruction, feedback and production](instruction-feedback-and-production.md).
+
+Keys: E1 `webbEtAl2023IncidentalMetaAnalysis`, E2 `yanagisawaWebbUchihara2020Glossing`, E3 `uchiharaEtAl2019Repetition`, E4 `sangersEtAl2025ExtensiveReading`, `nakanishi2015ExtensiveReading` and `hamada2020ExtensiveReadingBias`.
 
 ## E1 — Meaning-focused vocabulary learning
 
@@ -60,10 +62,49 @@ words. This correlational synthesis does not establish a required repetition
 count or a causal effect of LingoMage's regeneration feature. Avoid forcing a
 fixed encounter count that makes stories unnatural.
 
+## E4 — Extensive reading
+
+Sangers, N. L., et al. (2025). *Learning a language through reading: A meta-analysis
+of studies on the effects of extensive reading on second and foreign language
+learning*. Educational Psychology Review, 37(4), 96.
+[DOI: 10.1007/s10648-025-10068-6](https://doi.org/10.1007/s10648-025-10068-6).
+
+Access: Crossref metadata and abstract summary only. The Springer page redirected to
+a sign-in handshake, so full text was not read (the record states CC BY 4.0).
+Positive effects, small to medium, across reading comprehension, vocabulary,
+decoding/fluency, motivation, writing, oral proficiency and general proficiency.
+Effects were larger when learners' text choice was limited and when some form of
+accountability was included, and larger when samples had mixed first languages.
+Nakanishi, T. (2015). *A meta-analysis of extensive reading research*. TESOL
+Quarterly, 49(1), 6–37. [DOI: 10.1002/tesq.157](https://doi.org/10.1002/tesq.157).
+Access: Crossref metadata only; the 34 studies/d = 0.46 (group contrasts) and d = 0.71
+(pre-post) figures come from the Consensus abstract, so they are provisional.
+Hamada, A. (2020). *Using meta-analysis and propensity score methods to assess
+treatment effects toward evidence-based practice in extensive reading*. Frontiers in
+Psychology, 11, 617. [DOI: 10.3389/fpsyg.2020.00617](https://doi.org/10.3389/fpsyg.2020.00617).
+Access: open-access full text, read through a summarizing fetch tool (first 100,000
+of about 128,800 characters). A meta-analysis of 22 studies gave d = 0.55, reduced to
+d = 0.37 when restricted to studies with equivalent groups (selection bias); a
+propensity-score study of 109 reading learners versus 115 controls (one Japanese
+university, one semester) gave d = 0.24–0.44. Stated limits: non-randomized, single
+institution, unobserved confounders, no standard definition of reading amount.
+
+Decision: reading-first practice is supported, with small-to-medium and possibly
+overestimated effects. The evidence concerns sustained reading of many texts over a
+term, mostly with English-target classroom learners; it does not test one-off AI-written
+chapters, the four target languages or reading amounts a learner would choose.
+Because effects were larger with limited text choice and accountability, learner-chosen
+briefs and unlimited generation are not shown to be optimal. The related suggestions
+(accountability, a gradual challenge increase) have not been adopted; they are
+[strategy](../product/evidence-informed-strategy.md) questions.
+
 ## Product assumptions and remaining review
 
-Five to ten words, story lengths, A1-oriented AI suggestions, glossary placement,
-and local rereading are product choices. No learning trial has been run.
+Glossary placement and local rereading are product choices, as are the limits on
+vocabulary and grammar focuses. Earlier wording here about five to ten words,
+fixed story lengths and A1-oriented AI suggestions described the retired design;
+[PED-004](../pedagogy/PED-004-level-guided-generation.md) replaced it with optional
+planned practice focuses and narrative scope. No learning trial has been run.
 Language-specific grammar progression and beginner readability still need deeper
 review; content checks must not be reported as retention evidence.
 
