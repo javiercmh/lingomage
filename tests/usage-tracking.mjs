@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import {createWorkspaceStorage, validUsage, emptyUsage, USAGE_PATH} from '../js/workspace-storage.js';
 import {createUsageTracker, HEARTBEAT_MS, MAX_GAP_MS} from '../js/usage-tracker.js';
 import {summarize, formatDuration, hasUsage, shiftDateKey, rangeBounds, localCalendar} from '../js/usage-stats.js';
+import {createReaderPlayer} from '../js/reader-player.js';
 import {bootApp} from './support/app-harness.mjs';
 
 const SECOND = 1000, MINUTE = 60 * SECOND, HOUR = 60 * MINUTE;
@@ -124,6 +125,35 @@ const totalOf = days => Object.values(days).reduce((sum, item) => sum + item.app
   assert.equal(day(h).app, 22000); assert.equal(h.tracker.playing, false);
 }
 
+// --- Real player over the tracked speech: no per-sentence writes, one save when the run ends -------------
+{
+  const h = harness(); h.tracker.setVisible(true); h.tracker.setReader({storyId: 's', language: 'de'});
+  const pending = [];
+  const host = {available: true, voices: async () => ({voices: [{id: 'v', language: 'de-DE'}]}), stop: async () => ({}),
+    speak: () => new Promise(resolve => pending.push(resolve))};
+  const tracked = h.tracker.trackSpeech(host, () => ({storyId: 's', language: 'de'}));
+  const units = [0, 1, 2, 3].map(i => ({source: 'story', start: i * 10, end: i * 10 + 9, text: `Satz ${i}.`}));
+  const player = createReaderPlayer({speech: tracked, units, language: 'de-DE'});
+  const flush = () => new Promise(setImmediate);
+  let finished = false; player.done.then(() => { finished = true; });
+  player.play(0); await flush();
+  for (let i = 0; i < 3; i++) { // three successful sentences within the first 30 s
+    h.advance(seconds(8)); pending[i]({status: 'completed'}); await flush();
+    assert.equal(h.disk.writes, 0, `sentence ${i + 1} completing does not write`);
+  }
+  h.advance(seconds(4)); pending[3]({status: 'completed'}); await player.done; await flush();
+  assert.equal(finished, true); assert.equal(h.disk.writes, 0, 'the last sentence alone still does not write');
+  h.tracker.checkpoint(); // what the reader-listen `finally` does once the run settles
+  assert.equal(h.disk.writes, 1, 'the run end saves immediately, once');
+  assert.equal(h.stored().days['2026-10-19'].app, 28000); assert.equal(h.stored().days['2026-10-19'].languages.de.reading, 28000);
+  // A cancelled sentence (host cancel on backgrounding) saves immediately, mid-run.
+  const c = harness(); c.tracker.setVisible(false);
+  const cancelled = []; const cancelHost = {speak: () => new Promise(resolve => cancelled.push(resolve)), voices: async () => ({voices: []}), stop: async () => ({})};
+  const cp = createReaderPlayer({speech: c.tracker.trackSpeech(cancelHost, () => ({storyId: 's', language: 'de'})), units, language: 'de-DE'});
+  cp.play(0); await flush(); c.advance(seconds(6)); cancelled[0]({status: 'cancelled'}); await flush();
+  assert.equal(c.disk.writes, 1); assert.equal(c.stored().days['2026-10-19'].app, 6000);
+}
+
 // --- Unexplained gaps (suspension) are never credited without playback evidence -------------------------------
 {
   const h = harness(); h.tracker.setVisible(true); h.advance(seconds(10)); h.tick();
@@ -146,7 +176,7 @@ const totalOf = days => Object.values(days).reduce((sum, item) => sum + item.app
   w.tracker.utteranceEnded(long, 'completed');
   assert.equal(day(w).app, 40000, 'no fabricated or duplicate time after the gap');
   assert.equal(day(w).languages.de.reading, 40000);
-  assert.equal(w.stored().days['2026-10-19'].app, 40000, 'completed playback is saved immediately');
+  assert.equal(w.stored().days['2026-10-19'].app, 40000, 'heartbeats saved the observed time; completion adds nothing');
   const h4 = harness(); h4.tracker.setVisible(false);
   h4.tracker.utteranceStarted({storyId: 's', language: 'de'});
   h4.advance(MAX_GAP_MS + 1); h4.tracker.playbackStopped();

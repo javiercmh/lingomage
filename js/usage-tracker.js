@@ -115,14 +115,16 @@ export function createUsageTracker({clock = defaultClock, calendar = localCalend
       change(() => { playback = {id, storyId, language}; }, {persist: false});
       return id;
     },
-    // Completion, cancellation and failure all end the in-flight interval and save now. A long unobserved
-    // gap is never credited, whatever the outcome.
-    utteranceEnded(id) {
+    // Every outcome ends the in-flight interval. A successful completion is an ordinary mid-run event and
+    // leaves the write to the 30 s checkpoint or the end of the listening run (checkpoint()); cancellation
+    // and failure save now. A long unobserved gap is never credited, whatever the outcome.
+    utteranceEnded(id, outcome = 'completed') {
       if (!playback || playback.id !== id) return;
-      change(() => { playback = null; });
+      change(() => { playback = null; }, {persist: outcome !== 'completed'});
     },
     // Host acknowledged Stop (pause/stop), or the listening run finished: settle and save now.
     playbackStopped() { change(() => { playback = null; }); },
+    // End of a listening run (and other settle-and-save points).
     checkpoint() { change(() => {}); },
     // Settles without saving so a view includes the open interval.
     observe() { settle(); return data; },
@@ -150,9 +152,9 @@ export function createUsageTracker({clock = defaultClock, calendar = localCalend
           const id = api.utteranceStarted(context());
           try {
             const result = await speech.speak(options);
-            api.utteranceEnded(id);
+            api.utteranceEnded(id, result?.status === 'cancelled' ? 'cancelled' : 'completed');
             return result;
-          } catch (error) { api.utteranceEnded(id); throw error; }
+          } catch (error) { api.utteranceEnded(id, 'error'); throw error; }
         },
         stop: async () => {
           const result = await speech.stop();
