@@ -1644,7 +1644,7 @@ function renderSavedHelp(chapter, version) {
     if (title) card.append(title);
     if (hasContext && !state.explanationSelectionMode) {
       const show = document.createElement('button'); show.type = 'button'; show.className = 'small-btn help-show-in-text'; show.setAttribute('aria-label', `Show “${item.passage}” in the story`);
-      show.innerHTML = '<span aria-hidden="true">↑</span> Show in text'; show.addEventListener('click', () => showPassageInText(item.id)); card.append(show);
+      show.innerHTML = 'Show in text <span aria-hidden="true">↑</span>'; show.addEventListener('click', () => showPassageInText(item.id)); card.append(show);
     }
     card.append(quote);
     if (hasContext && item.contextTranslation) { const translation = document.createElement('p'); translation.className = 'help-context-translation help-text-selectable'; translation.textContent = item.contextTranslation; card.append(translation); }
