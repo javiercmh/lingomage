@@ -185,6 +185,8 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   vm.runInContext(section('function closeWordNote(', 'function readerPanel('), noteUi);
   noteUi.showWordNote(trigger,[{word:'買う',meaning:'to buy',forms:['買います']}]);
   const listen=popover.childNodes[0].childNodes[0].childNodes[1];
+  assert.match(cssSource,/\.word-note-listen\s*\{[^}]*color:\s*#bfdbfe;/,'idle note speaker uses the same bright color as chapter Listen');
+  assert.match(cssSource,/\.word-note-listen\[data-playing="true"\]\s*\{\s*color:\s*var\(--muted\);/,'playing note speaker switches to the same muted color as chapter Listen');
   assert.equal(listen.attributes['aria-label'],'Listen to 買う');assert.equal(popover.focused,true);
   const starting=listen.events.click();await Promise.resolve();await Promise.resolve();
   assert.equal(heard.text,'買う');assert.equal(heard.language,'ja-JP');assert.equal(listen.disabled,false);assert.equal(listen.attributes['aria-pressed'],'true');
