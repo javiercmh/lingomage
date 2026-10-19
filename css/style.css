@@ -134,6 +134,7 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 .story-card.swipe-revealed { --swipe-x: -168px; }
 .story-open, .story-menu-toggle { transform: translateX(var(--swipe-x)); transition: transform .2s ease; }
 .story-card.swiping .story-open, .story-card.swiping .story-menu-toggle { transition: none; }
+.story-card.swipe-revealed.settling .story-open, .story-card.swipe-revealed.settling .story-menu-toggle { pointer-events: none; } /* surface still sliding over the tray: first tap goes to Select/Delete */
 .story-check-control, .card-select-action { z-index: 2; }
 @media (prefers-reduced-motion: reduce) { .story-open, .story-menu-toggle { transition: none; } }
 .story-card.selecting { padding-right: 64px; }

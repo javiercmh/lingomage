@@ -51,7 +51,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   console.log('PASS long press cancels on leaving, outside release, scrolling, cancellation and movement; completed holds suppress clicks');
   console.log('PASS selectable explanation text is excluded from long-press and bulk-toggle handling');
 
-  const swipe = sandbox({setTimeout:()=>0,state:{storySelectionMode:false}, revealStory(card,id){swipe.revealed=id;}, closeStoryReveal(){swipe.revealed=null;}});
+  const swipe = sandbox({setTimeout:()=>0,clearTimeout(){},state:{storySelectionMode:false}, revealStory(card,id){swipe.revealed=id;}, closeStoryReveal(){swipe.revealed=null;}});
   vm.runInContext(section('const STORY_TRAY_WIDTH', 'function confirmStoryDeletion('),swipe);
   const swipeClasses=new Set();const swipeCard={events:{},classList:{contains:n=>swipeClasses.has(n),add:n=>swipeClasses.add(n),remove:n=>swipeClasses.delete(n)},style:{setProperty(){},removeProperty(){}},querySelector:()=>({hidden:true}),addEventListener(name,fn){this.events[name]=fn;},setPointerCapture(){}};
   let cancelledHolds=0;
