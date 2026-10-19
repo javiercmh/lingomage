@@ -88,6 +88,13 @@ First-only glossary display coexists with app-owned Japanese reading boundaries,
 
 New chapters use a separate vocabulary-note request after canonical prose is validated and durably checkpointed. It defines most meaningful words and useful expressions, including common words, contextual inflections, idioms and constructions; it skips routine proper names and duplicate meanings. The reading target guides explanation complexity, not a presumption that individual words are known. Notes use the existing English meaning/headword/exact-forms schema and first-occurrence display. At least one valid note remains mandatory; per-field/form bounds and a 1000000 UTF-16-unit total-response bound are technical limits, not pedagogical quotas; the former 100-note count cap is removed by explicit learner request.
 
+Terminology: research-facing documentation uses *lexical unit* for the learnable
+word or expression and *headword* for the stored target-language citation
+string. The existing `word` field is a schema name, not a claim that every note
+contains exactly one orthographic word. See the [terminology review](../research/lexical-units.md)
+for the evidence, distinction from *term*, product-copy recommendation, and
+limits.
+
 This breadth is the learner's requested product preference, not an evidence-based optimum. Existing `yanagisawaWebbUchihara2020Glossing`, `liZhang2021SelfAssessment` and `tigchelaarEtAl2017CanDoValidity` evidence and limitations apply. Structural validation cannot prove semantic accuracy, useful coverage or level suitability. A failed note request retains the completed prose for an explicit note-only retry; existing chapters and their original provenance remain unchanged. Japanese readings follow successful notes. Examples and selected-text Explain retain their existing workflows.
 
 Live prompt/model comparisons and preliminary AI review are recorded under [generation evaluation](../validation/generation-evaluation/README.md); qualified human review is separately pending.

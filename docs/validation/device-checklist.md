@@ -57,6 +57,7 @@ Native gestures and accessibility semantics/focus transitions can have automated
 | Explained passage highlight, card links and Show/View result scroll clearance | Browser and Android bounds/scroll and focus-visibility assertions with saved fixture explanations | Pending native check |
 | Swipe and Actions tray: card/button move together, one tray open, vertical scroll preserved, tray taps work | Android swipe/tap/long-press sequences and state assertions | Pending native coverage |
 | Bulk selection, chapter/path/story removal and confirmation | Browser state tests; Android gestures, confirmation/focus assertions and persistence checks using disposable data | Pending native coverage |
+| Running-request notification: LingoMage's task-specific title/body appear beside the host-derived app name for create, continue, rewrite, examples, notes, readings, explain and summary requests; Cancel affects only LingoMage's request | Android notification assertions with the deterministic fake provider in the App² test host | Partial: browser tests assert the `title`/`body` passed to `ai.start`. The App² host's fake-provider tests passed on the Test37 Android 37 emulator (2026-10-19) for two apps, request-scoped Cancel, Open, promotion, cleanup, rotation and owning-task close. They did not load LingoMage, so its actual copy on Android and denied notification permission are unverified |
 
 ## Results
 
