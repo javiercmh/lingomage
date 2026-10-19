@@ -1159,9 +1159,10 @@ function closeWordNote(restoreFocus = false) {
 }
 let wordNoteSpeechRun = 0;
 let wordNoteSpeechButton = null;
+let wordNoteSpeechStopPending = false;
 function renderWordNoteSpeech(button, playing, stopping = false) {
   const label = stopping ? 'Stop audio' : playing ? 'Stop audio' : button.dataset.listenLabel;
-  button.disabled = !speech.available || stopping;
+  button.disabled = !speech.available;
   button.title = speech.available ? label : 'Listening requires App²';
   button.setAttribute('aria-label', label);
   button.setAttribute('aria-pressed', String(playing));
@@ -1185,14 +1186,22 @@ function showWordNote(trigger, notes, surface = '', helpId = '') {
     listen.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4zM15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14"/></svg>';
     listen.disabled = !speech.available || !shown;
     listen.addEventListener('click', async () => {
+      if (wordNoteSpeechStopPending) return;
       if (wordNoteSpeechButton === listen) {
-        const run = ++wordNoteSpeechRun;
+        const run = wordNoteSpeechRun;
+        wordNoteSpeechStopPending = true;
         renderWordNoteSpeech(listen, true, true);
         try {
           await speech.stop();
-          if (run === wordNoteSpeechRun) { wordNoteSpeechButton = null; renderWordNoteSpeech(listen, false); }
+          if (run === wordNoteSpeechRun && wordNoteSpeechButton === listen) {
+            wordNoteSpeechRun++;
+            wordNoteSpeechButton = null;
+            renderWordNoteSpeech(listen, false);
+          }
         } catch (error) {
           if (run === wordNoteSpeechRun) { toast(`Could not stop audio: ${error.message}`); renderWordNoteSpeech(listen, true); }
+        } finally {
+          wordNoteSpeechStopPending = false;
         }
         return;
       }
