@@ -100,4 +100,4 @@ The overlapping-word chooser opened without scrolling to the explanation; both c
 
 - Pending: on the updated App² host with native playback UI removed, verify reader listening and pronunciation show no native Speaking bar, and Follow keeps sentences clear of the in-app player.
 
-- Pending: selection-menu buttons highlight throughout touch press; releasing Copy copies canonical text, clears handles and dismisses the menu, with “Copied” visible above the reader for one second. Release outside/cancel must not copy. Cancel explanation/detail and verify no recovery status remains, existing help/question is preserved, and another request can start; inject host cleanup failure to verify Finish request.
+- Pending: selection-menu buttons highlight throughout touch press; releasing Copy copies canonical text, clears handles and dismisses the menu, with only Android’s existing clipboard confirmation and no duplicate app toast. Release outside/cancel must not copy. Cancel explanation/detail and verify no recovery status remains, existing help/question is preserved, and another request can start; inject host cleanup failure to verify Finish request.

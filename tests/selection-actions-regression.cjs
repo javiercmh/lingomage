@@ -47,7 +47,7 @@ const context = {
     onTaskStarted();
     return pending.generation.promise;
   },
-  toast: (message, duration) => { toasts.push(message); context.toastDuration = duration; }
+  toast: message => toasts.push(message)
 };
 vm.createContext(context);
 vm.runInContext(app.slice(helperStart, actionsStart) + app.slice(actionsStart, actionsEnd), context);
@@ -69,8 +69,7 @@ async function clickAndCheck(id, operation) {
   assert.equal(context.state.readerSelection, null);
   assert.equal(buttons['selection-toolbar'].hidden, true);
   assert.equal(context.selectionCleared, true);
-  assert.equal(toasts.at(-1), 'Copied');
-  assert.equal(context.toastDuration, 1000);
+  assert.equal(toasts.length, 0, 'successful copy relies on Android clipboard feedback without an app toast');
   context.state.readerSelection = {kind:'body',text:'Hallo',languageTag:'de-DE'};
   buttons['selection-toolbar'].hidden = false;
   await clickAndCheck('selection-translate', pending.translate);
@@ -127,7 +126,7 @@ async function clickAndCheck(id, operation) {
     document:{querySelectorAll:()=>[{append(){throw Error('behind reader');}},{append(node){parent=node;}}],body:{append(){throw Error('behind dialogs');}}}};
   vm.createContext(toastContext);
   vm.runInContext(app.slice(app.indexOf('function toast('),app.indexOf('function setView(')),toastContext);
-  toastContext.toast('Copied',1000);assert.equal(parent,toastNode);assert.equal(scheduled.ms,1000);assert.equal(toastNode.hidden,false);
+  toastContext.toast('Request cancelled');assert.equal(parent,toastNode);assert.equal(scheduled.ms,2600);assert.equal(toastNode.hidden,false);
   scheduled.fn();assert.equal(toastNode.hidden,true);
   toastContext.toast('Request cancelled');assert.equal(scheduled.ms,2600);
 
