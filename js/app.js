@@ -4,6 +4,8 @@ import { createGenerationController } from './generation-controller.js';
 import { createReaderPanels } from './reader-panels.js';
 import { ai, readFile, writeFile, listFiles, speech, translation, selectionMenu } from './bridge.js';
 import { speakSelection, speakChapter, chapterSpeechText } from './reader-speech.js';
+import { createSelectionMenuRouter } from './selection-menu.js';
+import { createReaderActivation, createSourceChooser, glossaryForTrigger, indexGlossaryTriggers, normalizeReaderControls } from './reader-activation.js';
 import { annotatedText, applyExplainedMarks, getCanonicalSelection, japaneseSegments } from './reader-text.js';
 import { SPEECH_RATES, canonicalRange, createReaderPlayer, speechUnits } from './reader-player.js';
 import { createPipeline } from './generation-pipeline.js';
@@ -888,6 +890,7 @@ $('confirm-delete-stories').addEventListener('click', () => {
 });
 // Reader management preserves exact shared versions across surviving paths.
 let restoringPathPosition = false;
+const sourceChooser = createSourceChooser({ element: $('source-chooser'), document, window });
 const readerPanels = createReaderPanels({state, $, window, document, getComputedStyle, readerPanel, closeWordNote, persistSettings: trySaveSettings, toast});
 const { closeReaderActions, closeReaderPanels, positionReaderPanel, toggleReaderPanel, setReaderTextSize, updateReaderNavigation } = readerPanels;
 function renderReaderActions() {
@@ -1044,8 +1047,9 @@ function updateReader(keepNavigation = false) {
   annotatedText($('reader-story'), version.story, version.storySegments, {
     language: SPEECH_LANGUAGES[story.language] || 'en',
     glossary: version.glossary || [],
-    onNote: (event, trigger, notes, surface) => showWordNote(trigger, notes, surface)
+    onNote: event => activateReaderText(event)
   });
+  indexGlossaryTriggers($('reader-story'), version.story, version.glossary || []);
   setReaderTextSize(state.readerFontSize);
   $('reader-story').classList.toggle('hide-furigana', story.language === 'ja' && !state.furigana);
   $('furigana-control').hidden = story.language !== 'ja'; $('furigana-toggle').checked = state.furigana;
@@ -1063,6 +1067,7 @@ function renderChapterRequest() {
   if (!host.hidden) host.append(request.loading);
 }
 function closeWordNote(restoreFocus = false) {
+  sourceChooser.close();
   const popover = $('word-note-popover');
   if (popover.hidden) return;
   popover.hidden = true;
@@ -1141,7 +1146,7 @@ function openReader(story) {
   updateReader();
   if (draft) { showEditPanel(draft.mode); $('reader-prompt').value = draft.prompt; $('reader-edit-error').textContent = draft.error; }
   history.pushState({ ...(history.state && typeof history.state === 'object' ? history.state : {}), lingomageReader: story.id }, ''); state.readerHistoryEntry = true;
-  $('reader-dialog').showModal(); readerPanel().scrollTop = position?.scrollTop || 0; updateReaderNavigation(); renderGenerationRecovery(); settingsFeedback.sync();
+  selectionMenuRouter.reset(); $('reader-dialog').showModal(); readerPanel().scrollTop = position?.scrollTop || 0; updateReaderNavigation(); renderGenerationRecovery(); settingsFeedback.sync();
 }
 $('reader-dialog').addEventListener('close', () => {
   settingsFeedback.sync();
@@ -1151,6 +1156,12 @@ $('reader-dialog').addEventListener('close', () => {
 });
 window.addEventListener('popstate', () => {
   if (!$('reader-dialog').open) return;
+  // Back dismisses an open chooser first and restores the reader's history entry, so a second Back leaves the reader.
+  if (sourceChooser.isOpen()) {
+    sourceChooser.close(true);
+    history.pushState({ ...(history.state && typeof history.state === 'object' ? history.state : {}), lingomageReader: state.readerId }, '');
+    return;
+  }
   state.readerHistoryEntry = false;
   $('reader-dialog').close();
 });
@@ -1255,6 +1266,7 @@ function showSelectionToolbar() {
   if (!passage) { toolbar.hidden = true; state.readerSelection = null; return; }
   const translationSelectionChanged = toolbar.hidden || !state.readerSelection ||
     ['storyId', 'chapterId', 'versionId', 'start', 'end', 'text'].some(key => passage[key] !== state.readerSelection[key]);
+  sourceChooser.close();
   if (!state.readerSelection || passage.text !== state.readerSelection.text) closeWordNote();
   state.readerSelection = passage; toolbar.hidden = false;
   if (translationSelectionChanged) refreshTranslationAvailability();
@@ -1369,7 +1381,7 @@ $('reader-listen').addEventListener('click', async () => {
   }
 });
 $('reader-dialog').addEventListener('pointerdown', event => {
-  if (!event.target.closest?.('.gloss-note-trigger') && !event.target.closest?.('#word-note-popover')) closeWordNote();
+  if (!event.target.closest?.('.gloss-note-trigger, mark.explained-expression, #word-note-popover, #source-chooser')) closeWordNote();
 });
 // Sentence-level listening player (App² hosts that report showControl): floating controls, spoken-sentence highlight and Follow.
 let playerCollapseTimer = 0, playerScrubbing = false;
@@ -1687,6 +1699,7 @@ function refreshExplainedMarks(chapter, version) {
     .sort((a, b) => (Date.parse(a.createdAt || '') || 0) - (Date.parse(b.createdAt || '') || 0))
     .map(item => ({ id: item.id, start: item.start, end: item.end, label: item.passage }));
   applyExplainedMarks(root, ranges);
+  normalizeReaderControls(root);
 }
 function pulse(elements) {
   elements.forEach(node => { node.classList.add('mark-pulse'); setTimeout(() => node.classList.remove('mark-pulse'), 1400); });
@@ -1698,20 +1711,21 @@ function showPassageInText(helpId) {
   marks[0].scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
   pulse(marks);
 }
-function showExplanationForMark(mark) {
-  const card = [...$('reader-help').querySelectorAll('.help-card')].find(node => node.dataset.helpId === mark.dataset.helpId);
+function helpCardFor(helpId) { return [...$('reader-help').querySelectorAll('.help-card')].find(node => node.dataset.helpId === helpId); }
+function showExplanationForHelp(helpId) {
+  const card = helpCardFor(helpId);
   if (card) revealCard(card);
 }
-$('reader-story').addEventListener('click', event => {
-  const mark = event.target.closest?.('mark.explained-expression');
-  if (!mark || event.target.closest('.gloss-note-trigger') || !window.getSelection().isCollapsed || state.explanationSelectionMode) return;
-  showExplanationForMark(mark);
+const activateReaderText = createReaderActivation({
+  root: $('reader-story'), chooser: sourceChooser, glossaryFor: glossaryForTrigger,
+  hasExplanation: helpId => !state.explanationSelectionMode && Boolean(helpCardFor(helpId)),
+  selectionCollapsed: () => window.getSelection().isCollapsed,
+  closeNote: () => closeWordNote(),
+  showNote: vocab => showWordNote(vocab.trigger, vocab.notes, vocab.surface),
+  showExplanation: showExplanationForHelp
 });
-$('reader-story').addEventListener('keydown', event => {
-  const mark = event.target.closest?.('mark.explained-expression');
-  if (!mark || (event.key !== 'Enter' && event.key !== ' ')) return;
-  event.preventDefault(); showExplanationForMark(mark);
-});
+$('reader-story').addEventListener('click', activateReaderText);
+$('reader-story').addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') activateReaderText(event); });
 async function readerAi(kind, input, instructions, requestPanel, config = { providerId: state.providerId, model: state.model, reasoning: state.reasoning }) {
   workspaceStorage.assertWritable();
   if (state.pendingReaderResult) throw new Error('Save the completed response before starting another request.');
@@ -1966,21 +1980,8 @@ $('reader-copy').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(activeVersion(activeChapter(story)).story); toast('Chapter copied'); }
   catch { toast('Could not copy the chapter.'); }
 });
-// Android's own selection menu would compete with this bar on story text, but fields need Cut/Copy/Paste.
-// The host flag is page-wide, so toggle it by touch target; pointerdown precedes a long-press menu and focus.
-const FIELD_SELECTOR = 'input, textarea, select, [contenteditable]:not([contenteditable="false"])';
-// Targets that keep Android's native menu: fields plus selectable explanation text, vocabulary notes and errors.
-// Story text and the reader title use the LingoMage toolbar; all other chrome is unselectable.
-const NATIVE_MENU_SELECTOR = `${FIELD_SELECTOR}, .help-text-selectable, .word-note-popover, .form-error`;
-let selectionMenuSuppressed = null;
-function suppressSelectionMenu(suppressed) {
-  if (selectionMenuSuppressed === suppressed) return;
-  selectionMenuSuppressed = suppressed;
-  selectionMenu.setSuppressed(suppressed);
-}
-suppressSelectionMenu(true);
-document.addEventListener('pointerdown', event => suppressSelectionMenu(!event.target.closest?.(NATIVE_MENU_SELECTOR)), true);
-document.addEventListener('focusout', event => { if (event.target.closest?.(FIELD_SELECTOR) && !event.relatedTarget?.closest?.(NATIVE_MENU_SELECTOR)) suppressSelectionMenu(true); }, true);
+// Android's own selection menu would compete with the LingoMage bar on story text, but fields need Cut/Copy/Paste.
+const selectionMenuRouter = createSelectionMenuRouter({ host: selectionMenu, document, window });
 $('reader-copy').addEventListener('click', () => closeReaderActions());
 $('reader-actions-toggle').addEventListener('click', toggleReaderActions);
 $('reader-remove-chapters').addEventListener('click', () => confirmReaderRemoval('chapters'));
