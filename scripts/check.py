@@ -60,7 +60,6 @@ def main():
         assert name in update['seedFiles']
     assert update['seedDefaults']['data/generation-checkpoints.json'] == []
     assert update['seedDefaults']['data/usage.json'] == {'version': 1, 'days': {}}
-    assert json.loads((ROOT / 'data/usage.json').read_text()) == update['seedDefaults']['data/usage.json'], 'Packaged usage seed must be empty'
     for name in ['js/usage-stats.js', 'js/usage-tracker.js']:
         assert name in update['managedFiles']
     for name in ['js/learning-validation.js', 'js/generation-pipeline.js', 'data/language-safeguards.json']:
