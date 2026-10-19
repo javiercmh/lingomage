@@ -739,7 +739,7 @@ function revealStory(card, id, focusTray = false) {
 }
 const STORY_TRAY_WIDTH = 168;
 function wireStorySwipe(card, id, cancelHold) {
-  let origin = null, horizontal = false, suppressClick = false;
+  let origin = null, horizontal = false, suppressClick = false, settleTimer = null;
   // The surface and the Actions button share --swipe-x so they move together; the tray underneath is shown while dragging.
   const releaseSurface = () => {
     card.classList.remove('swiping'); card.style.removeProperty('--swipe-x');
@@ -757,7 +757,7 @@ function wireStorySwipe(card, id, cancelHold) {
     const dx = event.clientX - origin.x, dy = event.clientY - origin.y;
     if (!horizontal && Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx) / 1.5) { origin = null; return; }
     if (!horizontal && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      horizontal = true; suppressClick = true; cancelHold();
+      horizontal = true; suppressClick = true; cancelHold(); clearTimeout(settleTimer); card.classList.remove('settling');
       const tray = card.querySelector('.story-actions-tray'); if (tray) tray.hidden = false;
       card.setPointerCapture?.(event.pointerId);
     }
@@ -773,8 +773,11 @@ function wireStorySwipe(card, id, cancelHold) {
     const dx = event.clientX - origin.x;
     releaseSurface();
     if (horizontal && !state.storySelectionMode) {
-      if (dx <= -60) revealStory(card, id);
-      else if (dx >= 60) closeStoryReveal();
+      if (dx <= -60) {
+        revealStory(card, id);
+        // While the surface and Actions button slide over the tray's left edge, let taps reach the tray buttons beneath.
+        clearTimeout(settleTimer); card.classList.add('settling'); settleTimer = setTimeout(() => card.classList.remove('settling'), 220);
+      } else if (dx >= 60) closeStoryReveal();
     }
     origin = null; horizontal = false;
   });

@@ -72,9 +72,10 @@ function section(start, end) { const at = source.indexOf(start); assert(at >= 0,
   const css = fs.readFileSync(path.join(__dirname, '../css/style.css'), 'utf8');
   assert(/\.story-card\.swipe-revealed \{ --swipe-x: -168px; \}/.test(css) && /\.story-open, \.story-menu-toggle \{ transform: translateX\(var\(--swipe-x\)\)/.test(css), 'tray width matches the slide distance and the Actions button moves with the surface');
   assert(/story-menu-toggle[^}]*width: 44px; height: 44px/.test(css) && /\.story-tray-action \{[^}]*min-height: 44px/.test(css), '44px targets');
-  const vars = {}, tray = { hidden: true }, handlers = {}, classes = new Set();
+  assert(/\.story-card\.swipe-revealed\.settling \.story-open, \.story-card\.swipe-revealed\.settling \.story-menu-toggle \{ pointer-events: none; \}/.test(css), 'while the revealed surface slides over the tray, taps pass through to Select/Delete');
+  const vars = {}, tray = { hidden: true }, handlers = {}, classes = new Set(), timers = [];
   const card = { classList: { contains: name => classes.has(name), add: name => classes.add(name), remove: name => classes.delete(name) }, style: { setProperty: (k, v) => { vars[k] = v; }, removeProperty: k => { delete vars[k]; } }, querySelector: selector => selector === '.story-actions-tray' ? tray : null, addEventListener: (name, fn) => { handlers[name] = fn; }, setPointerCapture() {} };
-  const context = { state: { storySelectionMode: false }, revealStory() {}, closeStoryReveal() {}, setTimeout: () => 0 }; vm.createContext(context);
+  const context = { state: { storySelectionMode: false }, revealStory() {}, closeStoryReveal() {}, setTimeout: fn => timers.push(fn), clearTimeout() {} }; vm.createContext(context);
   vm.runInContext(section('const STORY_TRAY_WIDTH', 'function confirmStoryDeletion('), context);
   context.wireStorySwipe(card, 'a', () => {});
   handlers.pointerdown({ clientX: 300, clientY: 100, pointerId: 1, isPrimary: true, button: 0, target: { closest: () => null } });
@@ -85,6 +86,13 @@ function section(start, end) { const at = source.indexOf(start); assert(at >= 0,
   assert.equal(vars['--swipe-x'], '-168px', 'drag is clamped to the tray width');
   handlers.pointerup({ clientX: 20, clientY: 100, pointerId: 1 });
   assert.equal(vars['--swipe-x'], undefined, 'inline offset is released so the class settles the card');
+  assert(classes.has('settling'), 'a completed reveal swipe lets the first tap reach the tray while the surface is still sliding');
+  timers.splice(0).forEach(fn => fn());
+  assert(!classes.has('settling'), 'tray pass-through ends once the slide settles');
+  handlers.pointerdown({ clientX: 300, clientY: 100, pointerId: 3, isPrimary: true, button: 0, target: { closest: () => null } });
+  handlers.pointermove({ clientX: 280, clientY: 100, pointerId: 3, preventDefault() {} });
+  handlers.pointerup({ clientX: 280, clientY: 100, pointerId: 3 });
+  assert(!classes.has('settling'), 'a short drag that does not reveal the tray never makes the surface click-through');
   // A touch drag produces no click; the next tap on a tray button must not be swallowed.
   handlers.pointerdown({ clientX: 100, clientY: 100, pointerId: 2, isPrimary: true, button: 0, target: { closest: () => ({}) } });
   let swallowed = false; handlers.click({ preventDefault() { swallowed = true; }, stopImmediatePropagation() {} });
