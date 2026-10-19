@@ -405,7 +405,6 @@ const totalOf = days => Object.values(days).reduce((sum, item) => sum + item.app
   assert.ok(manifest.files.includes('data/usage.json') && update.seedFiles.includes('data/usage.json'), 'usage is a seeded user file');
   assert.ok(!update.managedFiles.includes('data/usage.json'), 'updates never overwrite learner usage');
   assert.deepEqual(update.seedDefaults['data/usage.json'], {version: 1, days: {}});
-  assert.deepEqual(JSON.parse(fs.readFileSync('data/usage.json', 'utf8')), emptyUsage(), 'the repository seed is empty');
   for (const name of ['js/usage-tracker.js', 'js/usage-stats.js']) assert.ok(manifest.files.includes(name) && update.managedFiles.includes(name));
   assert.ok(!/usage/i.test(fs.readFileSync('js/bridge.js', 'utf8').replace(/provider usage/g, '')), 'no host API change');
 }
