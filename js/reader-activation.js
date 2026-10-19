@@ -1,5 +1,5 @@
 // Reader text can carry a vocabulary note (glossary trigger) and a saved explanation (mark) on the same
-// characters, nested in either order. These helpers decide what an activation reaches and show the chooser.
+// characters, nested in either order. These helpers decide what an activation reaches and route it.
 import { firstGlossaryMatches } from './reader-text.js';
 
 const GLOSSARY = '.gloss-note-trigger';
@@ -50,7 +50,7 @@ export function normalizeReaderControls(root) {
   }
   for (const fragment of root.querySelectorAll(GLOSSARY)) {
     const info = glossaryForTrigger(fragment);
-    if (info && fragment.querySelector(MARK)) info.trigger.setAttribute('aria-label', `Vocabulary note or saved explanation for ${info.surface}`);
+    if (info && fragment.querySelector(MARK)) info.trigger.setAttribute('aria-label', `Word note for ${info.surface}, with a saved explanation`);
   }
 }
 
@@ -64,7 +64,7 @@ export function resolveReaderActivation(event, { root, glossaryFor, hasExplanati
   if (keyboard && !mark && trigger) {
     const primary = glossaryFor(trigger)?.trigger;
     // A single Japanese glossary control can span multiple ruby fragments. Its keyboard action
-    // must also offer an explanation attached only to one of the later fragments.
+    // must also reach an explanation attached only to one of the later fragments.
     mark = trigger.querySelector(MARK) || [...root.querySelectorAll(GLOSSARY)]
       .filter(fragment => primary && glossaryFor(fragment)?.trigger === primary)
       .map(fragment => fragment.querySelector(MARK)).find(Boolean);
@@ -77,8 +77,9 @@ export function resolveReaderActivation(event, { root, glossaryFor, hasExplanati
 }
 
 // One dispatcher owns every tap, Enter and Space on story text, so nested or overlapping controls activate once.
-// A single destination opens directly; a vocabulary note over a saved explanation asks which to open.
-export function createReaderActivation({ root, chooser, glossaryFor, hasExplanation, selectionCollapsed, closeNote, showNote, showExplanation }) {
+// Vocabulary comes first: text with a note opens it and passes any saved explanation id for the note's
+// "View saved explanation" action; explanation-only text jumps straight to the saved card.
+export function createReaderActivation({ root, glossaryFor, hasExplanation, selectionCollapsed, closeNote, showNote, showExplanation }) {
   const handled = new WeakSet();
   return function activate(event) {
     if (handled.has(event)) return;
@@ -88,70 +89,8 @@ export function createReaderActivation({ root, chooser, glossaryFor, hasExplanat
     if (event.type === 'keydown') event.preventDefault();
     // The click that ends a selection gesture must not navigate or open anything.
     if (!selectionCollapsed()) return;
-    const { vocab, helpId, mark, anchor } = found;
-    const openNote = () => showNote(vocab);
-    if (vocab && helpId) {
-      if (chooser.key === anchor) { chooser.close(true); return; }
-      closeNote();
-      const siblings = [...root.querySelectorAll('mark.explained-expression')].filter(node => node.dataset.helpId === helpId);
-      chooser.show({
-        anchor, returnFocus: [anchor, mark, vocab.trigger, ...siblings].find(node => node && node.tabIndex >= 0),
-        options: [{ label: 'Vocabulary note', run: openNote }, { label: 'Saved explanation', run: () => showExplanation(helpId) }]
-      });
-    } else if (vocab) { chooser.close(); openNote(); }
-    else { chooser.close(); closeNote(); showExplanation(helpId); }
+    const { vocab, helpId } = found;
+    if (vocab) showNote(vocab, helpId);
+    else { closeNote(); showExplanation(helpId); }
   };
-}
-
-// Anchored, nonmodal two-action popover. It owns focus, Escape, outside-press, scroll and resize dismissal.
-export function createSourceChooser({ element, document, window }) {
-  let open = null;
-  const isOpen = () => open !== null;
-  function close(restoreFocus = false) {
-    if (!open) return;
-    const { returnFocus, key } = open; open = null;
-    element.hidden = true; element.textContent = '';
-    if (restoreFocus && returnFocus?.isConnected !== false) returnFocus?.focus?.({ preventScroll: true });
-    return key;
-  }
-  function place(anchor) {
-    const rect = anchor.getBoundingClientRect(), width = window.innerWidth, height = window.innerHeight;
-    const box = element.getBoundingClientRect();
-    element.style.left = `${Math.max(12, Math.min(width - (box.width || 220) - 12, rect.left))}px`;
-    const below = rect.bottom + 8, fits = below + (box.height || 100) <= height - 12;
-    element.style.top = `${fits ? below : Math.max(12, rect.top - (box.height || 100) - 8)}px`;
-  }
-  // `key` identifies the activated control: activating it again closes the chooser instead of reopening it.
-  function show({ anchor, key = anchor, returnFocus = null, options }) {
-    if (open && open.key === key) { close(true); return false; }
-    close();
-    element.textContent = '';
-    const buttons = options.map(option => {
-      const button = document.createElement('button');
-      button.type = 'button'; button.className = 'source-chooser-option'; button.textContent = option.label;
-      button.addEventListener('click', () => { close(); option.run(); });
-      element.append(button); return button;
-    });
-    open = { key, anchor, returnFocus: returnFocus || anchor };
-    element.hidden = false; place(anchor);
-    buttons[0].focus({ preventScroll: true });
-    return true;
-  }
-  document.addEventListener('keydown', event => {
-    if (!open) return;
-    if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(true); return; }
-    const arrow = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[event.key];
-    const buttons = [...element.querySelectorAll('button')], index = buttons.indexOf(event.target);
-    if (arrow && index >= 0) { event.preventDefault(); buttons[(index + arrow + buttons.length) % buttons.length].focus({ preventScroll: true }); }
-  }, true);
-  document.addEventListener('pointerdown', event => {
-    if (!open) return;
-    const target = elementOf(event.target);
-    // A press on text that can open the chooser lets the following click replace or toggle it.
-    if (element.contains(target) || target?.closest?.(`${GLOSSARY}, ${MARK}`)) return;
-    close();
-  }, true);
-  document.addEventListener('scroll', event => { if (open && !element.contains(event.target)) close(); }, true);
-  window.addEventListener('resize', () => close());
-  return { show, close, isOpen, get key() { return open?.key ?? null; }, contains: node => element.contains(node) };
 }
