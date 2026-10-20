@@ -20,7 +20,7 @@ LingoMage is an **[App²](https://github.com/javiercmh/appapp) subapp**: it runs
 
 1. In App², tap **Import** and paste `https://github.com/javiercmh/lingomage`.
 2. Connect an AI provider in the App² library under **Settings → AI**.
-3. Open LingoMage, choose your learning languages and reading levels in Settings, then choose a story idea and reading scope.
+3. Open LingoMage, choose your learning languages and reading levels in Profile, then choose a story idea and reading scope.
 
 Reading levels are self-selected targets, not certified proficiency assessments. Generation first plans suitable vocabulary and grammar, then writes the story and contextual glossary.
 

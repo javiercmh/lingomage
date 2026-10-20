@@ -20,7 +20,10 @@ async function retryLoading(){const loaded=new Promise(resolve=>frame.addEventLi
 // Simulates an unavailable disk for settings.json only, through the app's real write path (the bridge request fails).
 function failSettingsWrites(on){const win=frame.contentWindow;win.__failSettings=on;const proto=win.XMLHttpRequest.prototype;if(proto.__plainOpen)return;proto.__plainOpen=proto.open;proto.open=function(method,url,...rest){if(win.__failSettings&&/writeFile\?/.test(url)&&decodeURIComponent(url).includes('name=data/settings.json'))url='/__bridge/unavailable';return proto.__plainOpen.call(this,method,url,...rest);};}
 const fire=(control,type)=>control.dispatchEvent(new Event(type,{bubbles:true}));
-async function closeReader(){frame.contentWindow.history.back();await until(()=>!field('reader-dialog').open,'Reader did not close');}
+// Back dismisses an open vocabulary note first and restores the reader's history entry, so only a second Back leaves the reader.
+async function closeReader(){const note=field('word-note-popover');const noteOpen=!note.hidden;frame.contentWindow.history.back();
+ if(noteOpen){await until(()=>note.hidden,'Back did not dismiss the vocabulary note');assert(field('reader-dialog').open,'Back closed the reader before the vocabulary note');await delay(50);frame.contentWindow.history.back();}
+ await until(()=>!field('reader-dialog').open,'Reader did not close');}
 function tab(name){doc().querySelector(`[data-view="${name}"]`).click();}
 async function completeGeneration(){await until(()=>field('reader-dialog').open && field('reader-story').textContent.trim(),'Generation did not open the reader');await until(()=>!field('generate').disabled,'Generation remained blocked');}
 document.querySelector('#run').addEventListener('click',async event=>{
@@ -74,7 +77,7 @@ document.querySelector('#run').addEventListener('click',async event=>{
   for(const [path,bad,label] of [['data/settings.json','{broken settings','malformed'],['data/stories.json','[null]','malformed'],['data/generation-checkpoints.json','{broken progress','malformed'],['data/settings.json','','blank'],['data/stories.json','','blank'],['data/generation-checkpoints.json','','blank']]){
    const original=await read(path);await write(path,bad);await reload();await until(()=>!field('storage-recovery').hidden,'No persistent storage error');
    assert(field('storage-recovery-message').textContent.includes(path),'The storage error does not name the file');
-   assert(field('generate').disabled,'Generation enabled with invalid data');tab('settings');await delay(100);
+   assert(field('generate').disabled,'Generation enabled with invalid data');tab('profile');await delay(100);
    assert(await read(path)===bad,'Invalid data was overwritten');
    await write(path,original);await retryLoading();
    assert(field('storage-recovery').hidden,'Retry loading left the storage error visible after repair');assert(!field('generate').disabled,'Generation stayed blocked after repair');
@@ -98,9 +101,9 @@ document.querySelector('#run').addEventListener('click',async event=>{
    await write('data/settings.json','{}');await retryLoading();
    // With a different store unreadable, Settings stay readable but cannot be edited.
    await write('data/stories.json','[null]');await write('data/settings.json',JSON.stringify({targetLanguages:{de:'enabled'},standardizedLevels:{de:'A1'}}));await reload();await until(()=>!field('storage-recovery').hidden,'No persistent storage error');
-   tab('settings');const toggle=doc().querySelector('.language-toggle');assert(toggle && !toggle.disabled,'Settings cannot be read while a store is unreadable');
+   tab('profile');const toggle=doc().querySelector('.language-toggle');assert(toggle && !toggle.disabled,'Settings cannot be read while a store is unreadable');
    toggle.click();assert(doc().querySelector('.target-language-settings').hidden===false,'The language disclosure did not expand');
-   assert([...doc().querySelectorAll('#view-settings select, #view-settings textarea, .language-remove, #model-select')].every(item=>item.disabled),'Settings stay editable while a store is unreadable');
+   assert([...doc().querySelectorAll('#view-settings select, #my-languages select, #my-languages textarea, .language-remove, #model-select')].every(item=>item.disabled),'Settings stay editable while a store is unreadable');
    await write('data/stories.json',storiesBefore);await write('data/settings.json','{}');await retryLoading();
    pass('Stories stay readable while settings are unreadable; preference edits are blocked with an in-modal explanation; Settings are read-only');
   }
@@ -130,7 +133,7 @@ document.querySelector('#run').addEventListener('click',async event=>{
    assert(slider.value==='27' && furigana.checked===!startFurigana && field('player-rate').value==='1.5','Retry save did not apply the intended changes to the controls');
    await closeReader();
    // Page-level failures: Add and Stop learning keep focus and report in the page; one Retry repeats both.
-   tab('settings');const add=doc().querySelector('.language-add[data-code="ru"]');add.focus();failSettingsWrites(true);add.click();
+   tab('profile');const add=doc().querySelector('.language-add[data-code="ru"]');add.focus();failSettingsWrites(true);add.click();
    const pageNotice=field('settings-write-error');
    assert(!pageNotice.hidden && pageNotice.getAttribute('role')==='alert' && pageNotice.querySelector('button'),'No announced page error with Retry save');
    assert(!doc().querySelector('.target-language-row[data-code="ru"]') && doc().activeElement===doc().querySelector('.language-add[data-code="ru"]'),'A failed Add was not rolled back with focus kept');
@@ -149,10 +152,59 @@ document.querySelector('#run').addEventListener('click',async event=>{
    let saved=JSON.parse(await read('data/settings.json'));
    assert(saved.futureTop.keep && saved.targetLanguages.fr==='enabled' && saved.standardizedLevels.fr==='B1' && saved.standardizedLevels.ja==='N0','Unknown nested settings were dropped');
    assert(saved.languageOrder[0]==='fr' && saved.languageOrder.at(-1)==='xx' && saved.learnerProfiles.de.length===900 && saved.readingPreferences.fontSize===14 && saved.readingPreferences.futurePreference===7,'Legacy values were rewritten by an ordinary save');
-   tab('settings');doc().querySelector('.target-language-row[data-code="de"] .language-toggle').click();doc().querySelector('.target-language-row[data-code="de"] .language-remove').click();
+   tab('profile');doc().querySelector('.target-language-row[data-code="de"] .language-toggle').click();doc().querySelector('.target-language-row[data-code="de"] .language-remove').click();
    saved=JSON.parse(await read('data/settings.json'));
    assert(!saved.targetLanguages.de && saved.targetLanguages.fr==='enabled','Stop learning was not honoured, or removed the future language');
    pass('Unknown and legacy nested settings survive ordinary saves; Stop learning still removes only the chosen language');
+  }
+  {
+   // Profile: navigation, period changes, language disclosures and focus. The page is parked on about:blank first so
+   // its own usage save cannot overwrite the disposable fixture, which uses past dates so counts are deterministic.
+   const key=days=>{const date=new Date();date.setDate(date.getDate()-days);return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');};
+   const min=60000;
+   const fixture={version:1,days:{[key(3)]:{app:120*min,languages:{de:{reading:90*min},ja:{reading:30*min}}},[key(30)]:{app:70*min,languages:{de:{reading:60*min},ru:{reading:10*min}}}}};
+   await new Promise(resolve=>{frame.addEventListener('load',resolve,{once:true});frame.src='about:blank';});
+   await write('data/usage.json',fixture);await write('data/stories.json',[]);await write('data/settings.json',{targetLanguages:{de:'enabled'},standardizedLevels:{de:'A1'}});await write('data/generation-checkpoints.json',[]);
+   await new Promise(resolve=>{frame.addEventListener('load',resolve,{once:true});frame.src='/';});
+   await until(()=>field('language')?.options.length && field('model-select').value==='development-mock','Profile fixture did not load');
+   const tabs=[...doc().querySelectorAll('.tabbar .tab')];
+   assert(tabs.map(item=>item.dataset.view).join()==='create,library,profile','Bottom navigation is not Create, Library, Profile');
+   tab('profile');
+   assert(field('view-profile').classList.contains('active') && doc().querySelector('.tab[data-view="profile"]').getAttribute('aria-current')==='page','Profile tab is not current');
+   assert(field('my-practice').compareDocumentPosition(field('my-languages')) & Node.DOCUMENT_POSITION_FOLLOWING,'My practice does not precede My languages');
+   assert(field('my-languages').querySelector('.target-language-row[data-code="de"]'),'My languages lost the enabled language row');
+   const gear=field('open-settings');assert(gear.getAttribute('aria-label')==='Settings' && gear.getBoundingClientRect().width>=44 && gear.getBoundingClientRect().height>=44,'Gear is not an accessible 44px button');
+   gear.click();
+   assert(field('view-settings').classList.contains('active') && !field('view-profile').classList.contains('active') && field('model-select') && doc().querySelector('.tab[data-view="profile"]').getAttribute('aria-current')==='page','Gear did not open Settings under the Profile tab');
+   assert(doc().activeElement===field('settings-back') && /Back to Profile/.test(field('settings-back').textContent),'Settings did not focus Back to Profile');
+   field('settings-back').click();
+   assert(field('view-profile').classList.contains('active') && doc().activeElement===gear,'Back to Profile did not return focus to the gear');
+   // Periods: the radiogroup moves and selects with arrow keys, keeping focus on the group.
+   const radios=[...field('usage-ranges').querySelectorAll('[role="radio"]')];
+   assert(radios.length===3 && radios.every(item=>item.getBoundingClientRect().height>=44),'Time period options are missing or under 44px');
+   const key_=(control,name)=>control.dispatchEvent(new KeyboardEvent('keydown',{key:name,bubbles:true,cancelable:true}));
+   const rows=()=>[...field('usage-content').querySelectorAll('.stats-language-toggle')];
+   const row=name=>rows().find(item=>item.dataset.key===name);
+   radios[0].focus();key_(radios[0],'ArrowRight');
+   assert(radios[1].getAttribute('aria-checked')==='true' && doc().activeElement===radios[1],'ArrowRight did not select and focus Last 7 days');
+   assert(row('language-de') && row('language-ja') && !row('language-ru') && /1 hour 30 minutes/.test(row('language-de').textContent) && /30 minutes/.test(row('language-ja').textContent),'Last 7 days figures are wrong');
+   // Disclosures: native buttons (Enter/Space activate), 44px, aria-expanded/controls, hidden until opened.
+   const de=row('language-de'), panel=field(de.getAttribute('aria-controls'));
+   assert(de.tagName==='BUTTON' && de.getBoundingClientRect().height>=44 && de.getAttribute('aria-expanded')==='false' && panel.hidden,'German row is not a collapsed 44px disclosure');
+   de.focus();de.click();
+   assert(de.getAttribute('aria-expanded')==='true' && !panel.hidden && /Reading/.test(panel.textContent) && /90|1 hour 30/.test(panel.textContent),'German disclosure did not reveal its Reading breakdown');
+   const activity=row('activity');assert(activity.getAttribute('aria-expanded')==='false' && field(activity.getAttribute('aria-controls')).hidden,'By activity is not a collapsed disclosure');
+   activity.click();assert(!field(activity.getAttribute('aria-controls')).hidden && /Reading/.test(field(activity.getAttribute('aria-controls')).textContent),'By activity did not reveal Reading');
+   // A period change rebuilds the content: focus on a still-present row and every open state are kept.
+   de.focus();radios[2].click();
+   const deAll=row('language-de');
+   assert(deAll!==de && doc().activeElement===deAll && deAll.getAttribute('aria-expanded')==='true' && row('activity').getAttribute('aria-expanded')==='true','Period change lost focus or expanded state');
+   assert(/2 hours 30 minutes/.test(deAll.textContent) && row('language-ru') && /10 minutes/.test(row('language-ru').textContent),'All time keeps disabled-language history');
+   // A focused row that does not exist in the new period hands focus to the selected period.
+   row('language-ru').focus();radios[1].click();
+   assert(!row('language-ru') && doc().activeElement===radios[1],'Focus was lost when the focused language row left the view');
+   radios[1].focus();key_(radios[1],'ArrowLeft');assert(radios[0].getAttribute('aria-checked')==='true' && doc().activeElement===radios[0],'ArrowLeft did not return to Today');
+   pass('Profile: three-tab navigation, gear/Back focus, period keys, language and activity disclosures, and focus/expanded state across rebuilds');
   }
   status.textContent='PASS — all offline browser smoke checks completed.';document.documentElement.dataset.result='passed';
  }catch(error){status.textContent=`FAIL — ${error.message}`;document.documentElement.dataset.result='failed';}

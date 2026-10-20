@@ -37,7 +37,8 @@ Native gestures and accessibility semantics/focus transitions can have automated
 
 | Check | Automation method | Current evidence / remaining work |
 | --- | --- | --- |
-| Launch, bottom navigation, Settings prompts and dismissal across reloads | Browser state tests; Android relaunch/persistence tests | Pending comprehensive native coverage |
+| Launch, bottom navigation (Create, Library, Profile), Profile gear → Settings → Back to Profile, language prompts and dismissal across reloads | Browser state tests; Android relaunch/persistence tests | Pending comprehensive native coverage |
+| Profile: By-language disclosure rows (TalkBack, 44px targets, enlarged font), My practice then My languages scroll, safe areas and keyboard insets | Android TalkBack/configuration tests; screenshots | Pending; browser inspection only |
 | Safe areas, sticky bars, keyboard insets, enlarged system font and pinch zoom across all screens | Android configuration/IME tests, gesture injection, geometry and screenshot captures; browser geometry as an early check | Partial: reader error notice and final actions inspected on API 36. Other screens, keyboard, scaling and 44px targets pending |
 | Managed updates preserve stories, settings, checkpoints and unowned files | Package ownership tests; Android import/update into disposable workspaces; assert publisher identity and native confirmation flow; compare file hashes | Pending end-to-end update verification |
 | Languages: expand rows, chevrons, Add/Stop learning, persisted Create order | Browser state; Android taps, reorder gestures, page-scroll conflict/edge-scroll assertions, cancellation, accessibility focus and reload assertions | Partial: native failed Add rolls back and Retry save persists it. Normal Stop/reordering/touch coverage pending |
