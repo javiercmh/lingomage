@@ -56,7 +56,7 @@ Native gestures and accessibility semantics/focus transitions can have automated
 | Examples, More detail and recovered results attach to the correct story/path | Browser fixtures and native navigation/lifecycle assertions | Pending native coverage |
 | Provider errors, correct recovery, no silent retries | Scripted bridge failures; native disconnected/error fixtures; request-count assertions | Pending native coverage; live calls are unnecessary for most error paths |
 
-### Reader and My stories
+### Reader and Library
 
 | Check | Automation method | Current evidence / remaining work |
 | --- | --- | --- |
@@ -73,8 +73,9 @@ Native gestures and accessibility semantics/focus transitions can have automated
 | Copy chapter writes canonical text to system clipboard | Native clipboard content assertions | Pending native check |
 | Reader multiword selection keeps Android's native context menu hidden, including selections spanning annotated text nodes and handle drags; custom reader actions remain available | Android instrumentation with real long-press/handle gestures and native menu visibility assertions across plain and annotated prose | Pending: this update routes context-menu events by the live selection because Android may target its common ancestor; verify on the updated App² host |
 | Explained passage highlight, card links and Show/View result scroll clearance | Browser and Android bounds/scroll and focus-visibility assertions with saved fixture explanations | Pending native check |
-| Swipe and Actions tray: card/button move together, one tray open, vertical scroll preserved, tray taps work | Android swipe/tap/long-press sequences and state assertions | Pending native coverage |
-| First tap on Select (including its left edge) or Delete immediately after a reveal swipe activates it, with no second tap needed | Android finger swipe then tap within 200 ms | Pending native coverage (desktop Chrome touch emulation only) |
+| Library Actions popover: tap/long-press/scroll separation, popover placement and flip with host insets and the bottom bar, Escape/Back dismissal, no gesture side effects | Android tap, scroll and long-press sequences with state and bounds assertions | Pending native coverage (desktop Chrome headless screenshots only) |
+| Library TalkBack and system font scaling: card names include title, language and "Updated"/"Created" dates; chips and Sort remain 44px and usable at large text; hero (with Read cue) and rows reflow without clipping | Android TalkBack traversal and 200% font-scale screenshots | Pending native coverage |
+| Library activity stamp persists across backgrounding: a long request finishing while the story is not open updates its "Updated" date and the hero after the app resumes, with no re-render under an open selection or popover | Android lifecycle test with the deterministic fake provider and `data/stories.json` inspection | Pending native coverage |
 | Bulk selection, chapter/path/story removal and confirmation | Browser state tests; Android gestures, confirmation/focus assertions and persistence checks using disposable data | Pending native coverage |
 | Running-request notification: LingoMage's task-specific title/body appear beside the host-derived app name for create, continue, rewrite, examples, notes, readings, explain and summary requests; Cancel affects only LingoMage's request | Android notification assertions with the deterministic fake provider in the App² test host | Partial: browser tests assert the `title`/`body` passed to `ai.start`. The App² host's fake-provider tests passed on the Test37 Android 37 emulator (2026-10-19) for two apps, request-scoped Cancel, Open, promotion, cleanup, rotation and owning-task close. They did not load LingoMage, so its actual copy on Android and denied notification permission are unverified |
 

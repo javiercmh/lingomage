@@ -1,4 +1,5 @@
 import { MEMORY_VERSION } from './story-memory.js';
+import { markStoryActivity } from './library-activity.js';
 // Final application remains idempotent by operation ID and rolls back failed saves.
 export function createGenerationController({state, normalizeChapters, ensureStoryPaths, persistReaderStory, savedFollowUps}) {
   function operationProvenance(op) {
@@ -10,6 +11,8 @@ function applyContentOperation(op) {
     if (state.stories.some(s=>s.operationId === op.id)) return;
     const version={id:`version-${op.id}`,...result,...provenance};
     const story={id:`story-${op.id}`,language:op.language,difficulty:op.input.difficulty,readingStartingPoint:op.input.readingStartingPoint,learnerKnowledge:op.input.learnerKnowledge,languageExpectations:op.input.languageExpectations,readingSelfReport:op.input.readingSelfReport,profileVersion:op.profileVersion,...result,...provenance,topic:op.input.topic,practice:op.input.practice,activeVersionId:version.id,chapters:[{id:`chapter-${op.id}`,activeVersionId:version.id,versions:[version],prompt:'',help:[]}]};
+    // The initial save time ranks the story, also after a resumed or recovered request; createdAt stays the operation start.
+    markStoryActivity(story,new Date(),'created'); // a failed save discards this object, so there is nothing to undo
     persistReaderStory(story); state.current=story; return;
   }
   const story=state.stories.find(s=>s.id === op.target.storyId);
@@ -38,6 +41,7 @@ function applyContentOperation(op) {
       candidate.paths.push(alternate); candidate.activePathId=alternate.id;
     }
   }
+  markStoryActivity(candidate); // saved by the single write below; the `before` copy restores the previous value on failure
   Object.assign(story,candidate);
   try { persistReaderStory(story); }
   catch (error) { for (const key of Object.keys(story)) delete story[key]; Object.assign(story,before); throw error; }

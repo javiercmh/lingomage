@@ -1,4 +1,4 @@
-// Behavioral checks for the reader redesign helpers (scroll reveal, overlap warning, swipe actions).
+// Behavioral checks for the reader redesign helpers (scroll reveal, overlap warning, library actions).
 const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
@@ -67,38 +67,16 @@ function section(start, end) { const at = source.indexOf(start); assert(at >= 0,
   console.log('PASS explained expression segments favor the newest explanation and overlap detection drives the replace warning');
 }
 
-// Story actions tray: swipe tracks the finger and a visible keyboard-reachable control exposes Select and Delete.
+// Library Actions: a visible 44px button opens a labelled popover with native Select and Delete. There is no swipe gesture or tray.
 {
   const css = fs.readFileSync(path.join(__dirname, '../css/style.css'), 'utf8');
-  assert(/\.story-card\.swipe-revealed \{ --swipe-x: -168px; \}/.test(css) && /\.story-open, \.story-menu-toggle \{ transform: translateX\(var\(--swipe-x\)\)/.test(css), 'tray width matches the slide distance and the Actions button moves with the surface');
-  assert(/story-menu-toggle[^}]*width: 44px; height: 44px/.test(css) && /\.story-tray-action \{[^}]*min-height: 44px/.test(css), '44px targets');
-  assert(/\.story-card\.swipe-revealed\.settling \.story-open, \.story-card\.swipe-revealed\.settling \.story-menu-toggle \{ pointer-events: none; \}/.test(css), 'while the revealed surface slides over the tray, taps pass through to Select/Delete');
-  const vars = {}, tray = { hidden: true }, handlers = {}, classes = new Set(), timers = [];
-  const card = { classList: { contains: name => classes.has(name), add: name => classes.add(name), remove: name => classes.delete(name) }, style: { setProperty: (k, v) => { vars[k] = v; }, removeProperty: k => { delete vars[k]; } }, querySelector: selector => selector === '.story-actions-tray' ? tray : null, addEventListener: (name, fn) => { handlers[name] = fn; }, setPointerCapture() {} };
-  const context = { state: { storySelectionMode: false }, revealStory() {}, closeStoryReveal() {}, setTimeout: fn => timers.push(fn), clearTimeout() {} }; vm.createContext(context);
-  vm.runInContext(section('const STORY_TRAY_WIDTH', 'function confirmStoryDeletion('), context);
-  context.wireStorySwipe(card, 'a', () => {});
-  handlers.pointerdown({ clientX: 300, clientY: 100, pointerId: 1, isPrimary: true, button: 0, target: { closest: () => null } });
-  handlers.pointermove({ clientX: 250, clientY: 100, pointerId: 1, preventDefault() {} });
-  assert.equal(vars['--swipe-x'], '-50px', 'card follows the finger');
-  assert.equal(tray.hidden, false, 'tray is revealed progressively while dragging');
-  handlers.pointermove({ clientX: 20, clientY: 100, pointerId: 1, preventDefault() {} });
-  assert.equal(vars['--swipe-x'], '-168px', 'drag is clamped to the tray width');
-  handlers.pointerup({ clientX: 20, clientY: 100, pointerId: 1 });
-  assert.equal(vars['--swipe-x'], undefined, 'inline offset is released so the class settles the card');
-  assert(classes.has('settling'), 'a completed reveal swipe lets the first tap reach the tray while the surface is still sliding');
-  timers.splice(0).forEach(fn => fn());
-  assert(!classes.has('settling'), 'tray pass-through ends once the slide settles');
-  handlers.pointerdown({ clientX: 300, clientY: 100, pointerId: 3, isPrimary: true, button: 0, target: { closest: () => null } });
-  handlers.pointermove({ clientX: 280, clientY: 100, pointerId: 3, preventDefault() {} });
-  handlers.pointerup({ clientX: 280, clientY: 100, pointerId: 3 });
-  assert(!classes.has('settling'), 'a short drag that does not reveal the tray never makes the surface click-through');
-  // A touch drag produces no click; the next tap on a tray button must not be swallowed.
-  handlers.pointerdown({ clientX: 100, clientY: 100, pointerId: 2, isPrimary: true, button: 0, target: { closest: () => ({}) } });
-  let swallowed = false; handlers.click({ preventDefault() { swallowed = true; }, stopImmediatePropagation() {} });
-  assert.equal(swallowed, false, 'a tap on the tray after a swipe is not suppressed');
-  const app = source;
-  assert(/story-tray-select/.test(app) && /story-swipe-delete/.test(app) && /Actions for \$\{story\.title\}/.test(app) && /closeStoryReveal\(true\)/.test(app));
-  assert(!/card-select-action'; select\.textContent = 'Select story'/.test(app), 'hidden focus-only Select story control is retired for stories');
-  console.log('PASS story swipe follows the finger, clamps to the tray, and a visible Actions button exposes Select and Delete');
+  assert(!/swipe|story-actions-tray|story-tray-|--swipe-x|settling/.test(css + source), 'swipe interaction and tray styles are removed');
+  assert(!/wireStorySwipe|revealStory|closeStoryReveal|STORY_TRAY_WIDTH|revealedStoryId/.test(source), 'swipe code is removed');
+  assert(/story-menu-toggle \{[^}]*width: 44px; height: 44px/.test(css) && /story-popover-action \{[^}]*min-height: 44px/.test(css) && /language-chip \{[^}]*min-height: 44px/.test(css), '44px targets');
+  assert(/role', 'group'/.test(source) && !/role', 'menu'/.test(source), 'popover is a labelled group of native buttons, not a partial ARIA menu');
+  assert(/Actions for \${story\.title}/.test(source) && /Select story \${story\.title}/.test(source) && /Delete story \${story\.title}/.test(source));
+  assert(/event\.key === 'Escape' && state\.storyMenu/.test(source) && /closeStoryMenu\(true\)/.test(source), 'Escape closes the popover and restores focus to its trigger');
+  assert(/pointerdown[\s\S]{0,160}closeStoryMenu\(\)/.test(source) && /addEventListener\('scroll', \(\) => closeStoryMenu/.test(source), 'outside press and scroll close the popover');
+  assert(!/card-select-action'; select\.textContent = 'Select story'/.test(source), 'hidden focus-only Select story control is retired for stories');
+  console.log('PASS library Actions popover replaces the swipe tray with visible 44px controls, labelled native buttons, Escape focus return and outside dismissal');
 }

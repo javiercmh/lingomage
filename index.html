@@ -53,7 +53,8 @@
     </section>
 
     <section id="view-library" class="view">
-      <div class="library-heading"><div><p class="eyebrow">YOUR READING SHELF</p><h2>My stories</h2></div><select id="filter-language" class="filter-select"><option value="all">All languages</option><option value="de">German</option><option value="ja">Japanese</option><option value="ru">Russian</option><option value="es-CL">Spanish</option></select></div>
+      <div class="library-heading"><div><h2>Library</h2><p id="library-count" class="library-count" aria-live="polite"></p></div><label id="library-sort-field" class="library-sort" hidden><span class="sr-only">Sort stories</span><select id="library-sort" class="filter-select"><option value="recent">Recent activity</option><option value="newest">Newest created</option></select></label></div>
+      <div id="library-languages" class="language-chips" role="group" aria-label="Filter by language" hidden></div>
       <div id="library-list" class="library-list"><div id="story-selection-toolbar" class="explanation-selection-toolbar story-selection-toolbar" role="toolbar" aria-label="Story selection" hidden><span id="story-selection-count" class="selection-count" aria-live="polite"></span><button id="delete-selected-stories" class="icon-btn danger-icon-btn" type="button" aria-label="Delete selected stories" title="Delete selected stories"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3"/></svg></button><button id="finish-story-selection" class="icon-btn selection-finish-btn" type="button" aria-label="Finish selection" title="Finish selection"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"/></svg></button></div></div>
     </section>
 
@@ -80,7 +81,7 @@
 
   <nav class="tabbar" aria-label="Main navigation">
     <button class="tab active" data-view="create" aria-current="page"><span class="tab-icon" aria-hidden="true">✨</span>Create</button>
-    <button class="tab" data-view="library"><span class="tab-icon" aria-hidden="true">📖</span><span class="tab-label">My stories <span id="story-count" class="story-count">0</span></span></button>
+    <button class="tab" data-view="library"><span class="tab-icon" aria-hidden="true">📖</span><span class="tab-label">Library</span></button>
     <button class="tab" data-view="stats"><span class="tab-icon" aria-hidden="true">📊</span>Stats</button>
     <button class="tab" data-view="settings" aria-label="Settings"><svg class="tab-icon settings-tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19.14 12.94c.04-.31.06-.62.06-.94s-.02-.63-.07-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.3 7.3 0 0 0-1.63-.95l-.36-2.54a.49.49 0 0 0-.49-.42h-3.84a.49.49 0 0 0-.49.42l-.36 2.54c-.59.23-1.14.55-1.63.95l-2.39-.96a.49.49 0 0 0-.61.22L2.64 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.05.31-.08.63-.08.94s.03.63.08.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.12.21.37.3.61.22l2.39-.96c.49.4 1.04.72 1.63.95l.36 2.54c.04.24.24.42.49.42h3.84c.25 0 .45-.18.49-.42l.36-2.54c.59-.23 1.14-.55 1.63-.95l2.39.96c.24.09.49-.01.61-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7"/></svg>Settings</button>
   </nav>

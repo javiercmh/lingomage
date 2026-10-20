@@ -1,4 +1,5 @@
 import { createStoryModel } from './story-model.js';
+import { markStoryActivity, planLibrary, dateSegments, describeDates } from './library-activity.js';
 import { createStoryMemory } from './story-memory.js';
 import { createGenerationController } from './generation-controller.js';
 import { createReaderPanels } from './reader-panels.js';
@@ -63,7 +64,7 @@ function fillScopeOptions(input, selected = 'scene', describe) {
 
 const PREFERRED_MODEL = 'gpt-6-luna';
 const $ = id => document.getElementById(id);
-const state = { languageOrder: Object.keys(LANGUAGES), standardizedLevels: {}, checkpointBlocked: false, stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, revealedStoryId: null, deleteStoryIds: new Set(), storySelectionMode: false, selectedStoryIds: new Set(), storySelectionFocusId: '', explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', readerHistoryEntry: false, speechVersionKey: '', playerEnabled: false, player: null, playerUnits: [], speechRate: 1, followAlong: true, following: true, wordNoteTrigger: null, readerEditBusy: false, activeChapterRequest: null, readerEditDraft: null };
+const state = { languageOrder: Object.keys(LANGUAGES), standardizedLevels: {}, checkpointBlocked: false, stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, libraryLanguage: 'all', librarySort: 'recent', storyMenu: null, libraryStale: false, libraryPlainHero: false, deleteTrigger: null, deleteStoryIds: new Set(), storySelectionMode: false, selectedStoryIds: new Set(), storySelectionFocusId: '', explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', readerHistoryEntry: false, speechVersionKey: '', playerEnabled: false, player: null, playerUnits: [], speechRate: 1, followAlong: true, following: true, wordNoteTrigger: null, readerEditBusy: false, activeChapterRequest: null, readerEditDraft: null };
 
 let readerSpeechRun = 0;
 let readerSpeechKey = '';
@@ -204,7 +205,7 @@ function persistStories() { workspaceStorage.save('data/stories.json', state.sto
 function persistReaderStory(story) {
   const alreadySaved = state.stories.some(item => item.id === story.id);
   if (!alreadySaved) state.stories.unshift(story);
-  try { persistStories(); updateCount(); }
+  try { persistStories(); libraryChanged(); }
   catch (error) { if (!alreadySaved) state.stories = state.stories.filter(item => item.id !== story.id); throw error; }
 }
 function persistSettings() { settingsPersistence.save(); }
@@ -767,7 +768,6 @@ async function saveGeneratedStory() {
   return !state.pendingGeneration;
 }
 
-function updateCount() { $('story-count').textContent = String(state.stories.length); }
 function pendingDeletionBlocked() { return !!(state.checkpointBlocked || pipeline?.records.length || state.requestId || state.pendingGeneration || state.pendingStoryRequestId || state.pendingReaderRequestId || state.pendingReaderResult || state.readerEditBusy || state.readerHelpBusy); }
 function syncStorySelection() {
   $('story-selection-toolbar').hidden = !state.storySelectionMode;
@@ -785,11 +785,11 @@ function leaveStorySelection(restoreFocus = false) {
   state.storySelectionMode = false; state.selectedStoryIds.clear(); syncStorySelection();
   const scrollY = window.scrollY;
   renderLibrary(); window.scrollTo(0, scrollY);
-  if (restoreFocus && focusId) $('library-list').querySelector(`[data-story-id="${CSS.escape(focusId)}"] .card-select-action`)?.focus({ preventScroll: true });
+  if (restoreFocus && focusId) $('library-list').querySelector(`[data-story-id="${CSS.escape(focusId)}"] .story-menu-toggle`)?.focus({ preventScroll: true });
   state.storySelectionFocusId = '';
 }
 function beginStorySelection(id) {
-  closeStoryReveal();
+  closeStoryMenu();
   if (!state.storySelectionMode) {
     state.storySelectionMode = true; state.selectedStoryIds.clear(); state.storySelectionFocusId = id;
   }
@@ -806,74 +806,39 @@ function toggleStorySelection(id) {
 function removeSelectedStories(ids) {
   if (!ids.size || pendingDeletionBlocked()) return false;
   const previous=state.stories; state.stories=previous.filter(story=>!ids.has(story.id));
-  try { persistStories(); leaveStorySelection(); updateCount(); renderLibrary(); toast(`${ids.size} ${ids.size===1?'story':'stories'} deleted`); return true; }
+  try { persistStories(); leaveStorySelection(); renderLibrary(); toast(`${ids.size} ${ids.size===1?'story':'stories'} deleted`); return true; }
   catch(error) { state.stories=previous; toast(error.message); return false; }
 }
-function closeStoryReveal(restoreFocus = false) {
-  const revealedId = state.revealedStoryId; state.revealedStoryId = null;
-  document.querySelectorAll('.story-card').forEach(card => {
-    card.classList.remove('swipe-revealed');
-    const tray = card.querySelector('.story-actions-tray'); if (tray) tray.hidden = true;
-    const toggle = card.querySelector('.story-menu-toggle'); if (toggle) toggle.setAttribute('aria-expanded', 'false');
-    if (restoreFocus && card.dataset.storyId === revealedId) toggle?.focus();
-  });
+// Story Actions popover: a labelled group of native buttons beside the open control; no drag gesture.
+function closeStoryMenu(restoreFocus = false) {
+  const menu = state.storyMenu; if (!menu) return;
+  state.storyMenu = null; menu.popover.remove(); menu.trigger.setAttribute('aria-expanded', 'false');
+  // A result saved while the popover was open re-renders now; focus then returns to the Actions button of the rebuilt card.
+  if (state.libraryStale && !state.storySelectionMode) renderLibrary();
+  if (!restoreFocus) return;
+  const list = $('library-list');
+  const target = menu.trigger.isConnected ? menu.trigger : list.querySelector(`[data-story-id="${CSS.escape(menu.id)}"] .story-menu-toggle`) || list.querySelector('.story-open');
+  target?.focus({ preventScroll: true });
 }
-function revealStory(card, id, focusTray = false) {
-  closeStoryReveal(); state.revealedStoryId = id;
-  card.classList.add('swipe-revealed');
-  card.querySelector('.story-actions-tray').hidden = false;
-  card.querySelector('.story-menu-toggle')?.setAttribute('aria-expanded', 'true');
-  if (focusTray) card.querySelector('.story-actions-tray button')?.focus();
-}
-const STORY_TRAY_WIDTH = 168;
-function wireStorySwipe(card, id, cancelHold) {
-  let origin = null, horizontal = false, suppressClick = false, settleTimer = null;
-  // The surface and the Actions button share --swipe-x so they move together; the tray underneath is shown while dragging.
-  const releaseSurface = () => {
-    card.classList.remove('swiping'); card.style.removeProperty('--swipe-x');
-    const tray = card.querySelector('.story-actions-tray');
-    if (tray && !card.classList.contains('swipe-revealed')) setTimeout(() => { if (!card.classList.contains('swipe-revealed') && !card.classList.contains('swiping')) tray.hidden = true; }, 220);
-  };
-  card.addEventListener('pointerdown', event => {
-    suppressClick = false;
-    if (state.storySelectionMode || event.isPrimary === false || (event.button !== undefined && event.button !== 0) || event.target.closest?.('.story-actions-tray, .story-menu-toggle')) return;
-    horizontal = false;
-    origin = { x: event.clientX, y: event.clientY, id: event.pointerId };
-  });
-  card.addEventListener('pointermove', event => {
-    if (!origin || event.pointerId !== origin.id) return;
-    const dx = event.clientX - origin.x, dy = event.clientY - origin.y;
-    if (!horizontal && Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx) / 1.5) { origin = null; return; }
-    if (!horizontal && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      horizontal = true; suppressClick = true; cancelHold(); clearTimeout(settleTimer); card.classList.remove('settling');
-      const tray = card.querySelector('.story-actions-tray'); if (tray) tray.hidden = false;
-      card.setPointerCapture?.(event.pointerId);
-    }
-    if (horizontal) {
-      event.preventDefault();
-      // The whole reading surface follows the finger (clamped to the tray width).
-      const base = card.classList.contains('swipe-revealed') ? -STORY_TRAY_WIDTH : 0;
-      card.classList.add('swiping'); card.style.setProperty('--swipe-x', `${Math.max(-STORY_TRAY_WIDTH, Math.min(0, base + dx))}px`);
-    }
-  });
-  card.addEventListener('pointerup', event => {
-    if (!origin || event.pointerId !== origin.id) return;
-    const dx = event.clientX - origin.x;
-    releaseSurface();
-    if (horizontal && !state.storySelectionMode) {
-      if (dx <= -60) {
-        revealStory(card, id);
-        // While the surface and Actions button slide over the tray's left edge, let taps reach the tray buttons beneath.
-        clearTimeout(settleTimer); card.classList.add('settling'); settleTimer = setTimeout(() => card.classList.remove('settling'), 220);
-      } else if (dx >= 60) closeStoryReveal();
-    }
-    origin = null; horizontal = false;
-  });
-  card.addEventListener('pointercancel', () => { releaseSurface(); origin = null; horizontal = false; });
-  card.addEventListener('pointerleave', () => { if (!horizontal) origin = null; });
-  card.addEventListener('click', event => {
-    if (suppressClick) { event.preventDefault(); event.stopImmediatePropagation(); suppressClick = false; }
-  }, true);
+function openStoryMenu(story, trigger) {
+  closeStoryMenu();
+  const popover = document.createElement('div'); popover.className = 'story-popover'; popover.setAttribute('role', 'group'); popover.setAttribute('aria-label', `Actions for ${story.title}`);
+  const icon = path => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg>`;
+  const select = document.createElement('button'); select.type = 'button'; select.className = 'story-popover-action story-popover-select';
+  select.innerHTML = `${icon('m5 12 4.5 4.5L19 7')}<span>Select</span>`; select.setAttribute('aria-label', `Select story ${story.title}`);
+  select.addEventListener('click', () => { closeStoryMenu(); beginStorySelection(story.id); });
+  const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'story-popover-action story-popover-delete';
+  remove.innerHTML = `${icon('M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3')}<span>Delete</span>`; remove.setAttribute('aria-label', `Delete story ${story.title}`);
+  remove.addEventListener('click', () => { state.deleteTrigger = { id: story.id, trigger }; closeStoryMenu(); confirmStoryDeletion(new Set([story.id]), story); });
+  popover.append(select, remove); document.body.append(popover);
+  trigger.setAttribute('aria-expanded', 'true');
+  // Fixed placement: right-aligned under the button, flipped above it when it would meet the bottom bar.
+  const rect = trigger.getBoundingClientRect(), height = popover.offsetHeight || 96, width = popover.offsetWidth || 180;
+  const bottomLimit = (document.querySelector('.tabbar')?.getBoundingClientRect().top || window.innerHeight) - 8;
+  const top = rect.bottom + 6 + height > bottomLimit ? Math.max(8, rect.top - 6 - height) : rect.bottom + 6;
+  popover.style.top = `${top}px`; popover.style.left = `${Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8))}px`;
+  state.storyMenu = { id: story.id, trigger, popover };
+  select.focus({ preventScroll: true });
 }
 function confirmStoryDeletion(ids, story = null) {
   if (!ids.size || pendingDeletionBlocked()) { toast('Finish or save the current AI response before deleting.'); return; }
@@ -917,63 +882,102 @@ function wireLongPress(card, onLongPress, onMove, allowStoryOpen = false, ignore
   card.addEventListener('contextmenu', event => { if (origin || completed) event.preventDefault(); clear(); });
   return clear;
 }
-function renderLibrary() {
-  closeStoryReveal();
-  const list = $('library-list'), toolbar = $('story-selection-toolbar'); list.replaceChildren(toolbar); toolbar.hidden = !state.storySelectionMode;
-  const filter = $('filter-language').value;
-  const stories = state.stories.filter(story => filter === 'all' || story.language === filter);
-  if (!stories.length) { const empty = document.createElement('div'); empty.className = 'empty-state'; empty.innerHTML = '<b>Your shelf is waiting.</b>Stories you save will appear here for offline reading.'; list.append(empty); syncStorySelection(); return; }
-  stories.forEach(story => {
-    const card = document.createElement('article'); card.className = `story-card${state.storySelectionMode?' selecting':''}`;
-    card.dataset.storyId = story.id;
-    if (state.storySelectionMode) {
-      card.classList.toggle('selected-card', state.selectedStoryIds.has(story.id));
-      const control = document.createElement('label'); control.className = 'story-check-control';
-      const check = document.createElement('input'); check.type = 'checkbox'; check.className = 'story-select-checkbox'; check.checked = state.selectedStoryIds.has(story.id); check.setAttribute('aria-label', `Select ${story.title}`); check.addEventListener('change', () => toggleStorySelection(story.id));
-      control.append(check); card.append(control);
-    }
-    const open = document.createElement('button'); open.className = 'story-open'; open.type = 'button';
-    const lang = document.createElement('span'); lang.className = 'language-tag'; lang.textContent = LANGUAGES[story.language] || story.language;
-    const title = document.createElement('h3'); title.textContent = story.title;
-    const meta = document.createElement('p'); const date = new Date(story.createdAt); meta.textContent = `${story.practice || (story.words || []).join(' · ') || story.topic || LANGUAGES[story.language]}  ·  ${date.toLocaleDateString()}`;
-    open.append(lang,title,meta); open.addEventListener('click', () => { if (state.storySelectionMode) toggleStorySelection(story.id); else openReader(story); });
-    card.append(open);
-    if (!state.storySelectionMode) {
-      const icon = path => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg>`;
-      const tray = document.createElement('div'); tray.className = 'story-actions-tray'; tray.hidden = true; tray.setAttribute('role', 'group'); tray.setAttribute('aria-label', `Actions for ${story.title}`);
-      const select = document.createElement('button'); select.type = 'button'; select.className = 'story-tray-action story-tray-select'; select.setAttribute('aria-label', `Select story ${story.title}`);
-      select.innerHTML = `${icon('m5 12 4.5 4.5L19 7')}<span>Select</span>`;
-      select.addEventListener('click', event => { event.stopPropagation(); beginStorySelection(story.id); });
-      const trash = document.createElement('button'); trash.type = 'button'; trash.className = 'story-tray-action story-swipe-delete';
-      trash.setAttribute('aria-label', `Delete story ${story.title}`);
-      trash.innerHTML = `${icon('M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3')}<span>Delete</span>`;
-      trash.addEventListener('click', event => { event.stopPropagation(); confirmStoryDeletion(new Set([story.id]), story); });
-      tray.append(select, trash); card.append(tray);
-      const more = document.createElement('button'); more.type = 'button'; more.className = 'icon-btn story-menu-toggle'; more.setAttribute('aria-label', `Actions for ${story.title}`); more.title = 'Story actions'; more.setAttribute('aria-expanded', 'false');
-      more.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>';
-      more.addEventListener('click', event => { event.stopPropagation(); if (state.revealedStoryId === story.id) closeStoryReveal(true); else revealStory(card, story.id, true); });
-      card.append(more);
-    }
-    list.append(card);
-    card.addEventListener('click', event => { if (event.target === card && state.storySelectionMode) toggleStorySelection(story.id); });
-    const cancelHold = wireLongPress(card, () => beginStorySelection(story.id), () => {}, true);
-    wireStorySwipe(card, story.id, cancelHold);
+// Library: one hero (the latest saved activity) and every other story once below it, in the session-only sort (js/library-activity.js). A result saved while a selection or Actions popover is open re-renders afterwards.
+function libraryChanged() {
+  if (!$('view-library').classList.contains('active')) { state.libraryStale = false; return; }
+  if (state.storySelectionMode || state.storyMenu) { state.libraryStale = true; return; }
+  renderLibrary();
+}
+function storyDateLine(entry, style) {
+  const line = document.createElement('p'); line.className = 'story-date';
+  dateSegments(entry, style).forEach((segment, index) => {
+    if (index) line.append(' · ');
+    const time = document.createElement('time'); time.dateTime = new Date(segment.ms).toISOString(); time.textContent = `${segment.label} ${segment.text}`; line.append(time);
   });
+  return line;
+}
+function storyCard(entry, variant, rowStyle) {
+  const story = entry.story, language = LANGUAGES[story.language] || story.language;
+  const card = document.createElement('article'); card.className = `story-card story-${variant}${state.storySelectionMode ? ' selecting' : ''}`; card.dataset.storyId = story.id;
+  if (state.storySelectionMode) {
+    card.classList.toggle('selected-card', state.selectedStoryIds.has(story.id));
+    const control = document.createElement('label'); control.className = 'story-check-control';
+    const check = document.createElement('input'); check.type = 'checkbox'; check.className = 'story-select-checkbox'; check.checked = state.selectedStoryIds.has(story.id); check.setAttribute('aria-label', `Select ${story.title}`); check.addEventListener('change', () => toggleStorySelection(story.id));
+    control.append(check); card.append(control);
+  }
+  const open = document.createElement('button'); open.className = 'story-open'; open.type = 'button';
+  const tag = document.createElement('span'); tag.className = 'language-tag';
+  tag.textContent = variant === 'hero' && !state.libraryPlainHero ? `Latest activity · ${language}` : language;
+  const title = document.createElement('h3'); title.textContent = story.title;
+  const style = variant === 'row' ? rowStyle : variant;
+  if (variant === 'hero') {
+    // Decorative reading cue on the sole hero; the whole card is the one control and its accessible name is unchanged.
+    const foot = document.createElement('div'); foot.className = 'hero-foot';
+    const cue = document.createElement('span'); cue.className = 'hero-read'; cue.setAttribute('aria-hidden', 'true'); cue.textContent = 'Read ›';
+    foot.append(storyDateLine(entry, style), cue); open.append(tag, title, foot);
+  } else open.append(tag, title, storyDateLine(entry, style));
+  const dates = describeDates(entry);
+  open.setAttribute('aria-label', `${story.title}. ${language}.${dates ? ` ${dates}.` : ''}`);
+  open.addEventListener('click', () => { if (state.storySelectionMode) toggleStorySelection(story.id); else openReader(story); });
+  card.append(open);
+  if (!state.storySelectionMode) {
+    const more = document.createElement('button'); more.type = 'button'; more.className = 'icon-btn story-menu-toggle'; more.setAttribute('aria-label', `Actions for ${story.title}`); more.title = 'Story actions'; more.setAttribute('aria-expanded', 'false');
+    more.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>';
+    more.addEventListener('click', event => { event.stopPropagation(); if (state.storyMenu?.id === story.id) closeStoryMenu(true); else openStoryMenu(story, more); });
+    card.append(more);
+  }
+  card.addEventListener('click', event => { if (event.target === card && state.storySelectionMode) toggleStorySelection(story.id); });
+  wireLongPress(card, () => beginStorySelection(story.id), () => {}, true);
+  return card;
+}
+function renderLibrary() {
+  state.libraryStale = false; closeStoryMenu();
+  const list = $('library-list'), toolbar = $('story-selection-toolbar'); list.replaceChildren(toolbar); toolbar.hidden = !state.storySelectionMode;
+  const codes = [...new Set(state.stories.map(story => story.language))].sort((a, b) => (Object.keys(LANGUAGES).indexOf(a) + 1 || 99) - (Object.keys(LANGUAGES).indexOf(b) + 1 || 99));
+  // A language filter that no longer matches any story (for example after deleting the last one) returns to All.
+  if (codes.length < 2 || !codes.includes(state.libraryLanguage)) state.libraryLanguage = 'all';
+  const plan = planLibrary(state.stories, { language: state.libraryLanguage, sort: state.librarySort });
+  state.libraryPlainHero = plan.plainHero;
+  const total = state.stories.length, shown = plan.count;
+  $('library-count').textContent = !total ? '' : shown === total ? `${total} ${total === 1 ? 'story' : 'stories'}` : `${shown} of ${total} stories`;
+  const chips = $('library-languages'); chips.replaceChildren(); chips.hidden = codes.length < 2;
+  if (codes.length > 1) ['all', ...codes].forEach(code => {
+    const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'language-chip'; chip.dataset.language = code;
+    chip.textContent = code === 'all' ? 'All' : LANGUAGES[code] || code; chip.setAttribute('aria-pressed', String(state.libraryLanguage === code));
+    chip.addEventListener('click', () => { if (state.libraryLanguage === code) return; state.libraryLanguage = code; leaveStorySelection(); renderLibrary(); });
+    chips.append(chip);
+  });
+  const sort = $('library-sort'); sort.value = state.librarySort; sort.disabled = state.storySelectionMode; $('library-sort-field').hidden = plan.rows.length < 2;
+  if (!total) {
+    const empty = document.createElement('div'); empty.className = 'empty-state'; empty.innerHTML = '<b>No stories yet</b>Stories you create will appear here for offline reading.'; list.append(empty); syncStorySelection(); return;
+  }
+  list.append(storyCard(plan.hero, 'hero'));
+  if (plan.rows.length) {
+    const label = document.createElement('h3'); label.className = 'library-list-label'; label.textContent = 'More stories'; list.append(label);
+    plan.rows.forEach(entry => list.append(storyCard(entry, 'row', state.librarySort === 'recent' ? 'recent' : 'created')));
+  }
   syncStorySelection();
 }
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && state.revealedStoryId && !document.querySelector('dialog[open]')) { event.preventDefault(); closeStoryReveal(true); }
+  if (event.key === 'Escape' && state.storyMenu && !document.querySelector('dialog[open]')) { event.preventDefault(); closeStoryMenu(true); }
 });
 document.addEventListener('pointerdown', event => {
-  if (state.revealedStoryId && !event.target.closest?.('.swipe-revealed')) closeStoryReveal();
+  if (state.storyMenu && !event.target.closest?.('.story-popover, .story-menu-toggle')) closeStoryMenu();
 });
+document.addEventListener('focusin', event => {
+  if (state.storyMenu && !event.target.closest?.('.story-popover') && event.target !== state.storyMenu.trigger) closeStoryMenu();
+});
+window.addEventListener('scroll', () => closeStoryMenu(), { passive: true });
+window.addEventListener('resize', () => closeStoryMenu());
+$('library-sort').addEventListener('change', event => { state.librarySort = event.target.value === 'newest' ? 'newest' : 'recent'; renderLibrary(); });
 $('finish-story-selection').addEventListener('click', () => leaveStorySelection(true));
-$('filter-language').addEventListener('change', () => { leaveStorySelection(); renderLibrary(); });
 $('delete-selected-stories').addEventListener('click', () => {
   confirmStoryDeletion(state.selectedStoryIds);
 });
 $('cancel-delete-stories').addEventListener('click', () => $('delete-stories-dialog').close());
-$('delete-stories-dialog').addEventListener('close', () => { if ($('reader-dialog').open && state.deleteStoryIds?.has(state.readerId)) $('reader-actions-toggle').focus(); });
+$('delete-stories-dialog').addEventListener('close', () => { const opener = state.deleteTrigger; state.deleteTrigger = null;
+  // The list may have re-rendered while the dialog was open; find the rebuilt Actions button for the same story.
+  if (opener) (opener.trigger.isConnected ? opener.trigger : $('library-list').querySelector(`[data-story-id="${CSS.escape(opener.id)}"] .story-menu-toggle`))?.focus({ preventScroll: true }); if ($('reader-dialog').open && state.deleteStoryIds?.has(state.readerId)) $('reader-actions-toggle').focus(); });
 $('delete-stories-dialog').addEventListener('click', event => { if (event.target === $('delete-stories-dialog')) $('delete-stories-dialog').close(); });
 $('confirm-delete-stories').addEventListener('click', () => {
   const ids=new Set(state.deleteStoryIds);
@@ -1277,7 +1281,7 @@ function loadReaderPositions() {
   }
 }
 function openReader(story) {
-  closeStoryReveal();
+  closeStoryMenu();
   // An empty legacy chapters array must be replaced too, or synthesized paths would point at chapters that are not saved.
   state.readerId = story.id; if (!story.chapters?.length) story.chapters = normalizeChapters(story);
   clearExplanationSelection();
@@ -2081,18 +2085,20 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
       if (readerGeneration) readerGeneration.helpId = existingHelp?.id || item.id;
       const preview = action === 'examples' ? result.examples.map(example => `${example.sentence}\n${example.translation}`).join('\n\n') : item.text;
       state.pendingReaderResult = { story, saved: false, preview, readerLocation: { chapterId: chapter.id, versionId: version.id, helpId: existingHelp?.id || '', followUp }, apply() {
+        // Saved with the explanation in the one write; the returned rollback restores the previous value or its absence.
+        const undoActivity = markStoryActivity(story);
         if (existingHelp) {
           const before = { ...existingHelp };
           const followUps = [...savedFollowUps(existingHelp), item];
           Object.assign(existingHelp, { followUps });
           // Retain the legacy latest-detail fields for older readers.
           if (action === 'detail') Object.assign(existingHelp, { more: item.text, detailProvenance: item });
-          return () => { for (const key of Object.keys(existingHelp)) delete existingHelp[key]; Object.assign(existingHelp, before); };
+          return () => { for (const key of Object.keys(existingHelp)) delete existingHelp[key]; Object.assign(existingHelp, before); undoActivity(); };
         }
         const before = chapter.help || [];
         const replaced = new Set(overlappingHelp(chapter, version.id, item.start, item.end));
         chapter.help = [...before.filter(entry => !replaced.has(entry)), item];
-        return () => { chapter.help = before; };
+        return () => { chapter.help = before; undoActivity(); };
       } };
       try { await savePendingReaderResult(); }
       catch { if (state.readerId === story.id) renderPendingReaderResult(); return; }
@@ -2386,4 +2392,4 @@ window.addEventListener('pagehide', () => usage.setVisible(false));
 window.addEventListener('pageshow', () => usage.setVisible(document.visibilityState === 'visible'));
 initializePipeline();
 showStorageErrors();
-updateCount(); refreshModels();
+refreshModels();
