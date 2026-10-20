@@ -223,7 +223,7 @@ function showStorageErrors() {
 }
 // Settings stay readable (disclosure toggles work) but cannot be edited while a store is unreadable.
 function applyStorageBlock() {
-  document.querySelectorAll('#view-settings input, #view-settings select, #view-settings textarea, #view-settings button:not(.language-toggle)').forEach(control=>{control.disabled=true;});
+  document.querySelectorAll('#view-settings input, #view-settings select, #view-settings textarea, #view-settings button:not(#settings-back), #my-languages input, #my-languages select, #my-languages textarea, #my-languages button:not(.language-toggle)').forEach(control=>{control.disabled=true;});
 }
 $('storage-retry').addEventListener('click', () => {
   const reason=unsavedWorkReason({state, pipeline, persistence:settingsPersistence});
@@ -246,8 +246,22 @@ function statsList(rows) {
   }
   return list;
 }
+// Language and activity rows are disclosures; the open keys survive re-renders so a refresh or period change never collapses a row.
+const openPractice = new Set();
+function disclosureRow(key, label, value, rows) {
+  const item = document.createElement('li'); item.className = 'stats-group stats-language';
+  const toggle = document.createElement('button'), name = document.createElement('span'), amount = document.createElement('span'), chevron = document.createElement('span');
+  const children = statsList(rows); children.id = `practice-${key}`; children.hidden = !openPractice.has(key);
+  toggle.type = 'button'; toggle.className = 'stats-language-toggle'; toggle.dataset.key = key; toggle.setAttribute('aria-controls', children.id);
+  name.textContent = label; amount.textContent = value; chevron.className = 'stats-chevron'; chevron.setAttribute('aria-hidden', 'true'); chevron.textContent = '⌄';
+  toggle.append(name, amount, chevron);
+  const sync = () => { toggle.setAttribute('aria-expanded', String(!children.hidden)); toggle.setAttribute('aria-label', `${label}${value ? `, ${value}` : ''}. ${children.hidden ? 'Show' : 'Hide'} details`); };
+  toggle.addEventListener('click', () => { children.hidden = !children.hidden; if (children.hidden) openPractice.delete(key); else openPractice.add(key); sync(); });
+  sync(); item.append(toggle, children);
+  return item;
+}
 function renderStats() {
-  if (!$('view-stats').classList.contains('active')) return;
+  if (!$('view-profile').classList.contains('active')) return;
   usage.observe();
   const summary = summarize(usage.data, state.statsRange, usage.today(), state.languageOrder);
   // The empty state is for no recorded time at all; any positive total shows as at least "Less than 1 minute".
@@ -255,24 +269,30 @@ function renderStats() {
   const activity = id => ACTIVITY_LABELS[id] || id;
   const model = empty ? { empty } : {
     total: formatDuration(summary.app),
-    languages: summary.languages.map(item => ({ label: LANGUAGES[item.id] || item.id, value: formatDuration(item.total), children: item.activities.map(entry => ({ label: activity(entry.id), value: formatDuration(entry.ms) })) })),
+    languages: summary.languages.map(item => ({ id: item.id, label: LANGUAGES[item.id] || item.id, value: formatDuration(item.total), children: item.activities.map(entry => ({ label: activity(entry.id), value: formatDuration(entry.ms) })) })),
     activities: summary.activities.map(entry => ({ label: activity(entry.id), value: formatDuration(entry.ms) }))
   };
   const signature = JSON.stringify([state.statsRange, model]);
   if (signature === statsSignature) return;
   statsSignature = signature;
-  const content = $('usage-content'); content.textContent = '';
-  const note = text => Object.assign(document.createElement('p'), { className: 'helper', textContent: text });
-  const section = (title, ...nodes) => {
-    const box = document.createElement('section'), heading = document.createElement('h3');
-    box.className = 'panel stats-section'; heading.className = 'settings-section-label'; heading.textContent = title;
-    box.append(heading, ...nodes); content.append(box);
-  };
-  if (empty) { section('No time tracked yet', note('Time appears here after you use LingoMage. Earlier use is not counted.')); return; }
-  section('Time in LingoMage', Object.assign(document.createElement('p'), { className: 'stats-total', textContent: model.total }), ...(model.languages.length ? [] : [note('No reading time in this period.')]));
-  if (!model.languages.length) return;
-  section('By language', statsList(model.languages));
-  section('By activity', statsList(model.activities));
+  const content = $('usage-content'), focusedKey = content.contains(document.activeElement) ? document.activeElement.dataset?.key : '';
+  content.textContent = '';
+  const text = (tag, className, value) => Object.assign(document.createElement(tag), { className, textContent: value });
+  const card = document.createElement('section'); card.className = 'panel stats-section'; content.append(card);
+  if (empty) card.append(text('h4', 'settings-section-label', 'No time tracked yet'), text('p', 'helper', 'Time appears here after you use LingoMage. Earlier use is not counted.'));
+  else {
+    card.append(text('h4', 'settings-section-label', 'Time in LingoMage'), text('p', 'stats-total', model.total));
+    if (!model.languages.length) card.append(text('p', 'helper', 'No reading time in this period.'));
+    else {
+      const list = document.createElement('ul'); list.className = 'stats-list';
+      model.languages.forEach(row => list.append(disclosureRow(`language-${row.id}`, row.label, row.value, row.children)));
+      const activities = document.createElement('ul'); activities.className = 'stats-list stats-activities';
+      activities.append(disclosureRow('activity', 'By activity', '', model.activities));
+      card.append(text('h5', 'stats-subtitle', 'By language'), list, activities);
+    }
+  }
+  // A row that is gone for this period hands focus to the selected period so it is never lost to the page.
+  if (focusedKey) (content.querySelector(`.stats-language-toggle[data-key="${CSS.escape(focusedKey)}"]`) || $('usage-ranges').querySelector('[tabindex="0"]'))?.focus({ preventScroll: true });
 }
 function setStatsRange(range, focus = false) {
   state.statsRange = range;
@@ -311,17 +331,20 @@ function toast(message) {
 }
 function setView(name) {
   if (name !== 'library' && state.storySelectionMode) leaveStorySelection();
+  const tabView = name === 'settings' ? 'profile' : name; // Settings is reached from Profile, which keeps its tab.
   document.querySelectorAll('.tab').forEach(tab => {
-    const active = tab.dataset.view === name;
+    const active = tab.dataset.view === tabView;
     tab.classList.toggle('active', active);
     if (active) tab.setAttribute('aria-current', 'page'); else tab.removeAttribute('aria-current');
   });
   document.querySelectorAll('.view').forEach(view => view.classList.toggle('active', view.id === `view-${name}`));
   if (name === 'library') renderLibrary();
-  if (name === 'stats') { renderStats(); startStatsRefresh(); } else stopStatsRefresh();
-  if (name === 'settings') { renderTargetLanguageSettings(); if (state.storageBlocked) showStorageErrors(); }
+  if (name === 'profile') { renderStats(); startStatsRefresh(); } else stopStatsRefresh();
+  if (name === 'profile' || name === 'settings') { if (name === 'profile') renderTargetLanguageSettings(); if (state.storageBlocked) showStorageErrors(); }
   window.scrollTo(0, 0);
 }
+$('open-settings').addEventListener('click', () => { setView('settings'); $('settings-back').focus({ preventScroll: true }); });
+$('settings-back').addEventListener('click', () => { setView('profile'); $('open-settings').focus({ preventScroll: true }); });
 document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => setView(tab.dataset.view)));
 
 // Match the starter's bottom navigation behavior when the on-screen keyboard opens.
@@ -371,7 +394,7 @@ function renderCheckpointRecovery() {
     if (readerGeneration && readerGeneration.storyId === op.target?.storyId) { readerGeneration.phase='working'; readerGeneration.message=stageMessage; renderReaderGeneration(); }
     if (state.activeChapterRequest && state.activeChapterRequest.storyId === op.target?.storyId) state.activeChapterRequest.loading.querySelector('strong').textContent=stageMessage;
   }
-  for (const id of ['checkpoint-recovery-create','checkpoint-recovery-settings','checkpoint-recovery-reader']) {
+  for (const id of ['checkpoint-recovery-create','checkpoint-recovery-profile','checkpoint-recovery-reader']) {
     const box = $(id);
     if (id === 'checkpoint-recovery-reader') { const anchor = op?.kind === 'examples' ? $('reader-help-section') : $('reader-edit-panel'); if (anchor.nextElementSibling !== box) anchor.after?.(box); }
     const hidden = !op || id === 'checkpoint-recovery-reader' && (op.target?.storyId !== state.readerId || pipeline.busy && state.activeChapterRequest?.storyId === op.target?.storyId) || id === 'checkpoint-recovery-create' && pipeline.busy && !$('loading-card').hidden;
@@ -2346,7 +2369,7 @@ async function refreshModels() {
     if (!state.model) { $('reasoning-select').value = ''; $('reasoning-select').hidden = true; $('reasoning-label').hidden = true; }
   } catch { if (refreshVersion !== modelRefreshVersion) return; $('ai-setup').hidden = false; $('model-controls').hidden = true; }
 }
-$('language-settings-open').addEventListener('click', () => setView('settings'));
+$('language-settings-open').addEventListener('click', () => { setView('profile'); $('my-languages').scrollIntoView({ block: 'start' }); });
 $('language-setup-dismiss').addEventListener('click', () => {
   state.languageSetupDismissed = true;
   $('language-setup').hidden = true;
@@ -2386,7 +2409,7 @@ usage.setVisible(document.visibilityState === 'visible');
 document.addEventListener('visibilitychange', () => {
   const visible = document.visibilityState === 'visible';
   usage.setVisible(visible);
-  if (!visible) stopStatsRefresh(); else if ($('view-stats').classList.contains('active')) { renderStats(); startStatsRefresh(); }
+  if (!visible) stopStatsRefresh(); else if ($('view-profile').classList.contains('active')) { renderStats(); startStatsRefresh(); }
 });
 window.addEventListener('pagehide', () => usage.setVisible(false));
 window.addEventListener('pageshow', () => usage.setVisible(document.visibilityState === 'visible'));

@@ -80,9 +80,9 @@ The reader preference notice reserves scroll space from its measured layout heig
 
 ## Time tracking
 
-Stats (fourth navigation tab) shows Today, Last 7 days (today plus the prior six local dates) and All time: app total, language totals, activity totals and language-by-activity. There are no charts, goals, reset or export. Counting rules are a product decision, not learning evidence:
+My practice in Profile (third navigation tab) shows Today, Last 7 days (today plus the prior six local dates) and All time: app total, language totals, activity totals and language-by-activity. There are no charts, goals, reset or export. Counting rules are a product decision, not learning evidence:
 
-- **App time** is time the page is visible, with no idle timeout. Create, Library, Stats and Settings count app time only.
+- **App time** is time the page is visible, with no idle timeout. Create, Library, Profile and Settings count app time only.
 - **Reading** (stable activity ID `reading`, attributed to the story's existing language ID) is visible time while the reader is open, including notes, explanations, selection and listening. It is never counted separately from app time, so reading ≤ app, and language and activity totals cannot exceed it.
 - **Background chapter audio** counts app, language and reading while an utterance is in flight, even when the page is hidden; paused, stopped, cancelled or failed audio does not. Chapter audio keeps the story it started with, even if the reader has closed or changed while Stop is pending. Only chapter Listen/player audio counts, through a wrapper around the host `speech` API in `js/usage-tracker.js`; selected-text speech does not.
 - Time is never counted twice: one state holds at any instant, and visible reader plus audio credits the same interval once.
