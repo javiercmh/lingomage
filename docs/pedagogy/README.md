@@ -20,3 +20,5 @@ Start here before changing learner profiles, story difficulty, prompts, or readi
 7. Revise a record for refinements. For a reversal, create a new decision, mark the old one superseded and link both. Git retains the edit history; no separate manual change log is needed.
 
 This log does not retrospectively certify older design choices. Existing language and research documents remain the record for choices not yet indexed here. Add them when revisited.
+
+Library ordering and its Updated/Created labels are navigation conventions, not pedagogical decisions: they make no progress, completion or learning-effect claim and need no record here (see DESIGN.md).

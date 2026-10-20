@@ -1,5 +1,6 @@
 (async()=>{
 const {bindStory, bindGeneration, bindPanels}=await import('./support/controllers.mjs');
+const {markStoryActivity}=await import('../js/library-activity.js');
 // Dependency-free regression harness; exercises production functions with isolated DOM/AI stubs.
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -20,7 +21,7 @@ function sandbox(extra = {}) {
     append(...nodes){this.childNodes.push(...nodes);},addEventListener(name,fn){this.events[name]=fn;},setAttribute(name,value){this.attributes[name]=value;},focus(){this.focused=true;},scrollIntoView(){},remove(){},querySelector(selector){return this.childNodes.find(node=>node.tagName===selector) || this.childNodes.map(node=>node.querySelector?.(selector)).find(Boolean) || null;},querySelectorAll(){return [];},classList:{add(){},remove(){},toggle(){}}});
   const c = {workspaceStorage:{assertWritable(){}},usage:{setReader(){},checkpoint(){}},settingsFeedback:{sync(){}},pipeline:null,state:{},console,crypto:{randomUUID:(()=>{let id=0;return ()=>`help-test-${++id}`;})()},PROMPT_VERSION:'test',STORY_GUIDES:{de:{beginner:'Simple sentences'}},renderChapterRequest(){},updateReaderNavigation(){},renderCheckpointRecovery(){},LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},SPEECH_LANGUAGES:{de:'de-DE',ja:'ja-JP',ru:'ru-RU','es-CL':'es-CL'},renderGenerationRecovery(){},readerPanel:()=>({classList:{toggle(){}}}),$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{createElement:element,createElementNS:(_ns,name)=>element(name),createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},...extra};
   c.readerGeneration = null; c.renderReaderGeneration = () => {}; c.setReaderGeneration = value => { c.readerGeneration = value; };
-  vm.createContext(c);
+  vm.createContext(c); c.markStoryActivity = markStoryActivity;
   vm.runInContext(notificationSource, c);
   vm.runInContext(fs.readFileSync('js/generation-errors.js','utf8').replaceAll('export function ', 'function '), c);
   vm.runInContext(readerTextSource, c);
@@ -51,25 +52,6 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   console.log('PASS long press cancels on leaving, outside release, scrolling, cancellation and movement; completed holds suppress clicks');
   console.log('PASS selectable explanation text is excluded from long-press and bulk-toggle handling');
 
-  const swipe = sandbox({setTimeout:()=>0,clearTimeout(){},state:{storySelectionMode:false}, revealStory(card,id){swipe.revealed=id;}, closeStoryReveal(){swipe.revealed=null;}});
-  vm.runInContext(section('const STORY_TRAY_WIDTH', 'function confirmStoryDeletion('),swipe);
-  const swipeClasses=new Set();const swipeCard={events:{},classList:{contains:n=>swipeClasses.has(n),add:n=>swipeClasses.add(n),remove:n=>swipeClasses.delete(n)},style:{setProperty(){},removeProperty(){}},querySelector:()=>({hidden:true}),addEventListener(name,fn){this.events[name]=fn;},setPointerCapture(){}};
-  let cancelledHolds=0;
-  swipe.wireStorySwipe(swipeCard,'a',()=>cancelledHolds++);
-  const gesture=(dx,dy=0,type='touch',cancel=false)=>{
-    const e={pointerId:1,pointerType:type,button:0,clientX:200,clientY:100,target:{closest:()=>null},preventDefault(){}};
-    swipeCard.events.pointerdown(e);
-    swipeCard.events.pointermove({...e,clientX:200+dx,clientY:100+dy});
-    if(cancel)swipeCard.events.pointercancel();else swipeCard.events.pointerup({...e,clientX:200+dx,clientY:100+dy});
-  };
-  gesture(-59);assert.equal(swipe.revealed,undefined);
-  gesture(-60);assert.equal(swipe.revealed,'a');assert.ok(cancelledHolds>0);
-  let clickSuppressed=false;swipeCard.events.click({preventDefault(){clickSuppressed=true;},stopImmediatePropagation(){}});assert.ok(clickSuppressed);
-  gesture(60,0,'mouse');assert.equal(swipe.revealed,null);
-  gesture(-80,70);assert.equal(swipe.revealed,null);
-  gesture(-80,0,'touch',true);assert.equal(swipe.revealed,null);
-  swipe.state.storySelectionMode=true;gesture(-90);assert.equal(swipe.revealed,null);
-  console.log('PASS touch/mouse swipe thresholds, vertical intent, cancellation, click suppression and bulk-selection guard');
 
   const glossary=sandbox();
   const matches=glossary.findGlossaryMatches('canto cantó canto',[
@@ -248,10 +230,10 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.equal(applied,2);assert.equal(story.value,1);assert.equal(acked,1);assert.equal(c.state.pendingReaderResult,null);
   console.log('PASS save failure retention, request blocking, acknowledgement failure, explicit retry');
 
-  let finish,current,helpRequests=0;
+  let finish,current,helpRequests=0;const persisted=[];
   const original={id:'A',language:'ja',chapters:[{id:'CA',help:[],versions:[{id:'VA',story:'日本'}]}]};
   const other={id:'B',language:'de',chapters:[{id:'CB',help:[],versions:[{id:'VB'}]}]};current=original;
-  const help=sandbox({state:{readerId:'A',readerSelection:{storyId:'A',text:'日本',start:0,end:2,chapterId:'CA',versionId:'VA',profile:{}},model:'mock',providerId:'mock'},readerStory:()=>current,normalizeChapters:s=>s.chapters,activeChapter:()=>current.chapters[0],activeVersion:()=>current.chapters[0].versions[0],readerPanel:()=>({scrollTop:150}),persistReaderStory(){},readerAi:()=>{helpRequests++;return new Promise(r=>finish=r);},decodeHelp:JSON.parse,renderSavedHelp(){},ai:{acknowledge:async()=>{}}});
+  const help=sandbox({state:{readerId:'A',readerSelection:{storyId:'A',text:'日本',start:0,end:2,chapterId:'CA',versionId:'VA',profile:{}},model:'mock',providerId:'mock'},readerStory:()=>current,normalizeChapters:s=>s.chapters,activeChapter:()=>current.chapters[0],activeVersion:()=>current.chapters[0].versions[0],readerPanel:()=>({scrollTop:150}),persistReaderStory(story){persisted.push({id:story.id,stamp:story.lastActivityAt});},readerAi:()=>{helpRequests++;return new Promise(r=>finish=r);},decodeHelp:JSON.parse,renderSavedHelp(){},ai:{acknowledge:async()=>{}}});
   vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(',"$('selection-translate')"),help);
   const pending=help.explainSelection();await new Promise(r=>setImmediate(r));
   await help.explainSelection();assert.equal(helpRequests,1);
@@ -261,6 +243,26 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.equal(original.chapters[0].help.length,1);assert.equal(other.chapters[0].help.length,0);
   assert.equal(original.chapters[0].help[0].model,'mock');
   console.log('PASS overlapping help blocked; response remains anchored after switching stories and captures model provenance');
+  assert.equal(persisted.length,2,'one pre-request save and one result save');
+  assert.equal(persisted[0].stamp,undefined,'the pre-request save is not activity');
+  assert.ok(Number.isFinite(Date.parse(persisted[1].stamp)),'the stamp rides the same write as the saved explanation');
+  assert.equal(original.lastActivityAt,persisted[1].stamp);assert.equal(other.lastActivityAt,undefined,'only the story that received content is stamped');
+  console.log('PASS explanation activity is stamped only with the saved result, never by the pre-request save');
+
+  {
+    // Failed result save: no stamp survives; the retry stamps the time it actually saved. Acknowledgement failure after a save keeps the stamp.
+    const target={id:'F',language:'ja',chapters:[{id:'CF',help:[],versions:[{id:'VF',story:'日本'}]}]};let resolveAi,failSave=true,failAck=true,saves=[];
+    const run=sandbox({state:{readerId:'F',readerSelection:{storyId:'F',text:'日本',start:0,end:2,chapterId:'CF',versionId:'VF',profile:{}},model:'mock',providerId:'mock'},readerStory:()=>target,normalizeChapters:s=>s.chapters,activeChapter:()=>target.chapters[0],activeVersion:()=>target.chapters[0].versions[0],readerPanel:()=>({scrollTop:0}),renderPendingReaderResult(){},
+      persistReaderStory(story){saves.push(story.lastActivityAt);if(failSave&&saves.length>1)throw new Error('disk full');},readerAi:()=>new Promise(r=>{run.state.pendingReaderRequestId='req-F';resolveAi=r;}),decodeHelp:JSON.parse,renderSavedHelp(){},ai:{acknowledge:async()=>{if(failAck)throw new Error('ack down');}}});
+    vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(',"$('selection-translate')"),run);
+    const request=run.explainSelection();await new Promise(r=>setImmediate(r));resolveAi(JSON.stringify({translation:'Japan',explanation:'Meaning'}));await request;
+    assert.equal(target.lastActivityAt,undefined,'a failed save leaves no stamp');assert.equal(target.chapters[0].help.length,0);assert.equal(run.state.pendingReaderResult.saved,false);
+    failSave=false;await assert.rejects(run.savePendingReaderResult(),/ack down/);
+    const stamped=target.lastActivityAt;assert.ok(Number.isFinite(Date.parse(stamped)));assert.equal(target.chapters[0].help.length,1);assert.equal(run.state.pendingReaderResult.saved,true);
+    failAck=false;await run.savePendingReaderResult();
+    assert.equal(target.lastActivityAt,stamped,'finishing the release neither re-applies nor restamps');assert.equal(target.chapters[0].help.length,1);
+    console.log('PASS explanation save failure restores absence of the stamp; a later save stamps; acknowledgement failure keeps it; release does not restamp');
+  }
 
   for (const action of ['initial','detail']) {
     const entry={id:'H',passage:'Brot',start:0,end:4,versionId:'V',text:'Existing explanation',followUps:[]};
@@ -601,7 +603,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
 
 
   const panel={scrollTop:321,addEventListener(){}};
-  const pos=sandbox({selectionMenuRouter:{reset(){}},state:{readerId:'S',readerChapter:2,readerPositions:{}},readerStory:()=>story3,activeChapter:()=>story3.chapters[pos.state.readerChapter],normalizeChapters:s=>s.chapters,closeStoryReveal(){},updateReader(){},clearExplanationSelection(){},window:{addEventListener(){}},history:{pushState(){}}});
+  const pos=sandbox({selectionMenuRouter:{reset(){}},state:{readerId:'S',readerChapter:2,readerPositions:{}},readerStory:()=>story3,activeChapter:()=>story3.chapters[pos.state.readerChapter],normalizeChapters:s=>s.chapters,closeStoryMenu(){},updateReader(){},clearExplanationSelection(){},window:{addEventListener(){}},history:{pushState(){}}});
   pos.$('reader-dialog').querySelector=()=>panel;pos.$('reader-dialog').showModal=()=>{};
   bindStory(pos);
   vm.runInContext(section('function readerPanel(', 'function sentenceContext('),pos);story3.activePathId='original';
