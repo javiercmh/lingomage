@@ -118,6 +118,21 @@ class DevelopmentServerTests(unittest.TestCase):
         status, _ = self.post(self.mock_server, '/__bridge/ai', {'action': 'providers'}, headers={'Origin': 'http://evil.example'})
         self.assertEqual(status, 403)
 
+    def test_mock_has_no_sessions_and_answers_exactly_like_an_old_host(self):
+        status, body = self.ai(self.mock_server, 'capabilities')
+        self.assertEqual((status, body['error']['code'], body['error']['message']),
+                         (400, 'invalid_request', 'Unsupported AI command.'))
+        self.assertEqual(self.mock_server.requests, {})
+
+    def test_mock_background_service_failure_is_terminal_and_acknowledgeable(self):
+        data = {'providerId': 'chatgpt', 'model': 'development-mock', 'instructions': '', 'input': '{}'}
+        status, request_id = self.ai(self.mock_server, 'start', data=data)
+        self.assertEqual(status, 200)
+        self.mock_server.requests[request_id]['error'] = {'code': 'background_service', 'message': 'Android could not keep background work running.'}
+        status, result = self.ai(self.mock_server, 'result', requestId=request_id)
+        self.assertEqual((status, result['error']['code']), (400, 'background_service'))
+        self.assertEqual(self.ai(self.mock_server, 'acknowledge', requestId=request_id)[1], True)
+
     def test_mock_summary_checkpoint_and_release(self):
         previous = {key: [] for key in ('characters', 'facts', 'plot', 'unresolved', 'uncertainties', 'situation')}
         previous['characters'] = ['Mia']

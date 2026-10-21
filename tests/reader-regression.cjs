@@ -524,6 +524,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
     gen.applyContentOperation(op); return op;
   };
   gen.showOperationResult=()=>{};
+  gen.aiSession={run:fn=>fn()};
   gen.structuredClone=structuredClone;
   bindGeneration(gen);
   gen.state.stories=[story3];
@@ -584,7 +585,8 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   console.log('PASS failed chapter request clears loading and retains an anchored prompt for explicit retry');
 
   let cancelAction, rejectWait, cancelCalls=0;
-  const cancelContext=sandbox({state:{models:[{id:'mock'}],model:'mock'},ai:{available:true,providers:async()=>({providers:[{id:'openrouter',connected:true}]}),start:async args=>{assert.equal(args.providerId,'openrouter');assert.deepEqual({title:args.title,body:args.body},{title:'Explaining your selection',body:'Safe to switch apps. LingoMage keeps going.'});return 'cancel-id';},wait:()=>new Promise((_,reject)=>rejectWait=reject),cancel:async()=>{cancelCalls++;rejectWait(Error('cancelled'));},acknowledge:async()=>{}},document:{createElement:()=>({addEventListener:(_,fn)=>cancelAction=fn,remove(){}})}});
+  const cancelContext=sandbox({state:{models:[{id:'mock'}],model:'mock'},ai:{available:true,providers:async()=>({providers:[{id:'openrouter',connected:true}]}),start:async args=>{assert.equal(args.providerId,'openrouter');assert.deepEqual({title:args.title,body:args.body},{title:'Explaining your selection',body:'Working now. Reopen LingoMage if it pauses between steps.'});return 'cancel-id';},wait:()=>new Promise((_,reject)=>rejectWait=reject),cancel:async()=>{cancelCalls++;rejectWait(Error('cancelled'));},acknowledge:async()=>{}},document:{createElement:()=>({addEventListener:(_,fn)=>cancelAction=fn,remove(){}})}});
+  cancelContext.aiSession={start:args=>cancelContext.ai.start(args)};
   vm.runInContext(lifecycle + section('async function readerAi(', 'async function acknowledgeReaderResult('),cancelContext);
   const cancellation=cancelContext.readerAi('explain',{},'test');
   await new Promise(resolve=>setImmediate(resolve));await cancelAction();
@@ -593,6 +595,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   for (const code of ['not_found','service']) {
     let starts=0,releaseFails=true;
     const releaseContext=sandbox({state:{models:[{id:'mock'}],model:'mock'},ai:{available:true,providers:async()=>({providers:[{id:'mock',connected:true}]}),start:async()=>{starts++;return 'failed-id';},wait:async()=>{throw Object.assign(Error('Service failed'),{code:'service'});},acknowledge:async()=>{if(releaseFails)throw Object.assign(Error('Release failed'),{code});}}});
+    releaseContext.aiSession={start:args=>releaseContext.ai.start(args)};
     vm.runInContext(lifecycle+section('async function readerAi(', 'async function acknowledgeReaderResult('),releaseContext);
     await assert.rejects(releaseContext.readerAi('explain',{},'fixture'),/Service failed/);
     assert.equal(releaseContext.state.requestId,null);

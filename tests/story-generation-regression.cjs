@@ -32,7 +32,7 @@ assert.deepEqual(defs.standardizedLevels.ja.levels.map(x=>x.id),['N5','N4','N3',
 assert.deepEqual(Object.keys(defs.scopes),['scene','chapter']);
 (async()=>{
   const bridgeSource=fs.readFileSync('js/bridge.js','utf8');
-  const bridgeContext={AI:null,DEV:{mockAi:true},aiResults:new Map(),setTimeout,aiCall:async(action,args)=>{assert.equal(action,'result');assert.equal(args.requestId,'persisted-id');return 'retained text';}};
+  const bridgeContext={AI:null,DEV:{mockAi:true},aiResults:new Map(),aiSessionSupport:async()=>true,setTimeout,aiCall:async(action,args)=>{assert.equal(action,'result');assert.equal(args.requestId,'persisted-id');return 'retained text';}};
   vm.createContext(bridgeContext);vm.runInContext(bridgeSource.slice(bridgeSource.indexOf('export const ai ='),bridgeSource.indexOf('// --- Preferences')).replace('export const ai =','globalThis.ai ='),bridgeContext);
   assert.equal(await bridgeContext.ai.wait('persisted-id'),'retained text');
   console.log('PASS standardized levels, bounded plans, production glossary/script validation and persisted request lookup; staged recovery covered by pipeline suites');

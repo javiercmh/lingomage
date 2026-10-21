@@ -134,7 +134,7 @@ async function clickAndCheck(id, operation) {
   const start = source.indexOf('async function readerAi(');
   const end = source.indexOf('\nasync function acknowledgeReaderResult', start);
   const readerAi = source.slice(start, end);
-  assert(readerAi.indexOf('config.onTaskStarted?.()') > readerAi.indexOf('await ai.start('), 'Explain handoff follows successful AI task creation');
+  assert(readerAi.indexOf('config.onTaskStarted?.()') > readerAi.indexOf('await aiSession.start('),'Explain handoff follows successful AI task creation');
   assert(readerAi.indexOf('config.onTaskStarted?.()') < readerAi.indexOf('await ai.wait(id)'), 'Explain handoff precedes AI generation completion');
   for (const id of ['selection-translate', 'selection-speak', 'selection-explain', 'selection-copy']) {
     const start = source.indexOf(`$('${id}').addEventListener`);
