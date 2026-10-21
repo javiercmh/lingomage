@@ -28,11 +28,19 @@ for (const kind of ['create','continue','rewrite','examples']) {
 const source=fs.readFileSync('js/app.js','utf8');
 const op={kind:'create',stage:'prose',promptVersion:'test',safeguardVersion:'test',error:'service'};
 let runs=0,results=0,resolve;
-const context={state:{readerEditDraft:null},PROMPT_VERSION:'test',SAFEGUARD_VERSION:'test',pipeline:{records:[op],busy:false,async run(){runs++;this.busy=true;await new Promise(r=>resolve=r);this.records=[];this.busy=false;}},readerGeneration:null,showOperationResult(){results++;},toast(){},renderCheckpointRecovery(){},revealRecovery(){},failureInfo};
+const context={state:{readerEditDraft:null},PROMPT_VERSION:'test',SAFEGUARD_VERSION:'test',pipeline:{records:[op],busy:false,async run(){runs++;this.busy=true;await new Promise(r=>resolve=r);this.records=[];this.busy=false;}},readerGeneration:null,setReaderGeneration(value){context.readerGeneration=value;},showOperationResult(){results++;},toast(){},renderCheckpointRecovery(){},revealRecovery(){},failureInfo};
 vm.createContext(context);vm.runInContext(source.slice(source.indexOf('async function resumeCheckpoint('),source.indexOf('function revealRecovery(')),context);
 const retry=context.resumeCheckpoint(op);assert.equal(runs,1);await context.resumeCheckpoint(op);assert.equal(runs,1);resolve();await retry;assert.equal(results,1);await context.resumeCheckpoint(op);assert.equal(runs,1);
 assert.match(recoverySummary({kind:'create',stage:'notes',prose,error:'service',failure:failureInfo(Object.assign(Error('Service failed'),{code:'service'}),'notes')}),/vocabulary notes.*Completed prose is preserved/);
 assert.equal(failureInfo(Error('Cannot set properties of null'),'prose').category,'internal');
 assert.equal(failureInfo(Error('Release failed'),'ready','release').category,'release');
 assert.ok(!failureInfo(Error('https://example.test/callback?token=secret Bearer secret api_key=secret request_id=abc'),'prose').message.includes('secret'));
+// Resume obeys the same status rules: a deliberate cancel clears it, a real failure points to recovery, Create has no story id.
+for (const [message, kind, expected] of [['Request cancelled. Resume to explicitly retry, or discard this attempt.','continue',null],['Service failed','continue','error'],['Request cancelled.','create',null],['Service failed','create','error']]) {
+  const failing={kind,stage:'prose',promptVersion:'test',safeguardVersion:'test',error:'',target:kind==='create'?undefined:{storyId:'story'}};
+  const ctx={state:{readerEditDraft:null},PROMPT_VERSION:'test',SAFEGUARD_VERSION:'test',pipeline:{records:[failing],busy:false,async run(){throw new Error(message);}},readerGeneration:null,setReaderGeneration(value){ctx.readerGeneration=value;},showOperationResult(){},toast(){},renderCheckpointRecovery(){},revealRecovery(){},failureInfo};
+  vm.createContext(ctx);vm.runInContext(source.slice(source.indexOf('async function resumeCheckpoint('),source.indexOf('function revealRecovery(')),ctx);
+  await ctx.resumeCheckpoint(failing);
+  assert.equal(ctx.readerGeneration?.phase ?? null,expected,`${kind} resume failure "${message}"`);
+}
 console.log('PASS all content kinds: inference/validation/save/release failures, explicit recovery, release-only no inference, stale/double Retry, Create null draft and bounded redacted diagnostics');
