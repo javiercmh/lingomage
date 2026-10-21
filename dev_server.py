@@ -360,6 +360,9 @@ class Handler(SimpleHTTPRequestHandler):
         if self.server.ai_mode == 'off':
             return fail('provider', 'Development AI is disabled. Start with --mock-ai or --chatgpt.')
         action = command.get('action')
+        if action == 'capabilities':
+            # The development server has no operation sessions; this is the exact answer of an App² host without them.
+            return fail('invalid_request', 'Unsupported AI command.')
         if action == 'providers':
             if self.server.ai_mode == 'mock':
                 return self.reply(dict(providers=[dict(id='chatgpt', name='Development mock', connected=True)]))

@@ -91,5 +91,29 @@ assert.ok(findAll(app.el('target-language-add'), node => node.className === 'lan
 assert.equal(app.el('settings-write-error').hidden, false);
 app.failWrites('data/settings.json', false); app.click(app.buttonWithText(app.el('settings-write-error'), 'Retry save'));
 assert.equal(settingsFile(app).targetLanguages.ru, 'enabled', 'Retry repeats the Add'); assert.equal(settingsFile(app).targetLanguages.fr, 'enabled');
+// Background-work failures render through the real app: accurate wording, the code in Technical details, and an explicit Retry (nothing resumes by itself).
+{
+  const {failureInfo} = await import('../js/generation-errors.js'), {SAFEGUARD_VERSION} = await import('../js/learning-validation.js');
+  const {readFileSync} = await import('node:fs');
+  const promptVersion = /const PROMPT_VERSION = '([^']+)'/.exec(readFileSync('js/app.js', 'utf8'))[1];
+  const cases = {
+    background_service: ['Android could not start background work (ForegroundServiceStartNotAllowedException).', /Android could not keep background work running\. Steps that finished earlier are saved\./],
+    session_idle: ['The background session was released after a period without a running request.', /about 90 seconds without a running step/],
+    session_timeout: ['Background work stopped at a time limit.', /stopped at a time limit\. A step in progress was stopped\./],
+    session_cancelled: ['Background work was cancelled.', /The request was cancelled\./],
+    not_found: ['Request not found.', /no longer available\. Earlier steps remain saved; Retry runs the unfinished step again\./],
+    background_paused: ['This step did not start because LingoMage was in the background.', /LingoMage was in the background when the next step was due, so it did not start\./],
+  };
+  for (const [code, [message, wording]] of Object.entries(cases)) {
+    const failure = failureInfo(Object.assign(new Error(message), {code}), 'plan', 'wait');
+    const op = {id: 'op-bg', kind: 'create', stage: 'plan', language: 'de', config: {}, input: {topic: 'x'}, request: null, promptVersion, safeguardVersion: SAFEGUARD_VERSION, error: failure.message, failure, createdAt: 'then'};
+    const booted = await bootApp({files: {...base, 'data/generation-checkpoints.json': JSON.stringify([op])}});
+    const box = booted.el('checkpoint-recovery-create'), text = textOf(box);
+    assert.equal(box.hidden, false, code); assert.match(text, wording, code);
+    assert.match(text, new RegExp(`Code: ${code}`), `${code}: technical details name the code`);
+    assert.ok(booted.buttonWithText(box, 'Retry'), `${code}: explicit Retry`);
+    assert.equal(booted.file('data/generation-checkpoints.json'), JSON.stringify([op]), `${code}: loading the panel changed nothing and started nothing`);
+  }
+}
 console.log('PASS app start-up and settings wiring: store states, Retry loading guard, rollback of every reader control, retry of the intended change, stable recovery panels, nested settings preservation');
 process.exit(0);

@@ -17,8 +17,12 @@ import { createUsageTracker } from './usage-tracker.js';
 import { RANGES, ACTIVITY_LABELS, summarize, formatDuration, hasUsage } from './usage-stats.js';
 import { saveBeforeAcknowledge } from './request-lifecycle.js';
 import { aiNotification } from './ai-notification.js';
+import { createAiSession } from './ai-session.js';
 import { createSettingsFeedback, unsavedWorkReason } from './settings-feedback.js';
 
+// Every ai.start goes through aiSession; multi-request operations scope it with aiSession.run, and
+// cleanup-only paths (finish request, save response, acknowledge, discard) never open a session.
+const aiSession = createAiSession({ ai });
 const LANGUAGES = {de:'German',ja:'Japanese',ru:'Russian','es-CL':'Spanish'};
 const SPEECH_LANGUAGES = { de: 'de-DE', ja: 'ja-JP', ru: 'ru-RU', 'es-CL': 'es-CL' };
 const PROFILE_DEFINITIONS = readJson('data/learning-profiles.json', {});
@@ -495,7 +499,9 @@ async function resumeCheckpoint(op) {
     }
     setReaderGeneration({storyId:op.target?.storyId ?? null,phase:'working',message:'Resuming saved progress…'});
     if (op.request?.completed && !['ready','applied'].includes(op.stage)) { await pipeline.finishRequest(op); setReaderGeneration(null); return; }
-    await pipeline.run(op); showOperationResult(op);
+    // An outstanding request is polled, saved and acknowledged by the pipeline before any new request,
+    // and so before any session is opened (sessions open lazily at the next ai.start).
+    await aiSession.run(() => pipeline.run(op)); showOperationResult(op);
   } catch (error) {
     op.error=failureInfo(error,op.stage).message; if (op.failure?.message !== failureInfo(error,op.stage).message) op.failure = failureInfo(error, op.stage);
     if (readerGeneration && (readerGeneration.storyId ?? null) === (op.target?.storyId ?? null)) setReaderGeneration(op.failure.category === 'cancelled' ? null : {...readerGeneration,phase:'error',message:'Generation stopped. View recovery below.'});
@@ -511,7 +517,7 @@ async function runContentOperation(spec) {
   workspaceStorage.assertWritable();
   if (pipeline.records.length) throw new Error('Resume or discard the pending generation before starting another.');
   const op = pipeline.create({...spec, promptVersion:PROMPT_VERSION, profileVersion:PROFILE_DEFINITIONS.version, planned:spec.kind !== 'examples'});
-  await pipeline.run(op);
+  await aiSession.run(() => pipeline.run(op));
   return op;
 }
 const { operationProvenance, applyContentOperation } = createGenerationController({state, normalizeChapters:(...args)=>normalizeChapters(...args), ensureStoryPaths:(...args)=>ensureStoryPaths(...args), persistReaderStory, savedFollowUps});
@@ -542,7 +548,7 @@ function initializePipeline() {
   if (entry.status === 'invalid') { state.checkpointBlocked=true; showStorageErrors(); return; }
   const records=entry.value;
   pipeline=createPipeline({records,persist:value=>workspaceStorage.save('data/generation-checkpoints.json',value),apply:applyContentOperation,changed:()=>{if(pipeline && !pipeline.busy) state.requestId=null; renderCheckpointRecovery();},ai:{
-    start:async args=>{workspaceStorage.assertWritable(); state.requestId='starting'; try {const id=await ai.start(args); state.requestId=id; return id;} catch(error){state.requestId=null;throw error;}},
+    start:async args=>{workspaceStorage.assertWritable(); state.requestId='starting'; try {const id=await aiSession.start(args); state.requestId=id; return id;} catch(error){state.requestId=null;throw error;}},
     wait:async id=>{state.requestId=id; try {const text=await ai.wait(id); return text;} finally {state.requestId=null;}},
     acknowledge:id=>ai.acknowledge(id), cancel:id=>ai.cancel(id)
   }});
@@ -2031,7 +2037,7 @@ async function readerAi(kind, input, instructions, requestPanel, config = { prov
   const providerId = provider.id;
   state.requestId = 'starting';
   let id;
-  try { id = await ai.start({ providerId, model: model.id, instructions, input: JSON.stringify({ kind, ...input }), reasoningEffort: model.reasoningLevels?.includes(config.reasoning) ? config.reasoning : undefined, ...aiNotification(kind) }); }
+  try { id = await aiSession.start({ providerId, model: model.id, instructions, input: JSON.stringify({ kind, ...input }), reasoningEffort: model.reasoningLevels?.includes(config.reasoning) ? config.reasoning : undefined, ...aiNotification(kind) }); }
   catch (error) { state.requestId = null; throw error; }
   state.requestId = id;
   config.onTaskStarted?.();
@@ -2383,14 +2389,17 @@ $('reader-edit-submit').addEventListener('click', async () => {
   try {
     persistReaderStory(story);
     await releaseSavedInference();
-    input.storyMemory = await prepareStoryMemory(story, mode === 'continue' ? entries : entries.slice(0, rewriteIndex), loading, config);
-    const priorEntry = mode === 'continue' ? entries[entries.length - 1] : entries[rewriteIndex - 1];
-    const priorVersion = priorEntry ? normalizeChapters(story).find(c => c.id === priorEntry.chapterId).versions.find(v => v.id === priorEntry.versionId) : null;
-    input.recentProse = priorVersion ? recentProse(priorVersion.story) : '';
-    if (mode === 'rewrite') input.currentChapter = { title: sourceVersion.title, story: sourceVersion.story };
-    if (readerGeneration) { readerGeneration.message = mode === 'continue' ? 'Writing the next chapter…' : 'Rewriting this chapter…'; renderReaderGeneration(); }
-    loading.querySelector('strong').textContent = mode === 'continue' ? 'Writing the next chapter…' : 'Rewriting this chapter…';
-    const op=await runContentOperation({kind:mode,language:story.language,input,instructions,config,target:{storyId:story.id,pathId:path.id,entries,chapterId:chapter.id,sourceVersionId:sourceVersion.id,index:rewriteIndex}});
+    // Summary preparation and every generation stage share one session; readerAi joins it and never ends it.
+    const op = await aiSession.run(async () => {
+      input.storyMemory = await prepareStoryMemory(story, mode === 'continue' ? entries : entries.slice(0, rewriteIndex), loading, config);
+      const priorEntry = mode === 'continue' ? entries[entries.length - 1] : entries[rewriteIndex - 1];
+      const priorVersion = priorEntry ? normalizeChapters(story).find(c => c.id === priorEntry.chapterId).versions.find(v => v.id === priorEntry.versionId) : null;
+      input.recentProse = priorVersion ? recentProse(priorVersion.story) : '';
+      if (mode === 'rewrite') input.currentChapter = { title: sourceVersion.title, story: sourceVersion.story };
+      if (readerGeneration) { readerGeneration.message = mode === 'continue' ? 'Writing the next chapter…' : 'Rewriting this chapter…'; renderReaderGeneration(); }
+      loading.querySelector('strong').textContent = mode === 'continue' ? 'Writing the next chapter…' : 'Rewriting this chapter…';
+      return runContentOperation({kind:mode,language:story.language,input,instructions,config,target:{storyId:story.id,pathId:path.id,entries,chapterId:chapter.id,sourceVersionId:sourceVersion.id,index:rewriteIndex}});
+    });
     showOperationResult(op);
   } catch (error) {
     try { await releaseInvalidReaderResponse(); } catch {}
