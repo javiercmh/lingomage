@@ -70,32 +70,76 @@ let readerSpeechRun = 0;
 let readerSpeechKey = '';
 let readerSpeechOwner = 0;
 let readerSpeechStop = null;
+// One status record covers Create, continuation, rewrite and explanation requests. It is shown in the reader bar
+// while that story is open and in the page-level bar everywhere else (any tab, reader closed, or another story's reader).
 let readerGeneration = null;
+let creatingStory = false;
 function setReaderGeneration(value) {
   readerGeneration = value;
   renderReaderGeneration();
 }
-function renderReaderGeneration() {
-  const bar = $('reader-generation-bar');
-  if (!bar) return;
-  const status = readerGeneration;
-  bar.hidden = !status || status.storyId !== state.readerId;
-  readerPanel().classList.toggle('has-generation-status', !bar.hidden);
-  if (bar.hidden) return;
+// "Working" is displayed only while a request is actually live, so a cancelled, failed or abandoned request never leaves a stale status.
+function generationLive() { return Boolean(creatingStory || pipeline?.busy || state.readerEditBusy || state.readerHelpBusy || state.requestId); }
+function generationView(status) {
+  if (!status) return null;
   const pending = state.pendingReaderResult;
-  const recovery = pending?.story.id === status.storyId;
-  $('reader-generation-message').textContent = recovery ? (pending.saved ? 'Response saved. Finish request.' : 'Response needs saving.') : status.message;
-  const button = $('reader-generation-action');
-  button.hidden = !recovery && !['working', 'ready', 'error', 'cleanup'].includes(status.phase);
-  button.textContent = recovery ? (pending.saved ? 'Finish request' : 'Save response') : status.phase === 'cleanup' ? 'Finish request' : status.phase === 'error' ? 'View recovery' : status.phase === 'ready' ? 'View result' : 'Cancel request';
-  button.disabled = status.phase === 'working' && !document.querySelector('.reader-ai-cancel');
-  $('reader-generation-dismiss').hidden = status.phase === 'working' || recovery;
+  if (pending && pending.story.id === status.storyId) return { message: pending.saved ? 'Response saved. Finish request.' : 'Response needs saving.', action: pending.saved ? 'Finish request' : 'Save response', dismiss: false };
+  if (status.phase === 'working') return generationLive() ? { message: status.message, action: 'Cancel request', dismiss: false, working: true } : null;
+  return { message: status.message, action: { cleanup: 'Finish request', error: 'View recovery', ready: 'View result' }[status.phase] || '', dismiss: true };
 }
-$('reader-generation-dismiss').addEventListener('click', () => setReaderGeneration(null));
-$('reader-generation-action').addEventListener('click', async () => {
+function paintGenerationBar(bar, view) {
+  bar.hidden = !view;
+  if (!view) return;
+  const [message, action, dismiss] = bar.id === 'generation-status-bar' ? ['generation-status-message', 'generation-status-action', 'generation-status-dismiss'] : ['reader-generation-message', 'reader-generation-action', 'reader-generation-dismiss'];
+  // Rewriting identical live-region text can be announced again, so only changed text is written.
+  if ($(message).textContent !== view.message) $(message).textContent = view.message;
+  $(action).hidden = !view.action; $(action).textContent = view.action;
+  $(action).disabled = Boolean(view.working) && !pipeline?.busy && !document.querySelector('.reader-ai-cancel');
+  $(dismiss).hidden = !view.dismiss;
+}
+function renderReaderGeneration() {
+  const bar = $('reader-generation-bar'), appBar = $('generation-status-bar');
+  if (!bar || !appBar) return;
+  const status = readerGeneration, view = generationView(status);
+  const inReader = Boolean(view) && status.storyId != null && status.storyId === state.readerId && $('reader-dialog').open;
+  // Create's visible progress card (with Cancel) is the indicator on its tab; a resumed Create has no such card.
+  const ownCard = Boolean(view?.working) && status.storyId == null && $('view-create').classList.contains('active') && !$('reader-dialog').open && !$('loading-card').hidden;
+  const page = view && !inReader && !ownCard ? view : null;
+  const inDialog = Boolean(page) && $('reader-dialog').open;
+  paintGenerationBar(bar, inReader ? view : null);
+  paintGenerationBar(appBar, page);
+  // Inside an open reader the page-level bar occupies the same bottom edge as the reader bar, so it shares its scroll and notice offsets.
+  readerPanel().classList.toggle('has-generation-status', inReader || inDialog);
+  const shown = inReader ? bar : inDialog ? appBar : null, panelStyle = readerPanel().style;
+  if (shown && shown.offsetHeight) panelStyle?.setProperty('--generation-bar-height', `${shown.offsetHeight}px`); else panelStyle?.removeProperty?.('--generation-bar-height');
+  document.body.classList.toggle('has-app-generation-status', Boolean(page) && !inDialog);
+  // A modal dialog makes the page inert, so the page-level bar moves into the topmost open dialog, as the toast does.
+  if (page) { const host = [...document.querySelectorAll('dialog[open]')].at(-1) || document.body; if (appBar.parentNode !== host) host.append(appBar); }
+}
+for (const id of ['reader-generation-dismiss', 'generation-status-dismiss']) $(id).addEventListener('click', () => setReaderGeneration(null));
+// Resolves after the reader's own close handler has run (the close event is dispatched asynchronously).
+function closeReader() {
+  const dialog = $('reader-dialog');
+  if (!dialog.open) return Promise.resolve();
+  return new Promise(resolve => { dialog.addEventListener('close', resolve, { once: true }); dialog.close(); });
+}
+// Opens the story's reader. Switching from another story's reader keeps and replaces that reader's history entry
+// instead of going back and pushing again, so a single Back still returns to the Library.
+async function ensureReaderOpen(story) {
+  if ($('reader-dialog').open && state.readerId === story.id) return;
+  if ($('reader-dialog').open) { state.switchingReader = true; try { await closeReader(); } finally { state.switchingReader = false; } }
+  openReader(story);
+}
+async function cancelGeneration() {
+  if (pipeline?.busy) { try { await pipeline.cancel(); } catch (error) { toast(error.message); } return; }
+  document.querySelector('.reader-ai-cancel')?.click();
+}
+async function generationAction() {
   const status = readerGeneration; if (!status) return;
-  if (state.pendingReaderResult) {
-    try { await savePendingReaderResult(); updateReader(); }
+  const pending = state.pendingReaderResult;
+  if (pending) {
+    // Acknowledging the saved response clears state.pendingReaderResult, so the owning story is captured first.
+    try { await savePendingReaderResult(); if ($('reader-dialog').open && state.readerId === pending.story.id) updateReader(); else renderReaderGeneration(); }
     catch (error) { status.message = error.message; renderReaderGeneration(); }
     return;
   }
@@ -104,23 +148,34 @@ $('reader-generation-action').addEventListener('click', async () => {
     catch { toast('Could not finish cancelled request. Try again.'); }
     return;
   }
+  if (status.phase === 'working') { await cancelGeneration(); return; }
+  const story = state.stories.find(item => item.id === status.storyId);
   if (status.phase === 'error') {
-    const op=pipeline?.records[0];
-    if (op?.target?.storyId === state.readerId) { revealRecovery(op); return; }
-    const target=document.querySelector('.help-request-recovery') || $('reader-edit-panel');
-    revealCard(target); return;
+    const op = pipeline?.records[0];
+    if (!story) { await closeReader(); setView('create'); if (op) revealRecovery(op); return; } // a modal reader would leave the Create page inert
+    await ensureReaderOpen(story);
+    if (op?.target?.storyId === story.id) { revealRecovery(op); return; }
+    revealCard(document.querySelector('.help-request-recovery') || $('reader-edit-panel')); return;
   }
-  if (status.phase === 'working') { document.querySelector('.reader-ai-cancel')?.click(); return; }
-  const story = readerStory();
-  const path = story.paths.find(item => item.entries.some(entry => entry.chapterId === status.chapterId && entry.versionId === status.versionId));
-  if (!path) { setReaderGeneration(null); return; }
-  story.activePathId = path.id;
+  if (!story) { toast('That story is no longer available.'); setReaderGeneration(null); return; }
+  await ensureReaderOpen(story);
+  // The result's own path is used, not whichever path happens to hold the same chapter version first.
+  const holds = item => item.entries.some(entry => entry.chapterId === status.chapterId && entry.versionId === status.versionId);
+  const path = story.paths.find(item => item.id === status.pathId && holds(item)) || story.paths.find(holds);
+  if (!path) { toast('That result is no longer available.'); setReaderGeneration(null); return; }
+  if (story.activePathId !== path.id) {
+    rememberReaderPosition();
+    const previous = story.activePathId; story.activePathId = path.id;
+    try { persistReaderStory(story); } catch (error) { story.activePathId = previous; toast(error.message); return; }
+  }
   state.readerChapter = path.entries.findIndex(entry => entry.chapterId === status.chapterId && entry.versionId === status.versionId);
+  state.readerPositions[`${story.id}:${path.id}`] = { chapterId: status.chapterId, scrollTop: 0 }; persistReaderPosition();
   updateReader();
   const target = status.helpId ? [...$('reader-help').querySelectorAll('.help-card')].find(card => card.dataset.helpId === status.helpId) : $('reader-title');
   setReaderGeneration(null);
   if (status.helpId) revealCard(target); else target?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-});
+}
+for (const id of ['reader-generation-action', 'generation-status-action']) $(id).addEventListener('click', generationAction);
 // Scroll the reader only as far as needed to show the bottom of a card; taller cards align at their top.
 function revealCard(card) {
   if (!card) return;
@@ -342,6 +397,7 @@ function setView(name) {
   if (name === 'profile') { renderStats(); startStatsRefresh(); } else stopStatsRefresh();
   if (name === 'profile' || name === 'settings') { if (name === 'profile') renderTargetLanguageSettings(); if (state.storageBlocked) showStorageErrors(); }
   window.scrollTo(0, 0);
+  renderReaderGeneration();
 }
 $('open-settings').addEventListener('click', () => { setView('settings'); $('settings-back').focus({ preventScroll: true }); });
 $('settings-back').addEventListener('click', () => { setView('profile'); $('open-settings').focus({ preventScroll: true }); });
@@ -391,9 +447,10 @@ function renderCheckpointRecovery() {
   const stageMessage=op?.kind === 'examples' && op.stage === 'prose' ? 'Generating examples…' : op?.stage === 'plan' ? 'Planning suitable language…' : op?.stage === 'notes' ? 'Adding vocabulary notes…' : op?.stage === 'readings' ? 'Adding kanji readings…' : 'Writing your story…';
   if (op && pipeline.busy) {
     if (op.kind === 'create') $('generation-status').textContent=stageMessage;
-    if (readerGeneration && readerGeneration.storyId === op.target?.storyId) { readerGeneration.phase='working'; readerGeneration.message=stageMessage; renderReaderGeneration(); }
+    if (readerGeneration && (readerGeneration.storyId ?? null) === (op.target?.storyId ?? null)) { readerGeneration.phase='working'; readerGeneration.message=stageMessage; }
     if (state.activeChapterRequest && state.activeChapterRequest.storyId === op.target?.storyId) state.activeChapterRequest.loading.querySelector('strong').textContent=stageMessage;
   }
+  renderReaderGeneration(); // busy and idle transitions both reach here through the pipeline's changed callback
   for (const id of ['checkpoint-recovery-create','checkpoint-recovery-profile','checkpoint-recovery-reader']) {
     const box = $(id);
     if (id === 'checkpoint-recovery-reader') { const anchor = op?.kind === 'examples' ? $('reader-help-section') : $('reader-edit-panel'); if (anchor.nextElementSibling !== box) anchor.after?.(box); }
@@ -436,10 +493,14 @@ async function resumeCheckpoint(op) {
       state.readerEditDraft.error = '';
       $('reader-edit-error').textContent = '';
     }
-    if (op.target?.storyId) setReaderGeneration({storyId:op.target.storyId,phase:'working',message:'Resuming saved progress…'});
-    if (op.request?.completed && !['ready','applied'].includes(op.stage)) { await pipeline.finishRequest(op); return; }
+    setReaderGeneration({storyId:op.target?.storyId ?? null,phase:'working',message:'Resuming saved progress…'});
+    if (op.request?.completed && !['ready','applied'].includes(op.stage)) { await pipeline.finishRequest(op); setReaderGeneration(null); return; }
     await pipeline.run(op); showOperationResult(op);
-  } catch (error) { op.error=failureInfo(error,op.stage).message; if (op.failure?.message !== failureInfo(error,op.stage).message) op.failure = failureInfo(error, op.stage); if (readerGeneration && readerGeneration.storyId === op.target?.storyId) setReaderGeneration({...readerGeneration,phase:'error',message:'Generation stopped. View recovery below.'}); renderCheckpointRecovery(); revealRecovery(op); }
+  } catch (error) {
+    op.error=failureInfo(error,op.stage).message; if (op.failure?.message !== failureInfo(error,op.stage).message) op.failure = failureInfo(error, op.stage);
+    if (readerGeneration && (readerGeneration.storyId ?? null) === (op.target?.storyId ?? null)) setReaderGeneration(op.failure.category === 'cancelled' ? null : {...readerGeneration,phase:'error',message:'Generation stopped. View recovery below.'});
+    renderCheckpointRecovery(); revealRecovery(op);
+  }
 }
 function revealRecovery(op) {
   const box = op?.target?.storyId === state.readerId && $('reader-dialog').open ? $('checkpoint-recovery-reader') : $('checkpoint-recovery-create');
@@ -457,12 +518,21 @@ const { operationProvenance, applyContentOperation } = createGenerationControlle
 function showOperationResult(op) {
   const story=state.stories.find(s=>op.kind === 'create' ? s.operationId === op.id : s.id === op.target.storyId);
   if (!story) return;
+  if (op.kind === 'create') { setReaderGeneration(null); ensureReaderOpen(story).catch(error => toast(error.message)); return; }
   if (readerGeneration && readerGeneration.storyId === story.id) {
-    Object.assign(readerGeneration,{phase:'ready',message:'Ready',chapterId:op.kind === 'examples' ? op.target.chapterId : op.kind === 'continue' ? `chapter-${op.id}` : op.target?.chapterId,versionId:op.kind === 'examples' ? op.target.versionId : `version-${op.id}`,helpId:op.kind === 'examples' ? op.target.helpId : ''});
+    Object.assign(readerGeneration,{phase:'ready',message:op.kind === 'continue' ? `Chapter ${op.target.entries.length + 1} is ready` : 'Ready',pathId:op.kind === 'continue' ? op.target.pathId : op.kind === 'rewrite' ? `path-${op.id}` : readerGeneration.pathId,chapterId:op.kind === 'examples' ? op.target.chapterId : op.kind === 'continue' ? `chapter-${op.id}` : op.target?.chapterId,versionId:op.kind === 'examples' ? op.target.versionId : `version-${op.id}`,helpId:op.kind === 'examples' ? op.target.helpId : ''});
+    renderReaderGeneration();
   }
-  if (op.kind === 'create') { openReader(story); return; }
-  if (state.readerId === story.id) {
-    if (op.kind !== 'examples') state.readerChapter=op.kind === 'continue' ? op.target.entries.length : op.target.index;
+  if (state.readerId === story.id && op.kind === 'continue') {
+    // Continue never moves the learner: the viewed path, chapter, scroll and focus stay put; only the counts and navigation controls change.
+    if ($('reader-dialog').open && selectedPath(story).id === op.target.pathId) {
+      const scrollTop = readerPanel().scrollTop, focused = document.activeElement;
+      $('reader-edit-panel').hidden = true; state.readerEditDraft = null;
+      renderChapterNavigation(story); renderReaderActions(); updateReaderNavigation();
+      readerPanel().scrollTop = scrollTop; if (focused?.isConnected && document.activeElement !== focused) focused.focus({ preventScroll: true });
+    }
+  } else if (state.readerId === story.id) {
+    if (op.kind !== 'examples') state.readerChapter=op.target.index;
     $('reader-edit-panel').hidden=true; state.readerEditDraft=null; updateReader();
   }
   toast(op.kind === 'examples' ? 'Examples saved' : op.kind === 'continue' ? 'Chapter added' : 'Alternate path created');
@@ -715,6 +785,7 @@ async function generate(event) {
     const requestInput = storyInput();
     const requestProfile = JSON.parse(requestInput);
     $('story-form').hidden = true; $('loading-card').hidden = false;
+    creatingStory = true; setReaderGeneration({storyId:null,phase:'working',message:'Writing your story…'});
     $('generation-status').textContent = ai.developmentMock ? 'Using the offline development response.' : 'Weaving your ideas into a story.';
     const op = await runContentOperation({kind:'create', language:languageCode, input:requestProfile, profileVersion:PROFILE_DEFINITIONS.version, instructions:storyInstructions(LANGUAGES[languageCode],difficulty,guideFor(languageCode,difficulty)), config:{providerId:provider.id,model:model.id,reasoning:chosenEffort}});
     showOperationResult(op);
@@ -727,7 +798,9 @@ async function generate(event) {
     $('form-error').textContent = op ? '' : recoverySummary({kind:'create',stage:'setup',error:error.message,failure:failureInfo(error,'setup')});
     if (!op) appendFailureDetails($('create-error-details'), failureInfo(error,'setup'));
     else revealRecovery(op);
-  } finally { $('loading-card').hidden = true; $('story-form').hidden = false; }
+    // A deliberate cancel leaves no status; a failure with saved progress points to its recovery.
+    if (readerGeneration?.storyId == null) setReaderGeneration(op && failureInfo(error,op.stage).category !== 'cancelled' ? {storyId:null,phase:'error',message:'Story generation stopped. View recovery.'} : null);
+  } finally { creatingStory = false; $('loading-card').hidden = true; $('story-form').hidden = false; renderReaderGeneration(); }
 }
 $('story-form').addEventListener('submit', generate);
 $('language').addEventListener('change', () => populateDifficulty());
@@ -1129,20 +1202,9 @@ function profileSnapshot(story) {
   const level = version?.difficulty || state.standardizedLevels[story.language] || story.readingStartingPoint || story.difficulty || 'beginner';
   return { language: story.language, readingStartingPoint: level, readingSelfReport: readingDescription(story.language, level), languageExpectations: state.languageExpectations[story.language] || '', profileVersion: PROFILE_DEFINITIONS.version };
 }
-function updateReader(keepNavigation = false) {
-  renderCheckpointRecovery();
-  if (!keepNavigation) closeReaderPanels();
-  closeReaderActions();
-  const story = readerStory(); if (!story) return;
-  const chapters = pathChapters(story); state.readerChapter = Math.min(state.readerChapter, chapters.length - 1);
-  const chapter = chapters[state.readerChapter], version = activeVersion(chapter);
-  const speechVersionKey = `${story.id}:${chapter.id}:${version.id}`;
-  if (state.speechVersionKey && state.speechVersionKey !== speechVersionKey) stopSpeech();
-  state.speechVersionKey = speechVersionKey;
-  renderReaderListen();
-  $('reader-title').textContent = version.title || story.title;
-  requestAnimationFrame(fitReaderTitle);
-  $('reader-title').lang = SPEECH_LANGUAGES[story.language] || 'en';
+// Title meta, chapter and path selectors and Previous/Next state for the displayed chapter; shared with in-place refreshes.
+function renderChapterNavigation(story) {
+  const chapters = pathChapters(story);
   const meta = $('reader-title-meta'); meta.textContent = '';
   const summary = document.createElement('span'); summary.className = 'reader-meta-summary';
   summary.textContent = `${LANGUAGES[story.language] || story.language} · Chapter ${state.readerChapter + 1} of ${chapters.length}`; meta.append(summary);
@@ -1160,6 +1222,22 @@ function updateReader(keepNavigation = false) {
   $('chapter-prev').disabled = state.readerChapter === 0; $('chapter-next').disabled = state.readerChapter >= chapters.length - 1;
   $('chapter-context-note').hidden = !path.forkChapter && !path.uncertain;
   $('chapter-context-note').textContent = [pathForkDescription(story, path), path.uncertain ? 'This older story has incomplete version history; its original continuity is uncertain.' : ''].filter(Boolean).join(' ');
+}
+function updateReader(keepNavigation = false) {
+  renderCheckpointRecovery();
+  if (!keepNavigation) closeReaderPanels();
+  closeReaderActions();
+  const story = readerStory(); if (!story) return;
+  const chapters = pathChapters(story); state.readerChapter = Math.min(state.readerChapter, chapters.length - 1);
+  const chapter = chapters[state.readerChapter], version = activeVersion(chapter);
+  const speechVersionKey = `${story.id}:${chapter.id}:${version.id}`;
+  if (state.speechVersionKey && state.speechVersionKey !== speechVersionKey) stopSpeech();
+  state.speechVersionKey = speechVersionKey;
+  renderReaderListen();
+  $('reader-title').textContent = version.title || story.title;
+  requestAnimationFrame(fitReaderTitle);
+  $('reader-title').lang = SPEECH_LANGUAGES[story.language] || 'en';
+  renderChapterNavigation(story);
   closeWordNote();
   annotatedText($('reader-story'), version.story, version.storySegments, {
     language: SPEECH_LANGUAGES[story.language] || 'en',
@@ -1315,13 +1393,15 @@ function openReader(story) {
   $('reader-help-section').hidden = true; $('reader-edit-panel').hidden = true; $('reader-prompt').value = '';
   updateReader();
   if (draft) { showEditPanel(draft.mode); $('reader-prompt').value = draft.prompt; $('reader-edit-error').textContent = draft.error; }
-  history.pushState({ ...(history.state && typeof history.state === 'object' ? history.state : {}), lingomageReader: story.id }, ''); state.readerHistoryEntry = true;
+  const entry = { ...(history.state && typeof history.state === 'object' ? history.state : {}), lingomageReader: story.id };
+  if (state.readerHistoryEntry) history.replaceState(entry, ''); else history.pushState(entry, '');
+  state.readerHistoryEntry = true;
   selectionMenuRouter.reset(); $('reader-dialog').showModal(); usage.setReader({ storyId: story.id, language: story.language }); readerPanel().scrollTop = position?.scrollTop || 0; updateReaderNavigation(); renderGenerationRecovery(); settingsFeedback.sync();
 }
 $('reader-dialog').addEventListener('close', () => {
   usage.setReader(null);
   settingsFeedback.sync();
-  if (state.readerHistoryEntry) { state.readerHistoryEntry = false; history.back(); }
+  if (state.readerHistoryEntry && !state.switchingReader) { state.readerHistoryEntry = false; history.back(); }
   if ($('reader-removal-dialog').open) $('reader-removal-dialog').close();
   closeReaderPanels(); closeReaderActions(); stopSpeech(); state.speechVersionKey = ''; closeWordNote(); rememberReaderPosition(); persistReaderPosition(); clearExplanationSelection(); setView('library');
 });
@@ -2084,7 +2164,7 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
     const box = $('reader-help');
     const helpRequest = { storyId: story.id, chapterId: chapter.id, versionId: version.id, helpId: existingHelp?.id || '', action, loading: createHelpLoading(action, followUp) };
     state.activeHelpRequest = helpRequest;
-    setReaderGeneration({ storyId: story.id, chapterId: chapter.id, versionId: version.id, helpId: existingHelp?.id, phase: 'working', message: action === 'initial' ? 'Explaining selection…' : action === 'detail' ? 'Writing more detail…' : 'Generating examples…' });
+    setReaderGeneration({ storyId: story.id, pathId: story.activePathId, chapterId: chapter.id, versionId: version.id, helpId: existingHelp?.id, phase: 'working', message: action === 'initial' ? 'Explaining selection…' : action === 'detail' ? 'Writing more detail…' : 'Generating examples…' });
     renderSavedHelp(chapter, version);
     const clearLoading = () => {
       if (state.activeHelpRequest === helpRequest) state.activeHelpRequest = null;
@@ -2174,7 +2254,7 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
         $('reader-help-section').hidden = false;
       }
     } finally { clearLoading(); }
-  } finally { state.readerHelpBusy = false; }
+  } finally { state.readerHelpBusy = false; renderReaderGeneration(); }
 }
 function runSelectionAction(button, action) {
   if (button.getAttribute('aria-busy') === 'true') return Promise.resolve();
@@ -2246,7 +2326,7 @@ document.addEventListener('click', event => { if (!event.target.closest?.('#read
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && !$('reader-actions-menu').hidden) { event.preventDefault(); event.stopPropagation(); closeReaderActions(true); }
 }, true);
-window.addEventListener('resize', () => { closeReaderPanels(); closeReaderActions(); closeWordNote(); updateReaderNavigation(); });
+window.addEventListener('resize', () => { closeReaderPanels(); closeReaderActions(); closeWordNote(); updateReaderNavigation(); renderReaderGeneration(); });
 $('chapter-select').addEventListener('change', () => { closeReaderPanels(true); state.readerChapter = Number($('chapter-select').value); state.readerVersion = 0; clearExplanationSelection(); updateReader(); });
 $('path-select').addEventListener('change', () => {
   if (state.readerEditBusy) { $('path-select').value = selectedPath().id; return; }
@@ -2314,7 +2394,8 @@ $('reader-edit-submit').addEventListener('click', async () => {
     showOperationResult(op);
   } catch (error) {
     try { await releaseInvalidReaderResponse(); } catch {}
-    if (readerGeneration) setReaderGeneration({ ...readerGeneration, phase: 'error', message: 'Generation stopped. View recovery below.' });
+    // A deliberate cancel clears the status instead of reporting a failure.
+    if (readerGeneration?.storyId === story.id) setReaderGeneration(failureInfo(error, 'prose').category === 'cancelled' ? null : { ...readerGeneration, phase: 'error', message: 'Generation stopped. View recovery below.' });
     const message = error.message === 'Request cancelled.' ? 'Generation cancelled.' : pipeline?.records.length ? '' : `${error.message} Submit again to retry.`;
     state.readerEditDraft = { storyId: story.id, pathId: path.id, chapterId: chapter.id, mode, prompt, error: message };
     if (state.readerId === story.id) {

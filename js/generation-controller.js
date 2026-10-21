@@ -33,7 +33,7 @@ function applyContentOperation(op) {
     const version={id:`version-${op.id}`,...result,...provenance,prompt:op.input.prompt,sourceVersionId:op.target.sourceVersionId,contextLineage:op.kind === 'continue' ? op.target.entries : op.target.entries.slice(0,op.target.index),memoryVersion:MEMORY_VERSION,learnerContext:op.input.learnerProfile};
     if (op.kind === 'continue') {
       const next={id:`chapter-${op.id}`,activeVersionId:version.id,versions:[version],prompt:op.input.prompt,basedOnVersionId:op.target.sourceVersionId,learnerContext:op.input.learnerProfile,createdAt:op.createdAt,help:[]};
-      candidate.chapters.push(next); path.entries.push({chapterId:next.id,versionId:version.id}); candidate.activePathId=path.id;
+      candidate.chapters.push(next); path.entries.push({chapterId:next.id,versionId:version.id}); // the learner's selected path is not changed by a finished Continue
     } else {
       if (!chapter) throw new Error('The destination chapter no longer exists.');
       chapter.versions.push(version);

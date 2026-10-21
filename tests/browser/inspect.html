@@ -1,12 +1,16 @@
 <!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>LingoMage layout inspection</title>
-<style>body{margin:0;background:#0f172a;color:#f8fafc;font:16px system-ui}header{padding:12px}button{font:inherit;min-height:44px;margin:0 8px 8px 0}iframe{display:block;width:100%;height:calc(100vh - 220px);border:0}#note{margin:4px 0}</style>
-<header><button id="normal">100% layout scale</button><button id="large">200% layout scale</button><p>CSS zoom emulation for screenshot inspection; actual device zoom and system font scaling require separate verification.</p>
+<style>body{margin:0;background:#0f172a;color:#f8fafc;font:16px system-ui}header{padding:12px}button{font:inherit;min-height:44px;margin:0 8px 8px 0}iframe{display:block;width:100%;height:calc(100vh - 220px);border:0}#note{margin:4px 0}body.full header{display:none}body.full iframe{height:100vh}#restore{display:none;position:fixed;z-index:10;top:2px;left:50%;transform:translateX(-50%);margin:0;opacity:.92}body.full #restore{display:block}body.capture #restore{display:none}</style>
+<button id="restore" type="button">Restore controls</button>
+<header><button id="full">Full preview (hide these controls)</button><button id="capture">Screenshot preview (Escape restores controls)</button><button data-width="360">360px mobile preview</button><button data-width="320">320px mobile preview</button><button data-width="auto">Desktop preview</button><button id="normal">100% layout scale</button><button id="large">200% layout scale</button><p>CSS zoom emulation for screenshot inspection; actual device zoom and system font scaling require separate verification.</p>
 <p id="note" role="status">Recovery fixtures overwrite the disposable workspace served by <code>python3 scripts/browser_smoke.py</code> and refuse to run anywhere else. Each button resets the workspace, then leaves the app in the named state for a screenshot.</p>
-<button data-fixture="unreadable-settings">Unreadable settings + reader notice</button><button data-fixture="write-failure-reader">Write failure in reader</button><button data-fixture="write-failure-page">Write failure on Profile page</button><button data-fixture="blank-stories">Blank stories file</button><button id="allow">Allow writes (then press Retry save)</button></header>
+<button data-fixture="unreadable-settings">Unreadable settings + reader notice</button><button data-fixture="write-failure-reader">Write failure in reader</button><button data-fixture="write-failure-page">Write failure on Profile page</button><button data-fixture="blank-stories">Blank stories file</button><button id="allow">Allow writes (then press Retry save)</button>
+<p>Generation status: the buttons below hold the mocked result polling, so a request stays running until released. Continue and Rewrite start on the Alternate 1 path of a seeded story; Create starts from the Create tab.</p>
+<button data-fixture="continue-held">Continue held (Alternate 1, chapter 1 of 2, mid-prose)</button><button data-fixture="rewrite-held">Rewrite held</button><button data-fixture="create-held">Create held</button><button data-fixture="other-reader-held">Continue held, then another story's reader</button><button data-fixture="create-resume-held">Create resumed after reload, held</button><button data-fixture="response-recovery">Explanation saved-response recovery</button><button id="hold">Hold AI results</button><button id="release">Release AI results</button></header>
 <iframe id="app" title="LingoMage layout preview" src="/"></iframe>
 <script type="module">
 const frame=document.querySelector('#app'),note=document.querySelector('#note');
+document.querySelectorAll('[data-width]').forEach(button=>button.addEventListener('click',()=>{frame.style.width=button.dataset.width==='auto'?'100%':`${button.dataset.width}px`;frame.style.maxWidth='100%';}));
 for(const [id,scale] of [['normal','1'],['large','2']])document.getElementById(id).addEventListener('click',()=>{frame.contentDocument.documentElement.style.zoom=scale;});
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms)),doc=()=>frame.contentDocument,field=id=>doc().getElementById(id);
 async function until(predicate,message){for(let i=0;i<200;i++){if(predicate())return;await delay(50);}throw Error(message);}
@@ -18,18 +22,66 @@ const story={id:'fixture-story',language:'de',title:'Der Markt',story:'Anna geht
 const settings={targetLanguages:{de:'enabled',ja:'enabled'},standardizedLevels:{de:'A1',ja:'N5'},readingPreferences:{followAlong:false}};
 async function openReaderPreferences(){doc().querySelector('[data-view="library"]').click();await until(()=>doc().querySelector('.story-open'),'Story missing');doc().querySelector('.story-open').click();await until(()=>field('reader-dialog').open,'Reader did not open');field('reader-preferences-toggle').click();field('reader-text-size').focus();}
 function changeSlider(){const slider=field('reader-text-size');slider.value='27';fire(slider,'input');fire(slider,'change');}
+// Mocked result polling is answered "still running" (the server's own pending reply, JSON null) while held.
+// Requests, cancellation and acknowledgement still reach the disposable mock server.
+function holdResults(on){const win=frame.contentWindow;win.__holdAi=on;if(win.fetch.__plain)return;const plain=win.fetch.bind(win);win.fetch=Object.assign((url,init)=>{
+ if(win.__holdAi&&String(url).includes('/__bridge/ai')&&typeof init?.body==='string'&&JSON.parse(init.body).action==='result')return Promise.resolve(new win.Response('null',{status:200,headers:{'Content-Type':'application/json'}}));
+ return plain(url,init);},{__plain:plain});}
+const chapterText=title=>`${title}. `+'Anna geht zum Markt. Sie kauft frisches Brot und lächelt. Dann geht sie nach Hause und liest ein Buch.\n\n'.repeat(10);
+const version=(id,title)=>({id,title,story:chapterText(title),glossary:[],difficulty:'A1',scope:'scene',createdAt:'2026-01-01T00:00:00.000Z'});
+const chapter=(id,versionId,title)=>({id,activeVersionId:versionId,versions:[version(versionId,title)],prompt:'',help:[]});
+// Original: chapters 1-2. Alternate 1 (selected): chapters 1 and 3, so chapter 1 is shared and the two paths differ.
+const twoPathStory={...story,id:'held-story',title:'Der Markt',activeVersionId:'v1',topic:'',practice:'',chapters:[chapter('c1','v1','Kapitel 1'),chapter('c2','v2','Kapitel 2 (Original)'),chapter('c3','v3','Kapitel 2 (Alternate 1)')],
+ paths:[{id:'original',name:'Original',entries:[{chapterId:'c1',versionId:'v1'},{chapterId:'c2',versionId:'v2'}]},{id:'alt',name:'Alternate 1',forkChapter:2,parentPathId:'original',parentPathName:'Original',entries:[{chapterId:'c1',versionId:'v1'},{chapterId:'c3',versionId:'v3'}]}],activePathId:'alt',nextAlternateNumber:2};
+// A second story lets a held request be watched from another story's reader.
+const otherStory={...story,id:'other-story',title:'Zweite Geschichte',story:chapterText('Zweite Geschichte'),chapters:undefined};
+async function seedHeld(){await write('data/stories.json',[twoPathStory,otherStory]);await write('data/settings.json',settings);await write('data/generation-checkpoints.json',[]);await reload();holdResults(true);}
+async function openStory(title){doc().querySelector('[data-view="library"]').click();await until(()=>[...doc().querySelectorAll('.story-open')].some(b=>b.textContent.includes(title)),`Story ${title} missing`);[...doc().querySelectorAll('.story-open')].find(b=>b.textContent.includes(title)).click();await until(()=>field('reader-dialog').open,'Reader did not open');}
+async function closeReader(){frame.contentWindow.history.back();await until(()=>!field('reader-dialog').open,'Reader did not close');}
+const panel=()=>doc().querySelector('.reader-panel');
+async function startHeld(mode){await seedHeld();await openStory('Der Markt');
+ field(mode==='continue'?'continue-story':'rewrite-chapter').click();await until(()=>!field('reader-edit-panel').hidden,'Edit panel did not open');
+ panel().scrollTop=500;await delay(150); // mid-prose: Continue must keep this reading position
+ field('reader-edit-submit').click();
+ await until(()=>!field('reader-generation-bar').hidden,'Generation status did not appear');}
+// Fail writes to one file after a request has started, so only the final save fails.
+function failWrites(on,name){const win=frame.contentWindow;win.__failNames=on?[name]:[];const proto=win.XMLHttpRequest.prototype;if(proto.__wrapOpen)return;proto.__wrapOpen=true;const open=proto.open;proto.open=function(method,url,...rest){if(win.__failNames?.some(n=>decodeURIComponent(url).includes('name='+n))&&/writeFile\?/.test(url))url='/__bridge/unavailable';return open.call(this,method,url,...rest);};}
 const fixtures={
+ 'continue-held':()=>startHeld('continue'),
+ 'rewrite-held':()=>startHeld('rewrite'),
+ async 'other-reader-held'(){await startHeld('continue');await closeReader();await openStory('Zweite Geschichte');await until(()=>field('generation-status-bar').parentNode===field('reader-dialog')&&!field('generation-status-bar').hidden,"Status did not appear in the other story's reader");},
+ async 'create-resume-held'(){await write('data/stories.json',[]);await write('data/settings.json',settings);await write('data/generation-checkpoints.json',[]);await reload();holdResults(true);
+  doc().querySelector('[data-view="create"]').click();field('story-form').requestSubmit();await until(()=>!field('loading-card').hidden,'Create progress did not appear');await delay(800);
+  await reload();holdResults(true);doc().querySelector('[data-view="create"]').click();await until(()=>!field('checkpoint-recovery-create').hidden,'Saved Create progress missing');
+  [...field('checkpoint-recovery-create').querySelectorAll('button')].find(b=>['Resume','Retry'].includes(b.textContent)).click();
+  await until(()=>!field('generation-status-bar').hidden&&field('loading-card').hidden,'Resumed Create status did not appear');},
+ async 'response-recovery'(){await seedHeld();await openStory('Der Markt');
+  const node=doc().createTreeWalker(field('reader-story'),4).nextNode(),range=doc().createRange();range.setStart(node,0);range.setEnd(node,Math.min(4,node.length));
+  const selection=frame.contentWindow.getSelection();selection.removeAllRanges();selection.addRange(range);doc().dispatchEvent(new frame.contentWindow.Event('selectionchange'));
+  await until(()=>!field('selection-toolbar').hidden,'Selection toolbar did not appear');[...field('selection-toolbar').querySelectorAll('button')].find(b=>b.textContent.trim()==='Explain').click();
+  await until(()=>!field('reader-generation-bar').hidden,'Explanation status did not appear');failWrites(true,'data/stories.json');holdResults(false);
+  await until(()=>field('reader-generation-message').textContent==='Response needs saving.','Saved-response recovery did not appear');failWrites(false,'data/stories.json');},
+ async 'create-held'(){await write('data/stories.json',[]);await write('data/settings.json',settings);await write('data/generation-checkpoints.json',[]);await reload();holdResults(true);doc().querySelector('[data-view="create"]').click();field('story-form').requestSubmit();await until(()=>!field('loading-card').hidden,'Create progress did not appear');},
  async 'unreadable-settings'(){await write('data/stories.json',[story]);await write('data/settings.json','{broken settings');await write('data/generation-checkpoints.json',[]);await reload();await openReaderPreferences();changeSlider();},
  async 'write-failure-reader'(){await write('data/stories.json',[{...story,story:(story.story+'\n\n').repeat(12)}]);await write('data/settings.json',settings);await write('data/generation-checkpoints.json',[]);await reload();failSettingsWrites(true);await openReaderPreferences();changeSlider();fire(field('furigana-toggle'),'change');field('reader-preferences-toggle').click();const panel=doc().querySelector('.reader-panel');panel.scrollTop=panel.scrollHeight;await delay(100);if(field('rewrite-chapter').getBoundingClientRect().bottom>field('reader-settings-error').getBoundingClientRect().top-8)throw Error('Preference notice covers final chapter actions');},
  async 'write-failure-page'(){await write('data/stories.json',[story]);await write('data/settings.json',settings);await write('data/generation-checkpoints.json',[]);await reload();failSettingsWrites(true);doc().querySelector('[data-view="profile"]').click();const add=doc().querySelector('.language-add[data-code="ru"]');add.focus();add.click();},
  async 'blank-stories'(){await write('data/stories.json','');await write('data/settings.json',settings);await write('data/generation-checkpoints.json',[]);await reload();doc().querySelector('[data-view="library"]').click();}
 };
+// Full preview keeps Restore controls visible; screenshot preview restores controls on Escape, including from the app frame.
+const setFull=on=>document.body.classList.toggle('full',on);
+document.getElementById('capture').addEventListener('click',()=>{setFull(true);document.body.classList.add('capture');});
+function restoreCapture(event){if(event.key==='Escape'&&document.body.classList.contains('capture')){event.preventDefault();event.stopImmediatePropagation();document.body.classList.remove('capture');setFull(false);}}
+document.addEventListener('keydown',restoreCapture,true);
+frame.addEventListener('load',()=>frame.contentDocument.addEventListener('keydown',restoreCapture,true));
+document.getElementById('full').addEventListener('click',()=>setFull(true));document.getElementById('restore').addEventListener('click',()=>setFull(false));
+async function guard(){const marker=await fetch('/data/browser-test-workspace.json').then(response=>response.json()),info=await fetch('/__bridge/info').then(response=>response.json());
+ if(marker.disposable!==true||info.mockAi!==true||info.liveAi)throw Error('Refusing to write: not the disposable offline workspace');}
+for(const [id,on] of [['hold',true],['release',false]])document.getElementById(id).addEventListener('click',async()=>{try{await guard();holdResults(on);note.textContent=on?'Mocked AI results are held; requests stay running.':'Mocked AI results released; the mock answers after its own 1.5 s delay.';}catch(error){note.textContent=`Fixture failed — ${error.message}`;}});
 document.querySelectorAll('[data-fixture]').forEach(button=>button.addEventListener('click',async()=>{
  try{
-  const marker=await fetch('/data/browser-test-workspace.json').then(response=>response.json()),info=await fetch('/__bridge/info').then(response=>response.json());
-  if(marker.disposable!==true||info.mockAi!==true||info.liveAi)throw Error('Refusing to write: not the disposable offline workspace');
+  await guard();
   note.textContent='Preparing…';await fixtures[button.dataset.fixture]();note.textContent=`Ready: ${button.textContent}. Inspect, then press the buttons again to reset.`;
- }catch(error){note.textContent=`Fixture failed — ${error.message}`;}
+ }catch(error){setFull(false);note.textContent=`Fixture failed — ${error.message}`;}
 }));
 document.querySelector('#allow').addEventListener('click',()=>{if(frame.contentWindow.XMLHttpRequest.prototype.__plainOpen)failSettingsWrites(false);note.textContent='Writes allowed. Press Retry save in the app.';});
 </script></html>
