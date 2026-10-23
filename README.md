@@ -4,12 +4,16 @@
 
 LingoMage is an **[App²](https://github.com/javiercmh/appapp) subapp**: it runs inside App² on Android and uses its shared AI connection.
 
-<p>
-  <img src="docs/images/create-story.jpg" width="320" alt="Create a story with a personal idea, reading scope, Japanese language and N5 reading level">
-  <img src="docs/images/reading-mode.jpg" width="320" alt="Japanese reader on Chapter 3 with furigana, a contextual vocabulary note, a saved explanation of 青く and three generated examples">
-</p>
+<img src="docs/images/reader-context-examples.jpg" width="640" alt="Japanese reader on Chapter 3 with furigana, a contextual vocabulary note, a saved explanation of 青く and three generated examples">
 
-*Create a story, then read with contextual vocabulary notes, phrase explanations and generated examples. The reader shows Chapter 3 of an illustrative Japanese story in the current offline browser preview.*
+*Chapter 3 with contextual vocabulary, a phrase explanation and generated examples. Illustrative Japanese content in the browser preview.*
+
+<details>
+<summary>Create a story</summary>
+
+<img src="docs/images/create-story-preview.jpg" width="480" alt="Create a story with a personal idea, reading scope, Japanese language and N5 reading level">
+
+</details>
 
 ## What you can do
 
