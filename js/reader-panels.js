@@ -42,6 +42,9 @@ export function createReaderPanels({state, $, window, document, getComputedStyle
     $('reader-story').style.fontSize = `${state.readerFontSize}px`;
     $('reader-text-size').value = String(state.readerFontSize);
     $('reader-text-size').setAttribute('aria-valuetext', `${state.readerFontSize} pixels`);
+    const slider = $('reader-text-size');
+    $('reader-text-smaller').disabled = state.readerFontSize <= Number(slider.min);
+    $('reader-text-larger').disabled = state.readerFontSize >= Number(slider.max);
   }
   function updateReaderNavigation() {
     if (!$('reader-dialog').open) return;
@@ -61,6 +64,11 @@ export function createReaderPanels({state, $, window, document, getComputedStyle
     };
     for (const name of READER_PANELS) listen($(`reader-${name}-toggle`), 'click', () => toggleReaderPanel(name));
     listen($('reader-text-size'), 'input', () => setReaderTextSize($('reader-text-size').value));
+    for (const [id, direction] of [['reader-text-smaller', -1], ['reader-text-larger', 1]]) listen($(id), 'click', () => {
+      const slider = $('reader-text-size');
+      setReaderTextSize(Number(slider.value) + direction * Number(slider.step || 1));
+      try { persistSettings(); } catch (error) { toast(error.message); }
+    });
     listen($('reader-text-size'), 'change', () => { try { persistSettings(); } catch (error) { toast(error.message); } });
     listen(document, 'pointerdown', event => {
       if (!event.target.closest?.('.reader-floating-panel, #reader-navigation-toggle, #reader-preferences-toggle')) closeReaderPanels();
