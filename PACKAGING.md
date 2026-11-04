@@ -33,8 +33,10 @@ bumps `version` in `manifest.json` on `dev`, then fast-forwards `main` to it (no
 commits), which is what installed apps on `main` are offered. To try unreleased work on
 a phone, open App² Library → LingoMage menu → Update app → Change source and set the
 branch to `dev`; set it back to `main` to return to releases. Each switch is shown as
-a source change and needs Update anyway. Keep `app2Update.github.branch` as `main` on
-both branches, because it is only the default suggested when an app is first linked.
+a source change and needs Update anyway. `app2Update.github` has no `branch` on `dev`:
+the branch belongs to each installation and App² Dev build 11+ defaults it to `main`.
+Older App² builds still require it, so a release that fast-forwards `main` should wait
+for an App² release that accepts it, or put `"branch": "main"` back on `main`.
 A version bump on `dev` is optional, since App² offers any change to managed files.
 
 `manifest.json.app2Update` declares publisher identity and file ownership.

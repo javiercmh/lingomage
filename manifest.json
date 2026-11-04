@@ -52,8 +52,7 @@
     "minimumHostVersionCode": 4,
     "github": {
       "owner": "javiercmh",
-      "repository": "lingomage",
-      "branch": "main"
+      "repository": "lingomage"
     },
     "managedFiles": [
       "icon.png",
