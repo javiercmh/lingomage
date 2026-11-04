@@ -439,7 +439,7 @@ let pipeline;
 // viewing, not the saved operation, so a reload simply starts counting again.
 const stepClock = new Map();
 let stepTimer = 0;
-function elapsedText(ms) { const s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+function elapsedText(ms) { const s = Math.max(0, Math.floor(ms / 1000)); if (!s) return ''; return s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 function createProgressView() {
   const root = document.createElement('div'); root.className = 'gen-progress'; root.hidden = true;
   const bar = document.createElement('div'); bar.className = 'gen-bar'; bar.setAttribute('aria-hidden', 'true');
@@ -500,11 +500,11 @@ function renderCheckpointRecovery() {
   if (!pipeline) return;
   const op = pipeline.records[0];
   applyGenerationLocks();
-  const stageMessage=op?.kind === 'examples' && op.stage === 'prose' ? 'Generating examples…' : op?.stage === 'plan' ? 'Planning suitable language…' : op?.stage === 'notes' ? 'Adding vocabulary notes…' : op?.stage === 'readings' ? 'Adding kanji readings…' : 'Writing your story…';
+  const stageMessage=op?.kind === 'examples' && op.stage === 'prose' ? 'Generating examples…' : op?.stage === 'plan' ? 'Planning suitable language…' : op?.stage === 'notes' ? 'Adding vocabulary notes…' : op?.stage === 'readings' ? 'Adding kanji readings…' : op?.stage === 'enrich' ? 'Adding vocabulary notes and kanji readings…' : op?.kind === 'continue' ? 'Writing the next chapter…' : op?.kind === 'rewrite' ? 'Rewriting this chapter…' : 'Writing your story…';
   if (op && pipeline.busy) {
     if (op.kind === 'create') { $('generation-status').textContent=stageMessage; paintProgress(createProgressRoot(), op); }
     if (readerGeneration && (readerGeneration.storyId ?? null) === (op.target?.storyId ?? null)) { readerGeneration.phase='working'; readerGeneration.message=progressSummary(op).text; }
-    if (state.activeChapterRequest && state.activeChapterRequest.storyId === op.target?.storyId) { state.activeChapterRequest.loading.querySelector('strong').textContent=stageMessage; const loading = state.activeChapterRequest.loading; if (!loading.progress) { loading.progress = createProgressView(); loading.querySelector('.help-loading-copy').append(loading.progress); } paintProgress(loading.progress, op); }
+    if (state.activeChapterRequest && state.activeChapterRequest.storyId === op.target?.storyId) { state.activeChapterRequest.loading.querySelector('strong').textContent=stageMessage; const loading = state.activeChapterRequest.loading; if (!loading.progress) { loading.progress = createProgressView(); loading.querySelector('.help-loading-copy').append(loading.progress); loading.classList.add('has-progress'); } paintProgress(loading.progress, op); }
   }
   renderReaderGeneration(); // busy and idle transitions both reach here through the pipeline's changed callback
   for (const id of ['checkpoint-recovery-create','checkpoint-recovery-profile','checkpoint-recovery-reader']) {
@@ -599,7 +599,7 @@ function initializePipeline() {
   const entry=workspaceStorage.load('data/generation-checkpoints.json');
   if (entry.status === 'invalid') { state.checkpointBlocked=true; showStorageErrors(); return; }
   const records=entry.value;
-  pipeline=createPipeline({records,persist:value=>workspaceStorage.save('data/generation-checkpoints.json',value),apply:applyContentOperation,parallel:true,changed:()=>{if(pipeline && !pipeline.busy) state.requestId=null; renderCheckpointRecovery();},ai:{
+  pipeline=createPipeline({records,persist:value=>workspaceStorage.save('data/generation-checkpoints.json',value),apply:applyContentOperation,parallel:false,changed:()=>{if(pipeline && !pipeline.busy) state.requestId=null; renderCheckpointRecovery();},ai:{
     start:async args=>{workspaceStorage.assertWritable(); state.requestId='starting'; try {const id=await aiSession.start(args); state.requestId=id; return id;} catch(error){state.requestId=null;throw error;}},
     wait:async id=>{state.requestId=id; try {const text=await ai.wait(id); return text;} finally {state.requestId=null;}},
     acknowledge:id=>ai.acknowledge(id), cancel:id=>ai.cancel(id)

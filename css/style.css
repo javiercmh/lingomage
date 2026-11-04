@@ -139,6 +139,8 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 .gen-label { flex: 1; min-width: 0; }
 .gen-time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; font-weight: 500; }
 .help-loading .gen-progress { max-width: none; margin: 12px 0 0; }
+.help-loading.has-progress { align-items: start; }
+.help-loading.has-progress .help-loading-sparkle { margin-top: 2px; }
 .library-heading { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; margin: 8px 2px 18px; }
 .library-heading h2 { margin: 0; font-size: 30px; font-weight: 720; letter-spacing: -.03em; }
 .filter-select { max-width: 150px; min-height: 42px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font-size: 12px; }

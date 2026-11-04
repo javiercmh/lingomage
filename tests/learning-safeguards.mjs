@@ -146,7 +146,7 @@ vm.createContext(recovery);vm.runInContext(source.slice(source.indexOf('function
 assert.equal(box('generation-status').textContent,'Adding kanji readings…');assert.equal(box('checkpoint-recovery-reader').hidden,true);
 recovery.pipeline.records[0]={kind:'continue',stage:'notes',target:{storyId:'story'}};recovery.state.readerId='story';recovery.readerGeneration={storyId:'story',phase:'ready'};
 recovery.renderCheckpointRecovery();assert.equal(box('reader-edit-submit').disabled,true);assert.equal(box('reader-prompt').disabled,true);assert.equal(recovery.readerGeneration.phase,'working');assert.equal(recovery.readerGeneration.message,'Step 3 of 3 · Vocabulary notes');
-const heading={append(){}};recovery.state.activeChapterRequest={storyId:'story',loading:{querySelector:()=>heading}};recovery.renderCheckpointRecovery();assert.equal(heading.textContent,'Adding vocabulary notes…');assert.equal(box('checkpoint-recovery-reader').hidden,true);delete recovery.state.activeChapterRequest;
+const heading={append(){}};recovery.state.activeChapterRequest={storyId:'story',loading:{querySelector:()=>heading,classList:{add(){}}}};recovery.renderCheckpointRecovery();assert.equal(heading.textContent,'Adding vocabulary notes…');assert.equal(box('checkpoint-recovery-reader').hidden,true);delete recovery.state.activeChapterRequest;
 
 recovery.pipeline.records[0]={kind:'create',stage:'notes',promptVersion:'test',safeguardVersion:'test'};
 

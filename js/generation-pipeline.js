@@ -10,8 +10,9 @@ export const pendingRequests = op => requestHolders(op).map(holder => holder.req
 
 // Checkpoints are user data. Valid stage results are durable before release;
 // the final application is idempotent via operationId on saved records.
-// parallel: run Japanese notes and readings together (the app does; the sequential default keeps offline
-// evaluation request budgets and ordering predictable).
+// parallel: run Japanese notes and readings together. Off in the app: the App² host (and the development
+// server) accept one running or unacknowledged request per app, so a second start fails with
+// request_in_progress. Enable only once the host accepts concurrent requests from one app.
 export function createPipeline({ records, persist, ai, apply, changed = () => {}, parallel = false }) {
   let busy = false;
   let phase = '';
