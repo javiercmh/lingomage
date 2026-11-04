@@ -26,7 +26,16 @@ Run `python3 dev_server.py --mock-ai` from this workspace for offline developmen
 App² version code 4 or later supports `updates.available` and `updates.open()` from
 `js/bridge.js`. The Settings button opens native review; installation always needs
 confirmation. Browser previews hide the button. App² follows
-`javiercmh/lingomage` branch `main`, pinned to one commit during download.
+`javiercmh/lingomage` branch `main` by default, pinned to one commit during download.
+
+Branches: day-to-day work goes to `dev`; `main` only moves for a release. A release
+bumps `version` in `manifest.json` on `dev`, then fast-forwards `main` to it (no merge
+commits), which is what installed apps on `main` are offered. To try unreleased work on
+a phone, open App² Library → LingoMage menu → Update app → Change source and set the
+branch to `dev`; set it back to `main` to return to releases. Each switch is shown as
+a source change and needs Update anyway. Keep `app2Update.github.branch` as `main` on
+both branches, because it is only the default suggested when an app is first linked.
+A version bump on `dev` is optional, since App² offers any change to managed files.
 
 `manifest.json.app2Update` declares publisher identity and file ownership.
 `data/stories.json`, `data/settings.json`, `data/generation-checkpoints.json` and `data/usage.json` are user files seeded only when absent. Usage is seeded as `{"version":1,"days":{}}`, preserved by updates and never packaged from local history.
