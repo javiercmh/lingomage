@@ -1,5 +1,7 @@
 import { bindGeneration } from './support/controllers.mjs';
 import { failureInfo, recoverySummary } from '../js/generation-errors.js';
+import { progressSummary } from '../js/generation-progress.js';
+import { pendingRequests } from '../js/generation-pipeline.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -139,12 +141,12 @@ print(Handler.mock_readings(SimpleNamespace(server=SimpleNamespace(workspace=Pat
 attachReadings(japaneseFixture.content,fixturePlan,fixtureReadings);
 // UI recovery must work for a fresh Create operation with no reader status.
 const boxes=new Map();const box=id=>{if(!boxes.has(id)){const b=element('section');b.hidden=true;b.dataset={};boxes.set(id,b);}return boxes.get(id);};
-const recovery={failureInfo,recoverySummary,appendFailureDetails(){},PROMPT_VERSION:'test',SAFEGUARD_VERSION:'test',pipeline:{records:[{kind:'create',stage:'readings'}],busy:true},readerGeneration:null,state:{readerId:null},$:box,document:{createElement:element},renderReaderGeneration(){},resumeCheckpoint(){},setScopeDisabled(){}};
+const recovery={createProgressView(){return {querySelector(){return null;}};},pendingRequests,progressSummary,createProgressRoot(){return {};},paintProgress(){},failureInfo,recoverySummary,appendFailureDetails(){},PROMPT_VERSION:'test',SAFEGUARD_VERSION:'test',pipeline:{records:[{kind:'create',stage:'readings'}],busy:true},readerGeneration:null,state:{readerId:null},$:box,document:{createElement:element},renderReaderGeneration(){},resumeCheckpoint(){},setScopeDisabled(){}};
 vm.createContext(recovery);vm.runInContext(source.slice(source.indexOf('function applyGenerationLocks('),source.indexOf('async function resumeCheckpoint(')),recovery);recovery.renderCheckpointRecovery();
 assert.equal(box('generation-status').textContent,'Adding kanji readings…');assert.equal(box('checkpoint-recovery-reader').hidden,true);
 recovery.pipeline.records[0]={kind:'continue',stage:'notes',target:{storyId:'story'}};recovery.state.readerId='story';recovery.readerGeneration={storyId:'story',phase:'ready'};
-recovery.renderCheckpointRecovery();assert.equal(box('reader-edit-submit').disabled,true);assert.equal(box('reader-prompt').disabled,true);assert.equal(recovery.readerGeneration.phase,'working');assert.equal(recovery.readerGeneration.message,'Adding vocabulary notes…');
-const heading={};recovery.state.activeChapterRequest={storyId:'story',loading:{querySelector:()=>heading}};recovery.renderCheckpointRecovery();assert.equal(heading.textContent,'Adding vocabulary notes…');assert.equal(box('checkpoint-recovery-reader').hidden,true);delete recovery.state.activeChapterRequest;
+recovery.renderCheckpointRecovery();assert.equal(box('reader-edit-submit').disabled,true);assert.equal(box('reader-prompt').disabled,true);assert.equal(recovery.readerGeneration.phase,'working');assert.equal(recovery.readerGeneration.message,'Step 3 of 3 · Vocabulary notes');
+const heading={append(){}};recovery.state.activeChapterRequest={storyId:'story',loading:{querySelector:()=>heading}};recovery.renderCheckpointRecovery();assert.equal(heading.textContent,'Adding vocabulary notes…');assert.equal(box('checkpoint-recovery-reader').hidden,true);delete recovery.state.activeChapterRequest;
 
 recovery.pipeline.records[0]={kind:'create',stage:'notes',promptVersion:'test',safeguardVersion:'test'};
 

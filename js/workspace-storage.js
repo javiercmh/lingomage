@@ -72,10 +72,11 @@ export function validSettings(value) {
 export function validCheckpoints(value) {
   return Array.isArray(value) && value.length <= 1 && value.every(op => object(op) && id(op.id)
     && ['create','continue','rewrite','examples'].includes(op.kind)
-    && ['plan','prose','notes','readings','ready','applied'].includes(op.stage)
+    && ['plan','prose','notes','readings','enrich','ready','applied'].includes(op.stage)
     && object(op.config) && object(op.input) && id(op.language)
     && (op.kind === 'create' || object(op.target))
-    && (op.request == null || object(op.request) && id(op.request.id)));
+    && (op.request == null || object(op.request) && id(op.request.id))
+    && (op.parallel == null || object(op.parallel) && Object.values(op.parallel).every(part => object(part) && (part.request == null || object(part.request) && id(part.request.id)))));
 }
 // Usage history: compact versioned local-date aggregates in milliseconds. Languages and activities are
 // open key sets so history for a disabled or future language stays readable. Activities never overlap
