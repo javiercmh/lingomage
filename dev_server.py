@@ -385,8 +385,6 @@ class Handler(SimpleHTTPRequestHandler):
             if self.server.ai_mode == 'chatgpt' and not any(item.get('id') == data['model'] for item in self.server.models):
                 return fail('invalid_request', 'The selected ChatGPT model is not available from Codex.')
             with self.server.request_lock:
-                if self.server.requests:
-                    return fail('request_in_progress', 'A request is running or awaiting acknowledgement')
                 request_id = ('mock-' if self.server.ai_mode == 'mock' else 'codex-') + uuid.uuid4().hex
                 request = {'ready': None, 'text': None, 'error': None, 'cancelled': False}
                 self.server.requests[request_id] = request

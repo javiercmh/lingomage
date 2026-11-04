@@ -10,9 +10,9 @@ export const pendingRequests = op => requestHolders(op).map(holder => holder.req
 
 // Checkpoints are user data. Valid stage results are durable before release;
 // the final application is idempotent via operationId on saved records.
-// parallel: run Japanese notes and readings together. Off in the app: the App² host (and the development
-// server) accept one running or unacknowledged request per app, so a second start fails with
-// request_in_progress. Enable only once the host accepts concurrent requests from one app.
+// parallel: run Japanese notes and readings together. The app enables it. Older App² hosts hold one
+// request per app and answer request_in_progress; the part then starts after the other finishes.
+// The sequential default keeps offline evaluation request budgets and ordering predictable.
 export function createPipeline({ records, persist, ai, apply, changed = () => {}, parallel = false }) {
   let busy = false;
   let phase = '';
@@ -70,8 +70,19 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
     await release(op, part);
   }
   async function runParallel(op) {
-    const names = Object.keys(op.parallel);
-    const settled = await Promise.allSettled(names.map(name => runPart(op, name)));
+    const names = Object.keys(op.parallel), running = new Map();
+    // A host that holds fewer concurrent requests refuses the start before any inference, so the part
+    // waits for the others and then starts once; this is not a retry of generated content.
+    const attempt = async name => {
+      try { await runPart(op, name); }
+      catch (error) {
+        if (error?.code !== 'request_in_progress' || op.parallel[name].request) throw error;
+        await Promise.allSettled([...running].filter(([other]) => other !== name).map(([, task]) => task));
+        await runPart(op, name);
+      }
+    };
+    for (const name of names) running.set(name, attempt(name));
+    const settled = await Promise.allSettled(running.values());
     const failed = settled.find(item => item.status === 'rejected');
     if (failed) throw failed.reason;
     const {notes, readings} = op.parallel;

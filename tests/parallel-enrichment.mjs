@@ -41,3 +41,14 @@ assert.deepEqual(progressSteps({kind:'create',language:'ja',stage:'enrich',paral
 assert.deepEqual(progressSteps({kind:'continue',language:'de',stage:'prose'}).map(s=>s.state),['done','active','pending']);
 assert.equal(progressSummary({kind:'examples',language:'de',stage:'prose'}).text,'Writing examples');
 console.log('PASS parallel Japanese enrichment: concurrency, partial failure reuse, cancellation and progress steps');
+// A host with a one-request cap refuses the second start before inference; the part runs after the first.
+{
+  let active=0,n=0;const kinds=new Map(),order=[];
+  const ai={async start(args){const kind=JSON.parse(args.input).kind;if(active)throw Object.assign(new Error('A request is already running'),{code:'request_in_progress'});active++;const id=kind+(++n);kinds.set(id,kind);order.push('start '+kind);return id;},
+    async wait(id){await new Promise(r=>setTimeout(r,5));const kind=kinds.get(id);return JSON.stringify(kind==='language-plan'?plan:kind==='create'?{title:prose.title,story:prose.story}:kind==='notes'?{glossary:prose.glossary}:{readings:readingPlan(prose).spans.map(s=>({id:s.id,reading:'まち'}))});},
+    async acknowledge(){active--;},async cancel(){}};
+  let applied=0;const p=createPipeline({records:[],persist(){},ai,parallel:true,apply(){applied++;}});
+  const op=p.create({planned:true,kind:'create',language:'ja',input:{},config:{providerId:'m',model:'m'},instructions:'x',promptVersion:'t'});
+  await p.run(op);assert.equal(applied,1);assert.equal(order.length,4,'each stage started exactly once');
+  console.log('PASS parallel enrichment falls back to one-at-a-time on a single-request host');
+}

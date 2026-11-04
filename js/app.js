@@ -599,7 +599,7 @@ function initializePipeline() {
   const entry=workspaceStorage.load('data/generation-checkpoints.json');
   if (entry.status === 'invalid') { state.checkpointBlocked=true; showStorageErrors(); return; }
   const records=entry.value;
-  pipeline=createPipeline({records,persist:value=>workspaceStorage.save('data/generation-checkpoints.json',value),apply:applyContentOperation,parallel:false,changed:()=>{if(pipeline && !pipeline.busy) state.requestId=null; renderCheckpointRecovery();},ai:{
+  pipeline=createPipeline({records,persist:value=>workspaceStorage.save('data/generation-checkpoints.json',value),apply:applyContentOperation,parallel:true,changed:()=>{if(pipeline && !pipeline.busy) state.requestId=null; renderCheckpointRecovery();},ai:{
     start:async args=>{workspaceStorage.assertWritable(); state.requestId='starting'; try {const id=await aiSession.start(args); state.requestId=id; return id;} catch(error){state.requestId=null;throw error;}},
     wait:async id=>{state.requestId=id; try {const text=await ai.wait(id); return text;} finally {state.requestId=null;}},
     acknowledge:id=>ai.acknowledge(id), cancel:id=>ai.cancel(id)
