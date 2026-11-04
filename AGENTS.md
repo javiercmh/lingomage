@@ -55,6 +55,8 @@ Existing saved records must remain readable; v1 has no general data migration. T
 glossary-alias migration in `js/workspace-storage.js` (`term`/`text` → `word` in `data/stories.json`); remove it in the next major release.
 Increment the app version for a published update. Commit and push require explicit
 user instructions; local changes are unavailable to GitHub updates until published.
+Day-to-day work goes to the `dev` branch, which installed apps do not follow. A release bumps the
+version on `dev` and then fast-forwards `main` to it (no merge commits), which is what App² offers.
 
 Package with App²'s `scripts/package_subapp.py`; it uses empty declared seed
 defaults rather than copying local stories or settings. ZIP installation belongs
