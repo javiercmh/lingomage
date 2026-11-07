@@ -1,55 +1,46 @@
-# LingoMage — Learn languages through stories
+# LingoMage
 
-**Turn the words and ideas you want to practise into stories you want to read.** LingoMage creates AI stories for learners of German, Japanese, Russian and Spanish, with English explanations, self-selected reading levels and scene/chapter narrative scope.
+**Learn a language by reading stories made for you.** Pick what the story is about and the words you want to practise. LingoMage writes it at your reading level, with English help whenever you need it.
 
-LingoMage is an **[App²](https://github.com/javiercmh/appapp) subapp**: it runs inside App² on Android and uses its shared AI connection.
+Supports **German, Japanese, Russian and Spanish**. LingoMage runs inside [App²](https://github.com/javiercmh/appapp) on Android.
 
-| Create a story | Read with contextual help |
-| :---: | :---: |
-| <img src="docs/images/create-mia-story.jpg" width="300" alt="Create view with a prompt about Mia buying bread, meeting a friend in the park and walking home, with Japanese and N5 selected"> | <img src="docs/images/reader-context-examples.jpg" width="300" alt="Japanese reader on Chapter 3 with furigana, a contextual vocabulary note, a saved explanation of 青く and three generated examples"> |
-
-*An illustrative Japanese story, from the initial idea to Chapter 3 with contextual vocabulary, a phrase explanation and generated examples. Browser previews.*
-
-## What you can do
-
-- **Make it personal:** choose a story idea, practice topics, reading level, narrative scope and language preferences.
-- **Read comfortably:** adjust text size, toggle Japanese furigana and open word notes when needed.
-- **Get contextual help:** select a passage and tap Explain for its English meaning and usage.
-- **Shape the story:** add chapters with follow-up prompts or rewrite a chapter while keeping the original.
-- **Read again offline:** save stories and explanations in your workspace.
+<p align="center">
+  <img src="docs/images/create-mia-story.jpg" width="40%" alt="Creating a Japanese story about Mia buying bread and meeting a friend, at level N5">
+  <img src="docs/images/reader-context-examples.jpg" width="40%" alt="Reading Chapter 3 with furigana, a vocabulary note and an explanation with examples">
+</p>
+<p align="center"><sub><b>Create a story</b> · <b>Read with help</b></sub></p>
 
 ## Get started
 
-1. In App², tap **Import** and paste `https://github.com/javiercmh/lingomage`.
-2. Connect an AI provider in the App² library under **Settings → AI**.
-3. Open LingoMage, choose your learning languages and reading levels in Profile, then choose a story idea and reading scope.
+1. Install [App²](https://github.com/javiercmh/appapp/releases/latest).
+2. In App², tap **New app** and paste `https://github.com/javiercmh/lingomage`.
+3. Connect an AI provider in App² under **Settings → AI**.
+4. Open LingoMage, set your languages and levels in **Profile**, and create your first story.
 
-Reading levels are self-selected targets, not certified proficiency assessments. Generation first plans suitable vocabulary and grammar, then writes the story and contextual glossary.
+## What you can do
+
+| | |
+| :--- | :--- |
+| ✍️ **Make it personal** | Choose the story idea, practice topics, reading level and length. |
+| 📖 **Read comfortably** | Change text size, show Japanese furigana and open word notes. |
+| 💡 **Get explanations** | Select any passage and tap **Explain** for its meaning and usage. |
+| ➕ **Continue the story** | Add chapters or rewrite one while keeping the original. |
+| 📴 **Read offline** | Stories and explanations are saved on your phone. |
+
+Reading levels are targets you choose, not official assessments.
 
 ## For developers
 
-Plain HTML, CSS and JavaScript; no dependencies or build step. Preview with Python 3.9+:
+Plain HTML, CSS and JavaScript, with no build step. To preview in your browser (Python 3.9+), run:
 
 ```sh
 python3 dev_server.py --mock-ai
 ```
 
-Open [localhost:8888](http://localhost:8888). The mock is offline; the server writes workspace files, so use a disposable copy for testing.
-
-For live desktop testing, sign in with the Codex CLI and run:
+Then open [localhost:8888](http://localhost:8888). To run all checks (also needs Node.js 22.12+):
 
 ```sh
-codex login
-python3 dev_server.py --chatgpt
+python3 scripts/check.py
 ```
 
-This development-only connection uses the model catalog and ChatGPT account managed by Codex. Requests may count against your ChatGPT plan. Codex is required; the Python server stores no credentials. Each request uses a fresh temporary directory and ephemeral Codex thread. Pending requests are lost if the server stops. Use a disposable copy for testing because workspace files are saved by the server.
-
-See the [runtime guide](docs/architecture/app2-runtime.md) and [pedagogical decisions](docs/pedagogy/README.md). The native app has been retired; historical Kotlin is preserved in Git. See the [safeguard audit](docs/architecture/language-safeguards.md).
-
-Run `python3 scripts/check.py` with Node.js 22.12 or newer and Python 3.9+ for the full regression, server and manifest checks. CI runs the same command; the released subapp still has no dependencies or build step. Unfinished generation is saved in inspectable JSON and offers explicit Resume/Discard recovery.
-
-For repeatable browser integration checks, run `python3 scripts/browser_smoke.py`
-and open the printed smoke-runner URL. It creates a disposable offline workspace,
-requires no browser-test dependency and never uses a live provider. See the
-[runtime guide](docs/architecture/app2-runtime.md#storage-boundaries-and-controller-modules).
+See also the [pedagogical decisions](docs/pedagogy/README.md).
