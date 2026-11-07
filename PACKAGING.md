@@ -28,16 +28,24 @@ App² version code 4 or later supports `updates.available` and `updates.open()` 
 confirmation. Browser previews hide the button. App² follows
 `javiercmh/lingomage` branch `main` by default, pinned to one commit during download.
 
-Branches: day-to-day work goes to `dev`; `main` only moves for a release. A release
-bumps `version` in `manifest.json` on `dev`, then fast-forwards `main` to it (no merge
-commits), which is what installed apps on `main` are offered. To try unreleased work on
-a phone, open App² Library → LingoMage menu → Update app → Change source and set the
-branch to `dev`; set it back to `main` to return to releases. Each switch is shown as
-a source change and needs Update anyway. `app2Update.github` has no `branch` on `dev`:
-the branch belongs to each installation and App² Dev build 11+ defaults it to `main`.
-Older App² builds still require it, so a release that fast-forwards `main` should wait
-for an App² release that accepts it, or put `"branch": "main"` back on `main`.
-A version bump on `dev` is optional, since App² offers any change to managed files.
+Branches: all changes, including contributor instructions and release fixes, go
+through `dev`. `main` only moves when publishing those changes. For an app release,
+bump `version` in `manifest.json` on `dev`, then fast-forward `main` to the tested
+`dev` commit with `git merge --ff-only dev`. Push both branches; they should point
+to the same commit immediately after publication. Between releases, `dev` may be
+ahead of `main`. Do not make separate copies of a change on both branches or add
+release-only commits to `main`. If a main-only fix is unavoidable, bring it back
+into `dev` before continuing development.
+
+Keep the manifest identical across branches. Retain `"branch": "main"` in
+`app2Update.github` for compatibility with older App² builds. App² Dev build 11+
+keeps the selected branch per installation; to try unreleased work, open App²
+Library → LingoMage menu → Update app → Change source and select `dev`. Select
+`main` to return to releases. Each switch is shown as a source change and needs
+Update anyway. Remove the compatibility field on `dev` only when supported by the
+released host, then publish that same manifest to `main`.
+A version bump on `dev` is optional before publication, since App² offers any
+change to managed files.
 
 `manifest.json.app2Update` declares publisher identity and file ownership.
 `data/stories.json`, `data/settings.json`, `data/generation-checkpoints.json` and `data/usage.json` are user files seeded only when absent. Usage is seeded as `{"version":1,"days":{}}`, preserved by updates and never packaged from local history.
