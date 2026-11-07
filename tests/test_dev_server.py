@@ -197,9 +197,8 @@ class DevelopmentServerTests(unittest.TestCase):
         server = self.start_live()
         status, request_id = self.start_request(server)
         self.assertEqual(status, 200)
-        second_status, second = self.start_request(server, 'second')
-        self.assertEqual(second_status, 400)
-        self.assertEqual(second['error']['code'], 'request_in_progress')
+        second_status, _ = self.start_request(server, 'second')
+        self.assertEqual(second_status, 200)
         value = None
         for _ in range(30):
             _, value = self.ai(server, 'result', requestId=request_id)

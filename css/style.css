@@ -121,6 +121,26 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 @keyframes twinkle { to { transform: rotate(20deg) scale(1.1); opacity: .65; } }
 .loading h2 { margin: 10px; font-size: 23px; font-weight: 700; }
 .loading p { margin: 0 0 18px; color: var(--muted); font-size: 14px; }
+/* Waiting progress: a segmented bar plus a stage checklist; the state text is never colour alone. */
+.gen-progress { margin: 0 auto 20px; max-width: 320px; text-align: left; }
+.gen-bar { display: flex; gap: 4px; margin-bottom: 14px; }
+.gen-seg { flex: 1; height: 6px; border-radius: 999px; background: var(--tint); overflow: hidden; }
+.gen-seg[data-state="done"] { background: var(--accent-strong); }
+.gen-seg[data-state="active"] { background: linear-gradient(90deg, rgba(59,130,246,.25), var(--accent), rgba(59,130,246,.25)) 0 0 / 200% 100%; animation: gen-sweep 1.4s linear infinite; }
+@keyframes gen-sweep { to { background-position: -200% 0; } }
+.gen-steps { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.gen-steps li { display: flex; align-items: center; gap: 10px; min-height: 24px; color: var(--muted); font-size: 14px; }
+.gen-steps li[data-state="active"] { color: var(--ink); font-weight: 650; }
+.gen-steps li[data-state="done"] { color: #cbd5e1; }
+.gen-mark { display: grid; flex: none; width: 20px; height: 20px; place-items: center; border: 2px solid var(--line); border-radius: 50%; font-size: 12px; line-height: 1; color: white; }
+.gen-steps li[data-state="done"] .gen-mark { border-color: var(--accent-strong); background: var(--accent-strong); }
+.gen-steps li[data-state="active"] .gen-mark { border-color: rgba(122,167,255,.3); border-top-color: var(--accent); animation: gen-spin .9s linear infinite; }
+@keyframes gen-spin { to { transform: rotate(360deg); } }
+.gen-label { flex: 1; min-width: 0; }
+.gen-time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; font-weight: 500; }
+.help-loading .gen-progress { max-width: none; margin: 12px 0 0; }
+.help-loading.has-progress { align-items: start; }
+.help-loading.has-progress .help-loading-sparkle { margin-top: 2px; }
 .library-heading { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; margin: 8px 2px 18px; }
 .library-heading h2 { margin: 0; font-size: 30px; font-weight: 720; letter-spacing: -.03em; }
 .filter-select { max-width: 150px; min-height: 42px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font-size: 12px; }

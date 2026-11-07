@@ -9,7 +9,8 @@ import { createSelectionMenuRouter } from './selection-menu.js';
 import { createReaderActivation, glossaryForTrigger, indexGlossaryTriggers, normalizeReaderControls } from './reader-activation.js';
 import { annotatedText, applyExplainedMarks, getCanonicalSelection, japaneseSegments } from './reader-text.js';
 import { SPEECH_RATES, canonicalRange, createReaderPlayer, speechUnits } from './reader-player.js';
-import { createPipeline } from './generation-pipeline.js';
+import { createPipeline, pendingRequests } from './generation-pipeline.js';
+import { progressSummary } from './generation-progress.js';
 import { SAFEGUARD_VERSION, parseContent, validateStory } from './learning-validation.js';
 import { failureInfo, recoverySummary, appendFailureDetails } from './generation-errors.js';
 import { createWorkspaceStorage, createSettingsPersistence, optionalStore, USAGE_PATH } from './workspace-storage.js';
@@ -434,6 +435,57 @@ window.addEventListener('resize', updateKeyboardNavigation);
 
 let pipeline;
 // Field locks that follow generation state; also reapplied after controls that share them are rebuilt.
+// Stage checklist and segmented bar for the waiting screens. Timing is in memory only: it describes this
+// viewing, not the saved operation, so a reload simply starts counting again.
+const stepClock = new Map();
+let stepTimer = 0;
+function elapsedText(ms) { const s = Math.max(0, Math.floor(ms / 1000)); if (!s) return ''; return s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+function createProgressView() {
+  const root = document.createElement('div'); root.className = 'gen-progress'; root.hidden = true;
+  const bar = document.createElement('div'); bar.className = 'gen-bar'; bar.setAttribute('aria-hidden', 'true');
+  const list = document.createElement('ol'); list.className = 'gen-steps';
+  const status = document.createElement('p'); status.className = 'sr-only'; status.setAttribute('role', 'status');
+  root.append(bar, list, status); return root;
+}
+function paintProgress(root, op) {
+  const summary = progressSummary(op), now = Date.now();
+  for (const step of summary.steps) {
+    const key = `${op.id}:${step.key}`, clock = stepClock.get(key) || {};
+    if (step.state !== 'pending' && !clock.start) clock.start = now;
+    if (step.state === 'done' && clock.start && !clock.end) clock.end = now;
+    stepClock.set(key, clock);
+  }
+  const signature = JSON.stringify(summary.steps.map(step => [step.key, step.state]));
+  root.hidden = false;
+  if (root.dataset.signature !== signature) {
+    root.dataset.signature = signature;
+    const bar = root.querySelector('.gen-bar'), list = root.querySelector('.gen-steps');
+    bar.textContent = ''; list.textContent = '';
+    for (const step of summary.steps) {
+      const segment = document.createElement('span'); segment.className = 'gen-seg'; segment.dataset.state = step.state; bar.append(segment);
+      const item = document.createElement('li'); item.dataset.state = step.state; item.dataset.clock = `${op.id}:${step.key}`;
+      const mark = document.createElement('span'); mark.className = 'gen-mark'; mark.setAttribute('aria-hidden', 'true'); mark.textContent = step.state === 'done' ? '✓' : '';
+      const label = document.createElement('span'); label.className = 'gen-label'; label.textContent = step.label;
+      const hint = document.createElement('span'); hint.className = 'sr-only'; hint.textContent = step.state === 'done' ? ' (done)' : step.state === 'active' ? ' (in progress)' : ' (waiting)';
+      const time = document.createElement('span'); time.className = 'gen-time';
+      item.append(mark, label, hint, time); list.append(item);
+    }
+    root.querySelector('[role="status"]').textContent = summary.text;
+  }
+  tickProgress();
+  if (!stepTimer) stepTimer = setInterval(tickProgress, 1000);
+}
+function tickProgress() {
+  const items = document.querySelectorAll('.gen-steps li[data-clock]');
+  if (!pipeline?.busy || !items.length) { clearInterval(stepTimer); stepTimer = 0; }
+  const now = Date.now();
+  for (const item of items) {
+    const clock = stepClock.get(item.dataset.clock), time = item.querySelector('.gen-time');
+    time.textContent = clock?.start && item.dataset.state !== 'pending' ? elapsedText((clock.end || now) - clock.start) : '';
+  }
+}
+let createProgress = null;
+function createProgressRoot() { if (!createProgress) { createProgress = createProgressView(); $('generation-status').after(createProgress); } return createProgress; }
 function applyGenerationLocks() {
   const op = pipeline?.records[0], busy = Boolean(pipeline?.busy);
   $('generate').disabled = Boolean(state.storageBlocked || state.checkpointBlocked || op || busy);
@@ -448,11 +500,11 @@ function renderCheckpointRecovery() {
   if (!pipeline) return;
   const op = pipeline.records[0];
   applyGenerationLocks();
-  const stageMessage=op?.kind === 'examples' && op.stage === 'prose' ? 'Generating examples…' : op?.stage === 'plan' ? 'Planning suitable language…' : op?.stage === 'notes' ? 'Adding vocabulary notes…' : op?.stage === 'readings' ? 'Adding kanji readings…' : 'Writing your story…';
+  const stageMessage=op?.kind === 'examples' && op.stage === 'prose' ? 'Generating examples…' : op?.stage === 'plan' ? 'Planning suitable language…' : op?.stage === 'notes' ? 'Adding vocabulary notes…' : op?.stage === 'readings' ? 'Adding kanji readings…' : op?.stage === 'enrich' ? 'Adding vocabulary notes and kanji readings…' : op?.kind === 'continue' ? 'Writing the next chapter…' : op?.kind === 'rewrite' ? 'Rewriting this chapter…' : 'Writing your story…';
   if (op && pipeline.busy) {
-    if (op.kind === 'create') $('generation-status').textContent=stageMessage;
-    if (readerGeneration && (readerGeneration.storyId ?? null) === (op.target?.storyId ?? null)) { readerGeneration.phase='working'; readerGeneration.message=stageMessage; }
-    if (state.activeChapterRequest && state.activeChapterRequest.storyId === op.target?.storyId) state.activeChapterRequest.loading.querySelector('strong').textContent=stageMessage;
+    if (op.kind === 'create') { $('generation-status').textContent=stageMessage; paintProgress(createProgressRoot(), op); }
+    if (readerGeneration && (readerGeneration.storyId ?? null) === (op.target?.storyId ?? null)) { readerGeneration.phase='working'; readerGeneration.message=progressSummary(op).text; }
+    if (state.activeChapterRequest && state.activeChapterRequest.storyId === op.target?.storyId) { state.activeChapterRequest.loading.querySelector('strong').textContent=stageMessage; const loading = state.activeChapterRequest.loading; if (!loading.progress) { loading.progress = createProgressView(); loading.querySelector('.help-loading-copy').append(loading.progress); loading.classList.add('has-progress'); } paintProgress(loading.progress, op); }
   }
   renderReaderGeneration(); // busy and idle transitions both reach here through the pipeline's changed callback
   for (const id of ['checkpoint-recovery-create','checkpoint-recovery-profile','checkpoint-recovery-reader']) {
@@ -460,7 +512,7 @@ function renderCheckpointRecovery() {
     if (id === 'checkpoint-recovery-reader') { const anchor = op?.kind === 'examples' ? $('reader-help-section') : $('reader-edit-panel'); if (anchor.nextElementSibling !== box) anchor.after?.(box); }
     const hidden = !op || id === 'checkpoint-recovery-reader' && (op.target?.storyId !== state.readerId || pipeline.busy && state.activeChapterRequest?.storyId === op.target?.storyId) || id === 'checkpoint-recovery-create' && pipeline.busy && !$('loading-card').hidden;
     const messageText = !op ? '' : pipeline.busy ? stageMessage : op.promptVersion !== PROMPT_VERSION || op.safeguardVersion !== SAFEGUARD_VERSION ? 'This saved request belongs to an older app definition. Discard it to start with the current requirements.' : recoverySummary(op);
-    const resumeText = !op ? '' : op.stage === 'applied' || op.request?.completed ? 'Finish request' : op.stage === 'ready' ? 'Save response' : op.error ? 'Retry' : 'Resume';
+    const resumeText = !op ? '' : op.stage === 'applied' || pendingRequests(op).some(request => request.completed) ? 'Finish request' : op.stage === 'ready' ? 'Save response' : op.error ? 'Retry' : 'Resume';
     const resumeBlocked = Boolean(op) && Boolean(state.storageBlocked || pipeline.busy || /older app definition|destination.*no longer|source explanation changed|destination path changed/i.test(op.error || '') || op.promptVersion !== PROMPT_VERSION || op.safeguardVersion !== SAFEGUARD_VERSION);
     // Rebuilding would drop keyboard focus and make screen readers repeat an unchanged alert.
     const signature = JSON.stringify([hidden, op?.id, messageText, resumeText, resumeBlocked, pipeline.busy, op?.error, op?.failure]);
@@ -498,7 +550,7 @@ async function resumeCheckpoint(op) {
       $('reader-edit-error').textContent = '';
     }
     setReaderGeneration({storyId:op.target?.storyId ?? null,phase:'working',message:'Resuming saved progress…'});
-    if (op.request?.completed && !['ready','applied'].includes(op.stage)) { await pipeline.finishRequest(op); setReaderGeneration(null); return; }
+    if (pendingRequests(op).some(request => request.completed) && !['ready','applied'].includes(op.stage)) { await pipeline.finishRequest(op); setReaderGeneration(null); return; }
     // An outstanding request is polled, saved and acknowledged by the pipeline before any new request,
     // and so before any session is opened (sessions open lazily at the next ai.start).
     await aiSession.run(() => pipeline.run(op)); showOperationResult(op);
@@ -547,7 +599,7 @@ function initializePipeline() {
   const entry=workspaceStorage.load('data/generation-checkpoints.json');
   if (entry.status === 'invalid') { state.checkpointBlocked=true; showStorageErrors(); return; }
   const records=entry.value;
-  pipeline=createPipeline({records,persist:value=>workspaceStorage.save('data/generation-checkpoints.json',value),apply:applyContentOperation,changed:()=>{if(pipeline && !pipeline.busy) state.requestId=null; renderCheckpointRecovery();},ai:{
+  pipeline=createPipeline({records,persist:value=>workspaceStorage.save('data/generation-checkpoints.json',value),apply:applyContentOperation,parallel:true,changed:()=>{if(pipeline && !pipeline.busy) state.requestId=null; renderCheckpointRecovery();},ai:{
     start:async args=>{workspaceStorage.assertWritable(); state.requestId='starting'; try {const id=await aiSession.start(args); state.requestId=id; return id;} catch(error){state.requestId=null;throw error;}},
     wait:async id=>{state.requestId=id; try {const text=await ai.wait(id); return text;} finally {state.requestId=null;}},
     acknowledge:id=>ai.acknowledge(id), cancel:id=>ai.cancel(id)
@@ -790,7 +842,7 @@ async function generate(event) {
     const languageCode = $('language').value, difficulty = $('difficulty').value;
     const requestInput = storyInput();
     const requestProfile = JSON.parse(requestInput);
-    $('story-form').hidden = true; $('loading-card').hidden = false;
+    $('story-form').hidden = true; $('loading-card').hidden = false; { const root = createProgressRoot(); root.hidden = true; delete root.dataset.signature; }
     creatingStory = true; setReaderGeneration({storyId:null,phase:'working',message:'Writing your story…'});
     $('generation-status').textContent = ai.developmentMock ? 'Using the offline development response.' : 'Weaving your ideas into a story.';
     const op = await runContentOperation({kind:'create', language:languageCode, input:requestProfile, profileVersion:PROFILE_DEFINITIONS.version, instructions:storyInstructions(LANGUAGES[languageCode],difficulty,guideFor(languageCode,difficulty)), config:{providerId:provider.id,model:model.id,reasoning:chosenEffort}});
@@ -1883,7 +1935,8 @@ function createHelpLoading(action, followUp) {
   const copy = document.createElement('div'); copy.className = 'help-loading-copy';
   const title = document.createElement('strong'); title.textContent = action === 'continue' ? 'Writing the next chapter…' : action === 'rewrite' ? 'Rewriting this chapter…' : action === 'examples' ? 'Generating examples…' : action === 'detail' ? 'Adding more detail…' : 'Preparing an explanation…';
   const note = document.createElement('p'); note.textContent = ['continue', 'rewrite'].includes(action) ? 'Your current chapter stays available while this is prepared.' : action === 'detail' && followUp ? `Answering: ${followUp}` : 'Your saved explanations will stay here while this is prepared.';
-  copy.append(title, note); panel.append(sparkle, copy); return panel;
+  copy.append(title, note);
+  panel.append(sparkle, copy); return panel;
 }
 function createShowInTextButton(item) {
   const chars = Array.from(String(item.passage || '').replace(/\s+/g, ' ').trim());

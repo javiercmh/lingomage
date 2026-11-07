@@ -28,7 +28,7 @@ export function failureInfo(error, stage, phase = '') {
 }
 export function recoverySummary(op) {
   const names={create:'Story generation',continue:'Story continuation',rewrite:'Chapter rewrite',examples:'Example generation',explain:'Explanation',initial:'Explanation',detail:'More detail'};
-  const stages={plan:'language planning',prose:'writing',notes:'vocabulary notes',readings:'Japanese readings',ready:'saving',applied:'finishing the request',setup:'setup',detail:'more detail',initial:'explanation'};
+  const stages={plan:'language planning',prose:'writing',notes:'vocabulary notes',readings:'Japanese readings',enrich:'vocabulary notes and readings',ready:'saving',applied:'finishing the request',setup:'setup',detail:'more detail',initial:'explanation'};
   if (!op.error) return 'An unfinished request has saved progress. Resume it or discard this attempt.';
   const failure=op.failure || failureInfo(new Error(op.error),op.stage);
   const reason=(failure.category === 'background' && BACKGROUND_REASONS[failure.code]) || {background:`Background work could not continue.${SAVED}`,unavailable:`The request or background session is no longer available. Earlier steps remain saved; Retry runs the unfinished step again.`,service:'The AI service could not complete the request.',validation:'The AI response did not meet the required format or language checks.',storage:'The response or progress could not be saved.',release:'The response is preserved, but the AI request could not be finished.',configuration:failure.message,cancelled:'The request was cancelled.',internal:'An unexpected app error stopped the request.'}[failure.category] || 'The request stopped.';

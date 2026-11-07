@@ -3,36 +3,100 @@ import { aiNotification } from './ai-notification.js';
 import { PLAN_INSTRUCTIONS, decodePlan } from './story-generation.js';
 import { parseContent, validateContentSize, validateProse, validateNotes, validateStory, validateExamples, readingPlan, attachReadings, NOTES_INSTRUCTIONS, READING_INSTRUCTIONS, SAFEGUARD_VERSION } from './learning-validation.js';
 
+// A saved operation can hold several requests: the main one and, for Japanese notes plus readings,
+// one per parallel part. Every cancel, release and recovery path walks all of them.
+export const requestHolders = op => [op, ...Object.values(op.parallel || {})];
+export const pendingRequests = op => requestHolders(op).map(holder => holder.request).filter(Boolean);
+
 // Checkpoints are user data. Valid stage results are durable before release;
 // the final application is idempotent via operationId on saved records.
-export function createPipeline({ records, persist, ai, apply, changed = () => {} }) {
+// parallel: run Japanese notes and readings together. The app enables it. Older App² hosts hold one
+// request per app and answer request_in_progress; the part then starts after the other finishes.
+// The sequential default keeps offline evaluation request budgets and ordering predictable.
+export function createPipeline({ records, persist, ai, apply, changed = () => {}, parallel = false }) {
   let busy = false;
   let phase = '';
   const mark = value => { phase=value; };
   const save = () => { mark('checkpoint'); persist(records); changed(); };
   const validate = op => op.kind === 'examples' ? validateExamples(op.prose, op.language) : validateStory(op.prose, op.language, op.length);
-  async function release(op) {
-    if (!op.request) return;
+  async function release(op, holder = op) {
+    if (!holder.request) return;
     mark('release');
-    try { await ai.acknowledge(op.request.id); }
+    try { await ai.acknowledge(holder.request.id); }
     catch (error) { if (error.code !== 'not_found') throw error; }
-    op.request = null; save();
+    holder.request = null; save();
   }
-  async function checkCancelled(op) {
+  const releaseAll = async op => { for (const holder of requestHolders(op)) await release(op, holder); };
+  async function cancelRequest(request) {
+    if (request.completed || request.cancelled) return;
+    try { await ai.cancel(request.id); } catch (error) { if (error.code !== 'not_found' && !/not found|unknown request/i.test(error.message)) throw error; }
+    request.cancelled=true;
+  }
+  async function checkCancelled(op, holder = op) {
     if (!op.cancelRequested) return;
-    if (op.request && !op.request.completed && !op.request.cancelled) {
-      try { await ai.cancel(op.request.id); } catch (error) { if (error.code !== 'not_found' && !/not found|unknown request/i.test(error.message)) throw error; }
-      op.request.cancelled=true;
-    }
-    if (op.request && !op.request.completed) { op.request.completed=true; op.request.invalid=true; save(); await release(op); }
+    if (holder.request) await cancelRequest(holder.request);
+    if (holder.request && !holder.request.completed) { holder.request.completed=true; holder.request.invalid=true; save(); await release(op, holder); }
     throw new Error('Request cancelled. Resume to explicitly retry, or discard this attempt.');
+  }
+  // Japanese notes and readings both need only the saved prose, so they run together. Each part keeps
+  // its own request and validated content; a failed part never discards a finished one.
+  async function runPart(op, name) {
+    const part = op.parallel[name];
+    if (part.done) return;
+    let partPhase = '';
+    const fail = error => {
+      error.generationFailure = failureInfo(error, name, partPhase);
+      return error;
+    };
+    const invalidate = async () => { if (part.request) { part.request.completed=true; part.request.invalid=true; save(); await release(op, part); } };
+    await checkCancelled(op, part);
+    const canonical = validateProse(op.prose, op.language), plan = readingPlan(canonical, op.kind);
+    if (name === 'readings' && !plan.spans.length) { part.content = attachReadings(canonical, plan, {readings:[]}, op.kind); part.done = true; save(); return; }
+    if (!part.request) {
+      const input = name === 'notes' ? {...op.input,kind:'notes',languagePlan:op.plan,chapter:canonical} : {kind:'readings',languageCode:'ja',spans:plan.spans};
+      const id = await ai.start({providerId:op.config.providerId,model:op.config.model,reasoningEffort:op.config.reasoning || undefined,instructions:name === 'notes' ? NOTES_INSTRUCTIONS : READING_INSTRUCTIONS,input:JSON.stringify(input),...aiNotification(op.kind,name)});
+      part.request={id,stage:name,completed:false}; save();
+    }
+    await checkCancelled(op, part);
+    let response;
+    try { partPhase='wait'; const raw = await ai.wait(part.request.id); await checkCancelled(op, part); response = parseContent(raw); }
+    catch (error) { fail(error); await invalidate(); throw error; }
+    try {
+      partPhase='validation';
+      part.content = name === 'notes' ? validateNotes(response, op.prose, op.language) : attachReadings(canonical, plan, response, op.kind);
+      validateContentSize(part.content);
+    } catch (error) { fail(error); await invalidate(); throw error; }
+    part.request.completed=true; part.done=true; save();
+    await release(op, part);
+  }
+  async function runParallel(op) {
+    const names = Object.keys(op.parallel), running = new Map();
+    // A host that holds fewer concurrent requests refuses the start before any inference, so the part
+    // waits for the others and then starts once; this is not a retry of generated content.
+    const attempt = async name => {
+      try { await runPart(op, name); }
+      catch (error) {
+        if (error?.code !== 'request_in_progress' || op.parallel[name].request) throw error;
+        await Promise.allSettled([...running].filter(([other]) => other !== name).map(([, task]) => task));
+        await runPart(op, name);
+      }
+    };
+    for (const name of names) running.set(name, attempt(name));
+    const settled = await Promise.allSettled(running.values());
+    const failed = settled.find(item => item.status === 'rejected');
+    if (failed) throw failed.reason;
+    const {notes, readings} = op.parallel;
+    op.prose = notes.content;
+    op.result = {...notes.content, titleSegments:readings.content.titleSegments, storySegments:readings.content.storySegments};
+    validateContentSize(op.result);
+    op.stage='ready'; op.parallel=null; save();
   }
   return {
     records,
     get busy() { return busy; },
     create(spec) {
       if (busy || records.length) throw new Error('Resume or discard the pending generation before starting another.');
-      const op = { ...JSON.parse(JSON.stringify(spec)), id:crypto.randomUUID(), createdAt:new Date().toISOString(), safeguardVersion:SAFEGUARD_VERSION, stage:spec.planned ? 'plan' : 'prose', request:null };
+      const op = { ...JSON.parse(JSON.stringify(spec)), id:crypto.randomUUID(), createdAt:new Date().toISOString(), safeguardVersion:SAFEGUARD_VERSION, stage:spec.planned ? 'plan' : 'prose', request:null, parallel:null };
       records.push(op);
       try { save(); } catch (error) { records.pop(); throw error; }
       return op;
@@ -44,8 +108,9 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
       try {
         // Also retries failed checkpoint writes before touching inference.
         save();
-        if (op.request?.completed) await release(op);
-        while (['plan','prose','notes','readings'].includes(op.stage)) {
+        for (const holder of requestHolders(op)) if (holder.request?.completed) await release(op, holder);
+        while (['plan','prose','notes','readings','enrich'].includes(op.stage)) {
+          if (op.stage === 'enrich') { await runParallel(op); continue; } // each part checks for cancellation itself
           await checkCancelled(op);
           const stage = op.stage;
           if (stage === 'readings' && !readingPlan(op.prose,op.kind).spans.length) {
@@ -79,8 +144,10 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
           if (stage === 'plan') { op.plan=content; op.stage='prose'; }
           else if (stage === 'prose') {
             op.prose=content;
-            if (op.kind !== 'examples') op.stage='notes';
-            else if (op.language === 'ja') op.stage='readings';
+            if (op.kind !== 'examples') {
+              if (parallel && op.language === 'ja') { op.stage='enrich'; op.parallel={notes:{request:null,done:false},readings:{request:null,done:false}}; }
+              else op.stage='notes';
+            } else if (op.language === 'ja') op.stage='readings';
             else { op.result=content; op.stage='ready'; }
           } else if (stage === 'notes') {
             op.prose=content;
@@ -110,29 +177,27 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
     async finishRequest(op) {
       if (busy || !records.includes(op)) return;
       busy=true; changed();
-      try { save(); await release(op); op.error=''; delete op.failure; save(); }
+      try { save(); await releaseAll(op); op.error=''; delete op.failure; save(); }
       catch (error) { op.failure=failureInfo(error,op.stage,phase); op.error=op.failure.message; try { save(); } catch {} throw error; }
       finally { busy=false; changed(); }
     },
     async cancel() {
       const op=records[0]; if (!op || !busy) return;
       op.cancelRequested=true; save();
-      if (op.request && !op.request.completed && !op.request.cancelled) {
-        try { await ai.cancel(op.request.id); op.request.cancelled=true; }
-        catch (error) { if (error.code !== 'not_found' && !/not found|unknown request/i.test(error.message)) { op.cancelRequested=false; save(); throw error; } }
-      }
+      try { for (const request of pendingRequests(op)) await cancelRequest(request); }
+      catch (error) { op.cancelRequested=false; save(); throw error; }
     },
     async discard(op) {
       if (!records.includes(op)) return;
       if (busy) throw new Error('Cancel the active request before discarding.');
       // Persist completed content before release even when choosing Discard.
       save();
-      if (op.request) {
-        if (!op.request.completed) {
-          try { await ai.cancel(op.request.id); } catch (error) { if (error.code !== 'not_found') throw error; }
+      for (const request of pendingRequests(op)) {
+        if (!request.completed) {
+          try { await ai.cancel(request.id); } catch (error) { if (error.code !== 'not_found') throw error; }
         }
-        await release(op);
       }
+      await releaseAll(op);
       const index=records.indexOf(op); if (index < 0) return; records.splice(index,1);
       try { save(); } catch (error) { records.splice(index,0,op); throw error; }
     }
