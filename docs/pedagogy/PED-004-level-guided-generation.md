@@ -29,7 +29,7 @@ During integration with newer main, numeric length safeguard LANG-001 is explici
 
 ## Validation
 
-Engineering behavior is covered by `tests/story-generation-regression.cjs` and `tests/learning-safeguards.mjs`. Native App² behavior is pending in the [device checklist](../validation/device-checklist.md); qualified language review remains pending. Revisit if level choices confuse learners, generated prose is consistently unsuitable, or a measured placement requirement emerges.
+Engineering behavior is covered by `tests/story-generation-regression.cjs` and `tests/learning-safeguards.mjs`. Native App² behavior checks are listed in the [device checklist](../validation/device-checklist.md); qualified language review remains pending. Revisit if level choices confuse learners, generated prose is consistently unsuitable, or a measured placement requirement emerges.
 
 
 A follow-up implementation audit (2026-10-13) corrected cancellation at stage boundaries, canonical-script validation and shared glossary matching. Underlines are contextual support links, not measured unknown-word coverage; the five vocabulary candidates do not cap the final glossary. No underline-density policy or generation-prompt change was introduced.

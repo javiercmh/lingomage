@@ -14,7 +14,7 @@ Product rationale, learning decisions, research evidence and the checks that are
 | Pedagogical decisions with evidence and limits | [`pedagogy/`](pedagogy/README.md) | Yes, one PED file per decision |
 | Research notes and citations | [`research/`](research/README.md), [`references.bib`](research/references.bib) | Append and correct |
 | Current runtime and safeguards | [`architecture/`](architecture/app2-runtime.md) | Yes |
-| Behavior still unverified on Android | [`validation/device-checklist.md`](validation/device-checklist.md) | Yes |
+| Behavior to verify on Android | [`validation/device-checklist.md`](validation/device-checklist.md) | Yes |
 | Live-generation evidence and language review | [`validation/generation-evaluation/`](validation/generation-evaluation/README.md), [`validation/sample-review.md`](validation/sample-review.md) | Summaries only |
 
 ## Index
@@ -28,7 +28,7 @@ Product rationale, learning decisions, research evidence and the checks that are
 - [Research index](research/README.md#research-index): reviews grouped by topic and the decision each informs. [Lexical-unit terminology](research/lexical-units.md) is the single source for vocabulary-note naming.
 - [App² runtime](architecture/app2-runtime.md): runtime, workspace data and validation limits.
 - [Language safeguard audit](architecture/language-safeguards.md): registered safeguards and their regression coverage.
-- [Device checklist](validation/device-checklist.md): pending Android checks and recorded device results.
+- [Device checklist](validation/device-checklist.md): what to verify on Android, and how.
 - [Generation evaluation](validation/generation-evaluation/README.md) and its [summary](validation/generation-evaluation/summary.md): live-model comparisons, prompt pilot and limits, and the opt-in [AI evals](validation/generation-evaluation/README.md#learning-quality-evaluations-ai-evals) (implemented, not yet run live).
 - [Initial language samples](validation/sample-review.md): early sample review and its limitations.
 
@@ -39,7 +39,7 @@ Product rationale, learning decisions, research evidence and the checks that are
 - **Labels.** Distinguish confirmed requirements, product assumptions, research-supported findings and open questions. A product preference or an AI-generated explanation is not research evidence. Never claim certified level alignment or proven learning effectiveness.
 - **Same-change updates.** Changes to the interface update `DESIGN.md`. Changes to prompts, reading aids or difficulty rules update the affected PED decision and language file, and increment `PROMPT_VERSION`. Changes to safeguards update `architecture/language-safeguards.md` and `data/language-safeguards.json`.
 - **Check reports go in the commit message.** For each change, state in the commit body which tests ran, which screenshots were inspected (screens and widths) and what remains unverified. Do not add a dated validation file for routine engineering checks.
-- **Pending device behavior goes in the checklist.** Add or update an item in `validation/device-checklist.md` whenever a change needs Android verification. Record results there when a device check is actually run.
+- **Device checks go in the checklist, results in commits.** Add or update an item in `validation/device-checklist.md` whenever a change needs Android verification. Record the results of a run in the commit message, not in the docs, so no file accumulates a history of done and pending checks.
 - **Evidence gets a durable summary.** Live-model evaluations and language reviews keep a short summary with method, results and limits under `validation/`. Raw outputs are not committed wholesale; commit them for traceability if needed, then archive them to Git history and reference the commit from the summary.
 - **Plans are temporary.** Draft plans in the conversation or pull request. If a plan file is committed, delete it once implemented and move any lasting rationale into `DESIGN.md` or the relevant PED decision.
 - **Delete superseded docs.** When a document describes retired behavior, remove it rather than labelling it historical. Git history is the archive. Fix inbound links in the same change.

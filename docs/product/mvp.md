@@ -2,7 +2,7 @@
 
 Status: App² workspace implemented. Standardized reading targets, narrative scope
 and language planning were checked in the offline browser preview on 2026-10-13.
-Native App² generation is pending in the [device checklist](../validation/device-checklist.md);
+Native App² generation checks are listed in the [device checklist](../validation/device-checklist.md);
 qualified language review remains pending.
 
 ## Confirmed requirements
