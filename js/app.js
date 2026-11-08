@@ -467,13 +467,16 @@ function renderLookups() {
     const entries = document.createElement('ol'); entries.className = 'lookup-list';
     for (const entry of ranked) {
       const row = document.createElement('li'); row.className = 'lookup-item';
+      const open = document.createElement('button'); open.type = 'button'; open.className = 'lookup-row'; open.dataset.lookup = entry.key;
       const words = document.createElement('span'); words.className = 'lookup-text';
       const word = text('span', 'lookup-word', entry.word); word.lang = SPEECH_LANGUAGES[code] || code;
       words.append(word);
       if (entry.meaning) words.append(text('span', 'lookup-meaning', entry.meaning));
       const times = text('span', 'lookup-count', `${entry.lookups}×`);
       times.setAttribute('aria-label', `looked up ${entry.lookups} ${entry.lookups === 1 ? 'time' : 'times'}`); times.setAttribute('role', 'img');
-      row.append(words, times);
+      open.append(words, times);
+      open.addEventListener('click', () => openLookupDetail(code, entry.key, open));
+      row.append(open);
       entries.append(row);
     }
     body.append(entries);
@@ -496,6 +499,65 @@ function renderLookups() {
     item.append(toggle, body); list.append(item);
   }
 }
+// Detail for one row of "Most looked up": every meaning with its own count and sentence, recent context
+// sentences for selections, and when it was looked up. Read-only; opening it or listening records nothing.
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+function lookupDate(key) {
+  const [y, m, d] = key.split('-').map(Number), date = new Date(y, m - 1, d);
+  return date.toLocaleDateString(undefined, {day:'numeric', month:'short', ...(y !== new Date().getFullYear() && {year:'numeric'})});
+}
+let lookupDetail = null; // {code, word, opener}
+function openLookupDetail(code, key, opener) {
+  const entry = signals.ranked(code).find(item => item.key === key);
+  if (!entry) return;
+  const lang = SPEECH_LANGUAGES[code] || code, body = $('lookup-detail-body');
+  const text = (tag, className, value) => Object.assign(document.createElement(tag), { className, textContent: value });
+  lookupDetail = {code, word:entry.word, opener};
+  $('lookup-detail-word').textContent = entry.word; $('lookup-detail-word').lang = lang;
+  const summary = [`Looked up ${plural(entry.lookups, 'time')}${entry.days.length > 1 ? ` on ${plural(entry.days.length, 'day')}` : ''}`];
+  if (entry.last) summary.push(`last ${lookupDate(entry.last)}`);
+  if (entry.seenSinceLookup) summary.push(`seen ${plural(entry.seenSinceLookup, 'time')} since`);
+  $('lookup-detail-summary').textContent = summary.join(' · ');
+  body.textContent = '';
+  const meanings = entry.meanings || (entry.meaning ? [{text:entry.meaning, count:entry.lookups}] : []);
+  const sentence = value => { const p = text('p', 'lookup-detail-sentence', value); p.lang = lang; return p; };
+  if (meanings.length) {
+    body.append(text('h3', 'lookup-detail-heading', meanings.length === 1 ? 'Meaning' : 'Meanings'));
+    const list = document.createElement('ul'); list.className = 'lookup-detail-list';
+    for (const meaning of meanings) {
+      const li = document.createElement('li'), head = text('p', 'lookup-detail-meaning', meaning.text);
+      if (meanings.length > 1) { const n = text('span', 'lookup-count', `${meaning.count}×`); n.setAttribute('role', 'img'); n.setAttribute('aria-label', `looked up ${plural(meaning.count, 'time')}`); head.append(' ', n); }
+      li.append(head);
+      if (meaning.sentence) li.append(sentence(meaning.sentence));
+      list.append(li);
+    }
+    body.append(list);
+  } else if (entry.contexts?.length) {
+    body.append(text('h3', 'lookup-detail-heading', 'Where you saw it'));
+    const list = document.createElement('ul'); list.className = 'lookup-detail-list';
+    for (const context of entry.contexts) { const li = document.createElement('li'); li.append(sentence(context.sentence)); list.append(li); }
+    body.append(list);
+  }
+  $('lookup-detail-listen').disabled = !speech.available;
+  $('lookup-detail-listen').title = speech.available ? 'Listen' : 'Listening requires App²';
+  $('lookup-detail-dialog').showModal(); $('lookup-detail-close').focus();
+}
+$('lookup-detail-close').addEventListener('click', () => $('lookup-detail-dialog').close());
+$('lookup-detail-dialog').addEventListener('click', event => { if (event.target === event.currentTarget) event.currentTarget.close(); });
+$('lookup-detail-listen').addEventListener('click', async () => {
+  if (!lookupDetail) return;
+  const {code, word} = lookupDetail;
+  const detail = lookupDetail; detail.speaking = true;
+  try { const { options } = await prepareSpeechOptions(speech, word, SPEECH_LANGUAGES[code]); if (lookupDetail === detail) await speech.speak(options); }
+  catch (error) { if (lookupDetail === detail) toast(`Could not play audio: ${error.message}`); }
+  finally { detail.speaking = false; }
+});
+$('lookup-detail-dialog').addEventListener('close', () => {
+  const {opener, speaking} = lookupDetail || {}; lookupDetail = null;
+  // Stop only speech this sheet started, never chapter audio playing in the background.
+  if (speaking) Promise.resolve().then(() => speech.stop()).catch(() => {});
+  if (opener?.isConnected) opener.focus();
+});
 function toast(message) {
   const el = $('toast');
   ([...document.querySelectorAll('dialog[open]')].at(-1) || document.body).append(el);

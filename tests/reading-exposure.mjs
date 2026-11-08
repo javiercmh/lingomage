@@ -82,6 +82,13 @@ function harness(paragraphs, visible = () => 1) {
   assert.match(app, /passage\.kind === 'title'/, 'title selections are not recorded');
   assert.match(app, /startExposure\(story, version\)/);
   assert.match(app, /usage\.setReader\(null\); stopExposure\(\)/);
+  // Most looked up rows open a read-only detail sheet; viewing or listening there records nothing.
+  assert.ok(/open\.className = 'lookup-row'[\s\S]{0,1500}openLookupDetail\(code, entry\.key, open\)/.test(app), 'each row is a button that opens its detail sheet');
+  const detail = app.slice(app.indexOf('function openLookupDetail'), app.indexOf('function toast('));
+  assert.ok(detail.length > 0 && !/record\w*\(/.test(detail), 'the detail sheet never records a lookup');
+  assert.match(detail, /if \(speaking\)[^\n]*speech\.stop\(\)/, 'closing stops only speech the sheet started');
+  const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /<dialog id="lookup-detail-dialog"[^>]*aria-labelledby="lookup-detail-word"/);
 }
 
 console.log('PASS reading exposure: paragraphs, word counts, dwell rules and app wiring');
