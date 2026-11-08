@@ -1,38 +1,23 @@
-# Language-specific learning decisions
+# Language-specific decisions
 
-The featured target languages are:
-
-| Language | Decision file | Interface and glossary |
+| Language | File | Level scale (PED-004) |
 | --- | --- | --- |
-| German | [german.md](german.md) | English |
-| Japanese | [japanese.md](japanese.md) | English |
-| Russian | [russian.md](russian.md) | English |
-| Spanish | [spanish-chile.md](spanish-chile.md) | English |
+| German | [german.md](german.md) | CEFR A1–C2 |
+| Japanese | [japanese.md](japanese.md) | JLPT N5–N1 |
+| Russian | [russian.md](russian.md) | Elementary, Basic, TORFL-I–IV (with A1–C2 references) |
+| Spanish | [spanish-chile.md](spanish-chile.md) | CEFR A1–C2 |
 
-Each file records that language's script presentation, vocabulary representation,
-grammar progression, reading aids, prompt requirements, and content review
-criteria. These are design requirements and decisions, not a claim that every rule
-is enforced in the current App² prompt. Current App² behavior and known prompt
-gaps are listed in [App² runtime](../architecture/app2-runtime.md). The prompt
-source links in individual language files refer to the earlier Android
-implementation. Shared behavior remains in the [MVP specification](../product/mvp.md).
+## Shared rules (all languages)
 
-Do not copy a learning rule from one language into another without considering
-its applicability. For example, Japanese reading annotation and segmentation
-require different decisions from German noun forms and capitalization.
+- English interface and English glossary meanings.
+- Generation follows [PED-004](../pedagogy/PED-004-level-guided-generation.md): a self-selected standardized reading target, narrative scope (Scene or Chapter) instead of numeric length quotas, an optional language-planning stage, and learner preferences (regional variety, register) from My languages. Level definitions and app-authored guides live in `data/learning-profiles.json`. A self-selected level is orientation, not certified alignment or evidence of individual vocabulary knowledge.
+- Every chapter needs useful integrated English learning notes, validated target-script forms and technical bounds. Correct orthography and natural grammar are requested; the retired beginner curriculum (fixed word counts, tense limits, regional defaults) is not reinstated. Adopted, adapted and rejected legacy rules are in the [safeguard audit](../architecture/language-safeguards.md).
+- Validators check structure and script; they cannot establish that an inflected form belongs to a lemma, that a reading is correct in context, or that usage is natural. Qualified human language review remains a requirement for every language.
+- Saved stories keep their original text and prompt provenance; new rules never rewrite them.
 
-## Maintaining a decision
+## Maintaining these files
 
-For shared pedagogical choices, use the [decision log and template](../pedagogy/README.md). Keep language-specific details here and link the relevant decision ID rather than duplicating its rationale. Current learner-profile and generation rationale: [PED-004](../pedagogy/PED-004-level-guided-generation.md); [PED-001](../pedagogy/PED-001-learner-self-report.md) is historical.
-
-Record:
-
-- Status: confirmed requirement, proposed design, supported finding, or open question.
-- Decision and learner need.
-- Evidence reference, or an explicit statement that this is a product assumption.
-- Applicability limits, including learner population and proficiency level.
-- Implications for prompts, reader presentation, stored content, and review.
-- Review results and date when available.
-
-Use [the research policy](../research/README.md) for source records. These language
-documents are the starting design records, not completed literature reviews.
+- Keep only language-specific rules here; link shared rationale (PED IDs) instead of repeating it. Do not copy a rule between languages without checking it applies (Japanese ruby is not German noun capitalization).
+- For each rule, state whether it is a confirmed requirement, product assumption, research-supported finding or open question, with evidence or an explicit "product assumption".
+- When a rule changes, replace it and add one line under "Earlier designs" saying what changed and why. Source records follow the [research policy](../research/README.md).
+- Legacy Android prompt sources are pinned at commit `f8fef12` (`android/app/src/main/assets/prompts/`).

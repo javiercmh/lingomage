@@ -1,7 +1,8 @@
 # Japanese reading support: furigana
 
-Review date: 2026-10-09. Status: preliminary discovery record; original source
-verification remains incomplete.
+- **Question:** Does always-visible furigana help L2 learners of Japanese?
+- **Reviewed:** 2026-10-09. Preliminary discovery record; source verification incomplete.
+- **Informs:** furigana default in [japanese.md](../languages/japanese.md) and [PED-002](../pedagogy/PED-002-contextual-reading-support.md).
 
 Kirwan, L. (2003). *The role of furigana in Japanese script for second language
 learners of Japanese*. University of Queensland thesis.

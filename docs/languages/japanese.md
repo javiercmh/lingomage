@@ -1,154 +1,38 @@
 # Japanese
 
-Current behavior follows PED-004: standardized self-selected reading targets and narrative scope; older dated requirements below are historical. App-owned Japanese readings and all active structural safeguards remain enforced.
+Shared rules: [languages README](README.md).
 
-Status: App² stores canonical Japanese prose first, then requests contextual
-readings for app-extracted kanji spans; deeper pedagogical review pending.
+## Current requirements
 
-## Confirmed presentation requirements
+- **Furigana by default** (confirmed product requirement): kana readings above the kanji they annotate; hiragana and katakana for the rest; kanji are preserved (a kana-only rewrite or a glossary reading does not satisfy the requirement). Readings stay visible at every level. Learning effect is unestablished; see the [furigana discovery record](../research/japanese-furigana.md).
+- **No romaji** anywhere in stories or examples. Kana literacy is assumed at every level; kanji familiarity is described by the level.
+- **Canonical text vs annotations:** canonical title and story are stored as plain strings; `titleSegments`/`storySegments` are ordered `{text, reading}` annotations for display. Selection, glossary matching, copy, speech and accessibility use canonical text. Concatenated segment text must reproduce canonical text exactly.
+- **Reading placement:** readings only on contiguous kanji runs, whole compounds kept together (学校/がっこう); kana, okurigana, punctuation and whitespace unannotated (行/い + きます; 食/た + べ + 物/もの). Katakana anchors may match their hiragana equivalents during alignment.
+- **App-owned readings stage:** after canonical prose and notes validate, the app scans code points by the Han script property, extracts contiguous kanji runs from title, story or example sentences with unique occurrence IDs, section, UTF-16 offsets and context (repeated spellings get separate IDs for contextual pronunciation), and asks the model only for kana readings. It requires exactly one valid nonempty kana reading per ID, rejects missing, duplicate or unknown IDs, aligns readings against the fixed written text, and builds segments itself. Missing, invalid or ambiguous alignments reject the stage without automatic retry or partial saving. Kana-only content skips the call. Glossary popover headwords are not annotated.
+- **Legacy display normalization:** saved annotations (including sentence-wide readings) are normalized for display only when alignment is unique; ambiguous ones keep their original display. Stored data and provenance are unchanged.
+- **Reader:** each annotated segment stays together at line breaks with room for the reading; scalable text must not clip annotations; screen readers must not repeat content. Glossary entries with kanji include the kana reading and a contextual English meaning.
 
-- English interface and English glossary explanations.
-- Display **furigana by default**: kana readings above the kanji they annotate.
-- Use hiragana and katakana for the rest of the Japanese story text.
-- Preserve kanji in the story; a separate kana-only replacement or a glossary
-  reading does not satisfy the furigana requirement.
+## Rationale and limits
 
-These are user-defined product requirements. Their learning effects still need
-research review; do not describe them as experimentally validated by LingoMage.
+- Model-controlled segmentation was unreliable (see Earlier designs); app-owned extraction removes model control of boundaries and kana/kanji classification. It costs one extra inference call when kanji are present. It does not certify that a supplied pronunciation is correct.
+- Annotating only kanji runs follows the standard display convention and avoids implying kana should be read twice; it is a correctness choice, not a measured learning benefit.
 
-See the [furigana discovery record](../research/japanese-furigana.md) for the
-initial evidence candidate and unresolved original-source verification.
+## Earlier designs
 
-## Reader contract for the post-authentication stage
+- **Android prompt 2026-10-09.1–.2:** 8–12 short sentences, polite です/ます, every kanji annotated in one model response. Version .1 allowed readings over whole inflected words (行きます/いきます); the learner found this looked like double reading, so .2 annotated only kanji runs.
+- **2026-10-09.3:** removed the duplicate model-generated `text`/`title` copy; canonical text was concatenated from segments so the two could not disagree.
+- **2026-10-09.4:** complete examples, required `reading` on every segment, NFC and whitespace trimming, distinct diagnostics for missing, non-kana and oversized segments.
+- **2026-10-09.5:** a device error showed the model grouping 駅 with kana (`ホテルは駅`) and omitting its reading even with stronger prompts. Generation split into canonical generation plus app-extracted kanji readings, the basis of the current stage.
+- **App² 2026-10-12.3:** returned to one request with app-side alignment; superseded by the current separate readings stage (2026-10-12.4).
+- **2026-10-10:** three broad reading bands with free-text self-assessment; replaced by PED-004 standardized targets (2026-10-13).
 
-- Represent reading annotations as ordered text segments, each containing base
-  text and an optional kana reading. Keep annotation data separate from rendered UI.
-- Attach a reading to the word or compound it belongs to, rather than assigning
-  independent readings mechanically to individual kanji.
-- Preserve canonical story text alongside annotations so storage, selection,
-  glossary matching, and accessibility do not depend on layout.
-- Render the reading above its base text. Keep each annotated segment together
-  at line breaks and reserve sufficient vertical space for the reading.
-- Glossary entries containing kanji also include their kana reading and an
-  English meaning in the story's context.
-- Generation and validation must account for inflected forms and context-dependent
-  readings; generated annotations require Japanese-specific content review.
-- Support scalable text without clipping annotations. Screen-reader output must
-  preserve reading order without unintentionally repeating the same content.
+## Open questions
 
-## Initial learning assumptions
+- How always-visible furigana affects comprehension and kanji learning for beginners.
+- Which kana and kanji knowledge each level should assume.
+- Which grammar and lexical constraints give readable beginner prose without unnatural Japanese.
+- How compounds and inflections should connect to learner-chosen vocabulary.
 
-- Use short sentences rather than whitespace-based word-length targets.
-- Treat A1 as a beginner-oriented target, not as a guarantee or a JLPT N5 mapping.
-- Do not use romaji in the initial story experience.
+## Content review criteria
 
-## Research questions
-
-- How does always-visible furigana affect comprehension and kanji learning for beginners?
-- Which kana and kanji knowledge should the first stories assume?
-- What grammar, sentence structure, and lexical constraints produce readable
-  beginner stories without unnatural Japanese?
-- How should compound words and inflections connect to learner-selected vocabulary?
-
-## Content and reader review
-
-Check kana readings in context, kanji-to-reading alignment, natural script use,
-vocabulary coverage, glossary accuracy, beginner grammar, and sentence readability.
-Check multi-character compounds, punctuation, long annotations, wrapping, and
-large font settings on a device. Record reviewer qualifications and unresolved issues.
-
-## Legacy Android prompt decision — 2026-10-09.2
-
-Write Japanese in exactly 8–12 short sentences ending in 。 or ！ or ？. Favor everyday vocabulary, simple particles and consistent polite です/ます forms. Do not imply equivalence to JLPT N5. Preserve appropriate kanji; use hiragana and katakana for the rest. Never use romaji. Annotate EVERY kanji in BOTH text and title by replacing the empty segments/titleSegments arrays with ordered {"text":"surface","reading":"kana"} segments. Concatenating segment text must EXACTLY reconstruct the canonical text/title, including punctuation and whitespace. Place readings ONLY above kanji runs. Keep compounds made entirely of kanji together, not split mechanically by character. Written kana (including okurigana and prefixes) must be separate segments with reading:null. For example 行きます becomes [{"text":"行","reading":"い"},{"text":"きます","reading":null}], 食べます becomes 食/た + べます/null, and 学校 stays 学校/がっこう. Never annotate 行きます with いきます or duplicate its written kana in the reading. Each segment containing kanji must have its full kana reading. Kana-only and punctuation segments use reading:null. Keep individual kanji-containing segments under 20 characters. In glossary entries whose headword includes kanji, supply the full headword reading in kana. English meanings stay English.
-
-These are product assumptions and linguistic presentation requirements, not a
-validated curriculum. Shared rationale remains in the [reading review](../research/reading-and-glossing.md).
-Historical Android prompt source: [ja.json](https://github.com/javiercmh/lingomage/blob/f8fef1255e608240301a13202168d4f6c41a1fea/android/app/src/main/assets/prompts/ja.json).
-If the App² prompt adopts these detailed rules later, record that change in
-[App² runtime](../architecture/app2-runtime.md) and review this decision.
-
-### Okurigana correction
-
-Version 2026-10-09.1 permitted readings above whole inflected words, such as
-行きます/いきます. The user identified that this can look like kana should be
-read twice. Version .2 annotates only kanji runs: 行/い + きます, 食/た + べます,
-while retaining whole kanji compounds such as 学校/がっこう. Mixed words such as
-食べ物 use 食/た + べ + 物/もの. This is a standard display convention and a
-product correction, not an experimentally established learning benefit.
-
-New annotations align fixed written kana against the proposed reading and reject
-mismatched or ambiguous alignments. Existing stories are normalized for display
-only when the alignment is unique; canonical text, original annotation data and
-saved prompt version remain unchanged. An ambiguous legacy annotation retains
-its original display rather than inventing pronunciation. This does not detect
-every wrong kanji reading; human Japanese review remains necessary.
-
-### Legacy Android text consistency — prompt 2026-10-09.3
-
-Japanese generation now omits duplicate `text` and `title` fields. Canonical
-story and title text are concatenated from `segments` and `titleSegments`,
-preserving every character and deriving annotation offsets from that same
-source. This removes a redundant model-generated copy that could disagree.
-Length, sentence count, vocabulary, glossary and furigana checks still apply.
-Legacy responses containing explicit text must still match their segments
-exactly; stored stories are unchanged. This is an engineering reliability
-decision, not a new learning-effectiveness claim.
-
-### Legacy Android reading completeness — prompt 2026-10-09.4
-
-The prompt now includes complete story-sentence and title examples, requires a
-`reading` field on every segment, and explicitly checks kanji readings before
-returning output. The validator trims surrounding reading whitespace and applies
-Unicode NFC without changing canonical story text or guessing pronunciations.
-Missing readings, non-kana readings and oversized segments have distinct error
-messages naming the affected surface text. Genuine missing or invalid readings
-still prevent saving. These changes improve engineering diagnostics; they do
-not establish that all generated readings are linguistically correct.
-
-## Legacy Android app-owned kanji segmentation — 2026-10-09.5
-
-A device read of the reported error confirmed the surface segment was
-`ホテルは駅`: the detector correctly found the kanji 駅, but the model grouped
-it with kana and omitted its reading. Stronger one-pass prompt instructions
-did not eliminate this failure.
-
-Japanese generation now has two sequential stages: generate canonical title,
-text and glossary, then request contextual readings for app-extracted kanji
-spans. The app scans Unicode code points using the Han script property, keeps
-contiguous kanji compounds together, and preserves kana, punctuation and
-okurigana as plain text. Each span has a unique id, section and UTF-16 offsets
-plus context; repeated spellings receive separate ids to allow contextual
-pronunciations. `ja-readings.txt` is versioned together with `ja.json`. The
-model supplies readings, never annotation boundaries or rewritten story text.
-
-The app requires exactly one valid kana reading per id, rejects missing,
-duplicate or unknown ids, and constructs segments whose text exactly reproduces
-the canonical source. The existing final validator checks length, vocabulary,
-glossary, script and annotations before saving. Cancellation applies to both
-stages; a failed stage is not automatically retried and no partial story is
-saved. Japanese generation uses two inference calls when kanji are present,
-which adds latency and usage. Kana-only text needs no reading call.
-
-This removes model-controlled segmentation and kana/kanji classification. It
-does not certify that a supplied kana pronunciation is linguistically correct.
-
-## App² reading self-report — 2026-10-10
-
-Settings offer three reading-task descriptions and an optional knowledge/difficulties description. These guide each story request and are revisable learner reports, not assessed proficiency. Japanese assumes hiragana and katakana literacy; kanji familiarity and comprehension can be described separately. Kanji readings remain visible at every level. Definitions are in `data/learning-profiles.json`; evidence and limits are in [the self-assessment record](../research/self-assessment.md).
-
-## App² furigana placement correction — 2026-10-12
-
-Prompt provenance `2026-10-12.3` requires readings only on contiguous kanji runs, retaining whole compounds and leaving kana, okurigana, punctuation and whitespace unannotated. App² continues to use one story inference request. The app extracts kanji runs and aligns supplied readings against fixed written text; katakana anchors may match their hiragana equivalents. New title/story annotations and Japanese help examples must reconstruct canonical text and have exactly one valid alignment with nonempty kana readings for every kanji run. Missing, invalid or ambiguous readings reject the response without automatic inference retry or partial saving.
-
-Saved story and example annotations are normalized for display only when alignment is unique, including sentence-wide legacy readings. Ambiguous legacy annotations retain their original display; canonical text, stored annotation data and original prompt provenance remain unchanged. Copy and speech continue to omit readings. This restores the existing kanji-only presentation convention; it is a product correctness choice, not a new claim of learning effectiveness. Alignment cannot establish linguistic correctness of a pronunciation; Japanese content review remains necessary. Covered by `tests/reader-regression.cjs`; Android rendering checks are listed in the [device checklist](../validation/device-checklist.md).
-
-## Current requirements — 2026-10-12.4
-
-The current App² profiles, difficulty and learner wishes remain authoritative. Legacy decisions above are historical; adopted, adapted and rejected rules are recorded in the [safeguard audit](../architecture/language-safeguards.md). New chapters require useful integrated English learning notes, validated target-script forms and technical bounds; narrative scope replaces numerical length quotas. Orthography and contextual correctness guidance do not reinstate the old beginner curriculum or regional defaults. Linguistic and pedagogical quality remain review requirements.
-
-Japanese stories and examples now use separate canonical generation and app-owned kanji reading stages. Glossary headword popovers remain unchanged. The 2026-10-12.3 single-request correction above is historical and superseded by this pipeline.
-
-
-## Current App² reading targets — 2026-10-13
-
-[PED-004](../pedagogy/PED-004-level-guided-generation.md) replaces broad reading bands/freeform self-assessment for new generation. The managed standardized-level definitions and app-authored guides are in `data/learning-profiles.json`. German/Spanish use CEFR A1–C2, Japanese JLPT N5–N1 and Russian Elementary/Basic/TORFL-I–IV with A1–C2 references. Canonical script requirements remain. Numeric story lengths in the earlier implementation above are historical; new generation uses narrative scope and a separate language-planning stage. Self-selected levels do not establish certified alignment or individual vocabulary knowledge. Existing saved content/provenance is preserved.
+Contextual kana readings, kanji-to-reading alignment, natural script use, glossary accuracy, grammar and readability for the level; multi-character compounds, punctuation, long annotations, wrapping and large fonts on a device. Record reviewer qualifications and unresolved issues.

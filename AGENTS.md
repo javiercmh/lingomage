@@ -1,85 +1,55 @@
-# LingoMage App² contributor instructions
+# LingoMage contributor instructions
+
+LingoMage is a plain HTML/CSS/JavaScript App² subapp at the repository root (no native app, build step or dependencies; the Python server is development-only). Read this file first, then the doc for the area you change.
+
+## Where to look
+
+| Changing | Read and update in the same change |
+| --- | --- |
+| Interface, copy, layout, accessibility | [`DESIGN.md`](DESIGN.md) |
+| Modules, data files, generation pipeline, storage, tracking | [`docs/architecture/app2-runtime.md`](docs/architecture/app2-runtime.md) |
+| Generation, validation, safeguards | [`docs/architecture/language-safeguards.md`](docs/architecture/language-safeguards.md), `data/language-safeguards.json` |
+| Learning behavior (prompts, reading aids, levels, tracking) | [`docs/pedagogy/README.md`](docs/pedagogy/README.md) and the relevant PED; citations from `docs/research/references.bib` |
+| One language's rules | [`docs/languages/`](docs/languages/README.md) |
+| Manifest, packaging, updates, host APIs | [`PACKAGING.md`](PACKAGING.md) |
+| Something that needs Android verification | add or edit a row in [`docs/validation/device-checklist.md`](docs/validation/device-checklist.md) |
+| Docs themselves | policy in [`docs/README.md`](docs/README.md) |
 
 ## Product and content
 
-- The current product is a plain HTML, CSS and JavaScript App² workspace at the repository root. There is no native LingoMage implementation; historical Kotlin remains in Git. The Python server is development-only.
-- Keep the interface and glossary explanations in English. Current targets are German, Japanese, Russian and Spanish; let learners request a regional variety in their language preferences.
-- Keep workspace domain data in inspectable JSON files under `data/`. Keep rationale, research, language decisions, pending device checks and evaluation evidence in `docs/`, following the documentation policy in `docs/README.md`: record decisions and evidence rather than activity, delete superseded docs and implemented plans (Git history is the archive), and do not add dated per-change validation files.
-- Before changing learning behavior, consult `docs/pedagogy/README.md`. Update the relevant pedagogical decision in the same change; use stable citation keys from `docs/research/references.bib`, and distinguish evidence from product assumptions.
-- Update affected documentation when prompts or learning behavior change. Increment `PROMPT_VERSION` in `js/app.js` and preserve saved-story provenance.
-- Label product assumptions and evidence limitations; do not claim certified CEFR alignment or proven learning effectiveness.
-- Preserve canonical Japanese text separately from furigana annotations. Copied Japanese text must omit readings. Russian uses Cyrillic without Latin transliteration.
+- Interface and glossary text are English. Targets: German, Japanese, Russian, Spanish (Chile); learners request regional varieties in language preferences.
+- Label product assumptions and evidence limits. Never claim certified CEFR alignment or proven learning effectiveness.
+- When prompts or learning behavior change: update the PED and language docs, increment `PROMPT_VERSION` in `js/app.js`, and preserve saved-story provenance.
+- Japanese canonical text stays separate from furigana; copy and speech omit readings. Russian uses Cyrillic without transliteration.
 
-## Interface design
+## Code rules
 
-- Follow `DESIGN.md` for shared App² visual rules, reader layout, accessibility and follow-up interaction. Update it when these conventions change.
+- Structure: `index.html`, `css/style.css`, `js/app.js`, `js/bridge.js`, `manifest.json`, `data/`. Keep `manifest.json` `files` and `app2Update` current.
+- Only `js/bridge.js` calls host APIs. No dependencies, no build step.
+- Domain data lives in inspectable JSON under `data/`, never in opaque host preferences. Optional stores (`data/usage.json`, `data/learning-signals.json`) must never block stories, settings or generation and are never overwritten while unreadable. Saved records must stay readable; there is no general migration.
+- AI only through the App² managed `ai` bridge (providers in App² Settings → AI). Never store credentials or request headers. Every `ai.start` passes `title`/`body` from `js/ai-notification.js`. Save completed data before acknowledging a request. Never retry inference silently.
+- 44px touch targets, safe-area insets, no `alert()`/`confirm()`, user and model text via `textContent` or text nodes.
 
-## App² platform
+## Safeguards
 
-- Follow the plain-file starter structure: `index.html`, `css/style.css`, `js/app.js`, `js/bridge.js`, `manifest.json`, and `data/`.
-- Keep the host API calls in `js/bridge.js`; app logic uses its exported wrappers. Keep the project dependency-free and do not add a build step.
-- Keep `manifest.json`'s `main` and `files` entries current. Domain records, preferences and unfinished generation belong in `data/stories.json`, `data/settings.json` and `data/generation-checkpoints.json`, not opaque host preferences. Lookup history and probable-reading aggregates belong in `data/learning-signals.json` (PED-005), an optional store with the same unreadable-file rules as usage. Time-tracking history belongs in `data/usage.json` (versioned local-date aggregates written whole, never appended); it is optional data, so an unreadable usage file must never block stories, settings or generation, and it must never be overwritten while unreadable. Stories, languages and settings may be deleted or disabled without touching usage history. Time tracking needs no host API, dependency or build step.
-- Released app behavior uses the App² managed `ai` bridge. Connect and choose models only through App² library Settings → AI. Never store credentials or request headers in the workspace. Every `ai.start` caller passes concise task-specific `title`/`body` from `js/ai-notification.js` for App²'s running-request notification; it is presentation only and must not change prompts, prompt versions, saved schema or provenance. The local development server may offer an explicit `--chatgpt` mode through the Codex CLI login for desktop testing; this exception must remain development-only.
-- Save completed story data before acknowledging an AI request. Do not silently retry inference.
-- Respect edge-to-edge safe-area variables, provide touch targets of at least 44px, and do not use system `alert()` or `confirm()` dialogs.
-- Keep user-generated text rendered with `textContent` or text nodes.
-
-## Safeguard maintenance
-
-- The current App² product is the specification. Consult `docs/architecture/language-safeguards.md` and `data/language-safeguards.json` before changing generation, validation or migrating runtime behavior. Legacy code is not a curriculum specification.
-- Account for every registered safeguard during a migration. Weakening or retiring one requires an explicit documented product decision and corresponding test changes; do not replace enforcement with a prompt silently.
-- Every active deterministic safeguard needs behavioral tests; prompt requirements need prompt-contract tests and stated semantic limitations. Run `python3 scripts/check.py` (Node 22.12 or newer, Python 3.9+) before completion.
-- Completed intermediate prose/readings belong in `data/generation-checkpoints.json` before releasing requests. Never publish or package learner checkpoints; seed them empty. Resume/retry is explicit and completed stages must not regenerate.
+- The current app is the specification; legacy code is not a curriculum spec.
+- Account for every registered safeguard. Weakening or retiring one needs a documented product decision and matching test changes; never replace enforcement with a prompt silently.
+- Every deterministic safeguard has behavioral tests; prompt requirements have prompt-contract tests and stated semantic limits.
+- Completed intermediate stages go to `data/generation-checkpoints.json` before releasing requests. Never publish or package learner checkpoints; seed empty. Resume and retry are explicit; completed stages never regenerate.
 
 ## Development and verification
 
-- Run the local workspace with `python3 dev_server.py --mock-ai`; open `http://localhost:8888`. The development mock is deterministic and makes no external requests. Optional live desktop testing uses `codex login` followed by `python3 dev_server.py --chatgpt`; requests may use ChatGPT plan allowance, and Codex is an optional external dependency.
-- The development server keeps learner files (the manifest's `seedFiles`, plus development preferences) in the gitignored `.dev-data/` folder, seeded from `seedDefaults` on first start, so committed seeds never change. Delete `.dev-data/` to start over as a fresh install.
-- For every interface or copy change, visually inspect screenshots from the development server at desktop and narrow mobile widths before declaring it complete. Check spacing, wrapping, hierarchy, field/helper grouping, clipping, and touch targets; DOM checks alone do not establish layout quality. Record what was actually inspected in the commit message.
-- Use the development server for browser checks. Native AI, alarms, Android insets and install shortcuts require App² on Android and should be marked pending unless actually verified there.
-- Record only checks actually run, in the commit message. When a change needs Android verification, add or edit its row in `docs/validation/device-checklist.md`. The checklist lists checks only: never results, status or dates, which belong in commit messages. Do not export credentials or log tokens, callback URLs or account identifiers.
-- Learning-quality AI evals (`scripts/ai-eval.mjs`) are opt-in, development-only and never part of checks, hooks, CI or packaging. Without `--live` they print help or a plan and make no request. Live runs need explicit OpenAI generator/judge settings, a request budget and the `--chatgpt` bridge; see `docs/validation/generation-evaluation/README.md`.
-- The Python server requires Python 3.9 or newer and no dependencies.
+- Run `python3 dev_server.py --mock-ai` and open `http://localhost:8888` (deterministic, no external requests). Optional live testing: `codex login`, then `python3 dev_server.py --chatgpt` (uses ChatGPT plan allowance; development only).
+- The server keeps learner files in the gitignored `.dev-data/`, seeded from `seedDefaults`; committed seeds never change. Delete `.dev-data/` for a fresh install. Never commit learner data.
+- Run `python3 scripts/check.py` (Node 22.12+, Python 3.9+) before completing any change.
+- For interface or copy changes, inspect screenshots at desktop and narrow mobile widths (spacing, wrapping, hierarchy, clipping, touch targets); DOM checks are not enough.
+- Record checks actually run, and what remains unverified, in the commit message. Results never go in docs; the device checklist lists checks only.
+- AI evals (`scripts/ai-eval.mjs`) are opt-in and never part of checks, hooks, CI or packaging; without `--live` they make no request. See `docs/validation/generation-evaluation/README.md`.
+- Never log or export credentials, tokens, callback URLs or account identifiers.
 
-## App updates
+## Branches and releases
 
-App² version code 4 or later supports `updates.available` and `updates.open()` from
-`js/bridge.js`. The Settings button opens native review; installation always needs
-confirmation. Browser previews hide the button. App² follows
-`javiercmh/lingomage` branch `main` by default, pinned to one commit during download.
-
-Branches: all changes, including contributor instructions and release fixes, go
-through `dev`. `main` only moves when publishing those changes. For an app release,
-bump `version` in `manifest.json` on `dev`, then fast-forward `main` to the tested
-`dev` commit with `git merge --ff-only dev`. Push both branches; they should point
-to the same commit immediately after publication. Between releases, `dev` may be
-ahead of `main`. Do not make separate copies of a change on both branches or add
-release-only commits to `main`. If a main-only fix is unavoidable, bring it back
-into `dev` before continuing development.
-
-Keep the manifest identical across branches. Retain `"branch": "main"` in
-`app2Update.github` for compatibility with older App² builds. App² Dev build 11+
-keeps the selected branch per installation; to try unreleased work, open App²
-Library → LingoMage menu → Update app → Change source and select `dev`. Select
-`main` to return to releases. Each switch is shown as a source change and needs
-Update anyway. Remove the compatibility field on `dev` only when supported by the
-released host, then publish that same manifest to `main`.
-A version bump on `dev` is optional before publication, since App² offers any
-change to managed files.
-
-`manifest.json.app2Update` declares publisher identity and file ownership.
-`data/stories.json`, `data/settings.json`, `data/generation-checkpoints.json`, `data/usage.json` and `data/learning-signals.json` are user files seeded only when absent (usage seeds `{"version":1,"days":{}}` and learning signals `{"version":1,"languages":{}}`; updates preserve them and packaging never includes local history).
-`data/learning-profiles.json` and `data/language-safeguards.json` are shipped managed definitions and updates with the
-code. All other unowned files remain untouched. Keep these declarations current.
-Existing saved records must remain readable; v1 has no general data migration. The one exception is a temporary
-glossary-alias migration in `js/workspace-storage.js` (`term`/`text` → `word` in `data/stories.json`); remove it in the next major release.
-Increment the app version for a published update. Commit and push require explicit
-user instructions; local changes are unavailable to GitHub updates until published.
-
-Package with App²'s `scripts/package_subapp.py`; it uses empty declared seed
-defaults rather than copying local stories or settings. ZIP installation belongs
-to the App² library; Share & Package is export-only.
-
-## Device translation
-
-`translation` from `js/bridge.js` exposes `availability()` → `{available: boolean}` and `open({text})` → `{opened: true}`. App² forwards text via Android ACTION_TRANSLATE to the configured handler or resolver. It returns no translation and accepts no language settings. Call only after a user action, with canonical text without readings. Browsers and older hosts report unavailable. Blank text or more than 100000 UTF-16 code units is rejected by the host. Handle `.code`/`.message` errors (`invalid_request`, `unavailable`, `timeout`) without automatic retry. The external translation tool may process text online.
+- All changes, including these instructions and release fixes, go through `dev`. `main` moves only on publication.
+- Release: bump `version` in `manifest.json` on `dev`, then `git merge --ff-only dev` into `main` and push both, so they point to the same commit. No separate copies of a change on both branches and no release-only commits on `main`; bring any unavoidable main-only fix back into `dev` first.
+- Commit and push only on explicit instruction. Local changes reach App² users only once published.
+- Authorship: the human responsible for the work, with their own name and email. Never list an AI tool as author or co-author.

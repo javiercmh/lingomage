@@ -25,6 +25,7 @@ Supports **German, Japanese, Russian and Spanish**. LingoMage runs inside [App²
 | 📖 **Read comfortably** | Change text size, show Japanese furigana and open word notes. |
 | 💡 **Get explanations** | Select any passage and tap **Explain** for its meaning and usage. |
 | ➕ **Continue the story** | Add chapters or rewrite one while keeping the original. |
+| 🔁 **Review your lookups** | See the words you look up most, with every meaning and sentence. |
 | 📴 **Read offline** | Stories and explanations are saved on your phone. |
 
 Reading levels are targets you choose, not official assessments.
@@ -43,4 +44,4 @@ Then open [localhost:8888](http://localhost:8888). Your test stories and setting
 python3 scripts/check.py
 ```
 
-See also the [pedagogical decisions](docs/pedagogy/README.md).
+Contributors and coding agents start with [AGENTS.md](AGENTS.md). See also the [pedagogical decisions](docs/pedagogy/README.md).

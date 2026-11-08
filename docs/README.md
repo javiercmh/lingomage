@@ -1,47 +1,36 @@
 # LingoMage documentation
 
-Product rationale, learning decisions, research evidence and the checks that are still pending. The current App² workspace is at the repository root. Retired material (the native Android app and its docs, implemented plans, per-change check reports and raw evaluation outputs) lives only in Git history.
+Two audiences: coding agents changing the app (start at [`AGENTS.md`](../AGENTS.md)), and a future paper about the app's methods (start at the [pedagogy log](pedagogy/README.md)). Retired material lives only in Git history.
 
-## Where things live
+## Map
 
-| Kind | Location | Kept current? |
-| --- | --- | --- |
-| Interface conventions, layout, interaction and accessibility | [`DESIGN.md`](../DESIGN.md) | Yes, updated in the same change as the UI |
-| Contributor rules | [`AGENTS.md`](../AGENTS.md) | Yes |
-| Packaging and App² updates | [`PACKAGING.md`](../PACKAGING.md) | Yes |
-| Shared product requirements and long-term strategy | [`product/`](product/mvp.md), [strategy](product/evidence-informed-strategy.md) | Yes |
-| Language-specific requirements | [`languages/`](languages/README.md) | Yes |
-| Pedagogical decisions with evidence and limits | [`pedagogy/`](pedagogy/README.md) | Yes, one PED file per decision |
-| Research notes and citations | [`research/`](research/README.md), [`references.bib`](research/references.bib) | Append and correct |
-| Current runtime and safeguards | [`architecture/`](architecture/app2-runtime.md) | Yes |
-| Behavior to verify on Android | [`validation/device-checklist.md`](validation/device-checklist.md) | Yes |
-| Live-generation evidence and language review | [`validation/generation-evaluation/`](validation/generation-evaluation/README.md), [`validation/sample-review.md`](validation/sample-review.md) | Summaries only |
+| Need | File |
+| --- | --- |
+| Contributor rules, where to look | [`AGENTS.md`](../AGENTS.md) |
+| Interface rules by screen | [`DESIGN.md`](../DESIGN.md) |
+| Manifest, packaging, updates, host APIs | [`PACKAGING.md`](../PACKAGING.md) |
+| Modules, data files, generation, storage, tracking | [architecture/app2-runtime.md](architecture/app2-runtime.md) |
+| Registered safeguards and their tests | [architecture/language-safeguards.md](architecture/language-safeguards.md) |
+| What the product does and does not do | [product/mvp.md](product/mvp.md) |
+| Research-linked directions and evaluation gates (not a plan) | [product/evidence-informed-strategy.md](product/evidence-informed-strategy.md) |
+| Intended learning outcomes, future in-app evaluation (not implemented) | [product/learning-outcomes-and-evaluation.md](product/learning-outcomes-and-evaluation.md) |
+| Per-language rules | [languages/](languages/README.md) |
+| Pedagogical decisions (why) | [pedagogy/](pedagogy/README.md), one PED per decision |
+| Evidence reviews (what studies show) | [research/](research/README.md), keys in [references.bib](research/references.bib); note terminology in [lexical units](research/lexical-units.md) |
+| What to verify on Android, and how | [validation/device-checklist.md](validation/device-checklist.md) |
+| Live-generation evaluations, AI evals, language samples | [validation/generation-evaluation/](validation/generation-evaluation/README.md) ([summary](validation/generation-evaluation/summary.md), [contextual-notes comparison](validation/generation-evaluation/contextual-notes/README.md)), [validation/sample-review.md](validation/sample-review.md) |
 
-## Index
+## Policy
 
-- [Pedagogical decision log](pedagogy/README.md): stable decision IDs, implementation links, evidence limits and template.
-- [MVP specification](product/mvp.md): shared requirements and delivery sequence.
-- [Evidence-informed strategy](product/evidence-informed-strategy.md): long-term research-linked directions, limits and evaluation gates (not a plan or feature commitment).
-- [Learning outcomes and evaluation](product/learning-outcomes-and-evaluation.md): intended learner outcomes and a future optional in-app evaluation direction, measurement principles and privacy stance (nothing implemented).
-- [Language decisions](languages/README.md): language-specific requirements and research questions.
-- [Research and evidence policy](research/README.md): how findings become documented decisions.
-- [Research index](research/README.md#research-index): reviews grouped by topic and the decision each informs. [Lexical-unit terminology](research/lexical-units.md) is the single source for vocabulary-note naming.
-- [App² runtime](architecture/app2-runtime.md): runtime, workspace data and validation limits.
-- [Language safeguard audit](architecture/language-safeguards.md): registered safeguards and their regression coverage.
-- [Device checklist](validation/device-checklist.md): what to verify on Android, and how.
-- [Generation evaluation](validation/generation-evaluation/README.md) and its [summary](validation/generation-evaluation/summary.md): live-model comparisons, prompt pilot and limits, and the opt-in [AI evals](validation/generation-evaluation/README.md#learning-quality-evaluations-ai-evals) (implemented, not yet run live).
-- [Initial language samples](validation/sample-review.md): early sample review and its limitations.
+**Docs hold decisions, evidence and current rules, not activity.** A file earns its place if a future contributor or paper author needs it.
 
-## Documentation policy
-
-**Write down decisions and evidence, not activity.** A document earns a place in `docs/` if a future contributor needs it to make a correct change. A record of what someone did on a given day does not.
-
-- **Labels.** Distinguish confirmed requirements, product assumptions, research-supported findings and open questions. A product preference or an AI-generated explanation is not research evidence. Never claim certified level alignment or proven learning effectiveness.
-- **Same-change updates.** Changes to the interface update `DESIGN.md`. Changes to prompts, reading aids or difficulty rules update the affected PED decision and language file, and increment `PROMPT_VERSION`. Changes to safeguards update `architecture/language-safeguards.md` and `data/language-safeguards.json`.
-- **Check reports go in the commit message.** For each change, state in the commit body which tests ran, which screenshots were inspected (screens and widths) and what remains unverified. Do not add a dated validation file for routine engineering checks.
-- **Device checks go in the checklist, results in commits.** Add or update an item in `validation/device-checklist.md` whenever a change needs Android verification. Record the results of a run in the commit message, not in the docs, so no file accumulates a history of done and pending checks.
-- **Evidence gets a durable summary.** Live-model evaluations and language reviews keep a short summary with method, results and limits under `validation/`. Raw outputs are not committed wholesale; commit them for traceability if needed, then archive them to Git history and reference the commit from the summary.
-- **Plans are temporary.** Draft plans in the conversation or pull request. If a plan file is committed, delete it once implemented and move any lasting rationale into `DESIGN.md` or the relevant PED decision.
-- **Delete superseded docs.** When a document describes retired behavior, remove it rather than labelling it historical. Git history is the archive. Fix inbound links in the same change.
-- **Screenshots.** Commit an image only when a kept document shows it. Inspection screenshots belong in the commit description or conversation, not the repository.
+- **Current state, concise.** Describe how things are now, one purpose per file, rules stated directly. Do not repeat a rule held elsewhere; link it. Replace outdated text instead of appending dated sections; Git is the archive.
+- **Methodological record.** PEDs and research reviews keep every decision, its rationale, citation keys with DOIs, study characteristics, access levels and stated limits, plus a one-line decision history per material change. Condense wording, never evidence.
+- **Labels.** Distinguish confirmed requirements, product assumptions, research-supported findings and open questions. Product preferences and AI output are not evidence. Never claim certified level alignment or proven learning effectiveness.
+- **Same-change updates.** UI → `DESIGN.md`. Prompts, reading aids, levels or tracking → the PED and language file, plus `PROMPT_VERSION`. Safeguards → `architecture/language-safeguards.md` and `data/language-safeguards.json`. Data or modules → the runtime doc.
+- **Checks go in commits.** Tests run, screenshots inspected and what remains unverified go in the commit message. The device checklist lists checks only, never results, status or dates; no file accumulates a history of done and pending checks.
+- **Evaluation evidence** gets a durable summary (method, results, limits) under `validation/`; raw outputs are archived to Git history and referenced by commit.
+- **Plans are temporary.** Keep them in the conversation or PR; move lasting rationale into `DESIGN.md` or a PED once implemented.
+- **Delete superseded docs** and fix inbound links in the same change.
+- **Images** only when a kept document shows them.
 - **Privacy.** Never record credentials, tokens, callback URLs, account or device identifiers.

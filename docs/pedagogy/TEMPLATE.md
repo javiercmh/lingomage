@@ -20,3 +20,7 @@ Link current code/data and affected docs. State prompt/provenance implications; 
 ## Alternatives and revisit conditions
 
 Record the main alternative and the concrete change or finding that would warrant revisiting this decision. Link actual validation records, or mark evaluation pending.
+
+## Decision history
+
+One line per material change: date, what changed, why. Git has the full edit history.

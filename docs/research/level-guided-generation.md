@@ -1,6 +1,11 @@
-# Level-guided generation: evidence and boundaries
+# Level-guided generation
 
-Reviewed 2026-10-13. Decision: [PED-004](../pedagogy/PED-004-level-guided-generation.md). This focused review uses fetched Consensus records and available abstracts from the conversation; full methods/results were not independently reviewed here. Existing glossing evidence uses the publisher abstract already recorded in [reading and glossing](reading-and-glossing.md). Do not present all discovered records as peer-reviewed: CALM was retrieved as an arXiv record.
+- **Question:** What evidence supports generating stories at a self-selected level with optional planned language, and what may be claimed?
+- **Reviewed:** 2026-10-13. Scoped review via Consensus.
+- **Access:** Consensus records and abstracts; full methods and results not independently reviewed. Glossing evidence uses the publisher abstract recorded in [reading and glossing](reading-and-glossing.md). CALM is an arXiv preprint, not peer reviewed.
+- **Informs:** [PED-004](../pedagogy/PED-004-level-guided-generation.md).
+
+## Sources
 
 | Stable key | Finding | Application and limitation |
 | --- | --- | --- |
@@ -9,7 +14,7 @@ Reviewed 2026-10-13. Decision: [PED-004](../pedagogy/PED-004-level-guided-genera
 | `hermanLeeser2022LexicalCoverage` | 50 beginning Spanish learners; lexical coverage related to comprehension; 98% predicted recall of eight of ten main events. [DOI](https://doi.org/10.1111/modl.12761) | Minimize unnecessary unfamiliar vocabulary. Coverage concerns known running-word tokens, not glossary size; no personal coverage estimate follows from a level selection. |
 | `crossleyAllenMcNamara2012Simplification` | Analysis of 300 graded news texts found differences in lexical/syntactic sophistication and cohesive features. [DOI](https://doi.org/10.1177/1362168811423456) | Guide cohesion as well as syntax and lexis. This observational text analysis does not demonstrate this app's learning effect. |
 | `odo2025ModifiedInput` | Review/network meta-analysis: 34 studies, n=4742; simplification and elaboration improved comprehension relative to authentic texts; risk of bias unclear. [DOI](https://doi.org/10.18823/asiatefl.2025.22.2.4.253) | Use accessible surrounding language and contextual paraphrase. Does not determine optimum narrative length or validate generated fiction. |
-| `glandorfMeurers2024GrammarControl` | Grammar-pattern detectors and ranking improved control in English educational generation. [Record](https://consensus.app/papers/towards-finegrained-pedagogical-control-over-english-glandorf-meurers/17f1501f56d65358904e9a22f594501a/?utm_source=chatgpt) | Use explicit grammar guidance. Two prompts do not reproduce their detector/ranking method; findings cannot establish equivalent four-language control. |
+| `glandorfMeurers2024GrammarControl` | Grammar-pattern detectors and ranking improved control in English educational generation. [Record](https://consensus.app/papers/towards-finegrained-pedagogical-control-over-english-glandorf-meurers/17f1501f56d65358904e9a22f594501a/) | Use explicit grammar guidance. Two prompts do not reproduce their detector/ranking method; findings cannot establish equivalent four-language control. |
 | `malikEtAl2024CALM` | Compared prompting, fine-tuning and RL; CALM outperformed compared strategies, with small human evaluation. [DOI](https://doi.org/10.48550/arxiv.2406.03030) | Requested level is not verification. This app neither trains CALM nor uses a validated independent difficulty scorer. |
 | `yanagisawaWebbUchihara2020Glossing` | 42 studies, 3802 participants; glossed reading benefited vocabulary learning; L1 glosses outperformed L2 glosses. [DOI](https://doi.org/10.1017/S0272263119000688) | Retain contextual English notes. English is not every learner's L1; glossary formats and AI note quality remain limitations. |
 
@@ -19,4 +24,6 @@ Official orientation sources (stable keys `councilEuropeCEFRLevels`, `jlptLevelS
 
 A two-call language-plan/writing pipeline, maximum five practice vocabulary candidates and two grammar focuses, and Scene/Chapter scopes (Longer passage retired) are product assumptions. No cited study validates those counts or stages. Removing the former story-length quota gives context room to develop; it is not a research claim that longer or unrestricted texts are better. Candidates may be omitted to preserve natural prose. There is no reader-feedback or automatic advancement feature.
 
-Qualified review across all four languages and low/middle/high levels, usability evaluation and actual learner comprehension/retention evaluation remain pending. Offline fixtures verify engineering behavior, not language suitability.
+## Open validation
+
+Qualified review across all four languages and low, middle and high levels; usability evaluation; learner comprehension and retention. Offline fixtures verify engineering behavior, not language suitability.

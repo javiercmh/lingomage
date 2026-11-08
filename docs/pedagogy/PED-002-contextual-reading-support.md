@@ -1,77 +1,69 @@
-# PED-002: Contextual help for selected text
+# PED-002: Contextual help for selected text and vocabulary notes
 
-- Date: 2026-10-11 (decision); consolidated into current state at prompt version `2026-10-14.21`
-- Status: implemented; learner usefulness and language quality unvalidated; qualified human language review pending
-- Scope: reading support for German, Japanese, Russian and Spanish stories
+- Date: 2026-10-11; current state at prompt version `2026-10-14.21`
+- Status: implemented; learner usefulness and language quality unvalidated; qualified language review pending
+- Scope: reading support in German, Japanese, Russian and Spanish stories
 - Evidence basis: product requirements and evidence-informed extrapolation; no direct evaluation of this feature
 
-Interaction details (layout, controls, accessibility) are in [`DESIGN.md`](../../DESIGN.md). This file records the learning-support decisions, how they are implemented and the evidence limits.
+Interaction details are in [`DESIGN.md`](../../DESIGN.md); pipeline and storage in the [runtime doc](../architecture/app2-runtime.md); Japanese script handling in [japanese.md](../languages/japanese.md).
 
-## Current decisions
+## Decisions
 
 ### Explain selected text
 
-- Readers select a word, phrase or fragment and request a concise English explanation of its contextual meaning and relevant grammar or usage, silently adapted to the saved reading profile and story difficulty. The explanation covers the exact selected text, including fragments within words; surrounding words or clauses only clarify its function. Fragments may have no standalone translation.
-- The initial explanation is one short paragraph. It does not explain unrelated vocabulary, teach assumed-known scripts, recap the profile or assess the learner.
-- The card shows an AI-chosen contiguous source excerpt containing the selection, with the exact occurrence highlighted by the app. A short context translation is optional. Invalid excerpts fall back to the containing sentence without retaining a possibly mismatched translation.
-- Rules apply to all four languages. Language expectations can guide regional usage and register. Japanese keeps canonical text and furigana as a separate display annotation; Russian never transliterates Cyrillic.
-- More detail is opt-in: opening the field makes no AI request. The learner may enter a one-line question. Follow-ups stay focused on the same selection and can build on earlier explanations. Detail responses are plain English paragraphs (optional bold, italic and inline code for display; unsupported syntax stays literal and model HTML is never interpreted).
-- Generate examples requests three short sentences showing the same meaning or grammatical function in varied contexts, each with a relevant-form highlight and English translation. Highlight boundaries are validated UTF-16 offsets; Japanese readings are separate annotations. Saved follow-ups distinguish detail from examples; older untyped follow-ups remain detail responses.
-- Responses stay attached to the exact chapter version and selection for offline reference. Follow-up chapter prompts add chapters; rewrite prompts create alternate paths ([PED-003](PED-003-story-memory-and-paths.md)). Continuation always appends after all existing active chapters, regardless of which chapter is displayed.
-- Saved explanations show newest first (stored order is preserved). Selection and deletion of explanations is an interaction choice; it does not change generated text or provenance.
-- Translate opens the user-configured device translation tool with canonical selected text and no Japanese readings. The external tool controls detection and output language and may process text online. Availability depends on the host; it does not change the English explanation contract.
-- Listening: selected text can be spoken through the native Android selection menu and vocabulary-note headwords have Listen. The reader supplies the story language through HTML `lang`; the voice comes from Android's configured text-to-speech engine. Spoken text is canonical, without Japanese readings. Whole-chapter Listen reads the displayed canonical title, a blank line and the body, never readings, glossary or explanations. Sentence-level controls (pause/resume, previous/next, stop, scrubber, speed, follow) are product conveniences: Pause stops audio and Resume repeats the current sentence because the host exposes no native pause or word position. Sentence boundaries come from `Intl.Segmenter` or a punctuation fallback and can differ from a teacher's division; one utterance per sentence adds short gaps.
+- The learner selects any word, phrase or fragment and asks for a concise English explanation of its contextual meaning and relevant grammar or usage, silently adapted to the learner's level. It covers the exact selection, including fragments within words; surrounding text only clarifies function. Fragments may have no standalone translation.
+- Initial help is one short paragraph: no unrelated vocabulary, no teaching of assumed scripts, no profile recap, no assessment.
+- The card shows a model-chosen contiguous source excerpt containing the selection, with the exact occurrence highlighted by the app, and an optional short context translation. An invalid excerpt falls back to the containing sentence, dropping any possibly mismatched translation.
+- **More detail** is opt-in (opening the field makes no request) with an optional one-line question; follow-ups stay on the same selection and may build on earlier answers. Plain English paragraphs; light formatting only, model HTML never interpreted.
+- **Generate examples:** three short sentences showing the same meaning or grammatical function in varied contexts, each with a validated highlight and English translation.
+- Help stays attached to the exact chapter version and selection for offline reference; saved help is never rewritten.
+- **Translate** opens the learner's device translation tool with canonical text (no readings); the external tool chooses languages and may process text online. It does not change the English explanation contract.
+- **Listening:** selected text, note headwords and whole chapters can be spoken through Android TTS in the story language, always canonical text without readings, glossary or explanations. Sentence controls are conveniences: Pause stops and Resume repeats the sentence (the host exposes no native pause or word position); sentence boundaries come from `Intl.Segmenter` or punctuation and may differ from a teacher's; one utterance per sentence adds short gaps.
 
-### Vocabulary notes (glossary)
+### Vocabulary notes
 
-- Every chapter has a nonempty set of vocabulary notes. There is no pedagogical quota or cap beyond one structurally valid note; underlines keep help learner-controlled.
-- Notes come from a separate request after canonical prose is validated and durably checkpointed. The request defines most meaningful words and useful expressions, including common words, contextual inflections, idioms and constructions, and skips routine proper names and duplicate meanings. The reading target guides explanation complexity; it is not a presumption that individual words are known.
-- Schema is the existing English meaning, headword (`word`) and exact `forms`. Forms must be exact chapter text. Listed forms are resolved tolerantly to attested chapter text; forms the chapter does not contain are dropped, and a note with no attested form is discarded rather than failing the chapter. Forms found only in the title or language plan do not count.
-- Grouped forms are allowed only with compatible explanations. The notes prompt distinguishes referents, grammatical person and number, and association from ownership; prefers disambiguating attested phrases; and explains discontinuous constructions without giving their whole meaning to an isolated particle. Pronouns, possessives, determiners and useful function words are in scope.
-- Technical limits (per-field and form bounds, 1,000,000 UTF-16-unit response bound) are storage bounds, not pedagogical quotas. The former 100-note cap was removed by explicit learner request; numeric length quotas are retired by [PED-004](PED-004-level-guided-generation.md).
-- Display: each explanation appears only at its first eligible occurrence in the displayed chapter version, as a subtle underline. Tap or keyboard activation opens the existing English note and generates nothing. Later occurrences stay plain text and can still be selected for Explain. Longest-form overlaps resolve first. Identity is headword plus English meaning, NFC-normalized with trimmed and collapsed whitespace; case and punctuation are preserved. Alternate forms and equivalent duplicates share an identity; different meanings stay distinct. Selection is recomputed on render, chapter navigation and version change without altering stored glossary or provenance. Japanese matches that span annotation segments keep complete ruby readings and canonical copy text and share one popup anchor and one keyboard control.
-- Terminology rationale and the product-copy recommendation live only in the [lexical-unit terminology review](../research/lexical-units.md). The `word` field is a schema name, not a claim that a note holds one orthographic word.
+- Every chapter has a nonempty set of English notes; at least one structurally valid note is required, with no pedagogical quota or cap (the former 100-note cap was removed at the learner's request). Underlines keep help learner-controlled.
+- Notes come from a separate request after canonical prose is validated and checkpointed. It asks for most meaningful words and useful expressions (common words, contextual inflections, idioms, constructions, pronouns, possessives, determiners, useful function words), skipping routine proper names and duplicate meanings. The level guides explanation complexity; it is not a presumption that words are known.
+- Schema: English meaning, headword (`word`, a schema name, not a claim of one orthographic word) and exact `forms`. Forms are resolved tolerantly to attested chapter text; unattested forms are dropped, and a note with none is discarded rather than failing the chapter. Forms only in the title or plan do not count.
+- Grouped forms need compatible explanations. The prompt distinguishes referents, person and number, association versus ownership, prefers disambiguating attested phrases, and explains discontinuous constructions without assigning their meaning to an isolated particle.
+- Display: each note appears once, at its first eligible occurrence in the displayed version (identity = headword + meaning, NFC, trimmed and collapsed whitespace, case and punctuation preserved; longest overlaps first); later occurrences stay selectable for Explain. Recomputed on render without changing stored data.
+- Terminology for notes: [lexical-unit review](../research/lexical-units.md).
 
-### Japanese and Russian handling
+### Creation and continuation
 
-- Japanese readings are app-owned. One story request supplies prose; the app extracts contiguous kanji runs and aligns supplied readings to fixed text. Readings appear only on kanji runs; whole compounds are retained and kana, okurigana, punctuation and whitespace are unannotated. Katakana anchors may match hiragana equivalents.
-- New title/story annotations and Japanese help examples must reconstruct canonical text with exactly one valid alignment and nonempty kana readings for every kanji run. Missing, invalid or ambiguous readings reject the response with no automatic retry and no partial saving.
-- Saved annotations are normalized for display only when alignment is unique, including legacy sentence-wide readings. Ambiguous legacy annotations keep their original display. Stored canonical text, stored annotation data and original provenance are unchanged; Copy and speech omit readings.
-- Japanese readings follow successful notes. Alignment cannot establish that a pronunciation is correct, so Japanese content review remains necessary. Russian uses Cyrillic without Latin transliteration, and stress marks are off unless requested.
-
-### Generation workflow and creation
-
-- Create starts with one combined story idea and topics field, then reading scope, before language and difficulty. The brief may include genre, tone or format and may describe vocabulary domains, situations, grammar concepts or expressions. English, the learning language or mixed-language input is permitted, and the app does not promise to correct or assess learner writing. Older saved stories keep their separate topic and practice values.
-- Each chapter or rewrite requests its own contextual glossary and carries forward original topics and learner context. Each output advances the narrative and leaves a natural reason to continue unless the learner explicitly asks for closure.
-- Continue and Rewrite accept a blank prompt. Continuation proceeds naturally from the existing active chapters; rewrite gives a fresh telling that preserves the chapter's main events and narrative role. The actual empty prompt is saved; the app does not invent learner instructions.
-- The unified pipeline plans language before prose and readings and saves intermediate results to the checkpoint user file before releasing requests. Examples reuse prose and readings without a story language plan. Resume and retry are explicit; completed stages are not regenerated. A failed notes request keeps the completed prose for a notes-only retry. There is no silent inference retry; failures keep a manual retry path and the submitted question. Cancellation records intent even while a stage is starting, so a newly returned request ID is cancelled before the next stage.
-- Generation profiles and narrative scope follow [PED-004](PED-004-level-guided-generation.md); its standardized self-selected targets supersede older broad-band and freeform-profile references for new requests.
-- Reader loading panels bind to the relevant story version and explanation card; saved explanations stay visible during generation. Long-press selection (for removing several explanations or stories) begins only on non-text card surfaces so explanation text stays natively selectable. Deleting stories asks for confirmation. Presentation: a floating bottom bar for explanation selection and an Aa panel for text size and furigana.
-
-## Implementation
-
-The full-screen reader stores ordered chapters, alternate versions and passage help in `data/stories.json`; legacy one-story records are read as one chapter in memory. Text size and furigana preference are in `data/settings.json`. Saved help records passage offsets, source version, learner profile snapshot, model and prompt version, and selection requests carry canonical sentence text with UTF-16 offsets. Saved follow-ups add the question, response and their own profile, model and prompt provenance; existing explanations are never rewritten. The decoder still accepts legacy JSON detail objects with a non-empty `explanation` string so saved history stays readable. Interrupted intermediate results live in `data/generation-checkpoints.json`.
-
-Code: [App² reader](../../js/app.js), [canonical reader text](../../js/reader-text.js), [validation and notes prompt](../../js/learning-validation.js), [reader UI](../../index.html), [reader styles](../../css/style.css). Runtime contract: [app2-runtime](../architecture/app2-runtime.md). Safeguards: [language safeguards](../architecture/language-safeguards.md). The current prompt version is `PROMPT_VERSION` in `js/app.js` (`2026-10-14.21` when this file was consolidated).
-
-**Saved-story provenance.** Records keep the prompt version they were generated with; new prompt versions never relabel them. Copy-only and presentation changes leave prompt versions and saved provenance unchanged, and a change to prompts or learning behavior must increment `PROMPT_VERSION`. Incompatible unfinished checkpoints follow the existing explicit recovery rules. The current version is `2026-10-14.21`; historical behavior is preserved in saved-record provenance and Git history.
+- Create leads with one combined story idea and topics brief (genre, tone, format, vocabulary domains, situations, grammar concepts, expressions), in English, the target language or both; the app does not promise to correct learner writing. Older stories keep separate topic and practice values.
+- Each chapter or rewrite gets its own glossary and carries forward the original topics and learner context. Chapters advance the narrative and leave a natural reason to continue unless closure is requested.
+- Blank Continue proceeds naturally; blank Rewrite retells the main events and narrative role. The actual empty prompt is saved; no instructions are invented. Paths: [PED-003](PED-003-story-memory-and-paths.md). Levels and scope: [PED-004](PED-004-level-guided-generation.md).
 
 ## Evidence and limits
 
-- Self-reports can inform adaptation but do not establish proficiency. `liZhang2021SelfAssessment` and `tigchelaarEtAl2017CanDoValidity` ([self-assessment review](../research/self-assessment.md)) do not validate LingoMage's free-text profile or model-based difficulty estimates.
-- The [reading and glossing review](../research/reading-and-glossing.md) finds support for glossed reading with heterogeneous, partial outcomes. `yanagisawaWebbUchihara2020Glossing` ([DOI](https://doi.org/10.1017/S0272263119000688)) supports offering contextual help as an option. It does not show that help improves learning, predicts retention, fixes an optimal display frequency or tests first-occurrence display, these four languages or AI explanations.
-- Evidence revision (2026-10-19): reading-first practice has small-to-medium, possibly overestimated support from extensive-reading syntheses (`sangersEtAl2025ExtensiveReading` ([DOI](https://doi.org/10.1007/s10648-025-10068-6)); `hamada2020ExtensiveReadingBias` ([DOI](https://doi.org/10.3389/fpsyg.2020.00617)), which lowered one estimate after correcting selection bias), mostly for sustained classroom reading, not one-off AI chapters. Encounters correlate with incidental learning (`uchiharaEtAl2019Repetition` ([DOI](https://doi.org/10.1111/lang.12343))) without a required count, so natural reuse stays a product assumption. Retrieval, review and instruction are not implemented and are research candidates only ([strategy](../product/evidence-informed-strategy.md)). Implementation status and intended outcome are unchanged: the help is a reading aid, and its learning effect has not been measured. Revisit if evaluation under the strategy's gates finds notes confuse learners or do not support comprehension.
-- The following are product assumptions or learner-requested preferences with no direct evidence: focusing and silently adapting help, three examples, first-only display, broad note coverage, no density cap, Listen and Translate, sentence-level playback controls, story-led creation, multilingual input, open-ended chapter endings, and the presentation and selection interactions. None is a claim of learning effectiveness. No study cited here tests this implementation, the four languages or AI-generated explanations.
-- Structural validation cannot establish semantic accuracy, useful coverage, novelty, level suitability or pedagogical suitability. Language accuracy remains a separate review requirement.
-- The cause of reported Android failures with prose-prefixed detail responses has not been confirmed from a captured response.
-- A controlled contextual-accuracy comparison of notes prompts is an evaluation candidate, not a shipped iteration. Production `NOTES_INSTRUCTIONS` and `PROMPT_VERSION` are unchanged pending selection. The [comparison design](../validation/generation-evaluation/contextual-notes/README.md) uses 24 frozen revised-pilot chapters and seven focused cases. Release requires qualified adjudication, fewer material errors overall, no increase per language or in missing useful support, and correct inspected focused outputs. Live generation and qualified review have not been performed; AI preference alone is insufficient. Promotion must increment the version and preserve historical provenance and incompatible-checkpoint handling. Live prompt and model comparisons and preliminary AI review are in [generation evaluation](../validation/generation-evaluation/README.md).
+- **Self-report** informs adaptation but does not establish proficiency (`liZhang2021SelfAssessment`, `tigchelaarEtAl2017CanDoValidity`; [self-assessment review](../research/self-assessment.md)).
+- **Glossed reading** has support with heterogeneous, partial outcomes ([reading and glossing review](../research/reading-and-glossing.md)). `yanagisawaWebbUchihara2020Glossing` ([DOI](https://doi.org/10.1017/S0272263119000688)) supports offering contextual help as an option; it does not test first-occurrence display, these languages or AI explanations, and does not fix an optimal frequency.
+- **Reading-first practice** has small-to-medium, possibly overestimated support, mostly for sustained classroom reading, not one-off AI chapters: `sangersEtAl2025ExtensiveReading` ([DOI](https://doi.org/10.1007/s10648-025-10068-6)); `hamada2020ExtensiveReadingBias` ([DOI](https://doi.org/10.3389/fpsyg.2020.00617)) lowered one estimate after correcting selection bias.
+- **Repeated encounters** correlate with incidental learning without a required count (`uchiharaEtAl2019Repetition`, [DOI](https://doi.org/10.1111/lang.12343)), so natural reuse remains a product assumption.
+- **Product assumptions** (no direct evidence): focused and silently adapted help, three examples, first-occurrence display, broad note coverage, no density cap, Listen and Translate, sentence playback controls, story-led creation, multilingual input, open-ended endings, and all presentation choices.
+- Structural validation cannot establish semantic accuracy, useful coverage, level suitability or pedagogical value; language review is separate. The cause of reported Android failures with prose-prefixed detail responses was never confirmed from a captured response.
+- Retrieval, review and instruction are not implemented; they are research candidates in the [strategy](../product/evidence-informed-strategy.md).
 
-## Alternatives and revisit conditions
+## Implementation
 
-Keep help opt-in and brief. Revisit focus and follow-up interaction after qualified language review and learner evaluation. Revisit the ruby selection implementation if Android testing shows visible furigana blocks reliable selection of the base text; disabling furigana is not a selection workaround.
+- Code: `js/app.js` (reader, help requests), `js/reader-text.js` (canonical text, glossary display), `js/learning-validation.js` (validation, notes prompt `NOTES_INSTRUCTIONS`).
+- Provenance: saved help records passage offsets, source version, profile snapshot, model and prompt version; follow-ups add question, response and their own provenance; legacy JSON detail objects remain readable. Prompt or learning-behavior changes increment `PROMPT_VERSION`; copy and presentation changes do not; saved records never relabel.
+- Lookups of notes, explanations, follow-ups, examples and translations are recorded under [PED-005](PED-005-consultation-signals.md); recording changes no help content or prompt.
 
-Reader behavior is covered by the regression suites in `tests/` (including `tests/reader-regression.cjs`). Android selection, native speech timing, stop latency, playback gaps and ruby rendering checks are listed in the [device checklist](../validation/device-checklist.md); content review remains pending until actually performed.
+## Open evaluation
 
-### Lookup history — 2026-11-08
+A controlled contextual-accuracy comparison of notes prompts is designed but not run: 24 frozen revised-pilot chapters plus seven focused cases. Promotion requires qualified adjudication, fewer material errors overall, no increase per language or in missing useful support, correct focused outputs, and a new `PROMPT_VERSION`; AI preference alone is insufficient. See the [comparison design](../validation/generation-evaluation/contextual-notes/README.md) and [generation evaluation](../validation/generation-evaluation/README.md).
 
-Opening a word note, Listen on a note, saved explanations, follow-ups, examples and opened device translations are now recorded locally as lookups under [PED-005](PED-005-consultation-signals.md). Help content, prompts and `PROMPT_VERSION` are unchanged. A lookup records that the learner checked something; it is not treated as evidence that a word is unknown.
+## Revisit when
+
+- Qualified language review or learner evaluation finds notes or explanations confuse learners or do not support comprehension.
+- Android testing shows visible furigana blocks reliable selection of base text (disabling furigana is not an acceptable workaround).
+
+## Decision history
+
+- 2026-10-11: contextual Explain, follow-ups and examples introduced.
+- 2026-10-13: notes moved to a separate request after prose; 100-note cap removed.
+- 2026-10-14: consolidated at prompt `2026-10-14.21`.
+- 2026-10-19: evidence revision (extensive reading, repetition) with no behavior change.
+- 2026-11-08: lookups recorded under PED-005.

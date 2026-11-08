@@ -1,61 +1,22 @@
 # Spanish
 
-Current App² behavior: Spanish is presented without a fixed regional variety.
-Learners can request a regional variety, register, or other language preference
-in Settings. Language review remains pending.
+Shared rules: [languages README](README.md). (The file name reflects the earlier Chilean default; the language code remains `es-CL`.)
 
-## Confirmed requirements
+## Current requirements
 
-- English interface and English glossary explanations.
-- Beginner stories may use the learner's optional freeform vocabulary or concept
-  guidance, as described in the current [MVP](../product/mvp.md).
-- Use broadly understandable Spanish by default. Apply learner preferences when
-  supplied and preserve learner-supplied wording from their chosen variety.
+- No fixed regional variety: broadly understandable Spanish by default. Apply a regional variety, register or address form the learner requests in language preferences, and keep learner-supplied wording from their variety.
+- Correct accents, punctuation, agreement and conjugation.
 
-## Historical Chilean Spanish preference — Android prompt 2026-10-09.2
+## Earlier designs
 
-The earlier Android prompt used a Chilean Spanish preference. This remains useful
-historical rationale for stories saved with that prompt, not a current default or
-a claim of improved learning effectiveness or a universal South American
-standard. Examples are contextual preferences, not obligatory words in every
-story. Correct spelling includes the accent in **maní**.
+- **Android prompt 2026-10-09.2: Chilean preference.** Contextual Chilean vocabulary as examples, not obligatory words (palta, maní with its accent, computador, auto); tú and plural ustedes, avoiding vosotros and vos for consistent beginner address (a simplification that does not represent every Chilean variety); no dense slang or phonetic spelling; 100–150 words, short clauses, present tense. Lexicographic support: ASALE *Diccionario de americanismos* records Chilean usage of [palta](https://www.asale.org/damer/palta), [maní](https://www.asale.org/damer/man%C3%AD) and [computador](https://www.asale.org/damer/computador) (usage references, not teaching-effectiveness evidence; auto was a requested product example). Stories saved with that prompt keep its provenance. Replaced by learner-chosen variety in App².
+- **2026-10-10:** reading bands, self-assessment and free-text expectations; replaced by CEFR targets (2026-10-13).
 
-For consistent beginner address forms, request standard tú conjugations and
-ustedes for plural address; avoid mixing vosotros and vos forms. This simplifies
-the initial product and does not represent every Chilean conversational variety.
-Avoid dense slang and phonetic spellings; maintain 100–150 words, short clauses,
-present-tense patterns and normal accents/punctuation. English explanations can
-clarify regional meanings. Grammar progression remains a research question.
+## Open questions
 
-Lexicographic checks: ASALE's *Diccionario de americanismos* includes Chile in
-its usage records for [palta](https://www.asale.org/damer/palta),
-[maní](https://www.asale.org/damer/man%C3%AD), and
-[computador](https://www.asale.org/damer/computador). These are usage references,
-not teaching-effectiveness studies. Auto is also an explicitly requested product
-example. The general learning rationale and transfer limits remain in the
-[initial evidence review](../research/reading-and-glossing.md).
+- Grammar progression by level.
+- How to present regional meanings in English notes.
 
-## Historical Android prompt and review
+## Content review criteria
 
-Source: [es-CL.json](https://github.com/javiercmh/lingomage/blob/f8fef1255e608240301a13202168d4f6c41a1fea/android/app/src/main/assets/prompts/es-CL.json), version
-2026-10-09.2, recorded with new stories. Existing stories retain their original
-text and prompt provenance. Increment the version when generation behavior changes.
-
-Review contextual Chilean vocabulary, accents, punctuation, agreement,
-conjugation, address consistency, naturalness, glossary meanings and beginner
-readability. The structural validator checks coverage and declared used forms;
-it cannot certify regional usage, inflection or language accuracy. Qualified
-human review remains necessary.
-
-## App² reading self-report and preferences — 2026-10-10
-
-Settings offer three reading-task descriptions, an optional self-assessment, and optional expectations or general instructions. These guide each story request and are revisable learner reports, not assessed proficiency. Spanish has no assumed regional variety in the current App² prompt; learners can state their preference. Definitions are in `data/learning-profiles.json`; evidence and limits are in [the self-assessment record](../research/self-assessment.md).
-
-## Current requirements — 2026-10-12.4
-
-The current App² profiles, difficulty and learner wishes remain authoritative. Legacy decisions above are historical; adopted, adapted and rejected rules are recorded in the [safeguard audit](../architecture/language-safeguards.md). New chapters require useful integrated English learning notes, validated target-script forms and technical bounds; narrative scope replaces numerical length quotas. Orthography and contextual correctness guidance do not reinstate the old beginner curriculum or regional defaults. Linguistic and pedagogical quality remain review requirements.
-
-
-## Current App² reading targets — 2026-10-13
-
-[PED-004](../pedagogy/PED-004-level-guided-generation.md) replaces broad reading bands/freeform self-assessment for new generation. The managed standardized-level definitions and app-authored guides are in `data/learning-profiles.json`. German/Spanish use CEFR A1–C2, Japanese JLPT N5–N1 and Russian Elementary/Basic/TORFL-I–IV with A1–C2 references. Canonical script requirements remain. Numeric story lengths in the earlier implementation above are historical; new generation uses narrative scope and a separate language-planning stage. Self-selected levels do not establish certified alignment or individual vocabulary knowledge. Existing saved content/provenance is preserved.
+Accents, punctuation, agreement, conjugation, address consistency, naturalness and consistency with any requested variety, glossary meanings and readability for the level. Validators cannot certify regional usage.

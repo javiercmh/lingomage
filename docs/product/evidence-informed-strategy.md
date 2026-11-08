@@ -66,4 +66,4 @@ Feasibility: a within-subject design that counterbalances which items get the fe
 
 - Revisit this document on relevant feature work, major new evidence, contradictory evaluation results, or when a provisional source is verified or fails verification.
 - Not used for product direction: matching to learning styles (no supporting source was reviewed; tangential to this strategy), an optimal activity time split, the claim that one combined method is best across skills, and any ranking drawn from the shared synthesis.
-- Deferred features remain research candidates until a proposal follows the policy; prototypes can precede trials, while learning claims require the gates above; see [MVP](mvp.md#deferred-features-and-research-candidates).
+- Deferred features remain research candidates until a proposal follows the policy; prototypes can precede trials, while learning claims require the gates above; see [MVP](mvp.md#not-in-scope).

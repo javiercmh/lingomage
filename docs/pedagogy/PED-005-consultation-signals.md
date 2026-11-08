@@ -28,7 +28,7 @@ The terms are:
 - **Repetition:** `1 + log2(distinct days looked up)`.
 - **Exposure damping:** `1 / (1 + encounters since the last lookup / 4)`.
 
-The profile shows the top 10 items per language with their lookup count. Exposure counts shape the ranking but are not shown, to keep the list simple.
+The profile shows the top 10 items per language with their lookup count. A row opens a read-only detail sheet with every meaning, its count and sentence, the days and last date looked up, and encounters since the last lookup ("seen N times since"). Viewing records nothing.
 
 **Probable reading (implemented)** follows these rules:
 - A paragraph counts once its on-screen time reaches its word count at 400 words per minute, and never less than 1.5 s.
@@ -126,3 +126,8 @@ Full notes are in the [consultation signals review](../research/consultation-sig
 - Device checks show the 400 wpm or idle rules misclassify normal reading.
 
 Evaluation is pending.
+
+## Decision history
+
+- 2026-11-08: Level 1 lookup ranking and probable-reading exposure implemented (app 1.3.0); Level 2 proposed.
+- 2026-11-08: items keyed by text alone (meanings are written per chapter); every meaning kept per item to allow later homograph splitting; read-only detail sheet in Profile.

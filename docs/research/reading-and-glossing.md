@@ -1,7 +1,8 @@
 # Reading, glossary support, and repeated encounters
 
-Review date: 2026-10-09; revised 2026-10-19 (E1 and E3 abstracts re-checked in Consensus and metadata in Crossref, E4 extensive reading added, stale product assumptions corrected). Discovery: Consensus; publication metadata and available
-original text checked separately. This is a scoped review, not a systematic review. Bibliography keys: [references.bib](references.bib). Retrieval, spacing and review ideas are in [retrieval and spacing](retrieval-and-spacing.md); instruction, feedback and listening are in [instruction, feedback and production](instruction-feedback-and-production.md).
+- **Question:** What do glossed reading, incidental learning, repeated encounters and extensive reading imply for generated stories with English notes?
+- **Reviewed:** 2026-10-09; revised 2026-10-19 (E1 and E3 abstracts re-checked, metadata via Crossref, E4 added). Scoped review via Consensus; publication metadata and available original text checked separately. Access is stated per source.
+- **Informs:** [PED-002](../pedagogy/PED-002-contextual-reading-support.md), [PED-004](../pedagogy/PED-004-level-guided-generation.md). Related: [retrieval and spacing](retrieval-and-spacing.md), [instruction, feedback and production](instruction-feedback-and-production.md).
 
 Keys: E1 `webbEtAl2023IncidentalMetaAnalysis`, E2 `yanagisawaWebbUchihara2020Glossing`, E3 `uchiharaEtAl2019Repetition`, E4 `sangersEtAl2025ExtensiveReading`, `nakanishi2015ExtensiveReading` and `hamada2020ExtensiveReadingBias`.
 
@@ -100,13 +101,4 @@ briefs and unlimited generation are not shown to be optimal. The related suggest
 
 ## Product assumptions and remaining review
 
-Glossary placement and local rereading are product choices, as are the limits on
-vocabulary and grammar focuses. Earlier wording here about five to ten words,
-fixed story lengths and A1-oriented AI suggestions described the retired design;
-[PED-004](../pedagogy/PED-004-level-guided-generation.md) replaced it with optional
-planned practice focuses and narrative scope. No learning trial has been run.
-Language-specific grammar progression and beginner readability still need deeper
-review; content checks must not be reported as retention evidence.
-
-
-Current product assumptions: [PED-004](../pedagogy/PED-004-level-guided-generation.md) replaces the former numeric story lengths and mandatory word-list framing with narrative scope and optional planned practice focuses. The evidence reviewed above does not validate those new bounds or the planning/writing split.
+Glossary placement, local rereading, the optional planned focuses and narrative scope ([PED-004](../pedagogy/PED-004-level-guided-generation.md)) are product choices; the evidence above does not validate those bounds or the planning/writing split. (An earlier version of this review described a retired design with five to ten target words, fixed story lengths and A1-oriented suggestions.) No learning trial has been run. Language-specific grammar progression and beginner readability need deeper review; content checks must not be reported as retention evidence.

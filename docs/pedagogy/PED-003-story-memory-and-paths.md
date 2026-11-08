@@ -1,35 +1,41 @@
 # PED-003: Bounded narrative memory and alternate story paths
 
 - Date: 2026-10-11
-- Status: implemented; model narrative fidelity and learning effects unvalidated
-- Scope: continuation and rewrite in all four target languages
-- Evidence basis: product assumption; no empirical claim or new research citation
+- Status: implemented; narrative fidelity and learning effects unvalidated
+- Scope: continuation and rewrite in all four languages
+- Evidence basis: product assumption; no empirical claim
 
-## Decision
+## Decisions
 
-Before a follow-up, summarize each source chapter from the saved preceding memory and canonical prose. The writer receives structured English memory and exact recent target-language prose, alongside the original brief, topics, learner preferences and optional follow-up prompt. Memory separates characters, established facts, important plot events, unresolved threads, uncertainties and current situation. Character beliefs must not become established facts; missing information must not be invented. Japanese readings and glossary/help content are excluded.
+- **Memory:** before a follow-up, each source chapter is summarized from the preceding memory and its canonical prose into structured English memory: characters, established facts, important events, unresolved threads, uncertainties and current situation. Character beliefs must not become facts; missing information must not be invented. Japanese readings and help content are excluded. The writer receives this memory, exact recent target-language prose, the original brief, topics, preferences and the optional prompt.
+- **Continue** summarizes through the selected path's end. **Rewrite** uses memory through the preceding chapter, its recent prose and the full current chapter as revision source; a blank rewrite keeps main events and narrative role, an explicit request may change them.
+- **Paths:** a rewrite starts an alternate path ending at that chapter, preserving original descendants and explanations. One Story path selector replaces independent version selection so incompatible histories are never silently combined.
+- **Removal:** learners can remove a chapter and its successors from a path, or a whole path. Content shared with other paths survives; content referenced nowhere else is permanently removed after confirmation; removing the start of the last path deletes the story. One durable save with rollback; blocked while AI work or an unsaved result is pending. Path names use a persistent counter so a deleted alternate's name is never reused.
 
-Continuation summarizes through the selected path's ending. Rewrite uses memory only through the preceding chapter, its recent prose and the full current chapter as the revision source. Empty rewrite requests retain the main events and narrative role. Explicit changes may alter them. A rewrite starts an alternate path ending at that chapter, preserving original descendants and explanations. The Story path selector replaces independent version selection so the app cannot silently combine incompatible histories. It is grouped with Chapter in a floating navigation panel, with the current path shown in the reader metadata and branch-origin/uncertain-history details in the panel; switching preserves the existing remembered position and generation locks. This compact presentation is a product assumption without a usability evaluation.
+## Product defaults and limits
 
-## Product defaults and limitations
-
-Memory JSON is bounded to 12,000 JavaScript characters; input chunks are at most 8,000 characters. Long chapters are consumed sequentially without omission, preserving surrogate pairs. Recent prose includes the whole chapter up to 8,000 characters, otherwise its last 4,000, preferring a sentence or paragraph boundary. These are character budgets, not model token limits. The rewrite source remains complete. These choices reduce history growth and duplication, but do not guarantee fidelity, eliminate summary drift, or establish improved learning. Long stories with no cached memory need several initial requests. No live model review was performed.
-
-Memory is cached by exact ordered version lineage, chunk index, memory format version and prompt version. Shared path prefixes reuse memory. Records retain provider/model/prompt provenance. Completed checkpoints are saved before acknowledgement; cancellation or errors stop subsequent stages and require explicit retry. Summaries are inspectable in `data/stories.json`.
+- Budgets (JavaScript characters, not tokens): memory JSON at most 12000; input chunks at most 8000, consumed sequentially without omission (surrogate pairs preserved); recent prose is the whole chapter up to 8000, otherwise its last 4000, preferring a sentence or paragraph boundary. The rewrite source is complete.
+- Memory is cached by exact ordered version lineage, chunk index, `MEMORY_VERSION` and prompt version; shared path prefixes reuse it. Summaries are inspectable in `data/stories.json` with provider, model and prompt provenance. Completed summary stages are saved before acknowledgement.
+- These choices limit history growth and duplication but do not guarantee fidelity, prevent summary drift or establish improved learning. Long uncached stories need several initial requests. No live-model review of long or branched stories has been done.
 
 ## Compatibility
 
-Legacy stories derive paths lazily from version-source and chapter predecessor links. Same-chapter rewrite links are traced back to their original predecessor. Where provenance is absent, use the saved selected sequence and mark continuity uncertain. Preserve all stored chapters, versions and help. There is no bulk data migration. Completed checkpoints survive reload; unsaved completed responses still require the existing in-page recovery workflow.
+Legacy stories derive paths lazily from version-source and predecessor links (same-chapter rewrite links traced to their original predecessor). Without provenance, the saved selected sequence is used and continuity is marked uncertain. No bulk migration; all stored chapters, versions and help are preserved.
 
-## Validation
+## Implementation and tests
 
-Behavior is covered by `tests/story-memory-regression.cjs`. Deterministic mock output and schema tests cannot establish narrative accuracy, language quality, or pedagogical effectiveness. Revisit budgets and summary instructions after live-model review of long stories and branched narratives.
+`js/story-model.js`, `js/story-memory.js`, `js/app.js`. Tests: `tests/story-memory-regression.cjs`, `tests/reader-management-regression.cjs`. Mock output cannot establish narrative accuracy, language quality or pedagogical value.
 
+## Open experiment
 
-## Reader management (2026-10-12)
+A candidate prose writer (development only) internally checks who knows what, possession and ownership, character and object location, chronology and unresolved events, within the same request and schema. It is not shipped; it waits for notes-prompt selection and a separate prose evaluation. See the [controlled comparison](../validation/generation-evaluation/contextual-notes/README.md).
 
-Learners can remove a chapter and its successors from the selected path or delete an entire path through Story actions. Shared chapter versions, explanations and memory remain available on other paths; exclusively unreferenced content is permanently removed after confirmation. Removing the beginning of the final path deletes the story. The app uses one durable save with rollback on failure, blocks removal while AI work or a result awaits saving/release, and clears positions/drafts for deleted content. Names use a persistent counter so a later rewrite cannot reuse a deleted alternate's name. This is a product assumption about keeping narrative continuity understandable, not evidence of learning effectiveness. Generation instructions and prompt version are unchanged. Covered by `tests/reader-management-regression.cjs`.
+## Revisit when
 
-### Continuity experiment prepared — 2026-10-14
+Live-model review of long and branched stories shows drift or omissions; then revisit budgets and summary instructions.
 
-The separate experimental prose writer internally checks who knows what, possession and ownership, character/object location, chronology and unresolved events. Continuation begins from supplied narrative state; rewrite treats the current chapter as its revision source and preceding history as constraints. Natural unresolved endings remain unless closure is requested. Checks occur in the existing writing request with the same schema. Production continuity instructions and saved records are unchanged pending the notes-selection prerequisite and separate prose evaluation. This remains a product assumption without direct evidence; no fidelity or learning-effect claim is made. See [controlled comparison](../validation/generation-evaluation/contextual-notes/README.md).
+## Decision history
+
+- 2026-10-11: memory and paths introduced.
+- 2026-10-12: chapter and path removal.
+- 2026-10-14: continuity-checking prose candidate prepared (not shipped).
