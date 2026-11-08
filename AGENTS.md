@@ -18,7 +18,7 @@
 
 - Follow the plain-file starter structure: `index.html`, `css/style.css`, `js/app.js`, `js/bridge.js`, `manifest.json`, and `data/`.
 - Keep the host API calls in `js/bridge.js`; app logic uses its exported wrappers. Keep the project dependency-free and do not add a build step.
-- Keep `manifest.json`'s `main` and `files` entries current. Domain records, preferences and unfinished generation belong in `data/stories.json`, `data/settings.json` and `data/generation-checkpoints.json`, not opaque host preferences. Time-tracking history belongs in `data/usage.json` (versioned local-date aggregates written whole, never appended); it is optional data, so an unreadable usage file must never block stories, settings or generation, and it must never be overwritten while unreadable. Stories, languages and settings may be deleted or disabled without touching usage history. Time tracking needs no host API, dependency or build step.
+- Keep `manifest.json`'s `main` and `files` entries current. Domain records, preferences and unfinished generation belong in `data/stories.json`, `data/settings.json` and `data/generation-checkpoints.json`, not opaque host preferences. Lookup history and probable-reading aggregates belong in `data/learning-signals.json` (PED-005), an optional store with the same unreadable-file rules as usage. Time-tracking history belongs in `data/usage.json` (versioned local-date aggregates written whole, never appended); it is optional data, so an unreadable usage file must never block stories, settings or generation, and it must never be overwritten while unreadable. Stories, languages and settings may be deleted or disabled without touching usage history. Time tracking needs no host API, dependency or build step.
 - Released app behavior uses the App² managed `ai` bridge. Connect and choose models only through App² library Settings → AI. Never store credentials or request headers in the workspace. Every `ai.start` caller passes concise task-specific `title`/`body` from `js/ai-notification.js` for App²'s running-request notification; it is presentation only and must not change prompts, prompt versions, saved schema or provenance. The local development server may offer an explicit `--chatgpt` mode through the Codex CLI login for desktop testing; this exception must remain development-only.
 - Save completed story data before acknowledging an AI request. Do not silently retry inference.
 - Respect edge-to-edge safe-area variables, provide touch targets of at least 44px, and do not use system `alert()` or `confirm()` dialogs.
@@ -34,6 +34,7 @@
 ## Development and verification
 
 - Run the local workspace with `python3 dev_server.py --mock-ai`; open `http://localhost:8888`. The development mock is deterministic and makes no external requests. Optional live desktop testing uses `codex login` followed by `python3 dev_server.py --chatgpt`; requests may use ChatGPT plan allowance, and Codex is an optional external dependency.
+- The development server keeps learner files (the manifest's `seedFiles`, plus development preferences) in the gitignored `.dev-data/` folder, seeded from `seedDefaults` on first start, so committed seeds never change. Delete `.dev-data/` to start over as a fresh install.
 - For every interface or copy change, visually inspect screenshots from the development server at desktop and narrow mobile widths before declaring it complete. Check spacing, wrapping, hierarchy, field/helper grouping, clipping, and touch targets; DOM checks alone do not establish layout quality. Record what was actually inspected in the commit message.
 - Use the development server for browser checks. Native AI, alarms, Android insets and install shortcuts require App² on Android and should be marked pending unless actually verified there.
 - Record only checks actually run, in the commit message. Add anything that needs Android verification to `docs/validation/device-checklist.md`. Do not export credentials or log tokens, callback URLs or account identifiers.
@@ -67,7 +68,7 @@ A version bump on `dev` is optional before publication, since App² offers any
 change to managed files.
 
 `manifest.json.app2Update` declares publisher identity and file ownership.
-`data/stories.json`, `data/settings.json`, `data/generation-checkpoints.json` and `data/usage.json` are user files seeded only when absent (usage seeds `{"version":1,"days":{}}`; updates preserve it and packaging never includes local usage).
+`data/stories.json`, `data/settings.json`, `data/generation-checkpoints.json`, `data/usage.json` and `data/learning-signals.json` are user files seeded only when absent (usage seeds `{"version":1,"days":{}}` and learning signals `{"version":1,"languages":{}}`; updates preserve them and packaging never includes local history).
 `data/learning-profiles.json` and `data/language-safeguards.json` are shipped managed definitions and updates with the
 code. All other unowned files remain untouched. Keep these declarations current.
 Existing saved records must remain readable; v1 has no general data migration. The one exception is a temporary

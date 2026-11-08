@@ -107,14 +107,38 @@ export function validUsage(value) {
     return total <= day.app;
   });
 }
+// Learning signals (PED-005): what the learner looked up and probably read, per language. Items are keyed
+// by glossary note identity or selection text; counts are open action keys so later actions stay readable.
+export const SIGNALS_VERSION = 1;
+export const SIGNALS_PATH = 'data/learning-signals.json';
+export const emptySignals = () => ({version:SIGNALS_VERSION, languages:{}});
+const count = value => Number.isSafeInteger(value) && value >= 0;
+const dateOrAbsent = value => absent(value) || typeof value === 'string' && dateKey(value);
+function validSignalItem(item) {
+  return object(item) && ['note','selection'].includes(item.kind) && typeof item.word === 'string'
+    && (absent(item.meaning) || typeof item.meaning === 'string')
+    && object(item.counts) && Object.entries(item.counts).every(([name, value]) => /^[a-z][a-z0-9-]{0,31}$/.test(name) && count(value))
+    && list(item.days, day => typeof day === 'string' && dateKey(day))
+    && dateOrAbsent(item.first) && dateOrAbsent(item.last) && dateOrAbsent(item.lastExposure)
+    && (absent(item.contexts) || list(item.contexts, context => object(context) && typeof context.sentence === 'string'))
+    && (absent(item.exposures) || count(item.exposures)) && (absent(item.seenSinceLookup) || count(item.seenSinceLookup));
+}
+export function validSignals(value) {
+  if (!object(value) || value.version !== SIGNALS_VERSION || !object(value.languages)) return false;
+  return Object.entries(value.languages).every(([code, language]) => /^[A-Za-z][A-Za-z0-9-]{0,15}$/.test(code) && object(language)
+    && (absent(language.items) || object(language.items) && Object.values(language.items).every(validSignalItem))
+    && (absent(language.reading) || object(language.reading) && Object.entries(language.reading).every(([key, day]) => dateKey(key) && object(day) && count(day.words) && count(day.paragraphs)))
+    && (absent(language.readMarks) || object(language.readMarks) && Object.values(language.readMarks).every(marks => object(marks) && Object.values(marks).every(day => typeof day === 'string' && dateKey(day)))));
+}
 // Optional stores never block generation, settings or stories when unreadable.
-export const optionalStore = path => path === USAGE_PATH;
+export const optionalStore = path => path === USAGE_PATH || path === SIGNALS_PATH;
 const CORE_STORES = ['data/stories.json', 'data/settings.json', 'data/generation-checkpoints.json'];
 const definitions = {
   'data/stories.json': {fallback:[], validate:validStories, migrate:migrateGlossaryAliases},
   'data/settings.json': {fallback:{}, validate:validSettings},
   'data/generation-checkpoints.json': {fallback:[], validate:validCheckpoints},
-  [USAGE_PATH]: {fallback:emptyUsage(), validate:validUsage}
+  [USAGE_PATH]: {fallback:emptyUsage(), validate:validUsage},
+  [SIGNALS_PATH]: {fallback:emptySignals(), validate:validSignals}
 };
 export function createWorkspaceStorage({read, write, exists}) {
   const entries = new Map();

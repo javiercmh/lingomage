@@ -161,11 +161,12 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   console.log('PASS speech uses explicit source locale and prefers Chilean, then Latin American, then available Spanish voices');
 
   let heard, finishSpeech, finishStop, stopped=0;
-  const revealed=[];const noteUi = sandbox({showExplanationForHelp:id=>revealed.push(id),state:{},readerStory:()=>({language:'ja'}),speech:{available:true,speak:options=>{heard=options;return new Promise(resolve=>{finishSpeech=resolve;});},stop:()=>new Promise(resolve=>{finishStop=()=>{stopped++;finishSpeech?.({status:'cancelled'});resolve();};})},window:{innerWidth:390,innerHeight:800},requestAnimationFrame:fn=>fn()});
+  const revealed=[],lookups=[];const noteUi = sandbox({recordNoteLookup:(notes,info,action)=>lookups.push([notes.map(note=>note.word).join(),action]),glossaryForTrigger:()=>null,showExplanationForHelp:id=>revealed.push(id),state:{},readerStory:()=>({language:'ja'}),speech:{available:true,speak:options=>{heard=options;return new Promise(resolve=>{finishSpeech=resolve;});},stop:()=>new Promise(resolve=>{finishStop=()=>{stopped++;finishSpeech?.({status:'cancelled'});resolve();};})},window:{innerWidth:390,innerHeight:800},requestAnimationFrame:fn=>fn()});
   const popover=noteUi.$('word-note-popover');popover.hidden=true;popover.style={};popover.getBoundingClientRect=()=>({bottom:150});
   const trigger=noteUi.document.createElement('span');trigger.getAttribute=name=>trigger.attributes[name];trigger.getBoundingClientRect=()=>({left:20,top:80,bottom:100});
   vm.runInContext(section('function closeWordNote(', 'function readerPanel('), noteUi);
   noteUi.showWordNote(trigger,[{word:'買う',meaning:'to buy',forms:['買います']}]);
+  assert.deepEqual(lookups,[['買う','note']],'opening a word note records one lookup (PED-005)');
   const listen=popover.childNodes[0].childNodes[0].childNodes[1];
   assert.match(cssSource,/\.word-note-listen\s*\{[^}]*color:\s*#bfdbfe;/,'idle note speaker uses the same bright color as chapter Listen');
   assert.match(cssSource,/\.word-note-listen\[data-playing="true"\]\s*\{\s*color:\s*var\(--muted\);/,'playing note speaker switches to the same muted color as chapter Listen');

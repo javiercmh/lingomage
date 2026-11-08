@@ -7,13 +7,15 @@ import { ai, readFile, writeFile, listFiles, speech, translation, selectionMenu 
 import { speakSelection, prepareSpeechOptions, speakChapter, chapterSpeechText } from './reader-speech.js';
 import { createSelectionMenuRouter } from './selection-menu.js';
 import { createReaderActivation, glossaryForTrigger, indexGlossaryTriggers, normalizeReaderControls } from './reader-activation.js';
-import { annotatedText, applyExplainedMarks, getCanonicalSelection, japaneseSegments } from './reader-text.js';
+import { annotatedText, applyExplainedMarks, findGlossaryMatches, getCanonicalSelection, japaneseSegments } from './reader-text.js';
 import { SPEECH_RATES, canonicalRange, createReaderPlayer, speechUnits } from './reader-player.js';
 import { createPipeline, pendingRequests } from './generation-pipeline.js';
 import { progressSummary } from './generation-progress.js';
 import { SAFEGUARD_VERSION, parseContent, validateStory } from './learning-validation.js';
 import { failureInfo, recoverySummary, appendFailureDetails } from './generation-errors.js';
-import { createWorkspaceStorage, createSettingsPersistence, optionalStore, USAGE_PATH } from './workspace-storage.js';
+import { createWorkspaceStorage, createSettingsPersistence, optionalStore, SIGNALS_PATH, USAGE_PATH } from './workspace-storage.js';
+import { createSignalsTracker } from './consultation-signals.js';
+import { SAMPLE_MS, createExposureTracker, paragraphRanges, visibleFraction, wordCount } from './reading-exposure.js';
 import { createUsageTracker } from './usage-tracker.js';
 import { RANGES, ACTIVITY_LABELS, summarize, formatDuration, hasUsage } from './usage-stats.js';
 import { saveBeforeAcknowledge } from './request-lifecycle.js';
@@ -212,6 +214,49 @@ const usage = createUsageTracker({persistence:{load:() => workspaceStorage.load(
 // Chapter audio keeps the story it started with, even if the reader changes while Stop is pending.
 let playbackContext = {storyId:'', language:''};
 const trackedSpeech = usage.trackSpeech(speech, () => playbackContext);
+// Lookup history and reading exposure (PED-005) are optional data like usage: recording never blocks reading.
+const signals = createSignalsTracker({persistence:{load:() => workspaceStorage.load(SIGNALS_PATH), save:value => workspaceStorage.save(SIGNALS_PATH, value)}, onStatus:status => renderLookupStatus(status)});
+function recordLookup(entry) { try { signals.record(entry); } catch (error) { console.error('Could not record lookup', error); } }
+function recordNoteLookup(notes, info, action) {
+  const story = readerStory(), version = story && activeVersion(activeChapter(story)); if (!version) return;
+  const sentence = info && Number.isInteger(info.start) ? sentenceContext(version.story, info.start, info.end) : '';
+  for (const note of notes) if (note?.word && note.meaning) recordLookup({language:story.language, kind:'note', word:note.word, meaning:note.meaning, action, sentence, where:`${story.id}/${version.id}`});
+}
+// Paragraphs on screen long enough to read count as exposure for tracked items (PED-005).
+const exposure = createExposureTracker({onRead:(paragraph, context) => {
+  try { signals.recordExposure({...context, paragraphIndex:paragraph.index, text:paragraph.text, words:paragraph.words, notes:paragraph.notes}); }
+  catch (error) { console.error('Could not record reading', error); }
+}});
+let exposureTimer = null, exposureListening = false;
+function listenForReading() {
+  if (exposureListening) return; exposureListening = true;
+  const interacted = () => exposure.interacted();
+  for (const type of ['pointerdown', 'keydown', 'wheel', 'touchstart']) $('reader-dialog').addEventListener(type, interacted, { passive: true });
+  const panel = readerPanel(); panel.addEventListener('scroll', interacted, { passive: true });
+}
+function startExposure(story, version) {
+  listenForReading();
+  const root = $('reader-story'), language = SPEECH_LANGUAGES[story.language] || story.language;
+  const matches = findGlossaryMatches(version.story, version.glossary || []);
+  const paragraphs = paragraphRanges(version.story).map(paragraph => ({...paragraph, words:wordCount(paragraph.text, language),
+    notes:matches.filter(match => match.start >= paragraph.start && match.end <= paragraph.end).flatMap(match => match.notes.map(note => ({word:note.word, meaning:note.meaning, count:1})))}));
+  exposure.start({paragraphs, context:{language:story.language, storyId:story.id, versionId:version.id}, measure:paragraph => {
+    const box = canonicalRange(root, paragraph.start, paragraph.end)?.getBoundingClientRect(), panel = readerPanel().getBoundingClientRect();
+    return visibleFraction(box, {top:Math.max(0, panel.top), bottom:Math.min(window.innerHeight, panel.bottom)});
+  }});
+  if (!exposureTimer) {
+    exposureTimer = setInterval(() => { try { if ($('reader-dialog').open) exposure.sample(document.visibilityState === 'visible'); } catch (error) { console.error('Could not measure reading', error); } }, SAMPLE_MS);
+    if (typeof exposureTimer === 'object') exposureTimer?.unref?.();
+  }
+}
+function stopExposure() { exposure.stop(); if (exposureTimer) clearInterval(exposureTimer); exposureTimer = null; }
+function recordSelectionLookup(passage, action) {
+  if (!passage || passage.kind === 'title' || !passage.text?.trim()) return;
+  const story = state.stories.find(item => item.id === passage.storyId) || readerStory();
+  const version = story?.chapters?.find(item => item.id === passage.chapterId)?.versions.find(item => item.id === passage.versionId);
+  const sentence = passage.sentence || (version && Number.isInteger(passage.start) ? sentenceContext(version.story, passage.start, passage.end) : '');
+  recordLookup({language:passage.language || story?.language, kind:'selection', word:passage.text, action, sentence, where:`${passage.storyId}/${passage.versionId}`});
+}
 // What this version loads into runtime state. Every other entry in settings.json is preserved by saves.
 const SETTINGS_ADMIT = {
   targetLanguages: code => Object.hasOwn(LEVELS, code),
@@ -383,6 +428,71 @@ $('usage-retry').addEventListener('click', () => {
   if (ok) { statsSignature = ''; renderStats(); $('usage-ranges').querySelector('[tabindex="0"]')?.focus(); }
 });
 renderUsageStatus(usage.status);
+// "Most looked up" (PED-005): per-language disclosure with the top items and an in-app clear confirmation.
+const LOOKUP_LIMIT = 10;
+const openLookups = new Set();
+let confirmingLookupClear = '';
+const lookupDate = key => new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${key}T00:00:00Z`));
+function renderLookupStatus(status) {
+  const message = status.blocked ? `${status.loadError} Lookups are still counted for this session but are not saved until the file loads.`
+    : status.saveError ? 'Lookup history could not be saved. New lookups are kept in memory and saved together once writing works.' : '';
+  $('lookups-notice').hidden = !message;
+  if ($('lookups-notice-message').textContent !== message) $('lookups-notice-message').textContent = message;
+  $('lookups-retry').textContent = status.blocked ? 'Retry loading' : 'Retry save';
+}
+$('lookups-retry').addEventListener('click', () => {
+  const blocked = signals.status.blocked, ok = blocked ? signals.retryLoad() : signals.retrySave();
+  $('lookups-retry-note').textContent = ok ? '' : blocked ? 'Still unreadable. Repair data/learning-signals.json, then try again.' : 'Still could not save. Your lookups are kept.';
+  if (ok) renderLookups();
+});
+renderLookupStatus(signals.status);
+function renderLookups() {
+  const content = $('lookups-content'); content.textContent = '';
+  const text = (tag, className, value) => Object.assign(document.createElement(tag), { className, textContent: value });
+  const card = document.createElement('section'); card.className = 'panel stats-section lookup-section'; content.append(card);
+  const codes = [...new Set([...state.languageOrder, ...Object.keys(signals.data.languages)])].filter(code => signals.ranked(code, 1).length);
+  if (!codes.length) { card.append(text('h4', 'settings-section-label', 'Nothing looked up yet'), text('p', 'helper', 'Tap an underlined word or explain a passage while reading, and it appears here.')); return; }
+  const list = document.createElement('ul'); list.className = 'stats-list'; card.append(list);
+  for (const code of codes) {
+    const ranked = signals.ranked(code), label = LANGUAGES[code] || code, key = `lookups-${code}`;
+    const item = document.createElement('li'); item.className = 'stats-group stats-language';
+    const toggle = document.createElement('button'), body = document.createElement('div');
+    toggle.type = 'button'; toggle.className = 'stats-language-toggle'; toggle.dataset.key = key;
+    body.id = key; body.className = 'lookup-body'; body.hidden = !openLookups.has(code); toggle.setAttribute('aria-controls', key);
+    const chevron = text('span', 'stats-chevron', '⌄'); chevron.setAttribute('aria-hidden', 'true');
+    const count = `${ranked.length} ${ranked.length === 1 ? 'item' : 'items'}`;
+    toggle.append(text('span', '', label), text('span', '', count), chevron);
+    const sync = () => { toggle.setAttribute('aria-expanded', String(!body.hidden)); toggle.setAttribute('aria-label', `${label}, ${count}. ${body.hidden ? 'Show' : 'Hide'} lookups`); };
+    toggle.addEventListener('click', () => { body.hidden = !body.hidden; if (body.hidden) openLookups.delete(code); else openLookups.add(code); sync(); });
+    sync();
+    const entries = document.createElement('ol'); entries.className = 'lookup-list';
+    for (const entry of ranked.slice(0, LOOKUP_LIMIT)) {
+      const row = document.createElement('li'); row.className = 'lookup-item';
+      const word = text('span', 'lookup-word', entry.word); word.lang = SPEECH_LANGUAGES[code] || code;
+      row.append(word);
+      if (entry.meaning) row.append(text('span', 'lookup-meaning', entry.meaning));
+      row.append(text('span', 'lookup-meta', `Looked up ${entry.lookups}× · seen ${entry.exposures || 0}× · last ${lookupDate(entry.last)}`));
+      entries.append(row);
+    }
+    body.append(entries);
+    const clear = document.createElement('div'); clear.className = 'lookup-clear';
+    if (confirmingLookupClear === code) {
+      const question = text('p', 'helper', `Clear ${label} lookup and reading history? This cannot be undone.`);
+      const yes = text('button', 'danger-btn', 'Clear'), no = text('button', 'secondary-btn', 'Cancel');
+      yes.type = no.type = 'button';
+      yes.addEventListener('click', () => { confirmingLookupClear = ''; if (!signals.clearLanguage(code)) toast('Could not clear lookup history.'); renderLookups(); });
+      no.addEventListener('click', () => { confirmingLookupClear = ''; renderLookups(); content.querySelector(`[data-clear="${code}"]`)?.focus(); });
+      clear.append(question, yes, no);
+    } else {
+      const button = text('button', 'small-btn lookup-clear-btn', `Clear ${label} history`); button.type = 'button'; button.dataset.clear = code;
+      button.disabled = signals.status.blocked;
+      button.addEventListener('click', () => { confirmingLookupClear = code; renderLookups(); content.querySelector('.lookup-clear .danger-btn')?.focus(); });
+      clear.append(button);
+    }
+    body.append(clear);
+    item.append(toggle, body); list.append(item);
+  }
+}
 function toast(message) {
   const el = $('toast');
   ([...document.querySelectorAll('dialog[open]')].at(-1) || document.body).append(el);
@@ -399,7 +509,7 @@ function setView(name) {
   });
   document.querySelectorAll('.view').forEach(view => view.classList.toggle('active', view.id === `view-${name}`));
   if (name === 'library') renderLibrary();
-  if (name === 'profile') { renderStats(); startStatsRefresh(); } else stopStatsRefresh();
+  if (name === 'profile') { renderStats(); renderLookups(); startStatsRefresh(); } else stopStatsRefresh();
   if (name === 'profile' || name === 'settings') { if (name === 'profile') renderTargetLanguageSettings(); if (state.storageBlocked) showStorageErrors(); }
   window.scrollTo(0, 0);
   renderReaderGeneration();
@@ -1307,6 +1417,7 @@ function updateReader(keepNavigation = false) {
   $('reader-story').classList.toggle('hide-furigana', story.language === 'ja' && !state.furigana);
   $('furigana-control').hidden = story.language !== 'ja'; $('furigana-toggle').checked = state.furigana;
   renderSavedHelp(chapter, version);
+  startExposure(story, version);
   $('selection-toolbar').hidden = true; state.readerSelection = null;
   renderPendingReaderResult();
   renderChapterRequest(); renderReaderActions(); renderReaderGeneration();
@@ -1343,6 +1454,7 @@ function showWordNote(trigger, notes, surface = '', helpId = '') {
   const popover = $('word-note-popover');
   if (!popover.hidden && trigger.getAttribute('aria-expanded') === 'true') { closeWordNote(); return; }
   closeWordNote(); popover.textContent = '';
+  recordNoteLookup(notes, glossaryForTrigger(trigger), 'note');
   for (const note of notes) {
     const item = document.createElement('p'); item.className = 'word-note-entry';
     // Lead with the wording as it appears in the text, so Listen plays the real text; the dictionary form follows.
@@ -1376,6 +1488,7 @@ function showWordNote(trigger, notes, surface = '', helpId = '') {
         return;
       }
       const run = ++wordNoteSpeechRun;
+      recordNoteLookup([note], glossaryForTrigger(trigger), 'listen');
       const previous = wordNoteSpeechButton;
       if (previous) {
         wordNoteSpeechButton = null;
@@ -1457,7 +1570,7 @@ function openReader(story) {
   selectionMenuRouter.reset(); $('reader-dialog').showModal(); usage.setReader({ storyId: story.id, language: story.language }); readerPanel().scrollTop = position?.scrollTop || 0; updateReaderNavigation(); renderGenerationRecovery(); settingsFeedback.sync();
 }
 $('reader-dialog').addEventListener('close', () => {
-  usage.setReader(null);
+  usage.setReader(null); stopExposure();
   settingsFeedback.sync();
   if (state.readerHistoryEntry && !state.switchingReader) { state.readerHistoryEntry = false; history.back(); }
   if ($('reader-removal-dialog').open) $('reader-removal-dialog').close();
@@ -2235,7 +2348,7 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
       const helpInput={ action, language:LANGUAGES[story.language], languageCode:story.language, difficulty:story.difficulty, sourceText:version.story, start:passage.start, end:passage.end, passage:passage.text, ...context, profile:passage.profile, followUp, previousExplanation };
       if (action === 'examples') {
         const op=await runContentOperation({kind:'examples',language:story.language,input:helpInput,instructions:helpInstructions(action),config:{providerId,model,reasoning},target:{storyId:story.id,chapterId:chapter.id,versionId:version.id,helpId:existingHelp.id,start:passage.start,end:passage.end,passage:passage.text}});
-        clearLoading(); showOperationResult(op); return;
+        clearLoading(); recordSelectionLookup(passage, 'examples'); showOperationResult(op); return;
       }
       const result = decodeHelp(await readerAi(kind, helpInput, helpInstructions(action), helpRequest.loading, {
         providerId, model, reasoning, onTaskStarted
@@ -2267,6 +2380,7 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
       if (state.readerId === story.id && activeChapter().id === chapter.id && activeVersion().id === version.id) {
         renderSavedHelp(chapter, version); readerPanel().scrollTop = scrollTop;
       }
+      recordSelectionLookup(passage, action === 'initial' ? 'explain' : action);
       toast('Explanation saved');
     } catch (error) {
       clearLoading();
@@ -2333,9 +2447,11 @@ $('selection-translate').addEventListener('click', () => {
     const passage = state.readerSelection;
     if (!passage || translationLaunching || translationAvailability !== 'available') return;
     translationLaunching = true; renderTranslationButton();
-    try { await translation.open({ text: passage.text }); }
+    let opened = false;
+    try { await translation.open({ text: passage.text }); opened = true; }
     catch (error) { toast(`Could not open translator: ${error.message}`); }
     finally { translationLaunching = false; renderTranslationButton(); }
+    if (opened) recordSelectionLookup(passage, 'translate');
   });
 });
 $('selection-speak').addEventListener('click', () => {

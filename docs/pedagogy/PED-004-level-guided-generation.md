@@ -42,3 +42,7 @@ Separate contextual notes refinement — 2026-10-13: chapter generation now runs
 After notes selection, the development `prose` suite can compare current and candidate planning/writing prompts on matched briefs and fixed follow-up contexts, using the same explicitly selected notes prompt for both. The candidate uses existing `guidance` to identify likely vocabulary/construction load problems and accessible ways to express the brief. The writer internally checks avoidable difficulty against the guide while preserving natural language and optional practice focuses. Schemas, stages and request counts remain unchanged. These are product hypotheses, not evidence of certified alignment or proven learning effects; existing research citations and limitations still apply.
 
 No prose candidate is shipped or evaluated yet. Promotion is conditional on notes selection and separate level-fit, naturalness and continuity review, and requires a new `PROMPT_VERSION`. See [comparison instructions](../validation/generation-evaluation/contextual-notes/README.md).
+
+### Lookup signals do not change the level — 2026-11-08
+
+[PED-005](PED-005-consultation-signals.md) records lookups and probable reading. These signals may inform a future learner-initiated analysis, but the self-selected reading target remains authoritative: nothing changes the level, generation guidance or language plan automatically.

@@ -71,3 +71,7 @@ Code: [App² reader](../../js/app.js), [canonical reader text](../../js/reader-t
 Keep help opt-in and brief. Revisit focus and follow-up interaction after qualified language review and learner evaluation. Revisit the ruby selection implementation if Android testing shows visible furigana blocks reliable selection of the base text; disabling furigana is not a selection workaround.
 
 Reader behavior is covered by the regression suites in `tests/` (including `tests/reader-regression.cjs`). Android selection, native speech timing, stop latency, playback gaps and ruby rendering are pending in the [device checklist](../validation/device-checklist.md); content review remains pending until actually performed.
+
+### Lookup history — 2026-11-08
+
+Opening a word note, Listen on a note, saved explanations, follow-ups, examples and opened device translations are now recorded locally as lookups under [PED-005](PED-005-consultation-signals.md). Help content, prompts and `PROMPT_VERSION` are unchanged. A lookup records that the learner checked something; it is not treated as evidence that a word is unknown.

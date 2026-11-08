@@ -8,6 +8,7 @@ This workspace is a plain HTML/CSS/JavaScript subapp. `manifest.json` lists the 
 - `data/settings.json` stores the selected model and reasoning preference. ChatGPT credentials remain in App² and are not exposed to the subapp.
 - Japanese uses language planning, canonical prose, contextual notes and app-owned kanji reading requests; validated stages save before acknowledgement. Japanese `story` and `title` remain the canonical strings. `storySegments` and `titleSegments` add optional reading annotations for display. Copying uses canonical text and excludes readings.
 - `data/usage.json` stores compact daily time aggregates (milliseconds by local date, language and activity); seed it empty.
+- `data/learning-signals.json` stores local lookup history and probable-reading aggregates per language (PED-005); seed it empty.
 - `data/generation-checkpoints.json` stores unfinished generation stages and captured context; seed it empty. `data/language-safeguards.json` is a managed definition.
 - Russian output is validated as Cyrillic. English glossary meanings are retained for all four target languages.
 
@@ -19,7 +20,7 @@ Connect ChatGPT through App² library **Settings → AI**. Browser preview suppo
 
 ## Local preview
 
-Run `python3 dev_server.py --mock-ai` from this workspace for offline development, or `python3 dev_server.py --chatgpt` after `codex login` for live desktop inference. The server binds to localhost and implements the starter file bridge so JSON data is saved to actual workspace files. Native Android behavior and App² safe-area insets are not validated by this preview.
+Run `python3 dev_server.py --mock-ai` from this workspace for offline development, or `python3 dev_server.py --chatgpt` after `codex login` for live desktop inference. The server binds to localhost and implements the starter file bridge. App files are read from the workspace, while learner files (`seedFiles`) are kept in the gitignored `.dev-data/` folder, seeded from `seedDefaults`, so committed seeds stay empty; delete it to start over. Native Android behavior and App² safe-area insets are not validated by this preview.
 
 ## App updates
 
@@ -48,7 +49,7 @@ A version bump on `dev` is optional before publication, since App² offers any
 change to managed files.
 
 `manifest.json.app2Update` declares publisher identity and file ownership.
-`data/stories.json`, `data/settings.json`, `data/generation-checkpoints.json` and `data/usage.json` are user files seeded only when absent. Usage is seeded as `{"version":1,"days":{}}`, preserved by updates and never packaged from local history.
+`data/stories.json`, `data/settings.json`, `data/generation-checkpoints.json`, `data/usage.json` and `data/learning-signals.json` are user files seeded only when absent. Usage is seeded as `{"version":1,"days":{}}` and learning signals as `{"version":1,"languages":{}}`; both are preserved by updates and never packaged from local history.
 `data/learning-profiles.json` and `data/language-safeguards.json` are shipped managed definitions and updates with the
 code. All other unowned files remain untouched. Keep these declarations current.
 Existing saved records must remain readable; v1 has no general data migration. The one exception is a temporary

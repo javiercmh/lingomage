@@ -19,7 +19,7 @@ function build() {
     return elements.get(id);
   };
   const context = {log, history, state: {readerPositions: {}, readerEditDraft: null, readerId: null}, $: element, window: {addEventListener: (type, fn) => (listeners[type] ||= []).push(fn)},
-    selectionMenuRouter: {reset() {}}, usage: {setReader() {}}, settingsFeedback: {sync() {}}, readerPanel: () => element('panel'),
+    selectionMenuRouter: {reset() {}}, usage: {setReader() {}}, stopExposure() {}, settingsFeedback: {sync() {}}, readerPanel: () => element('panel'),
     closeStoryMenu() {}, clearExplanationSelection() {}, normalizeChapters: s => s.chapters, pathChapters: () => [{id: 'c1'}], selectedPath: () => ({id: 'p'}), updateReader() {}, updateReaderNavigation() {}, renderGenerationRecovery() {},
     closeReaderPanels() {}, closeReaderActions() {}, stopSpeech() {}, closeWordNote() {}, rememberReaderPosition() {}, persistReaderPosition() {}, setView: name => log.views.push(name), showEditPanel() {}};
   vm.createContext(context);

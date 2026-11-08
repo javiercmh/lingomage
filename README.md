@@ -37,7 +37,7 @@ Plain HTML, CSS and JavaScript, with no build step. To preview in your browser (
 python3 dev_server.py --mock-ai
 ```
 
-Then open [localhost:8888](http://localhost:8888). To run all checks (also needs Node.js 22.12+):
+Then open [localhost:8888](http://localhost:8888). Your test stories and settings are kept in `.dev-data/`, which Git ignores. To run all checks (also needs Node.js 22.12+):
 
 ```sh
 python3 scripts/check.py

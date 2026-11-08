@@ -16,6 +16,7 @@ Only `js/bridge.js` calls host capabilities. App² owns production AI configurat
 - `data/settings.json`: models/reasoning, language enablement, standardized reading targets, retained legacy self-assessments, regional preferences and reading preferences.
 - `data/generation-checkpoints.json`: at most one unfinished content operation, seeded empty. Captures ID, kind, destination/path lineage, learner input, prompt and safeguard versions, AI configuration, scope, stage, validated language plan/content and outstanding request ID. No credentials are included.
 - `data/usage.json`: versioned time-tracking aggregates, seeded `{"version":1,"days":{}}`; see [Time tracking](#time-tracking).
+- `data/learning-signals.json`: versioned lookup history and probable-reading aggregates per language, seeded `{"version":1,"languages":{}}`; see [Lookup history and reading exposure](#lookup-history-and-reading-exposure).
 - Library activity: `lastActivityAt` is an optional, story-level ISO string in `data/stories.json`, written in the same save as new content and used only for Library ordering and the "Updated" label (`js/library-activity.js`). It is stamped when a new story is first saved, together with optional `lastActivityKind: "created"` (so the story reads "Created", not "Updated", while `createdAt` and provenance keep the operation start time), and when a continue, rewrite, examples, explanation or detail result is saved (kind `updated`); it is rolled back (restoring the previous values or their absence) with the content if the save fails. Creation is idempotent by operation ID and does not restamp. It is not stamped by opening, scrolling, saving reader positions, pre-request saves, path switching, removals, deleting stories, failed, cancelled or discarded requests, or checkpoint stages; re-applying an operation does not restamp, and a failed host acknowledgement after a successful save keeps the stamp. Opens are not tracked. Stories without it derive activity from the latest valid `createdAt` of the story, chapters, versions, explanations and follow-ups; invalid values and values more than a day in the future are ignored, and a malformed field never makes the store unreadable. Limits: derived times for versions and examples are operation start times, a story created by a resumed or recovered request keeps its start time as `createdAt` (and its "Created" date) while its save time ranks it, and deleting the newest content can lower a legacy story's derived activity (an explicit stamp is never lowered). The field is presentation-only: operation provenance, `PROMPT_VERSION` and prompts are unchanged, no migration is needed, and nothing is backfilled; stories without the kind field read as before. At the time of writing the repository seed is empty, so these structures were derived from the code paths that write them rather than from learner data.
 - `data/learning-profiles.json` and `data/language-safeguards.json`: shipped managed definitions.
 
@@ -108,3 +109,35 @@ My practice in Profile (third navigation tab) shows Today, Last 7 days (today pl
 **Storage.** `data/usage.json` is `{"version":1,"days":{"YYYY-MM-DD":{"app":ms,"languages":{"de":{"reading":ms}}}}}`, integer milliseconds, unknown fields tolerated, no backfill. `validUsage` in `js/workspace-storage.js` checks the version, calendar dates, whole non-negative milliseconds, safe language/activity keys and that tracked activity cannot exceed app time. Counters live in memory; the whole file is rewritten (never appended) every 30 s only when something changed and immediately on every visibility or pagehide notification (repeats flush any unsaved time without double counting; no-op writes are skipped), reader open/close, and audio pause, stop, cancel or error, plus once when a whole listening run (chapter) ends; an ordinary successful sentence or utterance completion does not save, so a long run writes only at the 30 s checkpoints and at its end. There is no per-day cap: a local date can repeat when the clock or timezone moves backwards, so one key may exceed 24 h. Usage is an optional store: when the file is unreadable it is preserved byte-for-byte, a Stats notice names it with Retry loading, time keeps counting in memory for the session, and stories, settings and generation are unaffected (`assertWritable()` covers only the three required stores and the Workspace needs attention panel ignores it). After repair, Retry loading adds the counted time to the repaired file. A failed write keeps the counters in memory; the next success writes the cumulative total once, and Stats offers Retry save. Warnings appear only in Stats. Story deletion, language disabling and app updates never touch history. Tests use injected clocks, calendar, persistence, scheduler and speech; `tests/usage-tracking.mjs` also covers a synthetic six-year history. Native App² storage atomicity and write latency for a multi-year file are unverified.
 
 The Stats content region is not a live region and is replaced only when its formatted figures change (refresh while visible every 10 s), so keyboard focus on the period buttons and screen-reader output are undisturbed. Until a minute has been counted the view shows an empty state. Durations read “Less than 1 minute”, “5 minutes”, “1 hour 5 minutes”.
+
+## Lookup history and reading exposure
+
+[PED-005](../pedagogy/PED-005-consultation-signals.md). `data/learning-signals.json` has the shape `{"version":1,"languages":{"de":{"items":{…},"reading":{"YYYY-MM-DD":{"words":n,"paragraphs":n}},"readMarks":{"storyId/versionId":{"paragraphIndex":"YYYY-MM-DD"}}}}}`.
+
+**Items.** Each item is keyed `note:<headword>|<meaning>` (NFC) or `sel:<normalized lowercase selection>`. It stores:
+- the kind, the word (canonical text without readings) and the meaning
+- per-action counts (`note`, `listen`, `explain`, `detail`, `examples`, `translate`)
+- the distinct days it was looked up, plus first and last dates
+- up to three recent context sentences
+- total exposures, encounters since the last lookup, and the last exposure date
+
+**Writes.** `js/consultation-signals.js` rewrites the whole file after each recorded change.
+- The same item and action within two minutes counts once.
+- Recording happens only after the user action succeeds: explanations and follow-ups after the result is saved, Translate after the translator opens.
+- Title selections are never recorded.
+
+**Probable reading.** `js/reading-exposure.js` samples once per second while a chapter is shown. A paragraph is any run of text between line breaks.
+- Dwell time accrues only while the page is visible, the learner interacted within 60 s and at least half the paragraph, or half the viewport, is visible. Gaps between samples longer than 5 s are discarded.
+- A paragraph counts once its dwell reaches word count ÷ 400 wpm, never less than 1.5 s. Words are counted with `Intl.Segmenter`.
+- It then counts at most once per version and local day.
+- Glossary occurrences come from `findGlossaryMatches`.
+
+**Optional store.** The rules match usage history:
+- An unreadable file is preserved and blocks only its own saves. The profile shows a notice with Retry loading or Retry save, and lookups keep counting in memory and are merged after repair.
+- Stories, settings and generation are unaffected, and so is the Workspace needs attention panel.
+- Story deletion and language disabling never touch it. Clear history removes one language after an in-app confirmation.
+
+**Size.** There are no caps. The file holds only items the learner touched, a few hundred bytes each.
+
+Native write latency and the dwell rules on Android are unverified.
+

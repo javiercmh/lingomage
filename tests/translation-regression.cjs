@@ -20,12 +20,12 @@ function harness(channel) { const c = {window: {AppTranslation: channel}, setTim
    setAttribute(key,value){this.attributes[key]=value;}, getAttribute(key){return this.attributes[key] ?? null;},
    addEventListener(type, fn) { this[type] = fn; }
  }]));
- const events = {}, checks = [], launches = [], messages = [];
+ const events = {}, checks = [], launches = [], messages = [], lookups = [];
  let passage = {text:'大学', start:0, end:2, storyId:'s', chapterId:'c', versionId:'v', rect:{left:10,top:100}};
  const deferred = () => {let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
  const c = {document:{hidden:false,addEventListener(type,fn){events[type]=fn;}}, window:{innerWidth:400},
    state:{readerSelection:null}, positionSelectionToolbar(){}, $:id=>buttons[id], selectedPassage:()=>passage, closeWordNote(){},
-   speech:{available:true}, toast:message=>messages.push(message),
+   speech:{available:true}, toast:message=>messages.push(message), recordSelectionLookup:(item,action)=>lookups.push(action),
    translation:{availability(){const d=deferred();checks.push(d);return d.promise;},open(options){const d=deferred();d.options=options;launches.push(d);return d.promise;}}
  };
  vm.createContext(c);
@@ -54,7 +54,7 @@ function harness(channel) { const c = {window: {AppTranslation: channel}, setTim
  checks[3].resolve({available:true});await flush();checks[2].resolve({available:false});await flush();assert.equal(button.disabled,false,'stale negative ignored');
  passage={...passage,start:8};c.showSelectionToolbar();c.document.hidden=true;events.visibilitychange();
  c.document.hidden=false;events.visibilitychange();checks[4].resolve({available:false});await flush();assert.equal(button.disabled,false,'background check invalidated');
- button.click();await flush();launches[20].reject(new Error('Launch failed'));await flush();assert.equal(button.disabled,false);assert.equal(messages.length,1);
+ button.click();await flush();launches[20].reject(new Error('Launch failed'));await flush();assert.equal(button.disabled,false);assert.equal(messages.length,1);assert.equal(lookups.length,20,'only opened launches record a lookup');
  passage={...passage,start:9};c.showSelectionToolbar();checks[5].resolve({available:false});await flush();assert.equal(button.disabled,true);
  passage={...passage,start:10};c.showSelectionToolbar();checks[6].reject(new Error('network'));await flush();assert.equal(button.disabled,true);
  passage={...passage,start:11};c.showSelectionToolbar();checks[7].resolve({available:true});await flush();assert.equal(button.disabled,false);

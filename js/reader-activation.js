@@ -23,7 +23,7 @@ export function indexGlossaryTriggers(root, canonical, glossary = []) {
         const match = matches.filter(item => item.start <= offset && offset < item.end).sort((a, b) => (a.end - a.start) - (b.end - b.start))[0];
         if (match) {
           if (!primaries.has(match)) primaries.set(match, child);
-          triggerNotes.set(child, { trigger: primaries.get(match), notes: match.notes, surface: canonical.slice(match.start, match.end) });
+          triggerNotes.set(child, { trigger: primaries.get(match), notes: match.notes, surface: canonical.slice(match.start, match.end), start: match.start, end: match.end });
         }
       }
       visit(child);

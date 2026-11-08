@@ -47,7 +47,8 @@ const context = {
     onTaskStarted();
     return pending.generation.promise;
   },
-  toast: message => toasts.push(message)
+  toast: message => toasts.push(message),
+  recordSelectionLookup() {}
 };
 vm.createContext(context);
 vm.runInContext(app.slice(helperStart, actionsStart) + app.slice(actionsStart, actionsEnd), context);

@@ -56,11 +56,13 @@ def main():
         if name.startswith('js/') and name.endswith('.js'):
             for imported in re.findall(r"from\s+'\./([^']+)'", (ROOT / name).read_text(encoding='utf-8')):
                 assert 'js/' + imported in files, name + ' imports a module outside the manifest: ' + imported
-    for name in ['data/stories.json', 'data/settings.json', 'data/generation-checkpoints.json', 'data/usage.json']:
+    for name in ['data/stories.json', 'data/settings.json', 'data/generation-checkpoints.json', 'data/usage.json', 'data/learning-signals.json']:
         assert name in update['seedFiles']
     assert update['seedDefaults']['data/generation-checkpoints.json'] == []
     assert update['seedDefaults']['data/usage.json'] == {'version': 1, 'days': {}}
-    for name in ['js/usage-stats.js', 'js/usage-tracker.js']:
+    assert update['seedDefaults']['data/learning-signals.json'] == {'version': 1, 'languages': {}}
+    assert json.loads((ROOT / 'data/learning-signals.json').read_text(encoding='utf-8')) == {'version': 1, 'languages': {}}, 'Learner lookup history must not be committed'
+    for name in ['js/usage-stats.js', 'js/usage-tracker.js', 'js/consultation-signals.js', 'js/reading-exposure.js']:
         assert name in update['managedFiles']
     for name in ['js/learning-validation.js', 'js/generation-pipeline.js', 'data/language-safeguards.json']:
         assert name in update['managedFiles']

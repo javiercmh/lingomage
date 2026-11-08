@@ -30,3 +30,9 @@ dist/
 
 # Raw learning-quality evaluation runs (development-only; never packaged or committed)
 docs/validation/generation-evaluation/ai-evals/runs/
+
+# Local assistant tool configuration
+.claude/
+
+# Development server learner data (stories, settings, history)
+.dev-data/

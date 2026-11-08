@@ -74,6 +74,7 @@ not systematic, unless a review says otherwise.
 | Learner self-report and levels | [Reading self-assessment](self-assessment.md), [level descriptors](level-descriptors.md) | [PED-001](../pedagogy/PED-001-learner-self-report.md) |
 | Generation at a target level | [Level-guided generation](level-guided-generation.md) | [PED-004](../pedagogy/PED-004-level-guided-generation.md) |
 | Reading support, glossing, extensive reading and repeated encounters | [Reading and glossing](reading-and-glossing.md), [lexical-unit terminology](lexical-units.md) | [PED-002](../pedagogy/PED-002-contextual-reading-support.md) |
+| Lookups, probable-reading exposure and learner modelling | [Consultation signals](consultation-signals.md) | [PED-005](../pedagogy/PED-005-consultation-signals.md) |
 | Spaced retrieval and review (not implemented) | [Retrieval and spacing](retrieval-and-spacing.md) | [Strategy](../product/evidence-informed-strategy.md) |
 | Explicit instruction, corrective feedback, listening and production (not implemented) | [Instruction, feedback and production](instruction-feedback-and-production.md) | [Strategy](../product/evidence-informed-strategy.md) |
 | Retention, transfer, spontaneous production and measurement (not implemented) | [Outcomes and measurement](outcomes-and-measurement.md) | [Learning outcomes and evaluation](../product/learning-outcomes-and-evaluation.md) |

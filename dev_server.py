@@ -35,9 +35,24 @@ def atomic_write(path, content):
             temporary.unlink(missing_ok=True)
 
 
+LOCAL_DATA_DIR = '.dev-data'
+DEV_PREFERENCES = 'data/dev-preferences.json'
+
+
 class DevServer(HTTPServer):
     def __init__(self, address, workspace, ai_mode='off', codex='codex'):
         self.workspace = Path(workspace).resolve()
+        # Learner files (the manifest's seedFiles) live in a gitignored folder, seeded from seedDefaults like a
+        # fresh App² install, so browser sessions never change the committed seeds.
+        self.local_data = self.workspace / LOCAL_DATA_DIR
+        manifest = self.workspace / 'manifest.json'
+        update = json.loads(manifest.read_text('utf-8')).get('app2Update', {}) if manifest.is_file() else {}
+        self.seed_defaults = {name: update.get('seedDefaults', {}).get(name) for name in update.get('seedFiles', [])}
+        self.redirected = set(self.seed_defaults) | {DEV_PREFERENCES}
+        for name, default in self.seed_defaults.items():
+            path = self.local_data / name
+            if default is not None and not path.exists():
+                atomic_write(path, (json.dumps(default, indent=2) + '\n').encode('utf-8'))
         self.ai_mode = ai_mode
         self.requests = {}
         self.request_lock = threading.Lock()
@@ -250,6 +265,11 @@ class Handler(SimpleHTTPRequestHandler):
             raise PermissionError('Path escapes workspace')
         return path
 
+    def data_path(self, name):
+        path = self.workspace_path(name)
+        relative = path.relative_to(self.server.workspace).as_posix()
+        return self.server.local_data / relative if relative in self.server.redirected else path
+
     def reply(self, value, status=200, raw=False):
         content = value.encode('utf-8') if raw else json.dumps(value).encode('utf-8')
         self.send_response(status)
@@ -261,10 +281,14 @@ class Handler(SimpleHTTPRequestHandler):
     def files(self):
         result = []
         for path in sorted(self.server.workspace.rglob('*')):
+            if path.is_relative_to(self.server.local_data):
+                continue
+            name = path.relative_to(self.server.workspace).as_posix()
+            if name in self.server.redirected:
+                path = self.server.local_data / name
             if path.is_file() and path.resolve().is_relative_to(self.server.workspace):
                 stat = path.stat()
-                result.append(dict(name=path.relative_to(self.server.workspace).as_posix(),
-                                   size=stat.st_size, lastModified=int(stat.st_mtime * 1000)))
+                result.append(dict(name=name, size=stat.st_size, lastModified=int(stat.st_mtime * 1000)))
         return result
 
     def do_GET(self):
@@ -309,7 +333,7 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError('Expected AI command object')
                 return self.ai(command)
             if action in {'readFile', 'writeFile', 'writeFileBase64', 'deleteFile'}:
-                path = self.workspace_path(param('name'))
+                path = self.data_path(param('name'))
                 if action == 'readFile' and not post:
                     return self.reply(path.read_text('utf-8') if path.is_file() else '', raw=True)
                 if action == 'deleteFile' and post:
@@ -328,7 +352,7 @@ class Handler(SimpleHTTPRequestHandler):
                     atomic_write(path, body)
                     return self.reply(True)
             if action in {'loadState', 'saveState', 'removeState'}:
-                path = self.workspace_path('data/dev-preferences.json')
+                path = self.data_path(DEV_PREFERENCES)
                 prefs = json.loads(path.read_text('utf-8')) if path.exists() else {}
                 if action == 'loadState' and not post:
                     return self.reply(prefs.get(param('key'), param('fallback')), raw=True)
@@ -648,7 +672,8 @@ if __name__ == '__main__':
             parser.error(str(error))
     with server:
         print(f'LingoMage: http://localhost:{server.server_port}', flush=True)
-        print(f'Reading and writing real files in: {server.workspace}', flush=True)
+        print(f'Serving app files from: {server.workspace}', flush=True)
+        print(f'Learner data (stories, settings, history): {server.local_data}', flush=True)
         if ai_mode == 'mock':
             print('Development mock AI: enabled (offline; no provider usage)', flush=True)
         elif ai_mode == 'chatgpt':

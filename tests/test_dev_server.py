@@ -111,6 +111,39 @@ class DevelopmentServerTests(unittest.TestCase):
         atomic_write(path, '日本語'.encode('utf-8'))
         self.assertEqual(path.read_text('utf-8'), '日本語')
 
+    def test_learner_files_live_outside_committed_seeds(self):
+        root = self.root / 'workspace'
+        (root / 'data').mkdir(parents=True)
+        (root / 'manifest.json').write_text(json.dumps({'app2Update': {
+            'seedFiles': ['data/stories.json', 'data/usage.json'],
+            'seedDefaults': {'data/stories.json': [], 'data/usage.json': {'version': 1, 'days': {}}}}}), encoding='utf-8')
+        (root / 'data' / 'stories.json').write_text('[]\n', encoding='utf-8')
+        (root / 'data' / 'fixture.json').write_text('{"fixed": true}', encoding='utf-8')
+        server = DevServer(('127.0.0.1', 0), root, 'mock')
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            base = f'http://127.0.0.1:{server.server_port}/__bridge'
+            read = lambda name: urllib.request.urlopen(f'{base}/readFile?name={name}', timeout=4).read().decode()
+            self.assertEqual(json.loads(read('data/usage.json')), {'version': 1, 'days': {}}, 'seeded from seedDefaults')
+            request = urllib.request.Request(f'{base}/writeFile?name=data/stories.json', data=b'[{"id":"s1"}]')
+            self.assertTrue(json.load(urllib.request.urlopen(request, timeout=4)))
+            self.assertEqual(read('data/stories.json'), '[{"id":"s1"}]')
+            self.assertEqual((root / 'data' / 'stories.json').read_text('utf-8'), '[]\n', 'committed seed untouched')
+            self.assertEqual((root / '.dev-data' / 'data' / 'stories.json').read_text('utf-8'), '[{"id":"s1"}]')
+            self.assertEqual(read('data/fixture.json'), '{"fixed": true}', 'app files are still read from the workspace')
+            request = urllib.request.Request(f'{base}/saveState?key=k', data=b'v')
+            urllib.request.urlopen(request, timeout=4).close()
+            self.assertFalse((root / 'data' / 'dev-preferences.json').exists())
+            names = [entry['name'] for entry in json.load(urllib.request.urlopen(f'{base}/listFiles', timeout=4))]
+            self.assertIn('data/stories.json', names)
+            self.assertFalse(any(name.startswith('.dev-data') for name in names))
+        finally:
+            server.shutdown()
+            server.server_close()
+        restarted = DevServer(('127.0.0.1', 0), root, 'mock')
+        restarted.server_close()
+        self.assertEqual((root / '.dev-data' / 'data' / 'stories.json').read_text('utf-8'), '[{"id":"s1"}]', 'restart keeps local data')
+
     def test_mock_mode_and_origin_guard(self):
         status, result = self.ai(self.mock_server, 'providers')
         self.assertEqual(status, 200)

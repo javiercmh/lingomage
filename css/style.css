@@ -596,3 +596,16 @@ body.has-app-generation-status .toast { bottom: calc(var(--tabbar-h) + 88px + va
 .stats-language > ul[hidden] { display: none; }
 .stats-language > ul { padding-bottom: 8px; }
 @media (prefers-reduced-motion: reduce) { .stats-chevron { transition: none; } }
+/* Most looked up (PED-005) */
+.lookup-body[hidden] { display: none; }
+.lookup-body { padding-bottom: 10px; }
+.lookup-list { margin: 0; padding: 0; list-style: none; }
+.stats-list .lookup-list li.lookup-item { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 8px 0 8px 14px; border-top: 1px solid var(--line); }
+.stats-list .lookup-list li.lookup-item:first-child { border-top: 0; }
+.stats-list .lookup-list .lookup-item > span { min-width: 0; text-align: left; overflow-wrap: anywhere; }
+.stats-list .lookup-item > .lookup-word { color: var(--ink); font-weight: 650; }
+.stats-list .lookup-item > .lookup-meaning { color: var(--muted); font-size: 14px; font-weight: 400; }
+.stats-list .lookup-item > .lookup-meta { color: var(--muted); font-size: 12px; font-weight: 500; }
+.lookup-clear { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 0 0 14px; }
+.lookup-clear .helper { flex: 0 0 100%; margin: 0; }
+.lookup-clear .danger-btn, .lookup-clear .secondary-btn { flex: 1 1 120px; width: auto; min-height: 44px; }
