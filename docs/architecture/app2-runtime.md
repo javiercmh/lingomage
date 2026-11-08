@@ -114,8 +114,9 @@ The Stats content region is not a live region and is replaced only when its form
 
 [PED-005](../pedagogy/PED-005-consultation-signals.md). `data/learning-signals.json` has the shape `{"version":1,"languages":{"de":{"items":{…},"reading":{"YYYY-MM-DD":{"words":n,"paragraphs":n}},"readMarks":{"storyId/versionId":{"paragraphIndex":"YYYY-MM-DD"}}}}}`.
 
-**Items.** Each item is keyed `note:<headword>|<meaning>` (NFC) or `sel:<normalized lowercase selection>`. It stores:
-- the kind, the word (canonical text without readings) and the meaning
+**Items.** Each item is keyed by its text: NFC, collapsed spaces, lowercase. A glossary note and a selection of the same text share one item. Items saved under the earlier `note:<headword>|<meaning>` and `sel:<text>` keys are merged on load. Each item stores:
+- the kind (`note` once any glossary note was opened, else `selection`) and the word (canonical text without readings)
+- `meaning`, the latest glossary meaning, and `meanings`: every glossary meaning it was looked up with, latest first, as `{text, count, first, last, sentence}`
 - per-action counts (`note`, `listen`, `explain`, `detail`, `examples`, `translate`)
 - the distinct days it was looked up, plus first and last dates
 - up to three recent context sentences

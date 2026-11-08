@@ -108,7 +108,7 @@ export function validUsage(value) {
   });
 }
 // Learning signals (PED-005): what the learner looked up and probably read, per language. Items are keyed
-// by glossary note identity or selection text; counts are open action keys so later actions stay readable.
+// by text; note items keep every glossary meaning they were looked up with; counts are open action keys so later actions stay readable.
 export const SIGNALS_VERSION = 1;
 export const SIGNALS_PATH = 'data/learning-signals.json';
 export const emptySignals = () => ({version:SIGNALS_VERSION, languages:{}});
@@ -117,6 +117,8 @@ const dateOrAbsent = value => absent(value) || typeof value === 'string' && date
 function validSignalItem(item) {
   return object(item) && ['note','selection'].includes(item.kind) && typeof item.word === 'string'
     && (absent(item.meaning) || typeof item.meaning === 'string')
+    && (absent(item.meanings) || list(item.meanings, entry => object(entry) && typeof entry.text === 'string' && count(entry.count)
+      && dateOrAbsent(entry.first) && dateOrAbsent(entry.last) && (absent(entry.sentence) || typeof entry.sentence === 'string')))
     && object(item.counts) && Object.entries(item.counts).every(([name, value]) => /^[a-z][a-z0-9-]{0,31}$/.test(name) && count(value))
     && list(item.days, day => typeof day === 'string' && dateKey(day))
     && dateOrAbsent(item.first) && dateOrAbsent(item.last) && dateOrAbsent(item.lastExposure)

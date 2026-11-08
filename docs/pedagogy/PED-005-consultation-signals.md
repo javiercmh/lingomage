@@ -12,7 +12,8 @@ Learners need practice and level suggestions that reflect what *they* found hard
 The app now keeps a local **lookup history** and a **probable-reading record** for each language in `data/learning-signals.json`.
 
 **What is recorded:**
-- Each word note opened, Listen on a note, saved explanation, saved follow-up, generated example set, and opened device translation. These are stored under the note's headword and meaning, or under the canonical selected text, with up to three recent context sentences.
+- Each word note opened, Listen on a note, saved explanation, saved follow-up, generated example set, and opened device translation. Each word or passage is one item, keyed by its text (NFC, collapsed spaces, case-insensitive), with up to three recent context sentences. Glossary meanings are written per chapter, so they are not part of the identity; a selection of a noted word merges with the note.
+- Every glossary meaning an item was looked up with, most recent first, each with its own lookup count, first and last date, and latest sentence. The profile shows only the latest. Keeping them all preserves the evidence needed to split homographs later (see Level 2).
 - Paragraphs that stayed on screen long enough to read. Each one adds to the day's words read and to the "seen" count of the items already in the history that it contains.
 
 **Level 1 (implemented)** ranks items with:
@@ -46,6 +47,7 @@ The record means **"looked up" and "probably read"**. It never means *unknown*, 
   - the self-selected level, the profile text and the previous analysis
 - **Output, saved with provenance:**
   - for each item: a category (vocabulary, multiword expression, grammar, script/reading, other), its dictionary form and a short reason
+  - for items whose stored meanings name different senses (homographs such as の as question marker and as possessive): the senses, each mapped to the stored meanings it covers. The list can then show one row per sense, and counts per sense come from the per-meaning counts. Per-chapter rewordings of one sense stay one sense. Exact string matching cannot tell rewordings from senses, which is why this is left to Level 2.
   - at most five focus areas
   - a non-binding comment on level
 - **Limits:** it must never set the level, and it needs prompt-contract tests before release.
