@@ -27,7 +27,7 @@ The terms are:
 - **Repetition:** `1 + log2(distinct days looked up)`.
 - **Exposure damping:** `1 / (1 + encounters since the last lookup / 4)`.
 
-The profile shows the top items per language as "looked up N× · seen M×".
+The profile shows the top 10 items per language with their lookup count. Exposure counts shape the ranking but are not shown, to keep the list simple.
 
 **Probable reading (implemented)** follows these rules:
 - A paragraph counts once its on-screen time reaches its word count at 400 words per minute, and never less than 1.5 s.

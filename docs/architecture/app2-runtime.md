@@ -135,7 +135,7 @@ The Stats content region is not a live region and is replaced only when its form
 **Optional store.** The rules match usage history:
 - An unreadable file is preserved and blocks only its own saves. The profile shows a notice with Retry loading or Retry save, and lookups keep counting in memory and are merged after repair.
 - Stories, settings and generation are unaffected, and so is the Workspace needs attention panel.
-- Story deletion and language disabling never touch it. Clear history removes one language after an in-app confirmation.
+- Story deletion and language disabling never touch it. Clear list removes one language after an in-app confirmation.
 
 **Size.** There are no caps. The file holds only items the learner touched, a few hundred bytes each.
 

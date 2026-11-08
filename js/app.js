@@ -430,19 +430,18 @@ $('usage-retry').addEventListener('click', () => {
 renderUsageStatus(usage.status);
 // "Most looked up" (PED-005): per-language disclosure with the top items and an in-app clear confirmation.
 const LOOKUP_LIMIT = 10;
-const openLookups = new Set();
+const lookupOpen = new Map(); // language → open; a single language starts open.
 let confirmingLookupClear = '';
-const lookupDate = key => new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${key}T00:00:00Z`));
 function renderLookupStatus(status) {
-  const message = status.blocked ? `${status.loadError} Lookups are still counted for this session but are not saved until the file loads.`
-    : status.saveError ? 'Lookup history could not be saved. New lookups are kept in memory and saved together once writing works.' : '';
+  const message = status.blocked ? `${status.loadError} New lookups won't be saved until it loads.`
+    : status.saveError ? "Couldn't save your lookups. They're kept until saving works." : '';
   $('lookups-notice').hidden = !message;
   if ($('lookups-notice-message').textContent !== message) $('lookups-notice-message').textContent = message;
   $('lookups-retry').textContent = status.blocked ? 'Retry loading' : 'Retry save';
 }
 $('lookups-retry').addEventListener('click', () => {
   const blocked = signals.status.blocked, ok = blocked ? signals.retryLoad() : signals.retrySave();
-  $('lookups-retry-note').textContent = ok ? '' : blocked ? 'Still unreadable. Repair data/learning-signals.json, then try again.' : 'Still could not save. Your lookups are kept.';
+  $('lookups-retry-note').textContent = ok ? '' : blocked ? 'Still unreadable. Repair data/learning-signals.json, then try again.' : "Still couldn't save.";
   if (ok) renderLookups();
 });
 renderLookupStatus(signals.status);
@@ -451,40 +450,44 @@ function renderLookups() {
   const text = (tag, className, value) => Object.assign(document.createElement(tag), { className, textContent: value });
   const card = document.createElement('section'); card.className = 'panel stats-section lookup-section'; content.append(card);
   const codes = [...new Set([...state.languageOrder, ...Object.keys(signals.data.languages)])].filter(code => signals.ranked(code, 1).length);
-  if (!codes.length) { card.append(text('h4', 'settings-section-label', 'Nothing looked up yet'), text('p', 'helper', 'Tap an underlined word or explain a passage while reading, and it appears here.')); return; }
+  $('lookups-footer').hidden = !codes.length;
+  if (!codes.length) { card.append(text('p', 'helper lookup-empty', 'Words you look up while reading appear here.')); return; }
   const list = document.createElement('ul'); list.className = 'stats-list'; card.append(list);
   for (const code of codes) {
-    const ranked = signals.ranked(code), label = LANGUAGES[code] || code, key = `lookups-${code}`;
+    const ranked = signals.ranked(code, LOOKUP_LIMIT), label = LANGUAGES[code] || code, key = `lookups-${code}`;
     const item = document.createElement('li'); item.className = 'stats-group stats-language';
     const toggle = document.createElement('button'), body = document.createElement('div');
     toggle.type = 'button'; toggle.className = 'stats-language-toggle'; toggle.dataset.key = key;
-    body.id = key; body.className = 'lookup-body'; body.hidden = !openLookups.has(code); toggle.setAttribute('aria-controls', key);
+    body.id = key; body.className = 'lookup-body'; body.hidden = !(lookupOpen.get(code) ?? codes.length === 1); toggle.setAttribute('aria-controls', key);
     const chevron = text('span', 'stats-chevron', '⌄'); chevron.setAttribute('aria-hidden', 'true');
-    const count = `${ranked.length} ${ranked.length === 1 ? 'item' : 'items'}`;
-    toggle.append(text('span', '', label), text('span', '', count), chevron);
-    const sync = () => { toggle.setAttribute('aria-expanded', String(!body.hidden)); toggle.setAttribute('aria-label', `${label}, ${count}. ${body.hidden ? 'Show' : 'Hide'} lookups`); };
-    toggle.addEventListener('click', () => { body.hidden = !body.hidden; if (body.hidden) openLookups.delete(code); else openLookups.add(code); sync(); });
+    toggle.append(text('span', '', label), chevron);
+    const sync = () => toggle.setAttribute('aria-expanded', String(!body.hidden));
+    toggle.addEventListener('click', () => { body.hidden = !body.hidden; lookupOpen.set(code, !body.hidden); sync(); });
     sync();
     const entries = document.createElement('ol'); entries.className = 'lookup-list';
-    for (const entry of ranked.slice(0, LOOKUP_LIMIT)) {
+    for (const entry of ranked) {
       const row = document.createElement('li'); row.className = 'lookup-item';
+      const words = document.createElement('span'); words.className = 'lookup-text';
       const word = text('span', 'lookup-word', entry.word); word.lang = SPEECH_LANGUAGES[code] || code;
-      row.append(word);
-      if (entry.meaning) row.append(text('span', 'lookup-meaning', entry.meaning));
-      row.append(text('span', 'lookup-meta', `Looked up ${entry.lookups}× · seen ${entry.exposures || 0}× · last ${lookupDate(entry.last)}`));
+      words.append(word);
+      if (entry.meaning) words.append(text('span', 'lookup-meaning', entry.meaning));
+      const times = text('span', 'lookup-count', `${entry.lookups}×`);
+      times.setAttribute('aria-label', `looked up ${entry.lookups} ${entry.lookups === 1 ? 'time' : 'times'}`); times.setAttribute('role', 'img');
+      row.append(words, times);
       entries.append(row);
     }
     body.append(entries);
     const clear = document.createElement('div'); clear.className = 'lookup-clear';
     if (confirmingLookupClear === code) {
-      const question = text('p', 'helper', `Clear ${label} lookup and reading history? This cannot be undone.`);
+      const question = text('p', 'helper', `Clear ${label} lookups? This can't be undone.`);
       const yes = text('button', 'danger-btn', 'Clear'), no = text('button', 'secondary-btn', 'Cancel');
       yes.type = no.type = 'button';
-      yes.addEventListener('click', () => { confirmingLookupClear = ''; if (!signals.clearLanguage(code)) toast('Could not clear lookup history.'); renderLookups(); });
+      yes.addEventListener('click', () => { confirmingLookupClear = ''; if (!signals.clearLanguage(code)) toast("Couldn't clear lookups."); renderLookups(); $('my-lookups-title').focus(); });
       no.addEventListener('click', () => { confirmingLookupClear = ''; renderLookups(); content.querySelector(`[data-clear="${code}"]`)?.focus(); });
       clear.append(question, yes, no);
     } else {
-      const button = text('button', 'small-btn lookup-clear-btn', `Clear ${label} history`); button.type = 'button'; button.dataset.clear = code;
+      const button = text('button', 'small-btn lookup-clear-btn', 'Clear list'); button.type = 'button'; button.dataset.clear = code;
+      button.setAttribute('aria-label', `Clear ${label} lookups`);
       button.disabled = signals.status.blocked;
       button.addEventListener('click', () => { confirmingLookupClear = code; renderLookups(); content.querySelector('.lookup-clear .danger-btn')?.focus(); });
       clear.append(button);
@@ -2381,7 +2384,6 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
         renderSavedHelp(chapter, version); readerPanel().scrollTop = scrollTop;
       }
       recordSelectionLookup(passage, action === 'initial' ? 'explain' : action);
-      toast('Explanation saved');
     } catch (error) {
       clearLoading();
       const cancelled = error.message === 'Request cancelled.';

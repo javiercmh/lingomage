@@ -138,10 +138,11 @@ Profile is the third bottom-navigation tab (Create, Library, Profile; the tab ba
 ### Most looked up — PED-005
 
 Most looked up sits between My practice and My languages and reuses the stats card pattern.
-- **Language rows:** one full-width disclosure per language with lookups (44px, `aria-expanded`, chevron), showing the language name and item count. Rows are collapsed by default and stay open across re-renders.
-- **Items:** the top 10 for that language, each with three lines: the word (with a `lang` attribute), the English meaning (glossary notes only) and "Looked up N× · seen M× · last <date>".
-- **Copy:** states that the list reflects lookups, not what the learner doesn't know, and that seen counts come from paragraphs on screen long enough to read. It never says known, unknown or mastered.
-- **Clear history:** a "Clear <language> history" button (44px) swaps in an inline confirmation with Clear (danger) and Cancel. System dialogs are not used. Cancel returns focus to the button.
+- **Language rows:** one full-width disclosure per language with lookups (44px, `aria-expanded`, chevron), showing only the language name. A single language starts open; with several, all start collapsed. Open state persists across re-renders.
+- **Items:** the top 10 for that language. Each row shows the word (with a `lang` attribute; long passages clamp to two lines) and the English meaning for glossary notes, with the lookup count ("4×", announced as "looked up 4 times") on the right. Exposure counts and dates stay internal to the ranking.
+- **Copy:** one footer line saying frequent and recent lookups come first, hidden in the empty state. It never says known, unknown or mastered.
+- **Clear list:** a "Clear list" button (44px, labelled "Clear <language> lookups") swaps in an inline confirmation with Clear (danger) and Cancel. System dialogs are not used. Cancel returns focus to the button; Clear moves focus to the section heading.
 - **Errors:** an unreadable or unsaved file shows an amber notice with Retry loading or Retry save. It never blocks other screens.
-- **Empty state:** explains that tapping an underlined word or explaining a passage adds items.
+- **Empty state:** one line: "Words you look up while reading appear here."
+- **Reader:** saved explanations and follow-ups appear in place without a toast.
 
