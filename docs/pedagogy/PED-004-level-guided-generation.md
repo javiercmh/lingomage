@@ -12,7 +12,7 @@
 - **Scope instead of quotas:** Scene (default) or Chapter replaces numeric word and sentence quotas (safeguard LANG-001 retired). Longer passage was dropped because it was hard to distinguish from Chapter (product decision); saved `longer` reads as Chapter. A 30000-unit technical bound remains.
 - **Language plan:** a bounded optional plan first (at most five vocabulary candidates and two grammar focuses, possibly none), then natural prose, then contextual notes ([PED-002](PED-002-contextual-reading-support.md)), then Japanese readings. Focuses are optional practice targets, not an allowed-language list or a repetition schedule; coherence and suitable surrounding language take priority over coverage. The five candidates do not cap the glossary. Underlines are support links, not measured unknown-word coverage.
 - **No adaptive progression:** no reader feedback or automatic level change. Lookup signals ([PED-005](PED-005-consultation-signals.md)) never change the level, guidance or plan.
-- Stages are checkpointed before acknowledgement; retries are explicit ([runtime](../architecture/app2-runtime.md#generation)).
+- Stages are checkpointed before acknowledgement; retries are explicit ([runtime](../architecture/generation-pipeline.md#generation)).
 
 ## Evidence
 
@@ -35,12 +35,12 @@ Source records: [level-guided generation review](../research/level-guided-genera
 
 - Definitions: `data/learning-profiles.json`. Orchestration: `js/story-generation.js`, `js/generation-pipeline.js`, `js/learning-validation.js`, `js/app.js`.
 - Settings keep old enablement and self-assessment values and add standardized selections. Each generated version keeps plan, level and framework, scope, exact learner context and provider, model, prompt and profile provenance.
-- Active safeguards LANG-002–009 and GEN-001–004 ([register](../architecture/language-safeguards.md)); Russian stress allowed when requested.
+- Active safeguards LANG-002–009 and GEN-001–004 ([register](../architecture/safeguards.md)); Russian stress allowed when requested.
 - Tests: `tests/story-generation-regression.cjs`, `tests/learning-safeguards.mjs`.
 
 ## Open experiment
 
-A candidate planning/writing prompt (development `prose` suite) uses `guidance` to identify likely vocabulary and construction load and accessible phrasings, and checks avoidable difficulty against the level guide while keeping natural language. Same schemas, stages and request counts. Not shipped; requires notes-prompt selection, separate level-fit, naturalness and continuity review, and a new `PROMPT_VERSION`. See the [comparison instructions](../validation/generation-evaluation/contextual-notes/README.md).
+A candidate planning/writing prompt (development `prose` suite) uses `guidance` to identify likely vocabulary and construction load and accessible phrasings, and checks avoidable difficulty against the level guide while keeping natural language. Same schemas, stages and request counts. Not shipped; requires notes-prompt selection, separate level-fit, naturalness and continuity review, and a new `PROMPT_VERSION`. See the [comparison instructions](../evaluation/generation-tests/notes-prompt-experiment/README.md).
 
 ## Revisit when
 

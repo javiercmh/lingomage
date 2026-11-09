@@ -2,7 +2,7 @@
 
 - **Question:** What do glossed reading, incidental learning, repeated encounters and extensive reading imply for generated stories with English notes?
 - **Reviewed:** 2026-10-09; revised 2026-10-19 (E1 and E3 abstracts re-checked, metadata via Crossref, E4 added). Scoped review via Consensus; publication metadata and available original text checked separately. Access is stated per source.
-- **Informs:** [PED-002](../pedagogy/PED-002-contextual-reading-support.md), [PED-004](../pedagogy/PED-004-level-guided-generation.md). Related: [retrieval and spacing](retrieval-and-spacing.md), [instruction, feedback and production](instruction-feedback-and-production.md).
+- **Informs:** [PED-002](../pedagogy/PED-002-contextual-reading-support.md), [PED-004](../pedagogy/PED-004-level-guided-generation.md). Related: [retrieval and spacing](spaced-review.md), [instruction, feedback and production](instruction-feedback-listening-production.md).
 
 Keys: E1 `webbEtAl2023IncidentalMetaAnalysis`, E2 `yanagisawaWebbUchihara2020Glossing`, E3 `uchiharaEtAl2019Repetition`, E4 `sangersEtAl2025ExtensiveReading`, `nakanishi2015ExtensiveReading` and `hamada2020ExtensiveReadingBias`.
 
@@ -97,7 +97,7 @@ chapters, the four target languages or reading amounts a learner would choose.
 Because effects were larger with limited text choice and accountability, learner-chosen
 briefs and unlimited generation are not shown to be optimal. The related suggestions
 (accountability, a gradual challenge increase) have not been adopted; they are
-[strategy](../product/evidence-informed-strategy.md) questions.
+[future directions](../product/future-directions.md) questions.
 
 ## Product assumptions and remaining review
 

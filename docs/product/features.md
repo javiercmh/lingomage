@@ -1,6 +1,6 @@
-# Product scope
+# Features and scope
 
-What LingoMage does now, its confirmed requirements and its defaults. Interaction details: [`DESIGN.md`](../../DESIGN.md). Rationale and evidence: [pedagogy log](../pedagogy/README.md). Long-term research directions: [strategy](evidence-informed-strategy.md).
+What LingoMage does now, its confirmed requirements and its defaults. Interaction details: [`DESIGN.md`](../../DESIGN.md). Rationale and evidence: [pedagogy log](../pedagogy/README.md). Long-term research directions: [future directions](future-directions.md).
 
 ## Learner-facing features
 
@@ -14,7 +14,7 @@ What LingoMage does now, its confirmed requirements and its defaults. Interactio
 | Story growth | Continue, Rewrite as alternate paths, remove chapters or paths | [PED-003](../pedagogy/PED-003-story-memory-and-paths.md) |
 | Library | Local stories, latest-activity hero, sort, language filter, bulk delete | `DESIGN.md` (navigation only) |
 | Profile | Time in LingoMage, Most looked up with detail sheet, language list and levels | [PED-005](../pedagogy/PED-005-consultation-signals.md) |
-| Recovery | Checkpointed generation with explicit Resume, Retry, Discard | [runtime](../architecture/app2-runtime.md#generation) |
+| Recovery | Checkpointed generation with explicit Resume, Retry, Discard | [runtime](../architecture/generation-pipeline.md#generation) |
 
 ## Confirmed requirements
 
@@ -37,5 +37,5 @@ Never claim certified CEFR/JLPT/TORFL alignment, map one framework to another, o
 ## Not in scope
 
 - **Deferred features:** images, cloud sync, more languages.
-- **Research candidates** (not commitments): retrieval or spaced review, reuse across stories, contextual instruction, story-linked listening, writing or speaking tasks, learner-language feedback, an in-app evaluation capability. They need evidence review, language review, usability checks and the strategy's [evaluation gates](evidence-informed-strategy.md#evaluation-before-learning-claims) before any learning claim. Intended outcomes: [learning outcomes and evaluation](learning-outcomes-and-evaluation.md).
+- **Research candidates** (not commitments): retrieval or spaced review, reuse across stories, contextual instruction, story-linked listening, writing or speaking tasks, learner-language feedback, an in-app evaluation capability. They need evidence review, language review, usability checks and the [evaluation gates](../evaluation/learning-evaluation-plan.md#evaluation-gates) before any learning claim. Intended outcomes: [learning evaluation plan](../evaluation/learning-evaluation-plan.md).
 - **Formal learning trials** have not been run.

@@ -2,8 +2,8 @@
 import fs from 'node:fs';import path from 'node:path';
 import {hash,read,write,freezeChapter,deliveredReport,anonymousPair,acceptance} from './evaluation/notes-comparison.mjs';
 const args=process.argv.slice(2),option=(k,d)=>args.includes(k)?args[args.indexOf(k)+1]:d;
-const base='docs/validation/generation-evaluation/contextual-notes';
-const directory=path.resolve(option('--output',base)),pilot=path.resolve(option('--pilot','docs/validation/generation-evaluation/pilot'));
+const base='docs/evaluation/generation-tests/notes-prompt-experiment';
+const directory=path.resolve(option('--output',base)),pilot=path.resolve(option('--pilot','docs/evaluation/generation-tests/pilot'));
 fs.mkdirSync(directory,{recursive:true});
 const manifestFile=path.join(directory,'corpus.json');
 if(args.includes('--freeze')){

@@ -5,7 +5,7 @@
 - Scope: reading support in German, Japanese, Russian and Spanish stories
 - Evidence basis: product requirements and evidence-informed extrapolation; no direct evaluation of this feature
 
-Interaction details are in [`DESIGN.md`](../../DESIGN.md); pipeline and storage in the [runtime doc](../architecture/app2-runtime.md); Japanese script handling in [japanese.md](../languages/japanese.md).
+Interaction details are in [`DESIGN.md`](../../DESIGN.md); pipeline and storage in the [generation pipeline](../architecture/overview.md); Japanese script handling in [japanese.md](../languages/japanese.md).
 
 ## Decisions
 
@@ -43,7 +43,7 @@ Interaction details are in [`DESIGN.md`](../../DESIGN.md); pipeline and storage 
 - **Repeated encounters** correlate with incidental learning without a required count (`uchiharaEtAl2019Repetition`, [DOI](https://doi.org/10.1111/lang.12343)), so natural reuse remains a product assumption.
 - **Product assumptions** (no direct evidence): focused and silently adapted help, three examples, first-occurrence display, broad note coverage, no density cap, Listen and Translate, sentence playback controls, story-led creation, multilingual input, open-ended endings, and all presentation choices.
 - Structural validation cannot establish semantic accuracy, useful coverage, level suitability or pedagogical value; language review is separate. The cause of reported Android failures with prose-prefixed detail responses was never confirmed from a captured response.
-- Retrieval, review and instruction are not implemented; they are research candidates in the [strategy](../product/evidence-informed-strategy.md).
+- Retrieval, review and instruction are not implemented; they are research candidates in the [future directions](../product/future-directions.md).
 
 ## Implementation
 
@@ -53,7 +53,7 @@ Interaction details are in [`DESIGN.md`](../../DESIGN.md); pipeline and storage 
 
 ## Open evaluation
 
-A controlled contextual-accuracy comparison of notes prompts is designed but not run: 24 frozen revised-pilot chapters plus seven focused cases. Promotion requires qualified adjudication, fewer material errors overall, no increase per language or in missing useful support, correct focused outputs, and a new `PROMPT_VERSION`; AI preference alone is insufficient. See the [comparison design](../validation/generation-evaluation/contextual-notes/README.md) and [generation evaluation](../validation/generation-evaluation/README.md).
+A controlled contextual-accuracy comparison of notes prompts is designed but not run: 24 frozen revised-pilot chapters plus seven focused cases. Promotion requires qualified adjudication, fewer material errors overall, no increase per language or in missing useful support, correct focused outputs, and a new `PROMPT_VERSION`; AI preference alone is insufficient. See the [comparison design](../evaluation/generation-tests/notes-prompt-experiment/README.md) and [generation evaluation](../evaluation/generation-tests/method.md).
 
 ## Revisit when
 

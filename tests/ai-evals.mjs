@@ -138,10 +138,10 @@ const readJson = (dir, name) => JSON.parse(fs.readFileSync(path.join(dir, name),
 
 // ---- output directory safety -----------------------------------------------------------------------------------
 {
-  for (const bad of ['', '../x', 'a/../../b', ROOT, path.join(ROOT, 'data'), path.join(ROOT, 'js'), path.join(ROOT, 'dist'), path.join(ROOT, '.javiercmh', 'x'), path.join(ROOT, 'docs/validation/generation-evaluation/ai-evals'), path.dirname(ROOT), os.homedir(), '/', os.tmpdir()]) {
+  for (const bad of ['', '../x', 'a/../../b', ROOT, path.join(ROOT, 'data'), path.join(ROOT, 'js'), path.join(ROOT, 'dist'), path.join(ROOT, '.javiercmh', 'x'), path.join(ROOT, 'docs/evaluation/generation-tests/ai-evals'), path.dirname(ROOT), os.homedir(), '/', os.tmpdir()]) {
     assert.throws(() => resolveOutputDir(bad), undefined, `should reject ${JSON.stringify(bad)}`);
   }
-  assert.ok(resolveOutputDir(path.join(ROOT, 'docs/validation/generation-evaluation/ai-evals/runs/example')).dir.endsWith('runs/example'));
+  assert.ok(resolveOutputDir(path.join(ROOT, 'docs/evaluation/generation-tests/ai-evals/runs/example')).dir.endsWith('runs/example'));
   assert.equal(resolveOutputDir(freshDir()).exists, false);
   const occupied = freshDir(); fs.mkdirSync(occupied); fs.writeFileSync(path.join(occupied, 'notes.txt'), 'x');
   assert.throws(() => resolveOutputDir(occupied), /not an AI-eval run directory/);
@@ -149,7 +149,7 @@ const readJson = (dir, name) => JSON.parse(fs.readFileSync(path.join(dir, name),
   assert.throws(() => resolveOutputDir(path.join(link, 'run')), /repository|runs belong/);
   assert.throws(() => resolveOutputDir(link));
   const gitignore = fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8');
-  assert.ok(gitignore.includes('docs/validation/generation-evaluation/ai-evals/runs/'));
+  assert.ok(gitignore.includes('docs/evaluation/generation-tests/ai-evals/runs/'));
   pass('output directories reject traversal, repository sources, learner data, symlinks and foreign directories');
 }
 

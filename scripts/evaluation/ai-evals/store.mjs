@@ -6,7 +6,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-export const RUNS_DIR = path.join(ROOT, 'docs/validation/generation-evaluation/ai-evals/runs');
+export const RUNS_DIR = path.join(ROOT, 'docs/evaluation/generation-tests/ai-evals/runs');
 export const RUN_FILE = 'run.json';
 
 const inside = (parent, child) => child === parent || child.startsWith(parent + path.sep);
@@ -39,7 +39,7 @@ export function resolveOutputDir(raw, {fs = nodeFs, root = ROOT, runsDir = RUNS_
     const repoRelative = inside(root, candidate) || inside(realRoot, candidate);
     const allowed = inside(runsDir, candidate) || inside(realRuns, candidate);
     if (repoRelative && (!allowed || candidate === runsDir || candidate === realRuns)) {
-      throw new Error('Inside the repository, runs belong in a subdirectory of docs/validation/generation-evaluation/ai-evals/runs/ (Git-ignored). Never use learner, packaged or source directories.');
+      throw new Error('Inside the repository, runs belong in a subdirectory of docs/evaluation/generation-tests/ai-evals/runs/ (Git-ignored). Never use learner, packaged or source directories.');
     }
   }
   let exists = false, empty = true;

@@ -32,7 +32,7 @@ export function parseArgs(argv) {
 export const HELP = `LingoMage learning-quality evaluations (AI evals). Development-only; never packaged.
 
 Default behavior is offline: with no --live this prints help or a plan and makes no network call, spawns no process and writes no file.
-Nothing has been run live yet. The user decides when (docs/validation/generation-evaluation/README.md).
+Nothing has been run live yet. The user decides when (docs/evaluation/generation-tests/ai-evals.md).
 
 Usage (placeholders in <angle brackets> must be chosen explicitly; there are no defaults):
   node scripts/ai-eval.mjs --cases <CASE_ID[,CASE_ID...]> \\

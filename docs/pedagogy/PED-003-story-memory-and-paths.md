@@ -28,7 +28,7 @@ Legacy stories derive paths lazily from version-source and predecessor links (sa
 
 ## Open experiment
 
-A candidate prose writer (development only) internally checks who knows what, possession and ownership, character and object location, chronology and unresolved events, within the same request and schema. It is not shipped; it waits for notes-prompt selection and a separate prose evaluation. See the [controlled comparison](../validation/generation-evaluation/contextual-notes/README.md).
+A candidate prose writer (development only) internally checks who knows what, possession and ownership, character and object location, chronology and unresolved events, within the same request and schema. It is not shipped; it waits for notes-prompt selection and a separate prose evaluation. See the [controlled comparison](../evaluation/generation-tests/notes-prompt-experiment/README.md).
 
 ## Revisit when
 

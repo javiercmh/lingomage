@@ -4,7 +4,7 @@ Review date: 2026-10-19. Scoped, not systematic. Discovery used Consensus search
 
 **Questions.** (1) Does revisiting vocabulary over time, with retrieval, produce more durable learning than massed or single-session study? (2) What do repeated encounters in reading add? (3) Which findings might apply to optional review of words met in LingoMage stories?
 
-**Status.** Nothing here is implemented. LingoMage has no retrieval, quiz or scheduling feature (see [strategy](../product/evidence-informed-strategy.md)). Findings are research candidates for [Horizon 2](../product/evidence-informed-strategy.md#horizon-2-investigate-durable-learning). They do not set a schedule.
+**Status.** Nothing here is implemented. LingoMage has no retrieval, quiz or scheduling feature (see [future directions](../product/future-directions.md)). Findings are research candidates for [Horizon 2](../product/future-directions.md#horizon-2-investigate-durable-learning). They do not set a schedule.
 
 ## Access levels used
 
@@ -42,4 +42,4 @@ Review date: 2026-10-19. Scoped, not systematic. Discovery used Consensus search
 
 ## Decision link
 
-Informs the investigation items in the [strategy](../product/evidence-informed-strategy.md) and the "Natural reuse" assumption in [PED-002](../pedagogy/PED-002-contextual-reading-support.md#evidence-and-limits). No PED changes behavior. Reconsider when an optional review feature is proposed, when a prospective review shows a delayed-retention effect in a comparable setting, or when the provisional sources are verified.
+Informs the investigation items in the [future directions](../product/future-directions.md) and the "Natural reuse" assumption in [PED-002](../pedagogy/PED-002-contextual-reading-support.md#evidence-and-limits). No PED changes behavior. Reconsider when an optional review feature is proposed, when a prospective review shows a delayed-retention effect in a comparable setting, or when the provisional sources are verified.

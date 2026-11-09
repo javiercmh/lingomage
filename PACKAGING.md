@@ -1,6 +1,6 @@
 # Packaging, updates and host APIs
 
-How LingoMage ships through App². Branch and release rules are in [`AGENTS.md`](AGENTS.md#branches-and-releases); data files are described in [`docs/architecture/app2-runtime.md`](docs/architecture/app2-runtime.md#data-files).
+How LingoMage ships through App². Branch and release rules are in [`AGENTS.md`](AGENTS.md#branches-and-releases); data files are described in [`docs/architecture/data-and-storage.md`](docs/architecture/data-and-storage.md#data-files).
 
 ## Manifest
 
@@ -27,7 +27,7 @@ All host calls go through `js/bridge.js`.
 
 - **AI:** connect providers only in App² Settings → AI (ChatGPT, OpenRouter, or one Combined provider). LingoMage discovers the connected provider and its models at runtime; Combined model IDs are opaque and names include their source. A provider change clears unavailable model and reasoning choices; pending checkpoints keep their original configuration. Any provider's output must pass LingoMage validation; nothing retries automatically. Save completed content before acknowledging a request.
 - **Device translation:** `translation.availability()` → `{available: boolean}`; `translation.open({text})` → `{opened: true}`. App² forwards text to the configured Android ACTION_TRANSLATE handler; it returns no translation and takes no language settings. Call only after a user action, with canonical text without readings. Browsers and older hosts report unavailable. Blank text or more than 100000 UTF-16 units is rejected. Errors (`invalid_request`, `unavailable`, `timeout`) are shown without retry. The external tool may process text online.
-- **Speech, selection menu, files:** see `js/bridge.js` and the runtime doc.
+- **Speech, selection menu, files:** see `js/bridge.js` and [`docs/architecture/overview.md`](docs/architecture/overview.md).
 
 ## Local preview
 

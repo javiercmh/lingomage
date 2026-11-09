@@ -1,10 +1,10 @@
 # Explicit instruction, corrective feedback, listening and production tasks
 
-Review date: 2026-10-19. Scoped, not systematic. Discovery used Consensus search; metadata was checked in Crossref; original text was read only where noted. Access levels are defined in [retrieval and spacing](retrieval-and-spacing.md#access-levels-used) (full text summarized, abstract + metadata, provisional).
+Review date: 2026-10-19. Scoped, not systematic. Discovery used Consensus search; metadata was checked in Crossref; original text was read only where noted. Access levels are defined in [retrieval and spacing](spaced-review.md#access-levels-used) (full text summarized, abstract + metadata, provisional).
 
 **Questions.** What does published evidence say about explicit instruction, corrective feedback, story-linked listening and learner production (speaking, writing, dialogue with an AI)? What would transfer to a reading-first app whose AI output is unvalidated?
 
-**Status.** Contextual explanations exist ([PED-002](../pedagogy/PED-002-contextual-reading-support.md)); chapter listening uses native speech. There is no instruction sequence, learner production task or feedback feature. These are [Horizon 3](../product/evidence-informed-strategy.md#horizon-3-explore-story-linked-listening-writing-and-feedback) candidates.
+**Status.** Contextual explanations exist ([PED-002](../pedagogy/PED-002-contextual-reading-support.md)); chapter listening uses native speech. There is no instruction sequence, learner production task or feedback feature. These are [Horizon 3](../product/future-directions.md#horizon-3-explore-story-linked-listening-writing-and-feedback) candidates.
 
 ## Explicit instruction
 
@@ -35,7 +35,7 @@ Applicability: advanced Chinese learners of English and one text type. Findings 
 
 Net: dialogue-based practice has a reasonable body of controlled studies, but mostly pre-LLM, English-target systems. The TBLT figure is disputed. None tests story-linked tasks, AI scoring validity or retention in the four target languages.
 
-Outcome and transfer evidence for repeated-task speaking and its limits, and the d/g comparison caution for the TBLT figures, are in [outcomes and measurement](outcomes-and-measurement.md).
+Outcome and transfer evidence for repeated-task speaking and its limits, and the d/g comparison caution for the TBLT figures, are in [outcomes and measurement](measuring-learning.md).
 
 ## What this does not support
 
@@ -43,4 +43,4 @@ No source compares a combined approach with single methods across skills. A sing
 
 ## Decision link
 
-Informs [Horizon 3](../product/evidence-informed-strategy.md#horizon-3-explore-story-linked-listening-writing-and-feedback) and the evaluation gates. No PED behavior changes. Revisit when a production or feedback feature is proposed, or when generative-AI dialogue studies with delayed outcomes in these languages appear.
+Informs [Horizon 3](../product/future-directions.md#horizon-3-explore-story-linked-listening-writing-and-feedback) and the evaluation gates. No PED behavior changes. Revisit when a production or feedback feature is proposed, or when generative-AI dialogue studies with delayed outcomes in these languages appear.

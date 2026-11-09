@@ -1,6 +1,6 @@
-# Learning outcomes and future in-app evaluation
+# Learning evaluation plan
 
-Status: durable product direction. **Nothing here is implemented or promised.** There is no probe, assessment UI, tracking, recording, evaluation request, saved assessment data or runtime schema, and none may be added without a separate change that follows the [research policy](../research/README.md#learning-change-policy). Evidence basis is separate: [retention, transfer, spontaneous production and measurement](../research/outcomes-and-measurement.md) and the [strategy](evidence-informed-strategy.md). Intended outcomes below are product intent; they are not research findings and carry no validated cutoffs.
+How LingoMage's learning effect would be defined and measured: intended outcomes, evaluation gates, a future optional in-app check, measurement principles and an example protocol. Status: durable direction. **Nothing here is implemented or promised.** There is no probe, assessment UI, assessment tracking, recording, evaluation request, saved assessment data or runtime schema, and none may be added without a separate change that follows the [research policy](../research/README.md#learning-change-policy). Evidence basis is separate: [retention, transfer, spontaneous production and measurement](../research/measuring-learning.md) and the [future directions](../product/future-directions.md). Intended outcomes below are product intent; they are not research findings and carry no validated cutoffs.
 
 ## Intended learner outcomes
 
@@ -23,6 +23,20 @@ What success would mean, conceptually: a learner understands new text with less 
 - **Self-report** and AI-estimated difficulty are orientation, not measurement.
 - **Observation versus attribution.** A change between two observations does not show the app caused it. Causal claims need comparisons designed for them (see below), and even then apply to the study sample.
 
+## Evaluation gates
+
+Work in gates; a later gate does not replace an earlier one. These gates define evaluation for proposed extensions; they do not imply that existing engineering checks or content reviews have not occurred. App-specific learning evaluations remain pending.
+
+1. **Qualified language review and usability.** A qualified reviewer per language checks accuracy, naturalness and level fit; a small usability session checks comprehension of the interface and whether the feature is used as intended. Without this, stop.
+2. **Quality proxies.** Deterministic safeguards and the opt-in [AI evals](generation-tests/ai-evals.md) can find errors early. They measure output quality only, and an AI judge's scores are not proof of learning.
+3. **Comprehension.** Test understanding of the story during or just after reading, separate from word knowledge.
+4. **Delayed retention.** Re-test target items after a delay chosen in advance and justified in the protocol (for example, days and weeks), against a reading-only comparison with the same time on task. Include a control for words learned elsewhere.
+5. **Transfer to unseen material.** Test the same items in new sentences or a new passage, and where relevant productive use, not only recognition of the exact story sentences.
+
+Engineering prototypes (to test whether a probe or review flow works, is usable and passes language review) may precede these gates; only **learning claims** need them, and a prototype is never evidence of learning. Typed unfamiliar-task responses are a limited production proxy; spontaneous speech assessment needs audio capture, transcription and qualified scoring that this workspace does not provide.
+
+Feasibility: a within-subject design that counterbalances which items get the feature, small consented pilots first, local data only, preregistered measures and analysis, and statistical advice on sample size before any confirmatory claim. Report limits, effect uncertainty and drop-out; never claim certified level alignment.
+
 ## Future in-app evaluation direction
 
 The direction is a voluntary, optional, learner-initiated check, designed so that it can later be run as research. It is not a mandatory test and never interrupts reading.
@@ -37,13 +51,13 @@ The direction is a voluntary, optional, learner-initiated check, designed so tha
 
 ### Feasibility against the current bridge
 
-Inspected `js/bridge.js` and `docs/architecture/app2-runtime.md` on 2026-10-19. Only that file calls host capabilities.
+What `js/bridge.js` (the only host caller) offers for each need.
 
 | Needed capability | Present in the bridge wrappers | Gap or constraint |
 | --- | --- | --- |
 | Local, user-owned JSON assessment records | `readFile`, `writeFile`, `deleteFile`, `listFiles` for workspace `data/` files | No assessment file or schema exists; any future file needs an owned-file declaration in the manifest, seeded empty, and an unpublishable-learner-data rule like checkpoints |
 | AI-assisted item generation or scoring | `ai.start/result/wait/cancel/acknowledge` using App²'s managed connection | Requests go to the learner's configured provider via App²; do **not** promise local-only scoring. Each call needs a concise task-specific title/body and must not store credentials. No retry without explicit action. Reliability for these languages is unvalidated |
-| Scheduling delayed probes | `scheduleNotification`, `canScheduleWhileClosed` | Needs notification permission and learner opt-in; may be unavailable on browser previews and older hosts; still unverified on Android per the device checklist |
+| Scheduling delayed probes | `scheduleNotification`, `canScheduleWhileClosed` | Needs notification permission and learner opt-in; may be unavailable on browser previews and older hosts; needs an Android check |
 | Typed responses | Standard page text input | Canonical text rules apply; no keystroke or timing capture is planned |
 | Spoken audio capture, latency, transcription | **Not exposed.** `speech` provides voices, capabilities, speak and stop (output only) | Microphone access, recording, ASR and scorers would be new host capabilities; whether the host offers any is unverified. Do not design around them yet |
 | Exact timing | Page clock, wall time | Reliability across suspended pages and device time changes is unverified |
@@ -57,7 +71,7 @@ Inspected `js/bridge.js` and `docs/architecture/app2-runtime.md` on 2026-10-19. 
 - **Provenance.** Record, for every item and response: item source and history, prompt/rubric/scorer identity, model and version, prompt version and date of generation or scoring, plus exact timing. Existing story provenance is preserved.
 - **Text handling.** Keep Japanese canonical text separate from furigana annotations (copy and scoring use canonical text); Russian stays in Cyrillic without transliteration; use language-sensitive rubrics rather than a single template.
 - **Feedback comes after the response.** Corrections, answers and explanations are shown only after the assessment response is submitted.
-- **AI evaluation is assistive.** AI-generated items and AI scores are checked against qualified human ratings in each language before any automated interpretive claim; until then they are labelled as unvalidated. The review found moderate human-AI agreement from few studies and sparse evidence outside English, so no autonomous scoring is assumed ([evidence](../research/outcomes-and-measurement.md#measurement-evidence)).
+- **AI evaluation is assistive.** AI-generated items and AI scores are checked against qualified human ratings in each language before any automated interpretive claim; until then they are labelled as unvalidated. The review found moderate human-AI agreement from few studies and sparse evidence outside English, so no autonomous scoring is assumed ([evidence](../research/measuring-learning.md#measurement-evidence)).
 - **Eligibility and floors.** Beginners may score near zero on production or novel-text probes. Define eligibility and report floor and ceiling effects instead of treating low scores as failure; do not offer probes the learner could not plausibly attempt.
 - **Primary versus exploratory.** Choose a small number of primary outcomes before looking at data (for example, delayed recognition of trained items and novel-passage comprehension). Everything else is exploratory and reported as such.
 - **Communicative success before proxies.** For production, judge whether meaning was conveyed before reporting speed, pause or complexity indices.
@@ -66,7 +80,7 @@ Inspected `js/bridge.js` and `docs/architecture/app2-runtime.md` on 2026-10-19. 
 
 If assessment is ever implemented, its records would be inspectable local JSON in the learner's workspace, owned by the learner and covered by the existing no-credential and no-token rules. Declare an empty seed default, created only when absent; packaging must use that empty default rather than learner records, and App² updates must preserve existing records. Conceptually each record needs: item identity and history; response; timing; assessment version and rubric/scorer/model provenance; and the consent state. **Nothing is collected now.**
 
-The strategy's rule that evaluations do not use learner files is clarified here: development evaluations and AI evals use public fictional briefs and frozen sources, never learner files. A **future voluntary in-app assessment** may use story targets the learner explicitly selects, with consent, and a **separate, explicit, consented research export** may exist. Learner data stays user-owned, with no telemetry, no automatic export and no silent upload. Where AI is used for items or scoring, the content goes to the learner's configured provider, which the learner must be told in plain English before opting in.
+Development evaluations and AI evals use public fictional briefs and frozen sources, never learner files. A **future voluntary in-app assessment** may use story targets the learner explicitly selects, with consent, and a **separate, explicit, consented research export** may exist. Learner data stays user-owned, with no telemetry, no automatic export and no silent upload. Where AI is used for items or scoring, the content goes to the learner's configured provider, which the learner must be told in plain English before opting in.
 
 ## Example research protocol (not a requirement)
 
@@ -79,7 +93,7 @@ An illustrative design only. It is not an established optimum, not a schedule fo
 
 ## Prototypes versus learning evidence
 
-A prototype is an engineering artifact that may be built to test whether a probe or review flow works (usability, reliability, language review, consent flow). It does not claim learning gains and need not wait for a trial. **Learning claims** (that a feature improves retention, transfer or production) require the [evaluation gates](evidence-informed-strategy.md#evaluation-before-learning-claims): reviewed quality, comprehension, delayed retention against a comparison, and transfer to unseen material. Do not require a completed trial before any prototype, and do not describe a prototype as evidence.
+A prototype is an engineering artifact that may be built to test whether a probe or review flow works (usability, reliability, language review, consent flow). It does not claim learning gains and need not wait for a trial. **Learning claims** (that a feature improves retention, transfer or production) require the [evaluation gates](#evaluation-gates): reviewed quality, comprehension, delayed retention against a comparison, and transfer to unseen material. Do not require a completed trial before any prototype, and do not describe a prototype as evidence.
 
 ## Revisit when
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';import fs from 'node:fs';
 import {freezeChapter,deliveredReport,anonymousPair,acceptance,hash} from '../scripts/evaluation/notes-comparison.mjs';
 import {PLAN_LOAD_CHECK,WRITER_CHECK} from '../scripts/evaluation/prose-candidate.mjs';
-const base=new URL('../docs/validation/generation-evaluation/contextual-notes/',import.meta.url);
+const base=new URL('../docs/evaluation/generation-tests/notes-prompt-experiment/',import.meta.url);
 const prompts=JSON.parse(fs.readFileSync(new URL('prompts.json',base)));
 for(const phrase of ['pronouns','possessives','determiners','function words','referent','grammatical person','number','association rather than ownership','singular and plural','discontinuous constructions','unsupported grammatical claims','grouped-form compatibility','Return only the existing glossary JSON','no fixed note-count quota or cap','20 forms per note','1000000'])assert.ok(prompts.candidate.includes(phrase),phrase);
 assert.ok(PLAN_LOAD_CHECK.includes('guidance field'));for(const phrase of ['who knows what','ownership and possession','locations','chronology','unresolved events','revision source','supplied narrative state','existing response schema'])assert.ok(WRITER_CHECK.includes(phrase),phrase);

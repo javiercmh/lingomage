@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {execFileSync} from 'node:child_process';
-const review=JSON.parse(fs.readFileSync('docs/validation/generation-evaluation/semantic-failures.json','utf8'));
+const review=JSON.parse(fs.readFileSync('docs/evaluation/generation-tests/semantic-failures.json','utf8'));
 assert.equal(new Set(review.cases.map(item=>item.id)).size,review.cases.length);
 // The archived pilot output is only in Git history. Shallow or offline checkouts cannot verify it; that is
 // reported rather than counted as a pass. Set SEMANTIC_REVIEW_REQUIRE_ARCHIVE=1 to make a missing archive fail.

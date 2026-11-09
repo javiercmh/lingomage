@@ -1,4 +1,4 @@
-# Generation evaluation summary
+# Generation test results
 
 The production workflow is language plan → canonical prose → contextual English notes → Japanese readings, when applicable → saved chapter. Completed stages are checkpointed before releasing requests. An explicit notes retry reuses the completed prose. Example requests retain their separate workflow.
 
@@ -14,7 +14,7 @@ Offline revalidation under the new size policy accepts 11/12 Sol notes outputs a
 
 An anonymous preliminary AI review preferred Sol in 11 of 12 pairs and Luna for German B1. The judge was GPT-6.1 Sol low; family bias, a small fixed brief set and lack of calibrated qualified reviewers limit this finding. Sol low is the provisional development choice. Both models can produce inaccurate contextual explanations, above-target constructions and narrative continuity problems. Counts alone do not establish quality.
 
-The original-versus-revised pilot covers two briefs, four languages and three requested levels (48 attempts): 45 completed, with three exact-form rejections (Russian B1 revised, C1 revised parcel, and C1 baseline railway). The completed original samples have 8–11 notes (median 10); revised samples have 41–220 (median 129.5). Different sampled prose and unequal rejected cases mean this is a descriptive comparison, not a controlled learning-effect estimate. Raw prompts, responses, checkpoints, errors and preliminary review records are archived in Git history at commit `7fd046c` (see [README](README.md)). Follow-up cases cover Scene continuation, Scene rewrite and Chapter creation in each language; retired Longer passage preferences are covered by compatibility tests.
+The original-versus-revised pilot covers two briefs, four languages and three requested levels (48 attempts): 45 completed, with three exact-form rejections (Russian B1 revised, C1 revised parcel, and C1 baseline railway). The completed original samples have 8–11 notes (median 10); revised samples have 41–220 (median 129.5). Different sampled prose and unequal rejected cases mean this is a descriptive comparison, not a controlled learning-effect estimate. Raw prompts, responses, checkpoints, errors and preliminary review records are archived in Git history at commit `7fd046c` (see [README](method.md)). Follow-up cases cover Scene continuation, Scene rewrite and Chapter creation in each language; retired Longer passage preferences are covered by compatibility tests.
 
 No official CEFR/JLPT/TORFL certification or measured learning effectiveness is claimed. Qualified language review remains necessary before stronger alignment claims. Evaluation uses the explicitly authorized development-only Codex bridge; released behavior continues through App² managed AI.
 
@@ -39,3 +39,7 @@ The 12 live follow-up cases finished with 11 completed outputs and one Japanese 
 A qualified reviewer reads the excerpts and, where needed, retrieves the full source with `git show 7fd046c:<source.path>`. Record qualification, disposition (`confirmed error`, `acceptable explanation`, or `unresolved`) and a rationale in the case. Missing qualifications, disputed context or insufficient evidence keep the case unresolved. Preserve the original note and provenance. Do not add a semantic pass assertion based on keywords, substring matching or model agreement. Ordinary tests check the review record's integrity only.
 
 This review makes no new inference requests, uses no AI judge and promotes no prompt changes. The existing focused comparison cases remain available for a separately authorized and budgeted future evaluation. Human linguistic review and Android checks remain pending; no stronger learning or level-alignment claim follows from this engineering change.
+
+## Earlier sample review (Android, 2026-10-09)
+
+One sample per language from the retired Android design (100–150 words, five learner-chosen items) received a preliminary AI review (no qualified human reviewer). It found consistent script, agreement and glossary mapping with some extra vocabulary beyond beginner level, and confirmed the okurigana correction in a second Japanese sample (readings only above kanji runs). The record and samples are in Git history before commit `f47e17d` (`docs/validation/sample-review.md`, `docs/validation/samples/`).

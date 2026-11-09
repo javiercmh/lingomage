@@ -1,0 +1,42 @@
+# Generation pipeline
+
+How stories, chapters, help and examples are generated, validated, checkpointed and recovered, including background operation sessions. Rationale: [PED-002](../pedagogy/PED-002-contextual-reading-support.md), [PED-003](../pedagogy/PED-003-story-memory-and-paths.md), [PED-004](../pedagogy/PED-004-level-guided-generation.md). Architecture docs: [overview](overview.md) · [data and storage](data-and-storage.md) · [generation pipeline](generation-pipeline.md) · [learner tracking](learner-tracking.md) · [safeguards](safeguards.md). Interface rules: [`DESIGN.md`](../../DESIGN.md).
+
+## Generation
+
+- **Targets** ([PED-004](../pedagogy/PED-004-level-guided-generation.md)): CEFR A1–C2 (German, Spanish), JLPT N5–N1 (Japanese), Elementary/Basic/TORFL-I–IV (Russian). Self-selected orientation, not assessed proficiency. Settings keep explicit selections separate from legacy enablement and self-assessments; no guessed conversion.
+- **Inputs:** level, one optional story idea and topics brief, narrative scope (`scene` or `chapter`; saved `longer` reads as chapter), regional and register preferences. No word or sentence quotas.
+- **Stages** for Create, Continue and Rewrite: optional bounded vocabulary/grammar plan → validated canonical prose → contextual glossary notes (at least one structurally valid note required) → Japanese readings when kanji are present. Examples skip the plan and notes. Plans guide writing; coverage is not required and no word knowledge is claimed.
+- **Japanese readings:** after notes validate, the app extracts contiguous kanji compounds from title, story or example sentences with occurrence IDs, UTF-16 offsets and context, requests only kana readings, validates exact ID coverage and builds annotations itself. Kana-only content skips the call. Popover headwords are excluded.
+- **Checkpoints:** every validated stage is saved to `data/generation-checkpoints.json` before its request is acknowledged; checkpoints, not settings, are authoritative for unfinished work. Resume reuses saved stages and captured configuration; completed stages never regenerate. Discard cancels and releases any outstanding request and removes progress. Cancel persists intent even before a new request ID returns and is checked before waits and stage handoffs. A failed notes request keeps the prose.
+- **Final application** is idempotent through `operationId` and stable derived IDs; partial prose never appears as a finished story. No inference retries automatically.
+- **Release failures** keep progress, block new generation and offer Resume or Save / finish; `finishRequest()` releases a completed stage without starting the next. A confirmed `not_found` may be released locally (the host already released it). Known limit: the host's atomic start/request-ID persistence gap.
+- **Failure metadata:** records keep the legacy `error` string and may add `failure` (`category`, `stage`, `phase`, `code`, bounded redacted `message`). Categories: service, validation, configuration, storage, cancellation, release, internal; no provider cause is inferred.
+- **Version changes:** checkpoints from an older prompt or safeguard version stay inspectable but must be discarded, never resumed under new rules; saved stories and provenance are untouched.
+- **Retry guards:** stale handlers and repeated clicks cannot rerun an operation; Create Retry clears a draft error only when a matching reader draft exists; captured Create fields are restored after preferences load, then frozen. Explanation and detail retries keep the passage and question; failed acknowledgement IDs block new requests until released. Explanation and detail responses use in-memory save recovery (not durable across reload); chapters, examples and readings use durable checkpoints.
+
+## Validation and bounds
+
+- Shared validation for creation, continuation, rewrite and examples. Japanese without romaji; Russian Cyrillic without transliteration; Russian stress absent unless requested (prompt guidance, not a validator ban). Details in the [safeguard register](safeguards.md).
+- Bounds: chapter content 30000 UTF-16 units; total response and assembled content 1000000; per-field maxima for title, notes, forms and examples; at most 20 forms per note; no cap on note count. Validators do not certify linguistic accuracy, complexity or learning effect.
+- Glossary validation checks every exact occurrence (repeated forms cached); display links only the first eligible occurrence of each normalized headword/meaning after overlap resolution, processing candidates by form length without materializing duplicates. A shorter listed form inside a longer chosen phrase keeps its own note. A note opened from text leads with the exact matched wording (which Listen speaks) and shows the dictionary headword after it when different.
+- Saved content is never revalidated or rewritten on load.
+
+## Reader, memory and help
+
+- Canonical text is kept separate from ruby for selection, copy and speech.
+- Memory: 8000-unit summary chunks, 12000-unit serialized memory cap, bounded recent prose, all lineage-specific. Rewrites include the current chapter as source but exclude its events from preceding context. Removal prunes only unreferenced versions, help and memory.
+- Initial help returns UTF-16 excerpt boundaries in the source, an optional English context translation and one short explanation. Detail returns plain text (legacy JSON accepted). Examples return three canonical sentences with English translations and validated highlight ranges; Japanese readings use the staged pipeline.
+
+## Background operation sessions
+
+A running request continues in App²'s native service in the background, but the web steps between requests (validation, saving, the next `ai.start`) run only while Android lets the page run, and Android refuses to start a foreground service from the background. LingoMage therefore holds one operation session (`js/ai-session.js`, host `ai.sessions`) across multi-request operations.
+
+- A session is a bounded hold on the host service, begun with the first request's provider and model (same AI permission as `ai.start`). It starts no inference and does not keep the page running; if web steps stall, the checkpoint stays at its stage for Resume.
+- Opened lazily at the first `ai.start` in a scope; ended when the outermost scope finishes. The host also ends it after about 90 s without a running request, after 30 minutes, at Android's foreground-service limit, on notification Cancel, AI revocation, or page replacement. The app never reopens an ended session; only the next explicit Create, Continue, Rewrite, Examples, Resume or Retry opens one.
+- Scope: Create (plan, prose, notes, readings); Continue and Rewrite including the story-context summary requests (`readerAi` joins the outer scope and never ends it); Examples; Resume.
+- Finish request, Save response, acknowledge, release and discard never open a session or probe capabilities. Resume with an outstanding request polls, saves and acknowledges first.
+- Single requests (Explain and follow-ups) use no session, but every `ai.start` uses the wrapper: a hidden page without a session makes no host call and pauses with `background_paused`.
+- Old hosts: the wrapper asks `capabilities` once and caches only `{sessions:1}` or exactly `invalid_request` "Unsupported AI command."; timeouts, other errors and malformed answers reject. A `sessions.begin` without a usable bounded `sessionId` is an error. `dev_server.py` answers like an old host, so sessions are tested only offline (`tests/ai-session.mjs`) and on Android.
+- Rotation loads a new page that cannot hold the old session; the host releases it while the request continues, and the new page polls, saves and acknowledges by saved ID. Closing the task cancels both.
+- Stored diagnostics redact session, request and account IDs. Recovery wording is in `DESIGN.md`.

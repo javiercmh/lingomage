@@ -29,7 +29,7 @@ android/build/
 dist/
 
 # Raw learning-quality evaluation runs (development-only; never packaged or committed)
-docs/validation/generation-evaluation/ai-evals/runs/
+docs/evaluation/generation-tests/ai-evals/runs/
 
 # Local assistant tool configuration
 .claude/

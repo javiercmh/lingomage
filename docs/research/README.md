@@ -34,11 +34,11 @@ Document AI-generated text quality separately from evidence of learning gains.
 
 ## Learning change policy
 
-Any change to learning behavior (prompts, reading support, difficulty, a new activity) records in its PED decision or the [strategy](../product/evidence-informed-strategy.md):
+Any change to learning behavior (prompts, reading support, difficulty, a new activity) records in its PED decision or the [future directions](../product/future-directions.md):
 
 - the evidence relied on, with stable bibliography keys and DOI links, and author/year at the claim;
 - the assumptions that are product choices rather than findings;
-- the intended learning outcome and how it would be evaluated (see the strategy's evaluation gates: reviewed quality, comprehension, delayed retention and transfer are different things, and AI scoring is not proof of learning);
+- the intended learning outcome and how it would be evaluated (see the [evaluation gates](../evaluation/learning-evaluation-plan.md#evaluation-gates): reviewed quality, comprehension, delayed retention and transfer are different things, and AI scoring is not proof of learning);
 - the conditions under which the decision will be revisited.
 
 Before adopting a new or materially revised research claim, verify it with a Consensus search, including contradictory findings and applicability gaps, then inspect the original abstract or text. If Consensus access is unavailable, adoption is blocked: record the gap, do not substitute another source for the check. Sources seen only as Consensus abstracts remain provisional candidates and may be cited only with that label.
@@ -51,7 +51,7 @@ On 2026-10-19 a user-supplied ChatGPT conversation (a ranked summary of adult L2
 
 | Candidate claim | Audit result |
 | --- | --- |
-| Spacing: medium-to-large, 48 experiments, 3,411 participants; longer spacing better at delay; equal and expanding similar | Matches the abstract of `kimWebb2022SpacedPractice`; moderators and counter-signals add important limits ([review](retrieval-and-spacing.md)) |
+| Spacing: medium-to-large, 48 experiments, 3,411 participants; longer spacing better at delay; equal and expanding similar | Matches the abstract of `kimWebb2022SpacedPractice`; moderators and counter-signals add important limits ([review](spaced-review.md)) |
 | Rice & Tokowicz: retrieval plus elaboration beats memorizing translations | Consistent with the abstract (spaced retrieval or user-generated elaboration); laboratory, adult, abstract only |
 | Explicit instruction: 28 reports, 3,754 learners, substantial benefit | Matches `liSun2024ExplicitInstruction` (published in the 2024 issue); outcome-measure type moderated effects |
 | Extensive reading: small-to-medium benefits across domains | Matches the abstract of `sangersEtAl2025ExtensiveReading`; omitted that effects were larger with limited text choice and accountability; "gradual challenge" has no support in the abstract. A separate, earlier analysis (`hamada2020ExtensiveReadingBias`) found smaller estimates after accounting for selection bias; it does not reanalyze the 2025 synthesis |
@@ -61,7 +61,7 @@ On 2026-10-19 a user-supplied ChatGPT conversation (a ranked summary of adult L2
 | Combination of methods beats any single method; ranking of methods; 60-minute split | Unsupported: no reviewed source compares combined with single methods or tests that allocation. Not repeated in product guidance |
 | Learning styles, universal best app | Not relevant; not used |
 
-A second audited excerpt (a research summary on retention, transfer and spontaneous production, with "long-term" labels, a qualitative strength table and an immediate/4-week/3-month design suggestion) is audited in [outcomes and measurement](outcomes-and-measurement.md#audit-of-the-supplied-evidence-excerpt). Effect sizes from unlike study pools or metrics (d, g, r, percentage gains) are never compared directly in project documents.
+A second audited excerpt (a research summary on retention, transfer and spontaneous production, with "long-term" labels, a qualitative strength table and an immediate/4-week/3-month design suggestion) is audited in [outcomes and measurement](measuring-learning.md#audit-of-the-supplied-evidence-excerpt). Effect sizes from unlike study pools or metrics (d, g, r, percentage gains) are never compared directly in project documents.
 
 ## Research index
 
@@ -75,10 +75,10 @@ not systematic, unless a review says otherwise.
 | Generation at a target level | [Level-guided generation](level-guided-generation.md) | [PED-004](../pedagogy/PED-004-level-guided-generation.md) |
 | Reading support, glossing, extensive reading and repeated encounters | [Reading and glossing](reading-and-glossing.md), [lexical-unit terminology](lexical-units.md) | [PED-002](../pedagogy/PED-002-contextual-reading-support.md) |
 | Lookups, probable-reading exposure and learner modelling | [Consultation signals](consultation-signals.md) | [PED-005](../pedagogy/PED-005-consultation-signals.md) |
-| Spaced retrieval and review (not implemented) | [Retrieval and spacing](retrieval-and-spacing.md) | [Strategy](../product/evidence-informed-strategy.md) |
-| Explicit instruction, corrective feedback, listening and production (not implemented) | [Instruction, feedback and production](instruction-feedback-and-production.md) | [Strategy](../product/evidence-informed-strategy.md) |
-| Retention, transfer, spontaneous production and measurement (not implemented) | [Outcomes and measurement](outcomes-and-measurement.md) | [Learning outcomes and evaluation](../product/learning-outcomes-and-evaluation.md) |
-| Long-term product direction | [Evidence-informed strategy](../product/evidence-informed-strategy.md) | Horizons and evaluation gates |
+| Spaced retrieval and review (not implemented) | [Spaced review](spaced-review.md) | [Future directions](../product/future-directions.md) |
+| Explicit instruction, corrective feedback, listening and production (not implemented) | [Instruction, feedback, listening and production](instruction-feedback-listening-production.md) | [Future directions](../product/future-directions.md) |
+| Retention, transfer, spontaneous production and measurement (not implemented) | [Measuring learning](measuring-learning.md) | [Learning evaluation plan](../evaluation/learning-evaluation-plan.md) |
+| Long-term product direction | [Future directions](../product/future-directions.md) | Horizons |
 | Japanese script support | [Japanese furigana](japanese-furigana.md) (preliminary; sources unverified) | [PED-002](../pedagogy/PED-002-contextual-reading-support.md) |
 
 Starting publications for glossing and incidental vocabulary learning:

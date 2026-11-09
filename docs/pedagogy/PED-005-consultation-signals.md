@@ -51,7 +51,7 @@ The record means **"looked up" and "probably read"**. It never means *unknown*, 
   - at most five focus areas
   - a non-binding comment on level
 - **Limits:** it must never set the level, and it needs prompt-contract tests before release.
-- **Later uses:** generation could reuse focus items so they come up again, and a practice mode could use retrieval and spacing (see the [evidence-informed strategy](../product/evidence-informed-strategy.md)).
+- **Later uses:** generation could reuse focus items so they come up again, and a practice mode could use retrieval and spacing (see [future directions](../product/future-directions.md)).
 
 ## Evidence and limits
 
@@ -109,7 +109,7 @@ Full notes are in the [consultation signals review](../research/consultation-sig
 - **Interface:** "Most looked up" in the profile; see `DESIGN.md`.
 - **Provenance:** no prompt changes. Selected text is stored canonically, without furigana.
 - **Tests:** `tests/consultation-signals.mjs` and `tests/reading-exposure.mjs`.
-- **Android checks:** listed in the [device checklist](../validation/device-checklist.md).
+- **Android checks:** listed in the [Android checklist](../evaluation/android-checklist.md).
 
 ## Alternatives and revisit conditions
 

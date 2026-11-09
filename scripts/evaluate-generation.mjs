@@ -11,7 +11,7 @@ import {findGlossaryMatches} from '../js/reader-text.js';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const args=process.argv.slice(2);const option=(key,fallback)=>{const i=args.indexOf(key);return i<0?fallback:args[i+1];};
 const suite=option('--suite','models'),endpoint=option('--endpoint','http://localhost:8889'),model=option('--model','gpt-6.1-sol'),effort=option('--effort','low');
-const output=path.resolve(option('--output',path.join(root,'docs/validation/generation-evaluation',suite)));
+const output=path.resolve(option('--output',path.join(root,'docs/evaluation/generation-tests',suite)));
 const limit=Number(option('--limit','Infinity'));const retry=args.includes('--retry');const languageFilter=option('--language','');
 if(!['models','pilot','followups','prose'].includes(suite))throw Error('Expected models, pilot, followups or prose suite.');
 if(!/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(endpoint))throw Error('Use the local development bridge only.');
@@ -20,7 +20,7 @@ const read=p=>JSON.parse(fs.readFileSync(p,'utf8'));const write=(p,value)=>{fs.w
 const app=fs.readFileSync(path.join(root,'js/app.js'),'utf8');const promptVersion=/const PROMPT_VERSION = '([^']+)'/.exec(app)[1];
 function loadPrompt(source){const context={};vm.createContext(context);vm.runInContext(source,context);return context;}
 const revisedPrompts=loadPrompt(app.slice(app.indexOf('function storyInstructions('),app.indexOf('function storyInput(')));
-const baseline=read(path.join(root,'docs/validation/generation-evaluation/baseline.json'));
+const baseline=read(path.join(root,'docs/evaluation/generation-tests/baseline.json'));
 const original=loadPrompt(baseline.storyInstructionsSource).storyInstructions;
 const revised=revisedPrompts.storyInstructions;
 const selectedNotesFile=option('--selected-notes','');
@@ -45,7 +45,7 @@ for(const language of Object.keys(languages))for(const difficulty of language===
 }
 if(suite==='followups'||suite==='prose')for(const language of Object.keys(languages))for(const kind of ['continue','rewrite','chapter']){
  const difficulty=language==='ja'?'N5':'A1';
- const parentFile=path.join(root,'docs/validation/generation-evaluation/pilot',`${language}-${difficulty}-0-revised.json`);
+ const parentFile=path.join(root,'docs/evaluation/generation-tests/pilot',`${language}-${difficulty}-0-revised.json`);
  if(!fs.existsSync(parentFile)||!read(parentFile).result)throw Error(`A completed pilot source is required: ${path.basename(parentFile)}`);
  const parent=read(parentFile).result;
  const value=input(language,difficulty,0,['chapter'].includes(kind)?kind:'scene');

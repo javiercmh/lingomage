@@ -1,20 +1,20 @@
-# Evidence-informed product strategy
+# Future directions
 
-Status: durable direction, not an implementation plan. Nothing here is a committed feature, date or ranking. First written 2026-10-19 from the scoped reviews listed below. Revisit under the conditions in each row and under the [research policy](../research/README.md#learning-change-policy).
+Where research suggests LingoMage could develop, what is known and what is not. Status: durable direction, not an implementation plan. Nothing here is a committed feature, date or ranking. First written 2026-10-19 from the scoped reviews listed below. Revisit under the conditions in each row and under the [research policy](../research/README.md#learning-change-policy).
 
 ## Purpose and rules
 
-LingoMage is a reading-first workspace of AI-generated stories with contextual help ([MVP](mvp.md)). This document records where research suggests the product could develop, what is known, what is not, and how an idea must be evaluated before it ships.
+LingoMage is a reading-first workspace of AI-generated stories with contextual help ([features](features.md)). This document records where research suggests the product could develop, what is known, what is not, and how an idea must be evaluated before it ships.
 
 - **Reading stays the core.** Other modes are options around a story, never a replacement for reading.
 - **Evidence is not a roadmap ranking.** The reviews show where studies exist, not which feature would work best here. An external synthesis that ranks methods was audited and was not used for ordering ([audit](../research/README.md#audit-of-a-candidate-synthesis)).
 - **Label every claim:** research-supported finding, extrapolation, product assumption or open question. Most items below are extrapolations: the evidence is mostly adult or university learners of English, controlled materials and short horizons, not AI-generated stories in German, Japanese, Russian or Spanish.
 - **No unvalidated schedules.** No optimal review interval, session length or time split between activities is claimed.
 - **Quality is not learning.** Good AI text, passing validators or an AI judge's approval do not show comprehension, retention or transfer.
-- **Privacy.** Learner stories, settings and checkpoints stay local. Development evaluations and AI evals use public fictional briefs and frozen sources, never learner files. A future voluntary in-app assessment could use story targets the learner explicitly selects, with consent, and any research export would be separate, explicit and consented, with no telemetry or automatic export ([outcomes and evaluation](learning-outcomes-and-evaluation.md#data-and-privacy-direction)).
-- **Outcomes.** What counts as learning (reading comprehension, retention, transfer, spontaneous production) and which signals cannot establish it alone (engagement, AI text quality, practiced-task performance) is defined in [learning outcomes and evaluation](learning-outcomes-and-evaluation.md).
+- **Privacy.** Learner stories, settings and checkpoints stay local. Development evaluations and AI evals use public fictional briefs and frozen sources, never learner files. A future voluntary in-app assessment could use story targets the learner explicitly selects, with consent, and any research export would be separate, explicit and consented, with no telemetry or automatic export ([outcomes and evaluation](../evaluation/learning-evaluation-plan.md#data-and-privacy-direction)).
+- **Outcomes.** What counts as learning (reading comprehension, retention, transfer, spontaneous production) and which signals cannot establish it alone (engagement, AI text quality, practiced-task performance) is defined in [learning evaluation plan](../evaluation/learning-evaluation-plan.md).
 
-Source reviews: [reading and glossing](../research/reading-and-glossing.md), [retrieval and spacing](../research/retrieval-and-spacing.md), [outcomes and measurement](../research/outcomes-and-measurement.md), [instruction, feedback and production](../research/instruction-feedback-and-production.md), [level-guided generation](../research/level-guided-generation.md), [self-assessment](../research/self-assessment.md).
+Source reviews: [reading and glossing](../research/reading-and-glossing.md), [retrieval and spacing](../research/spaced-review.md), [outcomes and measurement](../research/measuring-learning.md), [instruction, feedback and production](../research/instruction-feedback-listening-production.md), [level-guided generation](../research/level-guided-generation.md), [self-assessment](../research/self-assessment.md).
 
 ## Current baseline
 
@@ -45,25 +45,15 @@ Question: can optional retrieval, reuse across stories and contextual instructio
 | Opportunity | Learner need | Evidence and limits | Current behavior | Evaluation questions | Reconsider when |
 | --- | --- | --- | --- | --- | --- |
 | Story-linked listening | Hear target language tied to known text | Mixed: reading-while-listening lowered comprehension versus silent reading in one registered report (`huiGodfroid2026ReadingWhileListening`); vocabulary gains across modes similar and heterogeneous (`webbEtAl2023IncidentalMetaAnalysis`); not tested for synthesized speech or these languages | Device speech for chapters and selections | Does listening help or hinder comprehension for beginners with device speech? | Device audio quality review; comparison data |
-| Short writing or speaking tied to a story | Productive use of new language | Task and dialogue systems show medium effects in mostly pre-LLM studies (`houMin2026DialogueCALL`, `bibauwEtAl2022DialogueSystems`); the TBLT program figure is disputed (`bryfonskiMcKay2019TBLT`, `xuanEtAl2025TBLTComment`, `boersFaez2026TBLTMetaAnalysis`); gains on repeated speaking tasks are better shown than gains on unrelated spontaneous speech ([outcomes and measurement](../research/outcomes-and-measurement.md#spontaneous-production)) | None | Does a story-linked task improve delayed productive use on unseen prompts versus reading alone? | Qualified review of AI interlocutor or feedback accuracy |
+| Short writing or speaking tied to a story | Productive use of new language | Task and dialogue systems show medium effects in mostly pre-LLM studies (`houMin2026DialogueCALL`, `bibauwEtAl2022DialogueSystems`); the TBLT program figure is disputed (`bryfonskiMcKay2019TBLT`, `xuanEtAl2025TBLTComment`, `boersFaez2026TBLTMetaAnalysis`); gains on repeated speaking tasks are better shown than gains on unrelated spontaneous speech ([outcomes and measurement](../research/measuring-learning.md#spontaneous-production)) | None | Does a story-linked task improve delayed productive use on unseen prompts versus reading alone? | Qualified review of AI interlocutor or feedback accuracy |
 | Corrective feedback on learner language | Know what to fix | Feedback has durable effects in human-led studies, with type and setting differences (`li2010CorrectiveFeedback`, `lysterSaito2010OralFeedback`); AI feedback accuracy and effects untested here | The app does not assess learner writing | Is AI feedback accurate by language per qualified reviewers? Do learners revise correctly later? | Review shows accurate feedback; a consented delayed comparison |
 
 ## Evaluation before learning claims
 
-Work in gates; a later gate does not replace an earlier one. These gates define evaluation for proposed extensions; they do not imply that existing engineering checks or content reviews have not occurred. App-specific learning evaluations remain pending.
-
-1. **Qualified language review and usability.** A qualified reviewer per language checks accuracy, naturalness and level fit; a small usability session checks comprehension of the interface and whether the feature is used as intended. Without this, stop.
-2. **Quality proxies.** Deterministic safeguards and the opt-in [AI evals](../validation/generation-evaluation/README.md#learning-quality-evaluations-ai-evals) can find errors early. They measure output quality only, and an AI judge's scores are not proof of learning.
-3. **Comprehension.** Test understanding of the story during or just after reading, separate from word knowledge.
-4. **Delayed retention.** Re-test target items after a delay chosen in advance and justified in the protocol (for example, days and weeks), against a reading-only comparison with the same time on task. Include a control for words learned elsewhere.
-5. **Transfer to unseen material.** Test the same items in new sentences or a new passage, and where relevant productive use, not only recognition of the exact story sentences.
-
-Engineering prototypes (to test whether a probe or review flow works, is usable and passes language review) may precede these gates; only **learning claims** need them, and a prototype is never evidence of learning. The concrete in-app direction, measurement principles and an example research protocol (not a requirement) are in [learning outcomes and evaluation](learning-outcomes-and-evaluation.md). Typed unfamiliar-task responses are a limited production proxy; spontaneous speech assessment needs audio capture, transcription and qualified scoring that this workspace does not provide.
-
-Feasibility: a within-subject design that counterbalances which items get the feature, small consented pilots first, local data only, preregistered measures and analysis, and statistical advice on sample size before any confirmatory claim. Report limits, effect uncertainty and drop-out; never claim certified level alignment.
+No learning claim without the gates in the [learning evaluation plan](../evaluation/learning-evaluation-plan.md#evaluation-gates). Prototypes may precede them; a prototype is never evidence of learning.
 
 ## Reconsideration and rejected claims
 
 - Revisit this document on relevant feature work, major new evidence, contradictory evaluation results, or when a provisional source is verified or fails verification.
-- Not used for product direction: matching to learning styles (no supporting source was reviewed; tangential to this strategy), an optimal activity time split, the claim that one combined method is best across skills, and any ranking drawn from the shared synthesis.
-- Deferred features remain research candidates until a proposal follows the policy; prototypes can precede trials, while learning claims require the gates above; see [MVP](mvp.md#not-in-scope).
+- Not used for product direction: matching to learning styles (no supporting source was reviewed; tangential to these directions), an optimal activity time split, the claim that one combined method is best across skills, and any ranking drawn from the shared synthesis.
+- Deferred features remain research candidates until a proposal follows the policy; prototypes can precede trials, while learning claims require the gates above; see [MVP](features.md#not-in-scope).

@@ -4,20 +4,42 @@ LingoMage is a plain HTML/CSS/JavaScript App² subapp at the repository root (no
 
 ## Where to look
 
-| Changing | Read and update in the same change |
-| --- | --- |
-| Interface, copy, layout, accessibility | [`DESIGN.md`](DESIGN.md) |
-| Modules, data files, generation pipeline, storage, tracking | [`docs/architecture/app2-runtime.md`](docs/architecture/app2-runtime.md) |
-| Generation, validation, safeguards | [`docs/architecture/language-safeguards.md`](docs/architecture/language-safeguards.md), `data/language-safeguards.json` |
-| Learning behavior (prompts, reading aids, levels, tracking) | [`docs/pedagogy/README.md`](docs/pedagogy/README.md) and the relevant PED; citations from `docs/research/references.bib` |
-| One language's rules | [`docs/languages/`](docs/languages/README.md) |
-| Manifest, packaging, updates, host APIs | [`PACKAGING.md`](PACKAGING.md) |
-| Something that needs Android verification | add or edit a row in [`docs/validation/device-checklist.md`](docs/validation/device-checklist.md) |
-| Docs themselves | policy in [`docs/README.md`](docs/README.md) |
+Every doc, what it contains, and when to read or update it. Update the matching doc in the same change as the code.
+
+**App behavior (read before changing code)**
+
+| File | What you'll find | Read or update when |
+| --- | --- | --- |
+| [`DESIGN.md`](DESIGN.md) | Interface rules by screen: Create, Library, Reader, generation status and recovery, Profile, Settings, workspace recovery, verification | Any UI, copy, layout or accessibility change |
+| [`docs/architecture/overview.md`](docs/architecture/overview.md) | Platform, module responsibilities, version constants, how to run tests | Adding or moving a module; changing test tooling |
+| [`docs/architecture/data-and-storage.md`](docs/architecture/data-and-storage.md) | Every `data/*.json` file, required vs optional stores, invalid-file and save-failure rules, Library activity stamps | Touching saved data, validators or storage errors |
+| [`docs/architecture/generation-pipeline.md`](docs/architecture/generation-pipeline.md) | Generation stages, checkpoints, recovery, validation bounds, memory, help requests, background AI sessions | Changing prompts' plumbing, AI requests, retries or recovery |
+| [`docs/architecture/learner-tracking.md`](docs/architecture/learner-tracking.md) | Time tracking and lookup history/probable reading: counting rules and file formats | Changing what is counted or recorded about the learner |
+| [`docs/architecture/safeguards.md`](docs/architecture/safeguards.md) + `data/language-safeguards.json` | Registered language and generation safeguards and their tests | Changing generation or validation |
+| [`PACKAGING.md`](PACKAGING.md) | Manifest ownership, App² updates, packaging, host APIs (AI, translation), local preview | Adding files, changing the manifest or host calls |
+
+**Learning design and evidence (read before changing learning behavior)**
+
+| File | What you'll find | Read or update when |
+| --- | --- | --- |
+| [`docs/pedagogy/`](docs/pedagogy/README.md) | One PED per pedagogical decision: decision, evidence table, assumptions, revisit conditions, history | Changing prompts, reading aids, levels or learner tracking |
+| [`docs/research/`](docs/research/README.md) | Evidence reviews per topic with sources, access levels and limits; `references.bib` holds citation keys | Citing or adding evidence |
+| [`docs/languages/`](docs/languages/README.md) | Per-language rules (script, readings, orthography), earlier designs, review criteria | Changing anything language-specific |
+
+**Product scope and evaluation**
+
+| File | What you'll find | Read or update when |
+| --- | --- | --- |
+| [`docs/product/features.md`](docs/product/features.md) | What the app does now, confirmed requirements, defaults, what is out of scope | Adding or removing a feature |
+| [`docs/product/future-directions.md`](docs/product/future-directions.md) | Research-linked ideas not yet built (reading, retrieval, listening, writing, feedback) | Proposing a new learning feature |
+| [`docs/evaluation/learning-evaluation-plan.md`](docs/evaluation/learning-evaluation-plan.md) | How learning would be measured: outcomes, evaluation gates, in-app check design, protocol (nothing implemented) | Making or testing any learning claim |
+| [`docs/evaluation/android-checklist.md`](docs/evaluation/android-checklist.md) | What to verify on Android and how (no results) | A change needs Android verification: add or edit its row |
+| [`docs/evaluation/generation-tests/`](docs/evaluation/generation-tests/method.md) | Live model and prompt comparisons: `method.md`, `results.md`, `ai-evals.md` (opt-in learning-quality evals), `notes-prompt-experiment/` (pending) | Running or interpreting model, prompt or AI-eval tests |
+| [`docs/README.md`](docs/README.md) | Documentation policy | Writing or reorganizing docs |
 
 ## Product and content
 
-- Interface and glossary text are English. Targets: German, Japanese, Russian, Spanish (Chile); learners request regional varieties in language preferences.
+- Interface and glossary text are English. Targets: German, Japanese, Russian, Spanish; learners request regional varieties in language preferences.
 - Label product assumptions and evidence limits. Never claim certified CEFR alignment or proven learning effectiveness.
 - When prompts or learning behavior change: update the PED and language docs, increment `PROMPT_VERSION` in `js/app.js`, and preserve saved-story provenance.
 - Japanese canonical text stays separate from furigana; copy and speech omit readings. Russian uses Cyrillic without transliteration.
@@ -43,8 +65,8 @@ LingoMage is a plain HTML/CSS/JavaScript App² subapp at the repository root (no
 - The server keeps learner files in the gitignored `.dev-data/`, seeded from `seedDefaults`; committed seeds never change. Delete `.dev-data/` for a fresh install. Never commit learner data.
 - Run `python3 scripts/check.py` (Node 22.12+, Python 3.9+) before completing any change.
 - For interface or copy changes, inspect screenshots at desktop and narrow mobile widths (spacing, wrapping, hierarchy, clipping, touch targets); DOM checks are not enough.
-- Record checks actually run, and what remains unverified, in the commit message. Results never go in docs; the device checklist lists checks only.
-- AI evals (`scripts/ai-eval.mjs`) are opt-in and never part of checks, hooks, CI or packaging; without `--live` they make no request. See `docs/validation/generation-evaluation/README.md`.
+- Record checks actually run, and what remains unverified, in the commit message. Results never go in docs; the Android checklist lists checks only.
+- AI evals (`scripts/ai-eval.mjs`) are opt-in and never part of checks, hooks, CI or packaging; without `--live` they make no request. See `docs/evaluation/generation-tests/ai-evals.md`.
 - Never log or export credentials, tokens, callback URLs or account identifiers.
 
 ## Branches and releases

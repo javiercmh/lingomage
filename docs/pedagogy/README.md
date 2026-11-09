@@ -14,7 +14,7 @@ Not pedagogical decisions (no record needed): Library ordering and dates, and ot
 
 ## Writing a decision
 
-1. Copy [the template](TEMPLATE.md) to `PED-NNN-short-name.md` with the next ID and add a row above. One record per concrete choice, not per copy edit. Candidates that are not yet decisions live in the [strategy](../product/evidence-informed-strategy.md); intended outcomes in [learning outcomes](../product/learning-outcomes-and-evaluation.md).
+1. Copy [the template](TEMPLATE.md) to `PED-NNN-short-name.md` with the next ID and add a row above. One record per concrete choice, not per copy edit. Candidates that are not yet decisions live in the [future directions](../product/future-directions.md); intended outcomes in [learning evaluation plan](../evaluation/learning-evaluation-plan.md).
 2. Cite by stable key from [references.bib](../research/references.bib) with a DOI link at the claim; full study details and access level go in the research review. Add a key once; never rename one.
 3. State the evidence, the product assumptions, the intended outcome and the revisit conditions. Verify new or materially revised claims as the [learning change policy](../research/README.md#learning-change-policy) requires.
 4. Keep implementation status separate from evidence strength; record only reviews and checks actually performed (results of engineering checks go in commit messages).

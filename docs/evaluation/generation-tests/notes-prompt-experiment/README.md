@@ -1,4 +1,4 @@
-# Controlled contextual-notes comparison
+# Notes-prompt experiment (controlled contextual-notes comparison)
 
 Implementation prepared on 2026-10-14; live execution requires separate authorization. Production prompts are unchanged until acceptance. `prompts.json` contains exact current and candidate notes instructions. `corpus.json` freezes 24 canonical chapters (two briefs × four languages × three targets), their saved profiles/plans, source hashes, prompt versions, and exact validator/matcher sources. Completed writer responses are used even when subsequent notes failed. Historical records and reviews remain untouched. The seven passages in `focused.json` are review cases, not assertions that the candidate has passed semantic review.
 
