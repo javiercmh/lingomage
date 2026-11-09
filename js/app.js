@@ -829,7 +829,6 @@ function languageIcon(className, viewBox, shapes) {
   shapes.forEach(([tag, attributes]) => { const node = document.createElementNS(SVG_NS, tag); Object.entries(attributes).forEach(([key, value]) => node.setAttribute(key, value)); svg.append(node); });
   return svg;
 }
-const CHEVRON_SHAPES = [['path', { d: 'M6 9l6 6 6-6' }]];
 const GRIP_SHAPES = [[6, 4], [12, 4], [6, 9], [12, 9], [6, 14], [12, 14]].map(([cx, cy]) => ['circle', { cx, cy, r: 1.6 }]);
 function enabledLanguages() { return state.languageOrder.filter(code => state.targetLanguages[code]); }
 function setLanguageOrder(enabledOrder) { state.languageOrder = [...enabledOrder, ...state.languageOrder.filter(code => !enabledOrder.includes(code))]; }
@@ -937,7 +936,7 @@ function renderTargetLanguageSettings(expanded = new Set(), focusAfter = '') {
     const name = document.createElement('strong'); name.textContent = LANGUAGES[code];
     const summary = document.createElement('small'); summary.textContent = levelSummary(code);
     text.append(name, summary);
-    const chevron = document.createElement('span'); chevron.className = 'language-chevron'; chevron.append(languageIcon('language-chevron-icon', '0 0 24 24', CHEVRON_SHAPES));
+    const chevron = document.createElement('span'); chevron.className = 'stats-chevron'; chevron.setAttribute('aria-hidden', 'true');
     toggle.append(text, chevron);
     const updateToggle = () => { toggle.setAttribute('aria-expanded', String(!settings.hidden)); toggle.setAttribute('aria-label', `${LANGUAGES[code]}, ${summary.textContent}. ${settings.hidden ? 'Show' : 'Hide'} settings`); row.classList.toggle('open', !settings.hidden); };
     toggle.addEventListener('click', () => { settings.hidden = !settings.hidden; updateToggle(); });
