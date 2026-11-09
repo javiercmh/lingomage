@@ -79,7 +79,6 @@ not systematic, unless a review says otherwise.
 | Explicit instruction, corrective feedback, listening and production (not implemented) | [Instruction, feedback, listening and production](instruction-feedback-listening-production.md) | [Future directions](../product/future-directions.md) |
 | Retention, transfer, spontaneous production and measurement (not implemented) | [Measuring learning](measuring-learning.md) | [Learning evaluation plan](../evaluation/learning-evaluation-plan.md) |
 | Long-term product direction | [Future directions](../product/future-directions.md) | Horizons |
-| Japanese script support | [Japanese furigana](japanese-furigana.md) (preliminary; sources unverified) | [PED-002](../pedagogy/PED-002-contextual-reading-support.md) |
 
 Starting publications for glossing and incidental vocabulary learning:
 
