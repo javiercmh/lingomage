@@ -358,7 +358,7 @@ function disclosureRow(key, label, value, rows) {
   const toggle = document.createElement('button'), name = document.createElement('span'), amount = document.createElement('span'), chevron = document.createElement('span');
   const children = statsList(rows); children.id = `practice-${key}`; children.hidden = !openPractice.has(key);
   toggle.type = 'button'; toggle.className = 'stats-language-toggle'; toggle.dataset.key = key; toggle.setAttribute('aria-controls', children.id);
-  name.textContent = label; amount.textContent = value; chevron.className = 'stats-chevron'; chevron.setAttribute('aria-hidden', 'true'); chevron.textContent = '⌄';
+  name.textContent = label; amount.textContent = value; chevron.className = 'stats-chevron'; chevron.setAttribute('aria-hidden', 'true');
   toggle.append(name, amount, chevron);
   const sync = () => { toggle.setAttribute('aria-expanded', String(!children.hidden)); toggle.setAttribute('aria-label', `${label}${value ? `, ${value}` : ''}. ${children.hidden ? 'Show' : 'Hide'} details`); };
   toggle.addEventListener('click', () => { children.hidden = !children.hidden; if (children.hidden) openPractice.delete(key); else openPractice.add(key); sync(); });
@@ -459,7 +459,7 @@ function renderLookups() {
     const toggle = document.createElement('button'), body = document.createElement('div');
     toggle.type = 'button'; toggle.className = 'stats-language-toggle'; toggle.dataset.key = key;
     body.id = key; body.className = 'lookup-body'; body.hidden = !(lookupOpen.get(code) ?? codes.length === 1); toggle.setAttribute('aria-controls', key);
-    const chevron = text('span', 'stats-chevron', '⌄'); chevron.setAttribute('aria-hidden', 'true');
+    const chevron = text('span', 'stats-chevron', ''); chevron.setAttribute('aria-hidden', 'true');
     toggle.append(text('span', '', label), chevron);
     const sync = () => toggle.setAttribute('aria-expanded', String(!body.hidden));
     toggle.addEventListener('click', () => { body.hidden = !body.hidden; lookupOpen.set(code, !body.hidden); sync(); });

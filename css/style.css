@@ -590,8 +590,10 @@ body.has-app-generation-status .toast { bottom: calc(var(--tabbar-h) + 88px + va
 .stats-language-toggle { display: flex; width: calc(100% + 12px); min-height: 44px; align-items: center; gap: 12px; margin: 0 -6px; padding: 8px 6px; border: 0; background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
 .stats-language-toggle > span:first-child { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .stats-language-toggle > span:nth-child(2) { font-weight: 650; text-align: right; }
-.stats-chevron { flex: none; color: var(--muted); font-size: 18px; line-height: 1; transition: transform .18s; }
-.stats-language-toggle[aria-expanded="true"] .stats-chevron { transform: rotate(180deg); }
+.stats-chevron { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--tint); color: var(--muted); transition: transform .18s, background-color .18s, color .18s; }
+.stats-chevron::before { content: ''; width: 7px; height: 7px; margin-top: -4px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; border-radius: 1px; transform: rotate(45deg); }
+.stats-language-toggle[aria-expanded="true"] .stats-chevron { transform: rotate(180deg); color: var(--accent); }
+@media (hover: hover) { .stats-language-toggle:hover .stats-chevron { background: var(--line); color: var(--ink); } }
 .stats-language-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 8px; }
 .stats-language > ul[hidden] { display: none; }
 .stats-language > ul { padding-bottom: 8px; }
