@@ -64,7 +64,7 @@ Every doc, what it contains, and when to read or update it. Update the matching 
 - Run `python3 dev_server.py --mock-ai` and open `http://localhost:8888` (deterministic, no external requests). Optional live testing: `codex login`, then `python3 dev_server.py --chatgpt` (uses ChatGPT plan allowance; development only).
 - The server keeps learner files in the gitignored `.dev-data/`, seeded from `seedDefaults`; committed seeds never change. Delete `.dev-data/` for a fresh install. Never commit learner data.
 - Run `python3 scripts/check.py` (Node 22.12+, Python 3.9+) before completing any change.
-- For interface or copy changes, inspect screenshots at desktop and narrow mobile widths (spacing, wrapping, hierarchy, clipping, touch targets); DOM checks are not enough.
+- For interface or copy changes, inspect screenshots at desktop and narrow mobile widths (spacing, wrapping, hierarchy, clipping, touch targets); DOM checks are not enough. Share before and after screenshots with the requester in the conversation, not just a description.
 - Record checks actually run, and what remains unverified, in the commit message. Results never go in docs; the Android checklist lists checks only.
 - AI evals (`scripts/ai-eval.mjs`) are opt-in and never part of checks, hooks, CI or packaging; without `--live` they make no request. See `docs/evaluation/generation-tests/ai-evals.md`.
 - Never log or export credentials, tokens, callback URLs or account identifiers.
