@@ -11,9 +11,9 @@ const examples={examples:Array.from({length:3},()=>({sentence:'Brot',translation
 const paths=[{id:'original',name:'Original',entries:[{chapterId:'c1',versionId:'v1'},{chapterId:'c2',versionId:'v2'}]}, {id:'alt',name:'Alternate 1',entries:[{chapterId:'c1',versionId:'v1'},{chapterId:'c3',versionId:'v3'}]}];
 const labelStories=[{id:'story',title:'Der Markt',paths,chapters:[{id:'c1'},{id:'c2'},{id:'c3'}]}];
 const target={storyId:'story',pathId:'alt',entries:paths[1].entries,index:0};
-assert.equal(operationLabel({kind:'continue',target},labelStories),'Continuing “Der Markt” · Chapter 3 · Alternate 1');
-assert.equal(operationLabel({kind:'rewrite',target:{...target,index:1}},labelStories),'Rewriting “Der Markt” · Chapter 2 · Alternate 1');
-assert.equal(operationLabel({kind:'examples',target:{storyId:'story',chapterId:'c3',versionId:'v3'}},labelStories),'Examples for “Der Markt” · Chapter 2 · Alternate 1');
+assert.equal(operationLabel({kind:'continue',target},labelStories),'Continuing “Der Markt” · Chapter 3 · Branch 1');
+assert.equal(operationLabel({kind:'rewrite',target:{...target,index:1}},labelStories),'Rewriting “Der Markt” · Chapter 2 · Branch 1');
+assert.equal(operationLabel({kind:'examples',target:{storyId:'story',chapterId:'c3',versionId:'v3'}},labelStories),'Examples for “Der Markt” · Chapter 2 · Branch 1');
 assert.equal(operationLabel({kind:'create',language:'es-CL',input:{difficulty:'A1'}},[],'Spanish'),'New Spanish story · A1');
 assert.equal(operationLabel({kind:'continue',target},[]),'Continuing a saved story · Chapter 3');
 assert.equal(operationLabel({kind:'rewrite',target:{storyId:'missing'}},[]),'Rewriting a saved story');

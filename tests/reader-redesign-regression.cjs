@@ -32,7 +32,7 @@ function section(start, end) { const at = source.indexOf(start); assert(at >= 0,
 {
   const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
   const headerStart = html.indexOf('<header class="reader-title-section"'), header = html.slice(headerStart, html.indexOf('</header>', headerStart));
-  for (const id of ['reader-title-meta', 'reader-title', 'reader-actions-toggle', 'reader-menu-continue', 'reader-menu-rewrite', 'reader-copy', 'reader-remove-chapters', 'reader-delete-path', 'reader-listen', 'chapter-select'])
+  for (const id of ['reader-title-meta', 'reader-title', 'reader-actions-toggle', 'reader-menu-continue', 'reader-menu-rewrite', 'reader-share', 'reader-remove-chapters', 'reader-delete-path', 'reader-listen', 'chapter-select'])
     assert(header.includes(`id="${id}"`), `${id} belongs to the title section`);
   assert(header.includes('aria-label="Listen to this chapter"'), 'icon-only Listen retains its accessible scope');
   assert(!header.includes('Listen to chapter</span>'));
@@ -43,7 +43,7 @@ function section(start, end) { const at = source.indexOf(start); assert(at >= 0,
   assert.equal((navigation.match(/<svg/g) || []).length, 3, 'navigation and picker use stroked chevrons');
   assert(header.indexOf('id="reader-listen"') > header.indexOf('id="reader-title"'));
   assert(!html.includes('id="text-smaller"') && !html.includes('class="reader-toolbar"'));
-  assert.equal((html.match(/id="reader-copy"/g) || []).length, 1);
+  assert.equal((html.match(/id="reader-share"/g) || []).length, 1);
   const titleContext = { window: { getSelection: () => ({ getRangeAt: () => ({ getBoundingClientRect: () => ({ left: 1, top: 2 }) }) }) }, getCanonicalSelection: () => ({ text: 'Titel', start: 0, end: 5 }), $: () => ({}), readerStory: () => ({ id: 's', language: 'de' }), activeChapter: () => ({ id: 'c' }), activeVersion: () => ({ id: 'v' }), SPEECH_LANGUAGES: { de: 'de-DE' } };
   vm.createContext(titleContext); vm.runInContext(section('function selectedTitle(', 'function selectedPassage('), titleContext);
   const passage = titleContext.selectedTitle();

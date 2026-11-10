@@ -1,9 +1,10 @@
-import { createStoryModel } from './story-model.js';
+import { chapterShareText, storyShareText, storyExportFile, deliverShare } from './story-share.js';
+import { createStoryModel, pathLabel } from './story-model.js';
 import { markStoryActivity, planLibrary, dateSegments, describeDates } from './library-activity.js';
 import { beginMemoryRebuild, finishMemoryRebuild, createStoryMemory } from './story-memory.js';
 import { createGenerationController } from './generation-controller.js';
 import { createReaderPanels } from './reader-panels.js';
-import { ai, readFile, writeFile, listFiles, speech, translation, selectionMenu } from './bridge.js';
+import { ai, readFile, writeFile, listFiles, speech, translation, selectionMenu, share, isNative } from './bridge.js';
 import { speakSelection, prepareSpeechOptions, speakChapter, chapterSpeechText } from './reader-speech.js';
 import { createSelectionMenuRouter } from './selection-menu.js';
 import { createReaderActivation, glossaryForTrigger, indexGlossaryTriggers, normalizeReaderControls } from './reader-activation.js';
@@ -925,7 +926,7 @@ function showOperationResult(op) {
     if (op.kind !== 'examples') state.readerChapter=op.target.index;
     $('reader-edit-panel').hidden=true; state.readerEditDraft=null; updateReader();
   }
-  toast(op.kind === 'examples' ? 'Examples saved' : op.kind === 'continue' ? 'Chapter added' : 'Alternate path created');
+  toast(op.kind === 'examples' ? 'Examples saved' : op.kind === 'continue' ? 'Chapter added' : 'Branch created');
 }
 function initializePipeline() {
   const entry=workspaceStorage.load('data/generation-checkpoints.json');
@@ -1301,7 +1302,7 @@ function closeStoryMenu(restoreFocus = false) {
   const menu = state.storyMenu; if (!menu) return;
   state.storyMenu = null; menu.popover.remove(); menu.trigger.setAttribute('aria-expanded', 'false');
   // A result saved while the popover was open re-renders now; focus then returns to the Actions button of the rebuilt card.
-  if (state.libraryStale && !state.storySelectionMode) renderLibrary();
+  if (state.libraryStale && !state.storySelectionMode && !state.shareDialog) renderLibrary();
   if (!restoreFocus) return;
   const list = $('library-list');
   const target = menu.trigger.isConnected ? menu.trigger : list.querySelector(`[data-story-id="${CSS.escape(menu.id)}"] .story-menu-toggle`) || list.querySelector('.story-open');
@@ -1317,10 +1318,13 @@ function openStoryMenu(story, trigger) {
   const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'story-popover-action story-popover-delete';
   remove.innerHTML = `${icon('M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3')}<span>Delete</span>`; remove.setAttribute('aria-label', `Delete story ${story.title}`);
   remove.addEventListener('click', () => { state.deleteTrigger = { id: story.id, trigger }; closeStoryMenu(); confirmStoryDeletion(new Set([story.id]), story); });
-  popover.append(select, remove); document.body.append(popover);
+  const shareButton = document.createElement('button'); shareButton.type = 'button'; shareButton.className = 'story-popover-action';
+  shareButton.innerHTML = `${icon('M12 16V3m-5 5 5-5 5 5M5 13v7h14v-7')}<span>Share</span>`; shareButton.setAttribute('aria-label', `Share story ${story.title}`);
+  shareButton.addEventListener('click', () => { openShareDialog(story, {trigger}); closeStoryMenu(); });
+  popover.append(select, shareButton, remove); document.body.append(popover);
   trigger.setAttribute('aria-expanded', 'true');
   // Fixed placement: right-aligned under the button, flipped above it when it would meet the bottom bar.
-  const rect = trigger.getBoundingClientRect(), height = popover.offsetHeight || 96, width = popover.offsetWidth || 180;
+  const rect = trigger.getBoundingClientRect(), height = popover.getBoundingClientRect().height, width = popover.offsetWidth || 180;
   const bottomLimit = (document.querySelector('.tabbar')?.getBoundingClientRect().top || window.innerHeight) - 8;
   const top = rect.bottom + 6 + height > bottomLimit ? Math.max(8, rect.top - 6 - height) : rect.bottom + 6;
   popover.style.top = `${top}px`; popover.style.left = `${Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8))}px`;
@@ -1372,7 +1376,7 @@ function wireLongPress(card, onLongPress, onMove, allowStoryOpen = false, ignore
 // Library: one hero (the latest saved activity) and every other story once below it, in the session-only sort (js/library-activity.js). A result saved while a selection or Actions popover is open re-renders afterwards.
 function libraryChanged() {
   if (!$('view-library').classList.contains('active')) { state.libraryStale = false; return; }
-  if (state.storySelectionMode || state.storyMenu) { state.libraryStale = true; return; }
+  if (state.storySelectionMode || state.storyMenu || state.shareDialog) { state.libraryStale = true; return; }
   renderLibrary();
 }
 function storyDateLine(entry, style) {
@@ -1479,7 +1483,7 @@ function renderReaderActions() {
   const path = selectedPath(story), index = state.readerChapter, blocked = pendingDeletionBlocked();
   const remove = $('reader-remove-chapters'), removePath = $('reader-delete-path');
   remove.textContent = index === path.entries.length - 1 ? `Remove Chapter ${index + 1}…` : `Remove Chapter ${index + 1} onward…`;
-  removePath.textContent = story.paths.length > 1 ? 'Delete this path…' : 'Delete story…';
+  removePath.textContent = story.paths.length > 1 ? 'Delete this storyline…' : 'Delete story…';
   $('reader-rebuild-memory').disabled = blocked || state.storageBlocked;
   $('reader-rebuild-memory').textContent = story.memoryRebuild ? 'Resume memory rebuild…' : 'Rebuild story memory…';
   remove.disabled = blocked; removePath.disabled = blocked; $('reader-actions-note').hidden = !blocked;
@@ -1512,12 +1516,13 @@ function confirmReaderRemoval(action) {
   if (kind === 'story') { confirmStoryDeletion(new Set([story.id]), story); return; }
   const end = path.entries.length, first = index + 1;
   const range = first === end ? `Chapter ${first}` : `Chapters ${first}–${end}`;
-  state.readerRemoval = { storyId: story.id, pathId: path.id, kind, index, entries: JSON.stringify(path.entries) };
-  $('reader-removal-title').textContent = kind === 'path' ? `Delete ${path.name}?` : `Remove ${range}?`;
+  const label = pathLabel(story, path);
+  state.readerRemoval = { storyId: story.id, pathId: path.id, label, kind, index, entries: JSON.stringify(path.entries) };
+  $('reader-removal-title').textContent = kind === 'path' ? `Delete ${label}?` : `Remove ${range}?`;
   $('reader-removal-message').textContent = kind === 'path'
-    ? `Delete “${path.name}”, containing ${end} ${end === 1 ? 'chapter' : 'chapters'}? Other paths keep their chapters and explanations. Content unused by any remaining path is permanently deleted. This cannot be undone.`
-    : `Remove ${range} from “${path.name}”? Other paths keep their chapters and explanations. Content unused by any remaining path is permanently deleted. This cannot be undone.`;
-  $('reader-removal-confirm').textContent = kind === 'path' ? 'Delete path' : `Remove ${first === end ? 'chapter' : 'chapters'}`;
+    ? `Delete “${label}”, containing ${end} ${end === 1 ? 'chapter' : 'chapters'}? Other storylines keep their chapters and explanations. Content unused by any remaining storyline is permanently deleted. This cannot be undone.`
+    : `Remove ${range} from “${label}”? Other storylines keep their chapters and explanations. Content unused by any remaining storyline is permanently deleted. This cannot be undone.`;
+  $('reader-removal-confirm').textContent = kind === 'path' ? 'Delete storyline' : `Remove ${first === end ? 'chapter' : 'chapters'}`;
   $('reader-removal-error').textContent = '';
   $('reader-removal-dialog').showModal(); $('reader-removal-cancel').focus();
 }
@@ -1579,14 +1584,21 @@ function removeReaderContent(target = state.readerRemoval) {
   $('reader-removal-dialog').close(); state.readerRemoval = null;
   updateReader(); $('reader-actions-toggle').focus({ preventScroll: true });
   const removedCount = path.entries.length - target.index;
-  toast(target.kind === 'chapters' ? `${removedCount} ${removedCount === 1 ? 'chapter' : 'chapters'} removed` : `${path.name} deleted`);
+  toast(target.kind === 'chapters' ? `${removedCount} ${removedCount === 1 ? 'chapter' : 'chapters'} removed` : `${target.label || pathLabel(story, path)} deleted`);
   return true;
+}
+// A rebuild captured its path; it may since have been deleted, so fall back to the captured name.
+function rebuildPathLabel(story, rebuild) {
+  const captured = rebuild && story.paths?.find(item => item.id === rebuild.pathId);
+  if (captured) return pathLabel(story, captured);
+  if (!rebuild?.pathName) return pathLabel(story, selectedPath(story));
+  return rebuild.pathName === 'Original' ? 'Main story' : pathLabel({paths: []}, {name: rebuild.pathName});
 }
 function pathForkDescription(story, path) {
   if (!path.forkChapter) return '';
   const parent = path.parentPathId ? story.paths.find(item => item.id === path.parentPathId)
     : story.paths.find(item => item.id !== path.id && item.name === (path.parentPathName || 'Original'));
-  return `Different version from Chapter ${path.forkChapter}.${parent ? ` Later chapters remain on ${parent.name}.` : ''}`;
+  return `Different version from Chapter ${path.forkChapter}.${parent ? ` Later chapters remain on ${pathLabel(story, parent)}.` : ''}`;
 }
 const { normalizeChapters, ensureStoryPaths, initializePathCounter, selectedPath, pathChapters, activeChapter, activeVersion } = createStoryModel({state, readerStory});
 const { memoryChunks, recentProse, decodeMemory, prepareStoryMemory, storyContextReady } = createStoryMemory({state, normalizeChapters, readerAi:(...args)=>readerAi(...args), savePendingReaderResult:(...args)=>savePendingReaderResult(...args), discardResponse:()=>releaseInvalidReaderResponse()});
@@ -1604,14 +1616,14 @@ function renderChapterNavigation(story) {
   summary.textContent = `${LANGUAGES[story.language] || story.language} · Chapter ${state.readerChapter + 1} of ${chapters.length}`; meta.append(summary);
   if (story.paths.length > 1) {
     const name = document.createElement('span'); name.className = 'reader-meta-path';
-    name.textContent = `· ${selectedPath(story).name}`; name.title = selectedPath(story).name; meta.append(name);
+    name.textContent = `· ${pathLabel(story, selectedPath(story))}`; name.title = pathLabel(story, selectedPath(story)); meta.append(name);
   }
   $('reader-chapter-label').textContent = `Chapter ${state.readerChapter + 1}`;
   const select = $('chapter-select'); select.textContent = '';
   chapters.forEach((item, index) => { const option = document.createElement('option'); option.value = String(index); option.textContent = `Chapter ${index + 1}`; select.append(option); });
   select.value = String(state.readerChapter);
   const path = selectedPath(story), pathSelect = $('path-select'); pathSelect.textContent = '';
-  story.paths.forEach(item => { const option = document.createElement('option'); option.value = item.id; option.textContent = item.name; pathSelect.append(option); });
+  story.paths.forEach(item => { const option = document.createElement('option'); option.value = item.id; option.textContent = pathLabel(story, item); pathSelect.append(option); });
   pathSelect.value = path.id; $('path-control').hidden = story.paths.length < 2;
   $('chapter-prev').disabled = state.readerChapter === 0; $('chapter-next').disabled = state.readerChapter >= chapters.length - 1;
   $('chapter-context-note').hidden = !path.forkChapter && !path.uncertain;
@@ -2735,14 +2747,62 @@ $('selection-copy').addEventListener('click', () => {
     catch { toast('Could not copy the selection.'); }
   });
 });
-$('reader-copy').addEventListener('click', async () => {
+function openShareDialog(story, {chapterIndex = null, trigger}) {
+  const saved = workspaceStorage.entries.get('data/stories.json')?.value.find(item => item.id === story.id);
+  if (!saved) { toast('Could not share the story.'); return; }
+  const snapshot = JSON.parse(JSON.stringify(saved));
+  const modelStory = JSON.parse(JSON.stringify(snapshot));
+  const chapter = chapterIndex === null ? null : pathChapters(modelStory)[chapterIndex];
+  state.shareDialog = {story:snapshot, modelStory, chapter, trigger, id:story.id};
+  $('share-chapter-row').hidden = !chapter;
+  $('share-chapter').disabled = !chapter;
+  $('share-chapter').checked = Boolean(chapter); $('share-story').checked = !chapter; $('share-file').checked = false;
+  $('share-chapter-label').textContent = chapter ? `Chapter ${chapterIndex + 1}` : '';
+  $('share-path-label').textContent = modelStory.paths.length > 1 ? pathLabel(modelStory, selectedPath(modelStory)) : '';
+  $('share-notes').checked = false; updateShareControls();
+  $('share-dialog').showModal(); (chapter ? $('share-chapter') : $('share-story')).focus();
+}
+function shareKind() { return $('share-file').checked ? 'file' : $('share-chapter').checked ? 'chapter' : 'story'; }
+function updateShareControls() {
+  const file = shareKind() === 'file'; $('share-notes').disabled = file;
+  $('share-submit').textContent = share.available ? 'Share' : file && !isNative ? 'Download' : 'Copy';
+}
+for (const id of ['share-chapter', 'share-story', 'share-file']) $(id).addEventListener('change', updateShareControls);
+$('share-cancel').addEventListener('click', () => $('share-dialog').close());
+$('share-dialog').addEventListener('close', () => {
+  const opener = state.shareDialog; state.shareDialog = null;
+  if (state.libraryStale && !state.storySelectionMode) renderLibrary();
+  const target = opener?.trigger?.isConnected ? opener.trigger : [...$('library-list').querySelectorAll('[data-story-id]')].find(card => card.dataset.storyId === opener?.id)?.querySelector('.story-menu-toggle');
+  target?.focus({preventScroll:true});
+});
+function downloadStoryFile({name, mimeType, content}) {
+  const url = URL.createObjectURL(new Blob([content], {type:mimeType}));
+  const link = document.createElement('a'); link.href = url; link.download = name;
+  document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+$('share-submit').addEventListener('click', async () => {
+  const context = state.shareDialog; if (!context || context.busy) return;
+  context.busy = true; $('share-submit').disabled = true;
+  const kind = shareKind(), notes = $('share-notes').checked;
+  try {
+    const payload = kind === 'file' ? storyExportFile(context.story, {appVersion:readJson('manifest.json', {}).version}) : {
+      title:context.story.title, text:kind === 'chapter' ? chapterShareText(context.story, context.chapter, activeVersion(context.chapter, context.modelStory), {notes}) : storyShareText(context.story, {pathChapters, activeVersion}, {notes})
+    };
+    const result = await deliverShare(payload, {share, clipboard:navigator.clipboard, download:downloadStoryFile, isNative});
+    if (result.cancelled) return;
+    if (result.method) toast(`${kind === 'chapter' ? 'Chapter' : kind === 'file' ? 'Story file' : 'Story'} ${result.method}`);
+    if (state.shareDialog === context) $('share-dialog').close();
+  } catch { toast('Could not share the story.'); }
+  finally { context.busy = false; $('share-submit').disabled = false; }
+});
+
+$('reader-share').addEventListener('click', () => {
   const story = readerStory(); if (!story) return;
-  try { await navigator.clipboard.writeText(activeVersion(activeChapter(story)).story); toast('Chapter copied'); }
-  catch { toast('Could not copy the chapter.'); }
+  closeReaderActions(); openShareDialog(story, {chapterIndex:state.readerChapter, trigger:$('reader-actions-toggle')});
 });
 // Android's own selection menu would compete with the LingoMage bar on story text, but fields need Cut/Copy/Paste.
 const selectionMenuRouter = createSelectionMenuRouter({ host: selectionMenu, document, window });
-$('reader-copy').addEventListener('click', () => closeReaderActions());
+
 let memoryRebuildStory = null;
 function renderMemoryRebuild() {
   const story = readerStory(), panel = $('reader-memory-recovery');
@@ -2764,10 +2824,10 @@ $('reader-rebuild-memory').addEventListener('click', () => {
   closeReaderActions();
   const rebuild = memoryRebuildStory.memoryRebuild;
   $('memory-rebuild-title').textContent = rebuild ? 'Resume story memory rebuild?' : 'Rebuild story memory?';
-  $('memory-rebuild-description').textContent = `Story: ${memoryRebuildStory.title}. Path: ${rebuild?.pathName || selectedPath(memoryRebuildStory).name}. All chapters on this path will be summarized with ${state.model}.`;
+  $('memory-rebuild-description').textContent = `Story: ${memoryRebuildStory.title}. Storyline: ${rebuildPathLabel(memoryRebuildStory, rebuild)}. All chapters on this storyline will be summarized with ${state.model}.`;
   $('memory-rebuild-effect').textContent = rebuild
-    ? 'This uses AI to finish rebuilding story context. Completed summaries will be reused. Your chapters, paths, vocabulary notes and explanations stay as they are.'
-    : 'This uses AI to recreate summaries, characters, events and story context from saved chapters. Your chapters, paths, vocabulary notes and explanations stay as they are. Saved summaries for this story will be cleared; other paths prepare their context when needed.';
+    ? 'This uses AI to finish rebuilding story context. Completed summaries will be reused. Your chapters, storylines, vocabulary notes and explanations stay as they are.'
+    : 'This uses AI to recreate summaries, characters, events and story context from saved chapters. Your chapters, storylines, vocabulary notes and explanations stay as they are. Saved summaries for this story will be cleared; other storylines prepare their context when needed.';
   $('memory-rebuild-submit').textContent = rebuild ? 'Resume' : 'Rebuild';
   $('memory-rebuild-error').textContent = '';
   $('memory-rebuild-dialog').showModal(); $('memory-rebuild-cancel').focus();
@@ -2976,7 +3036,7 @@ window.addEventListener('app2:ai:connection', refreshModels);
 window.addEventListener('pageshow', () => { if (document.visibilityState === 'visible') refreshModels(); });
 
 document.documentElement.style.colorScheme = 'dark';
-state.stories = workspaceStorage.load('data/stories.json').value;
+state.stories = JSON.parse(JSON.stringify(workspaceStorage.load('data/stories.json').value));
 loadReaderPositions();
 const settings = workspaceStorage.load('data/settings.json').value; state.providerId = settings.providerId || ''; state.model = settings.model || PREFERRED_MODEL; state.reasoning = settings.reasoning || '';
 state.furigana = settings.readingPreferences?.furigana !== false;

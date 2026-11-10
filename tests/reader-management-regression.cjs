@@ -3,6 +3,7 @@ const {bindStory, bindGeneration, bindPanels}=await import('./support/controller
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
 const source=fs.readFileSync('js/app.js','utf8');
 const slice=(start,end)=>source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start)));
+const pathLabelSource=fs.readFileSync('js/story-model.js','utf8').replace(/^[\s\S]*?(?=export function pathLabel)/,'').replaceAll('export function ','function ');
 function fixture(){
  const version=(id,text,sourceVersionId)=>({id,title:text,story:text,glossary:[],providerId:'fixture',model:'mock',promptVersion:'test',sourceVersionId});
  return {id:'S',title:'Deleted original mirror',story:'Deleted original mirror',activeVersionId:'a',nextAlternateNumber:4,activePathId:'original',
@@ -20,7 +21,7 @@ function harness(story=fixture()){
  const c={pipeline:null,state:{readerId:'S',readerChapter:1,stories:[story],readerPositions:{'S:original':{chapterId:'C'},'S:alt1':{chapterId:'B'},'S:alt3':{chapterId:'A'}},readerEditDraft:{storyId:'S',pathId:'original',chapterId:'C'}},$,console,window:{innerWidth:390,innerHeight:844},
  readerStory:()=>c.state.stories.find(x=>x.id===c.state.readerId),persistReaderStory(s){assert.equal(s,c.state.stories[0]);if(failed)throw Error('disk');saves++;},
  clearExplanationSelection(){},closeWordNote(){},updateReader(){},readerPanel:()=>({scrollTop:0}),toast(){},setView(){},confirmStoryDeletion(ids){deleted=ids;}};
- vm.createContext(c);vm.runInContext(slice('function pendingDeletionBlocked(', 'function syncStorySelection('),c);bindStory(c); bindPanels(c); vm.runInContext(slice('function renderReaderActions(', 'const { normalizeChapters'),c);
+ vm.createContext(c);vm.runInContext(pathLabelSource,c);vm.runInContext(slice('function pendingDeletionBlocked(', 'function syncStorySelection('),c);bindStory(c); bindPanels(c); vm.runInContext(slice('function renderReaderActions(', 'const { normalizeChapters'),c);
  return {c,story,$,fail:value=>failed=value,saves:()=>saves,deleted:()=>deleted};
 }
 function target(story,pathId,kind,index=1){return {storyId:story.id,pathId,kind,index,entries:JSON.stringify(story.paths.find(p=>p.id===pathId).entries)};}

@@ -32,3 +32,7 @@ All host calls go through `js/bridge.js`.
 ## Local preview
 
 `python3 dev_server.py --mock-ai` (offline, deterministic) or `codex login` then `python3 dev_server.py --chatgpt` (live, development only: uses the Codex ChatGPT login and may use plan allowance; keeps no credentials and no pending requests across restarts). The server binds to localhost and implements the file bridge. App files come from the workspace; learner files (`seedFiles` and development preferences) live in the gitignored `.dev-data/`, seeded from `seedDefaults` on first start, so committed seeds never change. Delete `.dev-data/` to start fresh. The preview does not establish Android behavior, insets, translation quality or learning effect.
+
+## Story sharing
+
+`share.available`, `share.text({title, text})` and `share.file({name, mimeType, content})` wrap `window.AppShare` exclusively in the bridge. Requests use JSON `{id, action, options}` and replies `{id, value}` or `{id, error:{code, message}}`, like translation. `{launched:true}` means the Sharesheet opened; it does not establish completion. Host error codes are preserved; a missing reply gives `timeout`. Cancellation is silent; other failures are shown without automatic fallback or retry. Without AppShare, text copies to the clipboard, browser JSON files download via Blob, and native JSON files copy.

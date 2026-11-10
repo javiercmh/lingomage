@@ -1,3 +1,4 @@
+import { pathLabel } from './story-model.js';
 // Background work that Android or the operation session did not allow to continue. Local pause
 // (background_paused) means the page was hidden and no session was held, so no host call was made.
 const BACKGROUND_CODES = new Set(['background_service', 'background_paused', 'session_idle', 'session_timeout', 'session_ended']);
@@ -40,7 +41,7 @@ export function operationLabel(op, stories = [], languageName = '') {
     : story && !story.chapters?.length ? 0 : -1;
   const action={continue:'Continuing',rewrite:'Rewriting',examples:'Examples for'}[op.kind] || 'Generating';
   const destination=story ? `“${story.title || 'Untitled story'}”` : 'a saved story';
-  return `${action} ${destination}${index >= 0 ? ` · Chapter ${index+1}` : ''}${story?.paths?.length > 1 && path?.name ? ` · ${path.name}` : ''}`;
+  return `${action} ${destination}${index >= 0 ? ` · Chapter ${index+1}` : ''}${story?.paths?.length > 1 && path ? ` · ${pathLabel(story, path)}` : ''}`;
 }
 
 export function discardFailureMessage(op) {

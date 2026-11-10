@@ -48,7 +48,8 @@
     "data/usage.json",
     "js/consultation-signals.js",
     "js/reading-exposure.js",
-    "data/learning-signals.json"
+    "data/learning-signals.json",
+    "js/story-share.js"
   ],
   "app2Update": {
     "appId": "com.wynh.lingomage",
@@ -95,7 +96,8 @@
       "js/usage-stats.js",
       "js/usage-tracker.js",
       "js/consultation-signals.js",
-      "js/reading-exposure.js"
+      "js/reading-exposure.js",
+      "js/story-share.js"
     ],
     "seedFiles": [
       "data/stories.json",

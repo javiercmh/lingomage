@@ -23,7 +23,8 @@ function sandbox(extra = {}) {
   c.readerGeneration = null; c.renderReaderGeneration = () => {}; c.setReaderGeneration = value => { c.readerGeneration = value; };
   vm.createContext(c); c.markStoryActivity = markStoryActivity;
   vm.runInContext(notificationSource, c);
-  vm.runInContext(fs.readFileSync('js/generation-errors.js','utf8').replaceAll('export function ', 'function '), c);
+  vm.runInContext(fs.readFileSync('js/story-model.js','utf8').replace(/^[\s\S]*?(?=export function pathLabel)/, '').replaceAll('export function ', 'function '), c);
+  vm.runInContext(fs.readFileSync('js/generation-errors.js','utf8').replace(/^import .*\n/m, '').replaceAll('export function ', 'function '), c);
   vm.runInContext(readerTextSource, c);
   vm.runInContext(learningSource, c);
   vm.runInContext(requestLifecycleSource, c);

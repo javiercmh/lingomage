@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const app = fs.readFileSync('js/app.js', 'utf8');
 const helperStart = app.indexOf('function runSelectionAction(');
 const actionsStart = app.indexOf("$('selection-translate').addEventListener", helperStart);
-const actionsEnd = app.indexOf("$('reader-copy').addEventListener", actionsStart);
+const actionsEnd = app.indexOf('function openShareDialog(', actionsStart);
 assert(helperStart >= 0 && actionsStart > helperStart && actionsEnd > actionsStart, 'selection action runner and handlers exist');
 
 function deferred() {

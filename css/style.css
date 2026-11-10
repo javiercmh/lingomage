@@ -451,6 +451,8 @@ body.has-app-generation-status .toast { bottom: calc(var(--tabbar-h) + 88px + va
 .reader-floating-panel .furigana-control { margin-top: 8px; }
 .reader-actions-menu hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--line); }
 .reader-actions-menu .danger-item { color: #fda4af; }
+/* Same share glyph as the Library Actions popover. */
+.reader-actions-menu .menu-icon { width: 16px; height: 16px; vertical-align: -3px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 @media (max-width: 480px) { .reader-panel .reader-title { font-size: 22px; } }
 @media (max-width: 360px) { .reader-title-section { padding: 10px 10px 0; } .reader-title-controls { padding: 10px; gap: 6px; } }
 .selection-toolbar.title-selection #selection-explain { display: none; }
@@ -637,3 +639,10 @@ body.has-app-generation-status .toast { bottom: calc(var(--tabbar-h) + 88px + va
 .recovery-heading { display: block; color: var(--ink); font-size: 14px; line-height: 1.5; }
 .recovery-task { display: block; margin: 4px 0 10px; color: var(--ink); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
 .pending-progress > button { flex-shrink: 0; }
+
+/* Native share controls retain generous label targets at narrow widths. */
+.share-options { border: 0; padding: 0; margin: 16px 0 0; min-width: 0; }
+.share-row { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 6px 0; cursor: pointer; }
+.share-row input { flex: 0 0 auto; width: 20px; height: 20px; }
+.share-row small { display: block; }
+.share-row:has(input:disabled) { opacity: .6; }

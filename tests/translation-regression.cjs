@@ -1,5 +1,5 @@
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
-const source = fs.readFileSync('js/bridge.js','utf8').slice(fs.readFileSync('js/bridge.js','utf8').indexOf('const TRANSLATION =')).replace('export const translation', 'const translation') + '\nthis.translation = translation;';
+const source = fs.readFileSync('js/bridge.js','utf8').slice(fs.readFileSync('js/bridge.js','utf8').indexOf('const TRANSLATION =')).split('// Native Sharesheet:')[0].replace('export const translation', 'const translation') + '\nthis.translation = translation;';
 function harness(channel) { const c = {window: {AppTranslation: channel}, setTimeout, clearTimeout}; vm.createContext(c); vm.runInContext(source,c); return c.translation; }
 (async () => {
  const missing = harness(null); assert.deepEqual(JSON.parse(JSON.stringify(await missing.availability())), {available:false}); await assert.rejects(missing.open({text:'Hallo'}), e => e.code === 'unavailable');

@@ -57,3 +57,18 @@ export function createStoryModel({state, readerStory}) {
 
   return {normalizeChapters, ensureStoryPaths, initializePathCounter, selectedPath, pathChapters, activeChapter, activeVersion};
 }
+
+// Display names for story paths ("storylines"), derived from saved structure so legacy
+// stories read the same way. Saved `path.name` values stay unchanged for compatibility.
+export function pathLabel(story, path) {
+  if (!path) return '';
+  const paths = story?.paths || [];
+  if (!path.forkChapter) {
+    if (paths.find(item => !item.forkChapter)?.id === path.id) return 'Main story';
+    const number = /^Alternate (\d+)$/.exec(path.name || '')?.[1];
+    return number ? `Branch ${number}` : (path.name || 'Storyline');
+  }
+  const siblings = paths.filter(item => item.forkChapter === path.forkChapter);
+  const position = siblings.findIndex(item => item.id === path.id) + 1;
+  return `Branch at Chapter ${path.forkChapter}${position > 1 ? ` (Version ${position})` : ''}`;
+}

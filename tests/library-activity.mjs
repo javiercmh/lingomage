@@ -244,6 +244,7 @@ for (const kind of ['cont', 'rewrite', 'examples']) {
   context.libraryChanged(); assert.equal(renders, 1, 'no re-render under an open popover');
   context.closeStoryMenu(true); assert.equal(removed, 1); assert.equal(renders, 2, 'the stale library renders once the popover closes');
   assert.deepEqual(focused, ['rebuilt'], 'focus goes to the rebuilt Actions button, not the detached one');
+  context.state.shareDialog = {}; context.libraryChanged(); assert.equal(renders, 2, 'no re-render under Share dialog'); assert.equal(context.state.libraryStale, true); context.state.shareDialog = null; context.state.libraryStale = false;
   // No deferred render: focus returns to the original trigger.
   trigger.isConnected = true; focused = []; context.state.storyMenu = { id: 'S', trigger, popover: { remove() {} } }; context.closeStoryMenu(true);
   assert.deepEqual(focused, ['old']); assert.equal(renders, 2);
