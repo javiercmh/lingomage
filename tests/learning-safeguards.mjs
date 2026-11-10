@@ -1,5 +1,5 @@
 import { bindGeneration } from './support/controllers.mjs';
-import { failureInfo, recoverySummary } from '../js/generation-errors.js';
+import { failureInfo, recoverySummary, operationLabel, discardFailureMessage } from '../js/generation-errors.js';
 import { progressSummary } from '../js/generation-progress.js';
 import { pendingRequests } from '../js/generation-pipeline.js';
 import assert from 'node:assert/strict';
@@ -71,7 +71,7 @@ for (const text of ['Define most meaningful vocabulary','including common words'
 assert.ok(prompts.storyInstructions('Russian','A1','test').includes('canonical title and story'));
 tested('LANG-008');
 // Exercise the production renderer: notes stay inline and canonical text is intact.
-function element(tag) { return {tagName:tag,children:[],events:{},append(...nodes){this.children.push(...nodes);},setAttribute(){},addEventListener(n,f){this.events[n]=f;},set textContent(v){this.children=v?[{textContent:v}]:[];},get textContent(){return this.children.map(n=>n.textContent).join('');}}; }
+function element(tag) { return {tagName:tag,children:[],events:{},querySelector(tag){return this.children.find(node=>node.tagName===tag) || null;},append(...nodes){this.children.push(...nodes);},setAttribute(){},addEventListener(n,f){this.events[n]=f;},set textContent(v){this.children=v?[{textContent:v}]:[];},get textContent(){return this.children.map(n=>n.textContent).join('');}}; }
 const previousDocument=globalThis.document;globalThis.document={createElement:element,createTextNode:text=>({textContent:text})};
 const root=element('div');annotatedText(root,'Stadt',null,{language:'de-DE',glossary:good.glossary});assert.equal(root.children[0].className,'gloss-note-trigger');assert.equal(root.textContent,'Stadt');
 const legacyRoot=element('div');annotatedText(legacyRoot,'Stadt',null,{language:'de-DE',glossary:[]});assert.equal(legacyRoot.textContent,'Stadt');globalThis.document=previousDocument;
@@ -141,14 +141,20 @@ print(Handler.mock_readings(SimpleNamespace(server=SimpleNamespace(workspace=Pat
 attachReadings(japaneseFixture.content,fixturePlan,fixtureReadings);
 // UI recovery must work for a fresh Create operation with no reader status.
 const boxes=new Map();const box=id=>{if(!boxes.has(id)){const b=element('section');b.hidden=true;b.dataset={};boxes.set(id,b);}return boxes.get(id);};
-const recovery={createProgressView(){return {querySelector(){return null;}};},pendingRequests,progressSummary,createProgressRoot(){return {};},paintProgress(){},failureInfo,recoverySummary,appendFailureDetails(){},PROMPT_VERSION:'test',SAFEGUARD_VERSION:'test',pipeline:{records:[{kind:'create',stage:'readings'}],busy:true},readerGeneration:null,state:{readerId:null},$:box,document:{createElement:element},renderReaderGeneration(){},resumeCheckpoint(){},setScopeDisabled(){},creatingStory:false,resumedCreateCard:false,renderChapterRequest(){},paintChapterProgress(){},createChapterLoading:kind=>({kind,removed:false,remove(){this.removed=true;},querySelector:()=>({})})};
+const recovery={createProgressView(){return {querySelector(){return null;}};},pendingRequests,progressSummary,createProgressRoot(){return {};},paintProgress(){},failureInfo,recoverySummary,operationLabel,discardFailureMessage,LANGUAGES:{},appendFailureDetails(){},PROMPT_VERSION:'test',SAFEGUARD_VERSION:'test',pipeline:{records:[{kind:'create',stage:'readings'}],busy:true},readerGeneration:null,state:{readerId:null},$:box,document:{createElement:element},renderReaderGeneration(){},resumeCheckpoint(){},setScopeDisabled(){},creatingStory:false,resumedCreateCard:false,renderChapterRequest(){},paintChapterProgress(){},createChapterLoading:kind=>({kind,removed:false,remove(){this.removed=true;},querySelector:()=>({})})};
 vm.createContext(recovery);vm.runInContext(source.slice(source.indexOf('function applyGenerationLocks('),source.indexOf('async function resumeCheckpoint(')),recovery);recovery.renderCheckpointRecovery();
 assert.equal(box('generation-status').textContent,'Adding kanji readings…');assert.equal(box('checkpoint-recovery-reader').hidden,true);
 assert.equal(box('loading-card').hidden,false,'a resumed Create shows the same progress card as a fresh one');assert.equal(box('story-form').hidden,true);
 recovery.pipeline.records[0]={kind:'continue',stage:'notes',target:{storyId:'story'}};recovery.state.readerId='story';recovery.readerGeneration={storyId:'story',phase:'ready'};
 recovery.renderCheckpointRecovery();assert.equal(box('reader-edit-submit').disabled,true);assert.equal(box('reader-prompt').disabled,true);assert.equal(recovery.readerGeneration.phase,'working');assert.equal(recovery.readerGeneration.message,'Step 4 of 4 · Vocabulary notes');
 const resumedCard=recovery.state.activeChapterRequest;assert.equal(resumedCard?.resumed,true,'a resumed Continue uses the chapter status card');assert.equal(resumedCard.loading.kind,'continue');assert.equal(box('checkpoint-recovery-reader').hidden,true,'no recovery panel while the resumed run is live');
-recovery.pipeline.busy=false;recovery.renderCheckpointRecovery();assert.equal(resumedCard.loading.removed,true);assert.equal(recovery.state.activeChapterRequest,null,'the resumed card goes away when the run stops');assert.equal(box('checkpoint-recovery-reader').hidden,false,'idle saved progress shows recovery');recovery.pipeline.busy=true;
+recovery.pipeline.busy=false;recovery.renderCheckpointRecovery();assert.equal(resumedCard.loading.removed,true);assert.equal(recovery.state.activeChapterRequest,null,'the resumed card goes away when the run stops');assert.equal(box('checkpoint-recovery-reader').hidden,false,'idle saved progress shows recovery');
+assert.equal(box('reader-pending-progress').hidden,true,'the owning reader shows only the recovery panel');
+recovery.state.readerId='another-story';recovery.renderCheckpointRecovery();
+assert.equal(box('checkpoint-recovery-reader').hidden,true);assert.equal(box('reader-pending-progress').hidden,false,'another reader keeps the shortcut to recovery elsewhere');
+recovery.state.readerId='story';recovery.renderCheckpointRecovery();
+assert.equal(box('reader-pending-progress').hidden,true,'returning to the owning story hides the shortcut again');
+recovery.pipeline.busy=true;
 const heading={append(){}};recovery.state.activeChapterRequest={storyId:'story',loading:{querySelector:()=>heading,classList:{add(){}}}};recovery.renderCheckpointRecovery();assert.equal(heading.textContent,'Adding vocabulary notes…');assert.equal(box('checkpoint-recovery-reader').hidden,true);delete recovery.state.activeChapterRequest;
 
 recovery.pipeline.records[0]={kind:'create',stage:'notes',promptVersion:'test',safeguardVersion:'test'};
@@ -167,5 +173,11 @@ recovery.pipeline.records[0].promptVersion='old';recovery.renderCheckpointRecove
 assert.equal(box('checkpoint-recovery-create').children.at(-1).children[0].disabled,true);
 assert.match(box('checkpoint-recovery-create').children[0].textContent,/older app definition/);
 assert.equal(box('generate').disabled,true);
+assert.equal(box('reader-edit-submit').disabled,true,'another unfinished generation blocks submit in any reader');
+recovery.pipeline.records[0].discardRequested=true;recovery.renderCheckpointRecovery();
+assert.match(box('checkpoint-recovery-create').children[0].textContent,/still needs to be cleared/);
+const cleanupActions=box('checkpoint-recovery-create').children.at(-1).children;
+assert.equal(cleanupActions.length,1);assert.equal(cleanupActions[0].textContent,'Try again');
+assert.equal(cleanupActions[0].disabled,false,'old prompt definitions do not block cleanup-only cancellation');
 assert.equal(JSON.parse(fs.readFileSync(new URL('../data/language-safeguards.json',import.meta.url))).version,SAFEGUARD_VERSION);
 console.log('PASS current language requirements and staged generation regressions');

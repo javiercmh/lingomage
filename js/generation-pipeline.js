@@ -16,8 +16,12 @@ export const pendingRequests = op => requestHolders(op).map(holder => holder.req
 export function createPipeline({ records, persist, ai, apply, changed = () => {}, parallel = false }) {
   let busy = false;
   let phase = '';
+  let stopWaiting, stopped, cancellationError;
+  const wait = id => Promise.race([ai.wait(id), stopped.then(() => { throw cancelled(); })]);
   const mark = value => { phase=value; };
-  const save = () => { mark('checkpoint'); persist(records); changed(); };
+  const save = () => { const previous=phase; mark('checkpoint'); persist(records); phase=previous; changed(); };
+  const cancelled = () => Object.assign(new Error('Generation cancelled.'), {code:'generation_cancelled'});
+  const cancelling = new WeakMap();
   const validate = op => op.kind === 'examples' ? validateExamples(op.prose, op.language) : validateStory(op.prose, op.language, op.length);
   async function release(op, holder = op) {
     if (!holder.request) return;
@@ -29,14 +33,30 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
   const releaseAll = async op => { for (const holder of requestHolders(op)) await release(op, holder); };
   async function cancelRequest(request) {
     if (request.completed || request.cancelled) return;
-    try { await ai.cancel(request.id); } catch (error) { if (error.code !== 'not_found' && !/not found|unknown request/i.test(error.message)) throw error; }
-    request.cancelled=true;
+    if (cancelling.has(request)) return cancelling.get(request);
+    const task = (async () => {
+      mark('cancel');
+      try { await ai.cancel(request.id); } catch (error) { if (error.code !== 'not_found') throw error; }
+      request.cancelled=true;
+    })();
+    cancelling.set(request,task);
+    try { await task; } finally { cancelling.delete(request); }
   }
   async function checkCancelled(op, holder = op) {
-    if (!op.cancelRequested) return;
+    if (!op.cancelRequested && !op.discardRequested) return;
     if (holder.request) await cancelRequest(holder.request);
-    if (holder.request && !holder.request.completed) { holder.request.completed=true; holder.request.invalid=true; save(); await release(op, holder); }
-    throw new Error('Request cancelled. Resume to explicitly retry, or discard this attempt.');
+    throw cancelled();
+  }
+  async function discardRecord(op) {
+    save();
+    for (const request of pendingRequests(op)) {
+      await cancelRequest(request);
+      if (!request.completed) { request.completed=true; request.invalid=true; save(); }
+    }
+    await releaseAll(op);
+    const index=records.indexOf(op); if (index < 0) return;
+    records.splice(index,1);
+    try { save(); } catch (error) { records.splice(index,0,op); throw error; }
   }
   // Japanese notes and readings both need only the saved prose, so they run together. Each part keeps
   // its own request and validated content; a failed part never discards a finished one.
@@ -59,8 +79,8 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
     }
     await checkCancelled(op, part);
     let response;
-    try { partPhase='wait'; const raw = await ai.wait(part.request.id); await checkCancelled(op, part); response = parseContent(raw); }
-    catch (error) { fail(error); await invalidate(); throw error; }
+    try { partPhase='wait'; const raw = await wait(part.request.id); await checkCancelled(op, part); response = parseContent(raw); }
+    catch (error) { if (op.discardRequested) throw error; fail(error); await invalidate(); throw error; }
     try {
       partPhase='validation';
       part.content = name === 'notes' ? validateNotes(response, op.prose, op.language) : attachReadings(canonical, plan, response, op.kind);
@@ -104,10 +124,11 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
     async run(op) {
       if (busy) throw new Error('A generation is already running.');
       if (!records.includes(op)) throw new Error('This saved operation is no longer pending.');
-      busy=true; op.error=''; delete op.failure; phase=''; op.cancelRequested=false; changed();
+      busy=true; op.error=''; delete op.failure; phase=''; cancellationError=null; stopped=new Promise(resolve=>{stopWaiting=resolve;}); op.cancelRequested=false; changed();
       try {
         // Also retries failed checkpoint writes before touching inference.
         save();
+        if (op.discardRequested) throw cancelled();
         for (const holder of requestHolders(op)) if (holder.request?.completed) await release(op, holder);
         while (['plan','prose','notes','readings','enrich'].includes(op.stage)) {
           if (op.stage === 'enrich') { await runParallel(op); continue; } // each part checks for cancellation itself
@@ -125,8 +146,9 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
           }
           await checkCancelled(op);
           let response;
-          try { mark('wait'); const raw = await ai.wait(op.request.id); await checkCancelled(op); response = stage === 'plan' ? decodePlan(raw,op.language) : parseContent(raw); }
+          try { mark('wait'); const raw = await wait(op.request.id); await checkCancelled(op); response = stage === 'plan' ? decodePlan(raw,op.language) : parseContent(raw); }
           catch (error) {
+            if (op.discardRequested) throw error;
             const failure=failureInfo(error,stage,phase);
             if (op.request) { op.request.completed=true; op.request.invalid=true; save(); await release(op); }
             error.generationFailure=failure; throw error;
@@ -137,6 +159,7 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
             content = stage === 'plan' ? response : stage === 'prose' ? (op.kind === 'examples' ? validateExamples(response,op.language) : validateProse(response,op.language)) : stage === 'notes' ? validateNotes(response,op.prose,op.language) : attachReadings(validate(op),readingPlan(op.prose,op.kind),response,op.kind);
             validateContentSize(content);
           } catch (error) {
+            if (op.discardRequested) throw error;
             const failure=failureInfo(error,stage,phase);
             if (op.request) { op.request.completed=true; op.request.invalid=true; save(); await release(op); }
             error.generationFailure=failure; throw error;
@@ -168,6 +191,11 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
         try { save(); } catch (error) { records.push(op); throw error; }
         return op.result;
       } catch (error) {
+        if (op.discardRequested && records.includes(op)) {
+          try { if (cancellationError) throw cancellationError; await discardRecord(op); error=cancelled(); }
+          catch (cleanupError) { error=cleanupError; }
+        }
+        if (!records.includes(op)) throw error;
         op.failure=error.generationFailure || failureInfo(error,op.stage,phase);
         op.error=op.failure.message;
         try { save(); } catch { /* Preserve the in-memory result and request for explicit retry. */ }
@@ -182,24 +210,21 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
       finally { busy=false; changed(); }
     },
     async cancel() {
-      const op=records[0]; if (!op || !busy) return;
-      op.cancelRequested=true; save();
-      try { for (const request of pendingRequests(op)) await cancelRequest(request); }
-      catch (error) { op.cancelRequested=false; save(); throw error; }
+      const op=records[0]; if (!op || !busy || op.discardRequested) return;
+      op.discardRequested=true;
+      try {
+        save();
+        for (const request of pendingRequests(op)) await cancelRequest(request);
+      } catch (error) { cancellationError=error; throw error; }
+      finally { stopWaiting?.(); }
     },
     async discard(op) {
       if (!records.includes(op)) return;
       if (busy) throw new Error('Cancel the active request before discarding.');
-      // Persist completed content before release even when choosing Discard.
-      save();
-      for (const request of pendingRequests(op)) {
-        if (!request.completed) {
-          try { await ai.cancel(request.id); } catch (error) { if (error.code !== 'not_found') throw error; }
-        }
-      }
-      await releaseAll(op);
-      const index=records.indexOf(op); if (index < 0) return; records.splice(index,1);
-      try { save(); } catch (error) { records.splice(index,0,op); throw error; }
+      busy=true; op.discardRequested=true; changed();
+      try { await discardRecord(op); }
+      catch (error) { op.failure=failureInfo(error,op.stage,phase); op.error=op.failure.message; try { save(); } catch {} throw error; }
+      finally { busy=false; changed(); }
     }
   };
 }

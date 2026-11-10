@@ -295,6 +295,7 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 .word-note-entry strong { color: #c8d8ff; }
 .word-note-form { opacity: 0.75; font-size: 0.85em; }
 .recovery-panel { margin: 12px 0; padding: 14px 16px; border: 1px solid rgba(250,204,21,.32); border-radius: 14px; background: rgba(120,80,10,.18); }
+.recovery-panel.recovery-neutral { border-color: var(--line); background: var(--card); }
 .recovery-panel p { margin: 0 0 10px; }
 .recovery-panel button { width: auto; min-height: 44px; padding: 8px 14px; }
 .reader-recovery { margin-top: 10px; }
@@ -630,3 +631,9 @@ body.has-app-generation-status .toast { bottom: calc(var(--tabbar-h) + 88px + va
 .lookup-clear { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 0 0 14px; }
 .lookup-clear .helper { flex: 0 0 100%; margin: 0; }
 .lookup-clear .danger-btn, .lookup-clear .secondary-btn { flex: 1 1 120px; width: auto; min-height: 44px; }
+
+.pending-progress { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--muted); margin: 16px 0; overflow-wrap: anywhere; }
+.pending-progress > div { flex: 1 1 240px; min-width: 0; }
+.recovery-heading { display: block; color: var(--ink); font-size: 14px; line-height: 1.5; }
+.recovery-task { display: block; margin: 4px 0 10px; color: var(--ink); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.pending-progress > button { flex-shrink: 0; }

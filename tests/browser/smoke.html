@@ -59,8 +59,15 @@ document.querySelector('#run').addEventListener('click',async event=>{
    assert(field('reader-story').textContent.trim(),'Chapter edit cleared prose');pass(`${mode}: saves and refreshes the reader`);
   }
   await closeReader();tab('create');change('language','de');change('difficulty','A1');field('generate').click();await until(()=>!field('loading-card').hidden,'Request did not start');field('cancel-generation').click();
-  await until(()=>!field('checkpoint-recovery-create').hidden && field('loading-card').hidden,'Cancelled generation did not offer recovery');
-  await reload();await until(()=>!field('checkpoint-recovery-create').hidden,'Checkpoint missing after reload');pass('Cancellation and reload retain explicit recovery');
+  await until(()=>field('checkpoint-recovery-create').hidden && field('loading-card').hidden && !field('generate').disabled,'Cancelled generation did not unlock Create');
+  assert(JSON.parse(await read('data/generation-checkpoints.json')).length===0,'Cancelled generation retained progress');
+  await reload();assert(field('checkpoint-recovery-create').hidden,'Cancelled attempt returned after reload');pass('In-app cancellation discards progress and restores Create across reload');
+  // An external interruption retains recovery. Inject it through the real result polling path.
+  const plainFetch=frame.contentWindow.fetch.bind(frame.contentWindow);
+  frame.contentWindow.fetch=(url,init)=>String(url).includes('/__bridge/ai') && typeof init?.body==='string' && JSON.parse(init.body).action==='result'
+    ? Promise.resolve(new frame.contentWindow.Response(JSON.stringify({error:{message:'Request not found.',code:'not_found'}}),{status:400,headers:{'Content-Type':'application/json'}})) : plainFetch(url,init);
+  change('language','de');change('difficulty','A1');field('generate').click();await until(()=>!field('checkpoint-recovery-create').hidden && field('loading-card').hidden,'External interruption did not offer recovery');
+  await reload();await until(()=>!field('checkpoint-recovery-create').hidden,'Checkpoint missing after reload');pass('External interruption and reload retain explicit recovery');
   {
    // Unrelated settings saves, successful or failed, leave the recovery panel (and its focused button) alone.
    const panel=field('checkpoint-recovery-create'),button=[...panel.querySelectorAll('button')].find(item=>/Resume|Retry/.test(item.textContent));

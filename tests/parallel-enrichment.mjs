@@ -31,9 +31,9 @@ const before=h.events.filter(e=>e.startsWith('start')).length;
 h.pipeline.records[0].parallel.readings.request=null;
 const ok=createPipeline({records:h.pipeline.records,persist(){},parallel:true,ai:{start:async()=>'r',wait:async()=>JSON.stringify({readings:readingPlan(prose).spans.map(s=>({id:s.id,reading:'まち'}))}),acknowledge:async()=>{},cancel:async()=>{}},apply(op){assert.equal(op.result.glossary.length,1);}});
 await ok.run(h.op);assert.equal(ok.records.length,0);assert.equal(before,4);
-// Cancel stops both requests and leaves a resumable record.
+// Cancel stops both requests and discards the record.
 h=harness({cancelAt:'readings'});await assert.rejects(h.pipeline.run(h.op),/cancelled/);
-assert.ok(!h.events.includes('apply'));assert.equal(h.op.stage,'enrich');
+assert.ok(!h.events.includes('apply'));assert.equal(h.op.stage,'enrich');assert.deepEqual(h.durable,[]);assert.equal(h.pipeline.records.length,0);
 // Progress presentation.
 const steps=progressSteps({kind:'create',language:'ja',stage:'enrich',parallel:{notes:{done:true},readings:{done:false}}});
 assert.deepEqual(steps.map(s=>s.state),['done','done','done','active']);

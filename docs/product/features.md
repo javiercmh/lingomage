@@ -24,6 +24,8 @@ What LingoMage does now, its confirmed requirements and its defaults. Interactio
 - Everything is saved locally on the device in inspectable JSON.
 - No learning languages are enabled at first. Create then shows a dismissible prompt (Open Profile) and still allows generation, but always requires an explicit level. Dismissal persists as `languageSetupDismissed`.
 
+- In-app generation cancellation discards the unfinished attempt and retains form inputs. External interruptions preserve completed steps for explicit recovery. Failed cancellation cleanup remains visible and retryable without inference.
+
 ## Defaults (product assumptions)
 
 - Scope Scene (default) or Chapter; no numeric length quotas.

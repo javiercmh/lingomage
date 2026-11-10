@@ -17,7 +17,7 @@ export function failureInfo(error, stage, phase = '') {
   let category = 'internal';
   if (code === 'session_cancelled' || /cancel/i.test(message)) category='cancelled';
   else if (BACKGROUND_CODES.has(code)) category='background';
-  else if (phase === 'release') category='release';
+  else if (phase === 'release' || phase === 'cancel') category='release';
   else if (phase === 'checkpoint' || /save|persist|storage|write/i.test(message)) category='storage';
   // not_found also means a wrong owner, an acknowledged request or a reload, so it is never diagnosed as a crash.
   else if (code === 'not_found') category='unavailable';
@@ -26,9 +26,35 @@ export function failureInfo(error, stage, phase = '') {
   else if (code || /service|network|timeout|fetch/i.test(message)) category='service';
   return {category,stage,phase,code,message};
 }
+// Identify the captured destination, rather than whichever chapter the learner is now viewing.
+export function operationLabel(op, stories = [], languageName = '') {
+  if (!op) return '';
+  if (op.kind === 'create') return `New ${languageName || op.language || ''} story${op.input?.difficulty ? ` · ${op.input.difficulty}` : ''}`;
+  const story=stories.find(item=>item.id === op.target?.storyId);
+  const path=story?.paths?.find(item=>item.id === op.target?.pathId)
+    || (op.kind === 'examples' ? story?.paths?.find(item=>item.entries.some(entry=>entry.chapterId === op.target?.chapterId && entry.versionId === op.target?.versionId)) : null);
+  const entries=op.target?.entries || path?.entries;
+  const index=op.kind === 'continue' ? (entries ? entries.length : -1)
+    : op.kind === 'rewrite' ? (Number.isInteger(op.target?.index) ? op.target.index : -1)
+    : path ? path.entries.findIndex(entry=>entry.chapterId === op.target?.chapterId && entry.versionId === op.target?.versionId)
+    : story && !story.chapters?.length ? 0 : -1;
+  const action={continue:'Continuing',rewrite:'Rewriting',examples:'Examples for'}[op.kind] || 'Generating';
+  const destination=story ? `“${story.title || 'Untitled story'}”` : 'a saved story';
+  return `${action} ${destination}${index >= 0 ? ` · Chapter ${index+1}` : ''}${story?.paths?.length > 1 && path?.name ? ` · ${path.name}` : ''}`;
+}
+
+export function discardFailureMessage(op) {
+  const failure=op?.failure;
+  if (failure?.category === 'storage' || failure?.phase === 'checkpoint') return "Couldn't remove saved progress. Try again.";
+  if (failure?.phase === 'cancel') return "Couldn't stop the AI request. Try again.";
+  if (failure?.phase === 'release') return "Couldn't clear the finished AI request. Try again.";
+  return 'The AI request or saved progress still needs to be cleared. Try again.';
+}
+
 export function recoverySummary(op) {
   const names={create:'Story generation',continue:'Story continuation',rewrite:'Chapter rewrite',examples:'Example generation',explain:'Explanation',initial:'Explanation',detail:'More detail'};
   const stages={plan:'language planning',prose:'writing',notes:'vocabulary notes',readings:'Japanese readings',enrich:'vocabulary notes and readings',ready:'saving',applied:'finishing the request',setup:'setup',detail:'more detail',initial:'explanation'};
+  if (op.discardRequested) return discardFailureMessage(op);
   if (!op.error) return 'An unfinished request has saved progress. Resume it or discard this attempt.';
   const failure=op.failure || failureInfo(new Error(op.error),op.stage);
   const reason=(failure.category === 'background' && BACKGROUND_REASONS[failure.code]) || {background:`Background work could not continue.${SAVED}`,unavailable:`The request or background session is no longer available. Earlier steps remain saved; Retry runs the unfinished step again.`,service:'The AI service could not complete the request.',validation:'The AI response did not meet the required format or language checks.',storage:'The response or progress could not be saved.',release:'The response is preserved, but the AI request could not be finished.',configuration:failure.message,cancelled:'The request was cancelled.',internal:'An unexpected app error stopped the request.'}[failure.category] || 'The request stopped.';

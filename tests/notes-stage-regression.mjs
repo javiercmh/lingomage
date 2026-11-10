@@ -23,7 +23,7 @@ function harness(fail='') {
 let h=harness('invalid');await assert.rejects(h.pipeline.run(h.op),/None of the AI vocabulary notes/);assert.equal(h.op.stage,'notes');assert.deepEqual(h.durable[0].prose,prose);assert.ok(!h.events.includes('apply'));
 h.repair();const records=structuredClone(h.durable);const reloaded=createPipeline({...h.io,records});await reloaded.run(records[0]);assert.deepEqual(h.events,['language-plan','create','notes','notes','apply']);
 for(const failure of ['ack','save']){h=harness(failure);await assert.rejects(h.pipeline.run(h.op),failure==='ack'?/notes release/:/notes disk/);await h.pipeline.run(h.op);assert.deepEqual(h.events,['language-plan','create','notes','apply']);}
-h=harness('cancel');await assert.rejects(h.pipeline.run(h.op),/cancelled/);assert.equal(h.op.stage,'notes');assert.deepEqual(h.op.prose,prose);h.repair();await h.pipeline.run(h.op);assert.deepEqual(h.events,['language-plan','create','notes','cancel notes','notes','apply']);
+h=harness('cancel');await assert.rejects(h.pipeline.run(h.op),/cancelled/);assert.equal(h.op.stage,'notes');assert.deepEqual(h.op.prose,prose);assert.deepEqual(h.durable,[]);assert.equal(h.pipeline.records.length,0);assert.ok(!h.events.includes('apply'));
 // Examples still use only prose; the story-note stage is not applicable.
 let stages=[];const examples={examples:Array(3).fill({sentence:'Brot',translation:'Bread',highlightStart:0,highlightEnd:4})};
 const pipeline=createPipeline({records:[],persist(){},ai:{start:async args=>{stages.push(JSON.parse(args.input).kind);return 'examples';},wait:async()=>JSON.stringify(examples),acknowledge:async()=>{}},apply(){}});

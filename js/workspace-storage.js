@@ -74,6 +74,7 @@ export function validCheckpoints(value) {
     && ['create','continue','rewrite','examples'].includes(op.kind)
     && ['plan','prose','notes','readings','enrich','ready','applied'].includes(op.stage)
     && object(op.config) && object(op.input) && id(op.language)
+    && (op.discardRequested === undefined || typeof op.discardRequested === 'boolean')
     && (op.kind === 'create' || object(op.target))
     && (op.request == null || object(op.request) && id(op.request.id))
     && (op.parallel == null || object(op.parallel) && Object.values(op.parallel).every(part => object(part) && (part.request == null || object(part.request) && id(part.request.id)))));

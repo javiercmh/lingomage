@@ -18,7 +18,7 @@ function harness({phase,language='ja',kind='create'}={}) {
       return input.kind;
     },
     async wait(id){events.push('wait '+id);return JSON.stringify(id==='language-plan'?plan:id===kind?prose:id==='notes'?{glossary:prose.glossary}:{readings:readingPlan(prose).spans.map(s=>({id:s.id,reading:'まち'}))});},
-    async acknowledge(id){events.push('ack '+id);if(durable[0]?.request?.invalid)return;if(id==='language-plan'){assert.deepEqual(durable[0].plan,plan);if(phase==='plan-ack')await click();}if(id===kind)assert.deepEqual(durable[0].prose,validateProse(prose,language));if(id==='notes')assert.deepEqual(durable[0].prose,prose);},
+    async acknowledge(id){events.push('ack '+id);if(durable[0]?.request?.invalid)return;if(id==='language-plan'){assert.deepEqual(durable[0].plan,plan);if(phase==='plan-ack')await click();if(phase==='plan-interrupt')throw Object.assign(Error('Session stopped'),{code:'session_idle'});}if(id===kind)assert.deepEqual(durable[0].prose,validateProse(prose,language));if(id==='notes')assert.deepEqual(durable[0].prose,prose);},
     async cancel(id){events.push('cancel '+id);}
   };
   pipeline=createPipeline({records:[],persist(records){durable=structuredClone(records);},ai,apply(op){events.push('apply');assert.equal(op.result.story,prose.story);if(language==='ja')assert.equal(op.result.storySegments.map(p=>p.text).join(''),prose.story);}});
@@ -32,6 +32,7 @@ assert.deepEqual(complete.titles,['Planning your story','Writing your story','Wr
 for(const kind of ['create','continue','rewrite']) for(const phase of ['plan-start','plan-ack','prose-start','notes-start','readings-start']) {
   const h=harness({phase,kind});await assert.rejects(h.pipeline.run(h.op),/cancelled/);
   assert.ok(!h.events.includes('apply'));
+  assert.deepEqual(h.durable,[]); assert.equal(h.pipeline.records.length,0);
   if(phase==='plan-start')assert.ok(!h.events.includes('wait language-plan'));
   if(['plan-ack','prose-start'].includes(phase))assert.ok(!h.events.includes('wait '+kind));
   if(phase==='notes-start')assert.ok(!h.events.includes('wait notes'));
@@ -40,7 +41,7 @@ for(const kind of ['create','continue','rewrite']) for(const phase of ['plan-sta
   if(phase==='readings-start')assert.deepEqual(h.op.prose,prose);
 }
 // Reload after a persisted plan: frozen input is reused; planning is not repeated.
-const h=harness({phase:'plan-ack'});await assert.rejects(h.pipeline.run(h.op),/cancelled/);
+const h=harness({phase:'plan-interrupt'});await assert.rejects(h.pipeline.run(h.op),/Session stopped/);
 let calls=[];const records=structuredClone(h.durable);
 const resumed=createPipeline({records,persist(){},ai:{start:async args=>{calls.push(JSON.parse(args.input));return 'writer';},wait:async()=>JSON.stringify(calls.at(-1).kind==='notes'?{glossary:[{word:'Stadt',meaning:'town',forms:['Stadt']}]}:{title:'Stadt',story:'Stadt'}),acknowledge:async()=>{}},apply(op){assert.equal(op.input.topic,'Captured');assert.deepEqual(op.plan,plan);}});
 records[0].language='de';await resumed.run(records[0]);assert.equal(calls.length,2);assert.equal(calls[0].kind,'create');assert.deepEqual(calls[0].languagePlan,plan);
