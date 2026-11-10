@@ -340,7 +340,7 @@ export function createStoryMemory({state, promptVersion:PROMPT_VERSION, normaliz
   // Condenses a saved summary when it is over COMPACT_AT. The summary record stays saved, so a failed
   // compaction never regenerates the summary; Submit again retries only this step. Source passages of the
   // condensed events go with the request, oldest first, within EXCERPT_BUDGET.
-  async function compact(story, memory, prefix, index, summary, loading, config, excerpt) {
+  async function compact(story, memory, prefix, index, summary, loading, config, excerpt, requestPanel = loading) {
     const candidates = compactionCandidates(memory);
     const names = new Map(memory.characters.map(character => [character.id, character.name]));
     const sourceExcerpts = [], seen = new Set();
@@ -358,13 +358,14 @@ export function createStoryMemory({state, promptVersion:PROMPT_VERSION, normaliz
       previousArcs: memory.arcs,
       events: candidates.map(event => ({ id: event.id, event: event.event, who: event.who.map(id => names.get(id)).filter(Boolean), causes: event.causes, source: event.source && `${event.source.version}#${event.source.chunk}` })),
       sourceExcerpts
-    }, COMPACTION_INSTRUCTIONS, loading, config);
+    }, COMPACTION_INSTRUCTIONS, requestPanel, config);
     const next = applyCompaction(memory, candidates, raw);
     await saveRecord(story, { key: compactKey(prefix, index), memory: next, lineage: [...prefix], chunkIndex: index, compactedFrom: summary, condensedEvents: candidates.map(event => event.id), excerpts: sourceExcerpts.map(item => item.source), sizeBefore: size(memory), sizeAfter: size(next), memoryVersion: MEMORY_VERSION, promptVersion: PROMPT_VERSION, providerId: config.providerId, model: config.model, createdAt: new Date().toISOString() }, 'Story memory condensed. Save it before continuing.');
     return next;
   }
 
-  async function prepareStoryMemory(story, entries, loading, config = { providerId: state.providerId, model: state.model, reasoning: state.reasoning }) {
+  // `requestPanel` receives each request's cancel control; it defaults to the loading card itself.
+  async function prepareStoryMemory(story, entries, loading, config = { providerId: state.providerId, model: state.model, reasoning: state.reasoning }, requestPanel = loading) {
     let memory = emptyMemory();
     const prefix = [], records = () => new Map((story.memories || []).map(item => [item.key, item]));
     const chapters = normalizeChapters(story);
@@ -392,12 +393,12 @@ export function createStoryMemory({state, promptVersion:PROMPT_VERSION, normaliz
         let next = saved(records(), prefix, index);
         if (!next) {
           loading.querySelector('strong').textContent = 'Preparing story context…';
-          const raw = await readerAi('summary', { previousMemory: memory, chapterChunk: chunks[index], chapterTitle: version.title, chunkIndex: index, chunkCount: chunks.length, learnerRequest: version.prompt || '' }, SUMMARY_INSTRUCTIONS, loading, config);
+          const raw = await readerAi('summary', { previousMemory: memory, chapterChunk: chunks[index], chapterTitle: version.title, chunkIndex: index, chunkCount: chunks.length, learnerRequest: version.prompt || '' }, SUMMARY_INSTRUCTIONS, requestPanel, config);
           const { memory: updated, report } = applyUpdate(memory, raw, { chunk: chunks[index], source: { version: version.id, chunk: index } });
           next = updated;
           await saveRecord(story, { key, memory: next, updateReport: report, lineage: [...prefix], chunkIndex: index, memoryVersion: MEMORY_VERSION, promptVersion: PROMPT_VERSION, providerId: config.providerId, model: config.model, createdAt: new Date().toISOString() }, 'Story context prepared. Save it before continuing.');
         }
-        if (needsCompaction(next) && !records().has(compactKey(prefix, index))) next = await compact(story, next, prefix, index, key, loading, config, excerpt);
+        if (needsCompaction(next) && !records().has(compactKey(prefix, index))) next = await compact(story, next, prefix, index, key, loading, config, excerpt, requestPanel);
         memory = next;
       }
     }

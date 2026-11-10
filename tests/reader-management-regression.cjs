@@ -64,9 +64,9 @@ console.log('PASS chapter/path removal, shared content and memory, mirrors, name
 (async()=>{
  const {c,story,$}=harness();c.removeReaderContent(target(story,'original','chapters',1));
  let submit, requested, sequence=0;
- const element=tag=>({tagName:tag,childNodes:[],textContent:'',setAttribute(){},append(...nodes){this.childNodes.push(...nodes);},querySelector(selector){return this.childNodes.find(x=>x.tagName===selector)||this.childNodes.map(x=>x.querySelector?.(selector)).find(Boolean);},remove(){},scrollIntoView(){}});
+ const element=tag=>({tagName:tag,childNodes:[],textContent:'',setAttribute(){},append(...nodes){this.childNodes.push(...nodes);},querySelector(selector){return this.childNodes.find(x=>x.tagName===selector)||this.childNodes.map(x=>x.querySelector?.(selector)).find(Boolean);},remove(){},scrollIntoView(){},addEventListener(){},classList:{add(){}}});
  c.document={createElement:element,querySelectorAll:()=>[]};c.crypto={randomUUID:()=>`generated-${++sequence}`};c.PROMPT_VERSION='test';c.LANGUAGES={de:'German'};c.STORY_GUIDES={de:{beginner:'Simple'}};c.profileSnapshot=()=>({});c.decodeResponse=JSON.parse;c.state.model='mock';c.state.providerId='mock';story.language='de';story.difficulty='beginner';
- c.readerGeneration=null;c.renderReaderGeneration=()=>{};c.setReaderGeneration=value=>{c.readerGeneration=value;};c.renderChapterRequest=()=>{};c.renderCheckpointRecovery=()=>{};vm.runInContext(fs.readFileSync('js/request-lifecycle.js','utf8').replaceAll('export async function ','async function '),c);
+ Object.assign(c,await import('../js/generation-progress.js'));const painted=[];c.paintChapterProgress=(request,op)=>painted.push(op.stage);c.readerGeneration=null;c.renderReaderGeneration=()=>{};c.setReaderGeneration=value=>{c.readerGeneration=value;};c.renderChapterRequest=()=>{};c.renderCheckpointRecovery=()=>{};vm.runInContext(fs.readFileSync('js/request-lifecycle.js','utf8').replaceAll('export async function ','async function '),c);
  c.LENGTHS={short:{words:[100,150],sentences:[8,12]}};c.lengthPreference=()=> 'short';c.structuredClone=structuredClone;
  bindGeneration(c);
  c.runContentOperation=async spec=>{const op={...spec,id:`operation-${++sequence}`,createdAt:'test',result:JSON.parse(await c.readerAi(spec.kind,spec.input))};c.applyContentOperation(op);return op;};c.showOperationResult=()=>{};
@@ -78,7 +78,7 @@ console.log('PASS chapter/path removal, shared content and memory, mirrors, name
  $('reader-level').value='A1';$('reader-scope').value='scene';
  $('reader-edit-submit').addEventListener=(_,fn)=>submit=fn;$('reader-edit-panel').dataset={mode:'continue'};$('reader-prompt').value='';
  vm.runInContext(slice("$('reader-edit-submit').addEventListener", "$('reader-dialog').addEventListener"),c);
- await submit();assert.equal(story.paths[0].entries.length,2);assert.equal(requested.recentProse,'Start');assert.equal(story.paths[1].entries[1].versionId,'bx');
+ await submit();assert.deepEqual(painted,['context'],'Continue shows the story-context step before the operation starts');assert.equal(story.paths[0].entries.length,2);assert.equal(requested.recentProse,'Start');assert.equal(story.paths[1].entries[1].versionId,'bx');
  $('reader-edit-panel').dataset.mode='rewrite';c.state.readerChapter=1;await submit();assert.equal(c.selectedPath(story).name,'Alternate 4');assert.equal(c.selectedPath(story).parentPathId,'original');assert.equal(story.nextAlternateNumber,5);
  c.removeReaderContent(target(story,story.activePathId,'path'));c.state.readerChapter=1;await submit();assert.equal(c.selectedPath(story).name,'Alternate 5');assert.equal(story.nextAlternateNumber,6);
  console.log('PASS production generation continues from truncated ending and rewrite never reuses a deleted alternate name');

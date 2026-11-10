@@ -10,7 +10,7 @@ import { createReaderActivation, glossaryForTrigger, indexGlossaryTriggers, norm
 import { annotatedText, applyExplainedMarks, findGlossaryMatches, getCanonicalSelection, japaneseSegments } from './reader-text.js';
 import { SPEECH_RATES, canonicalRange, createReaderPlayer, speechUnits } from './reader-player.js';
 import { createPipeline, pendingRequests } from './generation-pipeline.js';
-import { progressSummary } from './generation-progress.js';
+import { hasStoryContext, progressSummary } from './generation-progress.js';
 import { SAFEGUARD_VERSION, parseContent, validateStory } from './learning-validation.js';
 import { failureInfo, recoverySummary, appendFailureDetails } from './generation-errors.js';
 import { createWorkspaceStorage, createSettingsPersistence, optionalStore, SIGNALS_PATH, USAGE_PATH } from './workspace-storage.js';
@@ -101,9 +101,11 @@ function paintGenerationBar(bar, view) {
   // Rewriting identical live-region text can be announced again, so only changed text is written.
   if ($(message).textContent !== view.message) $(message).textContent = view.message;
   $(action).hidden = !view.action; $(action).textContent = view.action;
-  $(action).disabled = Boolean(view.working) && !pipeline?.busy && !document.querySelector('.reader-ai-cancel');
+  $(action).disabled = Boolean(view.working) && !cancelAvailable();
   $(dismiss).hidden = !view.dismiss;
 }
+// Cancel is possible only while an operation stage or a memory request is live; the chapter card follows the bar.
+function cancelAvailable() { return Boolean(pipeline?.busy || document.querySelector('.reader-ai-cancel')); }
 // Ready hides itself after READY_STATUS_MS; the result stays in the reader. Hovering or focusing the bar, or a hidden
 // page, postpones it, and returning to the page restarts the full countdown. Working, errors, cleanup and unsaved
 // responses stay until handled.
@@ -136,6 +138,7 @@ function renderReaderGeneration() {
   const ownCard = Boolean(view?.working) && status.storyId == null && $('view-create').classList.contains('active') && !$('reader-dialog').open && !$('loading-card').hidden;
   const page = view && !inReader && !ownCard ? view : null;
   const inDialog = Boolean(page) && $('reader-dialog').open;
+  document.querySelectorAll('.chapter-cancel').forEach(button => { button.disabled = !cancelAvailable(); });
   paintGenerationBar(bar, inReader ? view : null);
   paintGenerationBar(appBar, page);
   // Inside an open reader the page-level bar occupies the same bottom edge as the reader bar, so it shares its scroll and notice offsets.
@@ -645,10 +648,12 @@ function createProgressView() {
   const status = document.createElement('p'); status.className = 'sr-only'; status.setAttribute('role', 'status');
   root.append(bar, list, status); return root;
 }
+// A chapter card painted before its operation exists keeps the clock id it started with, so the story-context
+// step keeps its time once the real operation takes over.
 function paintProgress(root, op) {
-  const summary = progressSummary(op), now = Date.now();
+  const summary = progressSummary(op), now = Date.now(), clockId = root.clockId || op.id;
   for (const step of summary.steps) {
-    const key = `${op.id}:${step.key}`, clock = stepClock.get(key) || {};
+    const key = `${clockId}:${step.key}`, clock = stepClock.get(key) || {};
     if (step.state !== 'pending' && !clock.start) clock.start = now;
     if (step.state === 'done' && clock.start && !clock.end) clock.end = now;
     stepClock.set(key, clock);
@@ -661,7 +666,7 @@ function paintProgress(root, op) {
     bar.textContent = ''; list.textContent = '';
     for (const step of summary.steps) {
       const segment = document.createElement('span'); segment.className = 'gen-seg'; segment.dataset.state = step.state; bar.append(segment);
-      const item = document.createElement('li'); item.dataset.state = step.state; item.dataset.clock = `${op.id}:${step.key}`;
+      const item = document.createElement('li'); item.dataset.state = step.state; item.dataset.clock = `${clockId}:${step.key}`;
       const mark = document.createElement('span'); mark.className = 'gen-mark'; mark.setAttribute('aria-hidden', 'true'); mark.textContent = step.state === 'done' ? '✓' : '';
       const label = document.createElement('span'); label.className = 'gen-label'; label.textContent = step.label;
       const hint = document.createElement('span'); hint.className = 'sr-only'; hint.textContent = step.state === 'done' ? ' (done)' : step.state === 'active' ? ' (in progress)' : ' (waiting)';
@@ -675,14 +680,19 @@ function paintProgress(root, op) {
 }
 function tickProgress() {
   const items = document.querySelectorAll('.gen-steps li[data-clock]');
-  if (!pipeline?.busy || !items.length) { clearInterval(stepTimer); stepTimer = 0; }
+  if (!generationLive() || !items.length) { clearInterval(stepTimer); stepTimer = 0; }
   const now = Date.now();
   for (const item of items) {
     const clock = stepClock.get(item.dataset.clock), time = item.querySelector('.gen-time');
     time.textContent = clock?.start && item.dataset.state !== 'pending' ? elapsedText((clock.end || now) - clock.start) : '';
   }
 }
-let createProgress = null;
+let createProgress = null, resumedCreateCard = false;
+function paintChapterProgress(request, op) {
+  const loading = request.loading;
+  if (!loading.progress) { loading.progress = createProgressView(); loading.progress.clockId = request.clockId; loading.querySelector('.help-loading-copy').append(loading.progress); loading.classList.add('has-progress'); }
+  paintProgress(loading.progress, op);
+}
 function createProgressRoot() { if (!createProgress) { createProgress = createProgressView(); $('generation-status').after(createProgress); } return createProgress; }
 function applyGenerationLocks() {
   const op = pipeline?.records[0], busy = Boolean(pipeline?.busy);
@@ -699,10 +709,15 @@ function renderCheckpointRecovery() {
   const op = pipeline.records[0];
   applyGenerationLocks();
   const stageMessage=op?.kind === 'examples' && op.stage === 'prose' ? 'Generating examples…' : op?.stage === 'plan' ? 'Planning suitable language…' : op?.stage === 'notes' ? 'Adding vocabulary notes…' : op?.stage === 'readings' ? 'Adding kanji readings…' : op?.stage === 'enrich' ? 'Adding vocabulary notes and kanji readings…' : op?.kind === 'continue' ? 'Writing the next chapter…' : op?.kind === 'rewrite' ? 'Rewriting this chapter…' : 'Writing your story…';
+  // A running operation always uses the same status card, whether it started here or was resumed from recovery.
+  if (op && pipeline.busy && op.kind === 'create' && !creatingStory && $('loading-card').hidden) { resumedCreateCard = true; $('story-form').hidden = true; $('loading-card').hidden = false; }
+  if (resumedCreateCard && !pipeline.busy) { resumedCreateCard = false; $('loading-card').hidden = true; $('story-form').hidden = false; }
+  if (op && pipeline.busy && ['continue','rewrite'].includes(op.kind) && !state.activeChapterRequest) { state.activeChapterRequest = { storyId: op.target.storyId, loading: createChapterLoading(op.kind), resumed: true }; renderChapterRequest(); }
+  if (state.activeChapterRequest?.resumed && !pipeline.busy) { state.activeChapterRequest.loading.remove(); state.activeChapterRequest = null; renderChapterRequest(); }
   if (op && pipeline.busy) {
     if (op.kind === 'create') { $('generation-status').textContent=stageMessage; paintProgress(createProgressRoot(), op); }
     if (readerGeneration && (readerGeneration.storyId ?? null) === (op.target?.storyId ?? null)) { readerGeneration.phase='working'; readerGeneration.message=progressSummary(op).text; }
-    if (state.activeChapterRequest && state.activeChapterRequest.storyId === op.target?.storyId) { state.activeChapterRequest.loading.querySelector('strong').textContent=stageMessage; const loading = state.activeChapterRequest.loading; if (!loading.progress) { loading.progress = createProgressView(); loading.querySelector('.help-loading-copy').append(loading.progress); loading.classList.add('has-progress'); } paintProgress(loading.progress, op); }
+    if (state.activeChapterRequest && state.activeChapterRequest.storyId === op.target?.storyId) { state.activeChapterRequest.loading.querySelector('strong').textContent=stageMessage; paintChapterProgress(state.activeChapterRequest, op); }
   }
   renderReaderGeneration(); // busy and idle transitions both reach here through the pipeline's changed callback
   for (const id of ['checkpoint-recovery-create','checkpoint-recovery-profile','checkpoint-recovery-reader']) {
@@ -734,7 +749,8 @@ function renderCheckpointRecovery() {
     });
     box.append(message);
     if (op.error) appendFailureDetails(box, op.failure || failureInfo(new Error(op.error), op.stage));
-    const actions = document.createElement('div'); actions.className='recovery-actions'; actions.append(resume,discard); box.append(actions);
+    // While the operation runs, Resume has nothing to do; only Cancel request is offered.
+    const actions = document.createElement('div'); actions.className='recovery-actions'; actions.append(...(pipeline.busy ? [discard] : [resume, discard])); box.append(actions);
   }
 }
 async function resumeCheckpoint(op) {
@@ -1497,7 +1513,7 @@ function updateReader(keepNavigation = false) {
   annotatedText($('reader-story'), version.story, version.storySegments, {
     language: SPEECH_LANGUAGES[story.language] || 'en',
     glossary: version.glossary || [],
-    onNote: event => activateReaderText(event)
+    onNote: event => activateStoryText(event)
   });
   indexGlossaryTriggers($('reader-story'), version.story, version.glossary || []);
   setReaderTextSize(state.readerFontSize);
@@ -1923,9 +1939,18 @@ $('reader-listen').addEventListener('click', async () => {
     usage.checkpoint();
   }
 });
+// A press outside an open vocabulary note only closes it: the click that follows on story text does not open
+// another note or jump to an explanation. Controls outside the story still act on the same press.
+let noteDismissPress = false;
+const noteDismissClicks = new WeakSet();
 $('reader-dialog').addEventListener('pointerdown', event => {
-  if (!event.target.closest?.('.gloss-note-trigger, mark.explained-expression, #word-note-popover')) closeWordNote();
+  noteDismissPress = !$('word-note-popover').hidden && !event.target.closest?.('#word-note-popover');
+  if (noteDismissPress) closeWordNote();
 });
+function activateStoryText(event) {
+  if (event.type === 'click' && (noteDismissPress || noteDismissClicks.has(event))) { noteDismissPress = false; noteDismissClicks.add(event); return; }
+  activateReaderText(event);
+}
 // Sentence-level listening player: floating controls, spoken-sentence highlight and Follow.
 let playerCollapseTimer = 0, playerScrubbing = false;
 const PLAYER_ICON_LABELS = { paused: ['Resume', 'Resume listening'], playing: ['Pause', 'Pause listening'] };
@@ -2139,6 +2164,15 @@ function createHelpLoading(action, followUp) {
   copy.append(title, note);
   panel.append(sparkle, copy); return panel;
 }
+// The chapter status card: one Cancel request for the whole run (story memory requests and operation stages).
+// A memory request's own cancel control goes into a hidden host, so the card never shows two.
+function createChapterLoading(kind) {
+  const panel = createHelpLoading(kind);
+  panel.requestHost = document.createElement('span'); panel.requestHost.hidden = true;
+  const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'small-btn chapter-cancel'; cancel.textContent = 'Cancel request';
+  cancel.addEventListener('click', () => { cancel.disabled = true; cancelGeneration().finally(() => { cancel.disabled = false; }); });
+  panel.append(cancel, panel.requestHost); return panel;
+}
 function createShowInTextButton(item) {
   const chars = Array.from(String(item.passage || '').replace(/\s+/g, ' ').trim());
   const passage = chars.length > 60 ? `${chars.slice(0, 59).join('').trimEnd()}…` : chars.join('');
@@ -2279,7 +2313,7 @@ const activateReaderText = createReaderActivation({
   showNote: (vocab, helpId) => showWordNote(vocab.trigger, vocab.notes, vocab.surface, helpId),
   showExplanation: showExplanationForHelp
 });
-$('reader-story').addEventListener('click', activateReaderText);
+$('reader-story').addEventListener('click', activateStoryText);
 $('reader-story').addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') activateReaderText(event); });
 async function readerAi(kind, input, instructions, requestPanel, config = { providerId: state.providerId, model: state.model, reasoning: state.reasoning }) {
   workspaceStorage.assertWritable();
@@ -2641,10 +2675,13 @@ $('reader-edit-submit').addEventListener('click', async () => {
   const input = { topic: story.topic || '', practice: story.practice || (story.words || []).join(', '), language: LANGUAGES[story.language], languageCode: story.language, difficulty, framework: LEVELS[story.language].framework, levelDescription: guideFor(story.language, difficulty), readingSelfReport: readingDescription(story.language, difficulty), languageExpectations: state.languageExpectations[story.language] || '', scope, scopeDescription: SCOPES[scope].description, learnerProfile: { ...profileSnapshot(story), readingStartingPoint: difficulty, readingSelfReport: readingDescription(story.language, difficulty) }, prompt };
   const instructions = chapterInstructions(LANGUAGES[story.language], difficulty, guideFor(story.language, difficulty), mode);
   state.readerEditBusy = true; state.readerEditDraft = null; $('path-select').disabled = true;
-  const loading = createHelpLoading(mode);
-  state.activeChapterRequest = { storyId: story.id, loading };
+  const loading = createChapterLoading(mode);
+  const request = state.activeChapterRequest = { storyId: story.id, loading, clockId: `chapter-request-${Date.now()}` };
+  // Earlier chapters are summarized before the operation exists; the checklist shows that as its first step.
+  const provisional = { id: request.clockId, kind: mode, language: story.language, stage: 'context', target: { index: rewriteIndex } };
+  if (hasStoryContext(provisional)) { loading.querySelector('strong').textContent = 'Preparing story context…'; paintChapterProgress(request, provisional); }
   renderChapterRequest();
-  setReaderGeneration({ storyId: story.id, phase: 'working', message: mode === 'continue' ? 'Preparing next chapter…' : 'Preparing rewrite…' });
+  setReaderGeneration({ storyId: story.id, phase: 'working', message: hasStoryContext(provisional) ? progressSummary(provisional).text : mode === 'continue' ? 'Preparing next chapter…' : 'Preparing rewrite…' });
   $('reader-edit-cancel').disabled = true; $('reader-prompt').disabled = true; $('reader-level').disabled = true; setScopeDisabled($('reader-scope'), true);
   const button = $('reader-edit-submit'); button.disabled = true; button.textContent = 'Working…'; $('reader-edit-error').textContent = '';
   try {
@@ -2652,7 +2689,7 @@ $('reader-edit-submit').addEventListener('click', async () => {
     await releaseSavedInference();
     // Summary preparation and every generation stage share one session; readerAi joins it and never ends it.
     const op = await aiSession.run(async () => {
-      input.storyMemory = await prepareStoryMemory(story, mode === 'continue' ? entries : entries.slice(0, rewriteIndex), loading, config);
+      input.storyMemory = await prepareStoryMemory(story, mode === 'continue' ? entries : entries.slice(0, rewriteIndex), loading, config, loading.requestHost);
       const priorEntry = mode === 'continue' ? entries[entries.length - 1] : entries[rewriteIndex - 1];
       const priorVersion = priorEntry ? normalizeChapters(story).find(c => c.id === priorEntry.chapterId).versions.find(v => v.id === priorEntry.versionId) : null;
       input.recentProse = priorVersion ? recentProse(priorVersion.story) : '';

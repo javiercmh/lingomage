@@ -219,6 +219,7 @@ const BREAD = [{ word: 'Brot', meaning: 'bread', forms: ['Brot'] }];
   assert.match(app, /function closeWordNote\(restoreFocus = false\) \{\n  const popover/, 'note closing no longer touches a chooser');
   assert.match(app, /if \(!\$\('word-note-popover'\)\.hidden\) \{\n    closeWordNote\(true\);\n    history\.pushState/, 'Back dismisses an open note before leaving the reader');
   assert.match(app, /selectionMenuRouter\.reset\(\); \$\('reader-dialog'\)\.showModal\(\)/, 'reader entry re-asserts native menu suppression');
-  assert.match(app, /onNote: event => activateReaderText\(event\)/, 'trigger controls share the single dispatcher');
+  assert.match(app, /onNote: event => activateStoryText\(event\)/, 'trigger controls share the single dispatcher');
+  assert.match(app, /\$\('reader-story'\)\.addEventListener\('click', activateStoryText\)/, 'story taps go through the same note-dismissal gate');
   console.log('PASS chooser removed; note action is 44px, divided, focus-visible; Back dismisses the note first');
 }

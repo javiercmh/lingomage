@@ -432,7 +432,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.throws(()=>contract.decodeHelp('   ','detail'),/invalid/);
   console.log('PASS explanation/example contracts reject malformed counts, ranges, translations and annotations');
 
-  const rendered=sandbox({normalizeReaderControls(){},createReaderActivation:()=>()=>{},glossaryForTrigger:()=>null,state:{furigana:true,explanationSelectionMode:false,selectedExplanationIds:new Set()},readerStory:()=>({id:'S'}),profileSnapshot:()=>({})});
+  const rendered=sandbox({normalizeReaderControls(){},createReaderActivation:()=>()=>{},activateStoryText(){},glossaryForTrigger:()=>null,state:{furigana:true,explanationSelectionMode:false,selectedExplanationIds:new Set()},readerStory:()=>({id:'S'}),profileSnapshot:()=>({})});
   vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function wireLongPress(', 'function renderLibrary(')+section('function renderHighlightedText(', 'async function readerAi('),rendered);
   const formatted=rendered.document.createElement('div');
   rendered.renderDetailText(formatted, 'In “al salir,” **al** contracts **a + el**.\n\nUse **bold with *italic* inside** and `a él`. <img src=x> Unmatched **marker');
@@ -543,6 +543,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   gen.showOperationResult=()=>{};
   gen.aiSession={run:fn=>fn()};
   gen.structuredClone=structuredClone;
+  Object.assign(gen,await import('../js/generation-progress.js'));gen.paintChapterProgress=()=>{};
   bindGeneration(gen);
   gen.state.stories=[story3];
   gen.document.createElement = sandbox().document.createElement;
@@ -641,6 +642,19 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   pos.state.readerPositions={};pos.openReader(emptyChapters);
   assert.equal(emptyChapters.chapters.length,1);assert.equal(emptyChapters.paths[0].entries[0].chapterId,emptyChapters.chapters[0].id);assert.ok(validStories([emptyChapters]));
   console.log('PASS legacy story with an empty chapters array opens with saved chapters matching its paths');
+  {
+    // A press outside an open vocabulary note closes it without opening the note (or explanation) it lands on.
+    const popover={hidden:false},events={},activated=[];let closed=0;
+    const ctx={$:id=>id==='word-note-popover'?popover:{addEventListener:(type,fn)=>{events[type]=fn;}},closeWordNote(){closed++;popover.hidden=true;},activateReaderText:event=>activated.push(event),WeakSet};
+    vm.createContext(ctx);vm.runInContext(section('let noteDismissPress = false;','// Sentence-level listening player'),ctx);
+    const outside={closest:()=>null},inside={closest:selector=>selector==='#word-note-popover'?{}:null};
+    events.pointerdown({target:outside});assert.equal(closed,1,'outside press closes the note');
+    const click={type:'click'};ctx.activateStoryText(click);ctx.activateStoryText(click);assert.equal(activated.length,0,'the dismissing tap opens nothing, even through both click handlers');
+    const next={type:'click'};events.pointerdown({target:outside});ctx.activateStoryText(next);assert.deepEqual(activated,[next],'with no note open, the next tap opens a note');
+    popover.hidden=false;events.pointerdown({target:inside});ctx.activateStoryText({type:'click'});assert.equal(closed,1,'presses inside the note keep it open');
+    const key={type:'keydown'};popover.hidden=false;events.pointerdown({target:outside});ctx.activateStoryText(key);assert.equal(activated.at(-1),key,'keyboard activation is never swallowed');
+    console.log('PASS tapping outside a vocabulary note closes it without opening another');
+  }
 })().catch(error=>{console.error(error);process.exitCode=1;});
 
 })().catch(error=>{console.error(error);process.exitCode=1;});

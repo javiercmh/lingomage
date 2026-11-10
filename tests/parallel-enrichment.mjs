@@ -38,7 +38,11 @@ assert.ok(!h.events.includes('apply'));assert.equal(h.op.stage,'enrich');
 const steps=progressSteps({kind:'create',language:'ja',stage:'enrich',parallel:{notes:{done:true},readings:{done:false}}});
 assert.deepEqual(steps.map(s=>s.state),['done','done','done','active']);
 assert.deepEqual(progressSteps({kind:'create',language:'ja',stage:'enrich',parallel:{notes:{done:false},readings:{done:false}}}).map(s=>s.state),['done','done','active','active']);
-assert.deepEqual(progressSteps({kind:'continue',language:'de',stage:'prose'}).map(s=>s.state),['done','active','pending']);
+assert.deepEqual(progressSteps({kind:'continue',language:'de',stage:'prose'}).map(s=>s.state),['done','done','active','pending']);
+assert.deepEqual(progressSteps({kind:'continue',language:'de',stage:'context'}).map(s=>[s.key,s.state]),[['context','active'],['plan','pending'],['prose','pending'],['notes','pending']],'Continue shows story memory as its first step');
+assert.equal(progressSummary({kind:'continue',language:'de',stage:'context'}).text,'Step 1 of 4 · Story context');
+assert.deepEqual(progressSteps({kind:'rewrite',language:'de',stage:'plan',target:{index:0}}).map(s=>s.key),['plan','prose','notes'],'rewriting chapter 1 has no earlier chapters to summarize');
+assert.deepEqual(progressSteps({kind:'rewrite',language:'de',stage:'plan',target:{index:2}}).map(s=>[s.key,s.state]).slice(0,2),[['context','done'],['plan','active']]);
 assert.equal(progressSummary({kind:'examples',language:'de',stage:'prose'}).text,'Writing examples');
 console.log('PASS parallel Japanese enrichment: concurrency, partial failure reuse, cancellation and progress steps');
 // A host with a one-request cap refuses the second start before inference; the part runs after the first.

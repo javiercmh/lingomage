@@ -1,11 +1,17 @@
 // Presentation of a saved operation's stages for the waiting screen. It reads the checkpoint record
 // and never changes it, so the checklist cannot disagree with what the pipeline will actually do.
 const PROSE_LABEL = { create: 'Writing your story', continue: 'Writing the next chapter', rewrite: 'Rewriting the chapter', examples: 'Writing examples' };
-const ORDER = ['plan', 'prose', 'notes', 'readings'];
+const ORDER = ['context', 'plan', 'prose', 'notes', 'readings'];
+
+// Continue and rewrites after chapter 1 first summarize the earlier chapters into story memory (separate
+// summary requests made before the operation exists). A saved operation has always finished that step.
+export function hasStoryContext(op) { return op.kind === 'continue' || (op.kind === 'rewrite' && op.target?.index > 0); }
 
 // Steps in display order; "notes" and "readings" are the parallel pair for Japanese.
+// A provisional record with stage "context" describes the story-memory step before the operation is created.
 export function progressSteps(op) {
   const steps = [];
+  if (hasStoryContext(op)) steps.push({ key: 'context', label: 'Story context' });
   if (op.kind !== 'examples') steps.push({ key: 'plan', label: 'Planning language' });
   steps.push({ key: 'prose', label: PROSE_LABEL[op.kind] || 'Writing' });
   if (op.kind !== 'examples') steps.push({ key: 'notes', label: 'Vocabulary notes' });
@@ -13,7 +19,7 @@ export function progressSteps(op) {
   const done = new Set();
   if (['ready', 'applied'].includes(op.stage)) steps.forEach(step => done.add(step.key));
   else if (op.stage === 'enrich') {
-    ['plan', 'prose'].forEach(key => done.add(key));
+    ['context', 'plan', 'prose'].forEach(key => done.add(key));
     for (const [name, part] of Object.entries(op.parallel || {})) if (part.done) done.add(name);
   } else {
     const at = ORDER.indexOf(op.stage);
