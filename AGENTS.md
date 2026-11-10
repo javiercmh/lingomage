@@ -33,7 +33,6 @@ Every doc, what it contains, and when to read or update it. Update the matching 
 | [`docs/product/features.md`](docs/product/features.md) | What the app does now, confirmed requirements, defaults, what is out of scope | Adding or removing a feature |
 | [`docs/product/future-directions.md`](docs/product/future-directions.md) | Research-linked ideas not yet built (reading, retrieval, listening, writing, feedback) | Proposing a new learning feature |
 | [`docs/evaluation/learning-evaluation-plan.md`](docs/evaluation/learning-evaluation-plan.md) | How learning would be measured: outcomes, evaluation gates, in-app check design, protocol (nothing implemented) | Making or testing any learning claim |
-| [`docs/evaluation/android-checklist.md`](docs/evaluation/android-checklist.md) | What to verify on Android and how (no results) | A change needs Android verification: add or edit its row |
 | [`docs/evaluation/generation-tests/`](docs/evaluation/generation-tests/method.md) | Live model and prompt comparisons: `method.md`, `results.md`, `ai-evals.md` (opt-in learning-quality evals), `notes-prompt-experiment/` (pending) | Running or interpreting model, prompt or AI-eval tests |
 | [`docs/README.md`](docs/README.md) | Documentation policy | Writing or reorganizing docs |
 
@@ -65,7 +64,8 @@ Every doc, what it contains, and when to read or update it. Update the matching 
 - The server keeps learner files in the gitignored `.dev-data/`, seeded from `seedDefaults`; committed seeds never change. Delete `.dev-data/` for a fresh install. Never commit learner data.
 - Run `python3 scripts/check.py` (Node 22.12+, Python 3.9+) before completing any change.
 - For interface or copy changes, inspect screenshots at desktop and narrow mobile widths (spacing, wrapping, hierarchy, clipping, touch targets); DOM checks are not enough. Share before and after screenshots with the requester in the conversation, not just a description.
-- Record checks actually run, and what remains unverified, in the commit message. Results never go in docs; the Android checklist lists checks only.
+- LingoMage has no Android tests. Verify everything with unit tests and the Python dev server. Host behavior (bridge, storage, AI requests and notifications, speech, translation, selection menus, insets, Back, WebView lifecycle) is tested in [App²](https://github.com/javiercmh/appapp) (`docs/DEVICE_CHECKS.md`; `~/projects/appapp` when available). When a change depends on host behavior App² does not yet check, propose a check there.
+- Record checks actually run, and what remains unverified, in the commit message. Results never go in docs.
 - AI evals (`scripts/ai-eval.mjs`) are opt-in and never part of checks, hooks, CI or packaging; without `--live` they make no request. See `docs/evaluation/generation-tests/ai-evals.md`.
 - Never log or export credentials, tokens, callback URLs or account identifiers.
 

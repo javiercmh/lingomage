@@ -109,7 +109,6 @@ Full notes are in the [consultation signals review](../research/consultation-sig
 - **Interface:** "Most looked up" in the profile; see `DESIGN.md`.
 - **Provenance:** no prompt changes. Selected text is stored canonically, without furigana.
 - **Tests:** `tests/consultation-signals.mjs` and `tests/reading-exposure.mjs`.
-- **Android checks:** listed in the [Android checklist](../evaluation/android-checklist.md).
 
 ## Alternatives and revisit conditions
 

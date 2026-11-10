@@ -126,4 +126,4 @@ A separate view from the Profile gear (Profile stays the current tab): a "‹ Ba
 
 ## Verification
 
-Every interface or copy change: inspect screenshots from the development server at desktop and narrow mobile widths (and affected loading, error and recovery states, furigana, large reading text, keyboard focus, disclosures). Check spacing, wrapping, hierarchy, clipping and touch targets; DOM checks do not establish layout quality. Record what was inspected in the commit message. Host insets, Android keyboard, selection menus, Back, font scaling, TalkBack and speech need Android checks; list them in `docs/validation/device-checklist.md`.
+Every interface or copy change: inspect screenshots from the development server at desktop and narrow mobile widths (and affected loading, error and recovery states, furigana, large reading text, keyboard focus, disclosures). Check spacing, wrapping, hierarchy, clipping and touch targets; DOM checks do not establish layout quality. Record what was inspected in the commit message. Host insets, Android keyboard, selection menus, Back, font scaling, TalkBack and speech are host behavior, tested in App² (see `AGENTS.md`).

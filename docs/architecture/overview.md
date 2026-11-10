@@ -23,4 +23,4 @@ What the app is made of: platform, modules, version constants and tests. Archite
 
 - `python3 scripts/check.py` (Node 22.12+, Python 3.9+) runs every Node and Python test.
 - `python3 scripts/browser_smoke.py` prints a runner URL; Run smoke checks needs its disposable-workspace marker and offline mock. It covers the four language flows, notes, reopening, continuation and rewrite, cancel/reload/resume, malformed and blank stores with Retry loading, unreadable settings and injected settings write failures. `tests/browser/inspect.html` gives screenshot fixtures for recovery and write-failure states. `tests/app-startup.mjs` boots `js/app.js` against a stub DOM.
-- Mock fixtures establish interface and contract behavior only. Android behavior is listed in the [Android checklist](../evaluation/android-checklist.md); live-model evidence is in the [generation test results](../evaluation/generation-tests/results.md).
+- Mock fixtures establish interface and contract behavior only. Host (Android) behavior is tested in App², not here; live-model evidence is in the [generation test results](../evaluation/generation-tests/results.md).
