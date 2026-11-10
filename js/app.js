@@ -104,10 +104,33 @@ function paintGenerationBar(bar, view) {
   $(action).disabled = Boolean(view.working) && !pipeline?.busy && !document.querySelector('.reader-ai-cancel');
   $(dismiss).hidden = !view.dismiss;
 }
+// Ready hides itself after READY_STATUS_MS; the result stays in the reader. Hovering or focusing the bar, or a hidden
+// page, postpones it, and returning to the page restarts the full countdown. Working, errors, cleanup and unsaved
+// responses stay until handled.
+const READY_STATUS_MS = 8000;
+let readyTimer = null, readyStatus = null;
+function scheduleReadyDismiss(status, view) {
+  const ready = Boolean(view?.dismiss) && status?.phase === 'ready';
+  if (ready && readyStatus === status) return;
+  clearTimeout(readyTimer); readyTimer = null; readyStatus = ready ? status : null;
+  if (ready) readyTimer = setTimeout(expireReadyStatus, READY_STATUS_MS);
+}
+function expireReadyStatus() {
+  const status = readyStatus; readyTimer = null;
+  if (!status || readerGeneration !== status || status.phase !== 'ready') { readyStatus = null; return; }
+  const held = ['reader-generation-bar', 'generation-status-bar'].some(id => { const bar = $(id); return !bar.hidden && (bar.matches?.(':hover') || bar.contains?.(document.activeElement)); });
+  if (held || document.visibilityState === 'hidden') { readyTimer = setTimeout(expireReadyStatus, READY_STATUS_MS); return; }
+  readyStatus = null; setReaderGeneration(null);
+}
+function restartReadyCountdown() {
+  if (!readyStatus) return;
+  clearTimeout(readyTimer); readyTimer = setTimeout(expireReadyStatus, READY_STATUS_MS);
+}
 function renderReaderGeneration() {
   const bar = $('reader-generation-bar'), appBar = $('generation-status-bar');
   if (!bar || !appBar) return;
   const status = readerGeneration, view = generationView(status);
+  scheduleReadyDismiss(status, view);
   const inReader = Boolean(view) && status.storyId != null && status.storyId === state.readerId && $('reader-dialog').open;
   // Create's visible progress card (with Cancel) is the indicator on its tab; a resumed Create has no such card.
   const ownCard = Boolean(view?.working) && status.storyId == null && $('view-create').classList.contains('active') && !$('reader-dialog').open && !$('loading-card').hidden;
@@ -2128,7 +2151,11 @@ function createShowInTextButton(item) {
 }
 function renderSavedHelp(chapter, version) {
   const box = $('reader-help'), section = $('reader-help-section'); box.textContent = '';
+  // Cards follow the text: by selection start, then end; equal ranges keep the newest first. Stored order is unchanged.
+  const offset = value => Number.isFinite(value) ? value : Infinity;
   const orderedHelp = (chapter.help || []).map((item,index)=>({item,index})).filter(row=>row.item.versionId === version.id).sort((a,b)=>{
+    const byText = offset(a.item.start) - offset(b.item.start) || offset(a.item.end) - offset(b.item.end);
+    if (byText) return byText;
     const at=Date.parse(a.item.createdAt||''), bt=Date.parse(b.item.createdAt||'');
     if(Number.isFinite(at)!==Number.isFinite(bt)) return Number.isFinite(at)?-1:1;
     return Number.isFinite(at)&&at!==bt ? bt-at : b.index-a.index;
@@ -2391,7 +2418,6 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
     const overlaps = overlappingHelp(chapter, version.id, passage.start, passage.end);
     if (overlaps.length && !await confirmReplaceHelp(overlaps)) return;
   }
-  const scrollTop = readerPanel().scrollTop;
   const providerId = state.providerId, model = state.model, reasoning = state.reasoning;
   state.readerHelpBusy = true;
   try {
@@ -2440,10 +2466,12 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
         chapter.help = [...before.filter(entry => !replaced.has(entry)), item];
         return () => { chapter.help = before; undoActivity(); };
       } };
+      // The learner may have kept reading during the request: the re-render keeps where they are now, not where they asked.
       try { await savePendingReaderResult(); }
       catch { if (state.readerId === story.id) renderPendingReaderResult(); return; }
       if (state.readerId === story.id && activeChapter().id === chapter.id && activeVersion().id === version.id) {
-        renderSavedHelp(chapter, version); readerPanel().scrollTop = scrollTop;
+        const panel = readerPanel(), current = panel.scrollTop;
+        renderSavedHelp(chapter, version); panel.scrollTop = current;
       }
       recordSelectionLookup(passage, action === 'initial' ? 'explain' : action);
     } catch (error) {
@@ -2726,7 +2754,10 @@ state.languageExpectations = Object.fromEntries(admitted('languageExpectations',
 settingsPersistence.remember();
 renderTargetLanguageSettings(); populateTargetPicker();
 // Positions update in memory while scrolling; write them when the reader closes or the page is hidden.
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && $('reader-dialog').open) { rememberReaderPosition(); persistReaderPosition(); } });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') restartReadyCountdown();
+  if (document.visibilityState === 'hidden' && $('reader-dialog').open) { rememberReaderPosition(); persistReaderPosition(); }
+});
 window.addEventListener('pagehide', () => { if ($('reader-dialog').open) { rememberReaderPosition(); persistReaderPosition(); } });
 usage.setVisible(document.visibilityState === 'visible');
 document.addEventListener('visibilitychange', () => {

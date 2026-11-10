@@ -16,7 +16,8 @@ function build(extra = {}) {
   dialog.addEventListener = (type, fn) => { if (type === 'close') closers.push(fn); };
   dialog.close = () => { dialog.open = false; setTimeout(() => closers.splice(0).forEach(fn => fn()), 0); };
   const context = {state: {readerId: null, stories: []}, $: element, readerPanel: () => element('reader-panel'), pipeline: null, toasts: [],
-    document: {body, querySelectorAll: () => dialog.open ? [dialog] : [], querySelector: () => null}, toast(message) { context.toasts.push(message); }, ...extra};
+    document: {body, querySelectorAll: () => dialog.open ? [dialog] : [], querySelector: () => null}, toast(message) { context.toasts.push(message); },
+    timers: [], setTimeout(fn, ms) { context.timers.push({fn, ms}); return context.timers.length; }, clearTimeout(id) { if (context.timers[id - 1]) context.timers[id - 1].cleared = true; }, ...extra};
   Object.defineProperty(context, 'bodyClass', {get: () => body.classList.contains('x')});
   vm.createContext(context);
   // The status core, then the View result handler; both are the production source.
@@ -98,6 +99,35 @@ const visible = (t, id) => !t.element(id).hidden;
     assert.equal(t.element('reader-generation-action').textContent, label); assert.equal(t.element('reader-generation-dismiss').hidden, false);
   }
   context.setReaderGeneration(null); assert.equal(visible(t, 'reader-generation-bar'), false);
+}
+
+// Ready hides itself after a timeout; a held or hidden bar postpones it; other phases never time out.
+{
+  const t = build(), {context} = t, live = () => context.timers.filter(timer => !timer.cleared && !timer.fired);
+  const fire = () => { const timer = live().at(-1); timer.fired = true; timer.fn(); };
+  const current = () => vm.runInContext('readerGeneration', context);
+  t.element('reader-dialog').open = true; context.state.readerId = 'story';
+  context.document.visibilityState = 'visible';
+  for (const phase of ['error', 'cleanup']) { context.setReaderGeneration({storyId: 'story', phase, message: phase}); assert.equal(live().length, 0, `${phase} stays`); }
+  context.state.pendingReaderResult = {story: {id: 'story'}, saved: true};
+  context.setReaderGeneration({storyId: 'story', phase: 'ready', message: 'Ready'}); assert.equal(live().length, 0, 'unreleased response stays');
+  context.state.pendingReaderResult = null;
+  const ready = {storyId: 'story', phase: 'ready', message: 'Ready'};
+  context.setReaderGeneration(ready); assert.equal(live().length, 1); assert.equal(live()[0].ms, 8000);
+  context.renderReaderGeneration(); assert.equal(live().length, 1, 're-rendering the same status keeps one countdown');
+  t.element('reader-generation-bar').matches = selector => selector === ':hover';
+  fire(); assert.equal(current(), ready, 'hovered bar stays'); assert.equal(live().length, 1);
+  t.element('reader-generation-bar').matches = () => false; context.document.visibilityState = 'hidden';
+  fire(); assert.equal(current(), ready, 'hidden page postpones'); assert.equal(live().length, 1);
+  // Returning to the page restarts the full countdown instead of keeping whatever was left.
+  context.document.visibilityState = 'visible'; const leftover = live().at(-1);
+  context.restartReadyCountdown(); assert.equal(leftover.cleared, true); assert.equal(live().length, 1); assert.equal(live()[0].ms, 8000);
+  fire(); assert.equal(current(), null); assert.equal(visible(t, 'reader-generation-bar'), false);
+  context.restartReadyCountdown(); assert.equal(live().length, 0, 'nothing to restart once Ready is gone');
+  // A newer status replaces the countdown; the old timer cannot dismiss it.
+  const first = {storyId: 'story', phase: 'ready', message: 'First'}; context.setReaderGeneration(first);
+  const stale = live().at(-1); context.setReaderGeneration({storyId: 'story', phase: 'error', message: 'Failed'});
+  assert.equal(stale.cleared, true); stale.fn(); assert.equal(current().phase, 'error');
 }
 
 // Cancel uses the pipeline directly, so it works from the page bar with the reader closed.

@@ -19,7 +19,7 @@ function sandbox(extra = {}) {
   const element = (tag = 'div') => ({tagName:tag,hidden:false,classList:{toggle(){},contains:()=>false},dataset:{},childNodes:[],events:{},attributes:{},
     get textContent(){return this.childNodes.map(node=>node.textContent).join('');},set textContent(value){this.childNodes=value ? [{tagName:'#text',textContent:String(value)}] : [];},
     append(...nodes){this.childNodes.push(...nodes);},addEventListener(name,fn){this.events[name]=fn;},setAttribute(name,value){this.attributes[name]=value;},focus(){this.focused=true;},scrollIntoView(){},remove(){},querySelector(selector){return this.childNodes.find(node=>node.tagName===selector) || this.childNodes.map(node=>node.querySelector?.(selector)).find(Boolean) || null;},querySelectorAll(){return [];},classList:{add(){},remove(){},toggle(){}}});
-  const c = {workspaceStorage:{assertWritable(){}},usage:{setReader(){},checkpoint(){}},settingsFeedback:{sync(){}},pipeline:null,state:{},console,crypto:{randomUUID:(()=>{let id=0;return ()=>`help-test-${++id}`;})()},PROMPT_VERSION:'test',STORY_GUIDES:{de:{beginner:'Simple sentences'}},renderChapterRequest(){},updateReaderNavigation(){},renderCheckpointRecovery(){},LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},SPEECH_LANGUAGES:{de:'de-DE',ja:'ja-JP',ru:'ru-RU','es-CL':'es-CL'},renderGenerationRecovery(){},readerPanel:()=>({classList:{toggle(){}}}),$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{body:element(),createElement:element,createElementNS:(_ns,name)=>element(name),createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},...extra};
+  const c = {workspaceStorage:{assertWritable(){}},usage:{setReader(){},checkpoint(){}},settingsFeedback:{sync(){}},pipeline:null,state:{},console,crypto:{randomUUID:(()=>{let id=0;return ()=>`help-test-${++id}`;})()},PROMPT_VERSION:'test',STORY_GUIDES:{de:{beginner:'Simple sentences'}},renderChapterRequest(){},updateReaderNavigation(){},renderCheckpointRecovery(){},LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},SPEECH_LANGUAGES:{de:'de-DE',ja:'ja-JP',ru:'ru-RU','es-CL':'es-CL'},renderGenerationRecovery(){},readerPanel:()=>({classList:{toggle(){}}}),$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{body:element(),createElement:element,createElementNS:(_ns,name)=>element(name),createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},setTimeout:()=>0,clearTimeout(){},...extra};
   c.readerGeneration = null; c.renderReaderGeneration = () => {}; c.setReaderGeneration = value => { c.readerGeneration = value; };
   vm.createContext(c); c.markStoryActivity = markStoryActivity;
   vm.runInContext(notificationSource, c);
@@ -383,6 +383,19 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   }
   console.log('PASS all languages share focused instructions; steered and blank follow-ups preserve legacy history and save before acknowledgement');
 
+  {
+    const entry = {id:'H',passage:'く',start:3,end:4,text:'Original explanation'};
+    const version = {id:'V',story:'空は青く、遠く。'}, chapter = {id:'C',help:[entry],versions:[version]}, story = {id:'S',language:'ja',chapters:[chapter]};
+    const panel = {scrollTop:900}; let renders = 0;
+    const f = sandbox({state:{readerId:'S',providerId:'mock',model:'model'},readerStory:()=>story,normalizeChapters:s=>s.chapters,activeChapter:()=>chapter,activeVersion:()=>version,readerPanel:()=>panel,persistReaderStory(){},
+      readerAi:async()=>{panel.scrollTop=120;f.state.pendingReaderRequestId='r';return 'More detail.';},decodeHelp:text=>({explanation:text}),renderSavedHelp(){renders++;panel.scrollTop=0;},recordSelectionLookup(){},ai:{acknowledge:async()=>{}}});
+    vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(', "$('selection-translate')"),f);
+    await f.explainSelection('explain','detail','',{storyId:'S',chapterId:'C',versionId:'V',helpId:'H',text:'く',start:3,end:4,profile:{}});
+    assert.equal(entry.followUps.length,1); assert.equal(renders,2);
+    assert.equal(panel.scrollTop,120,'completion keeps where the learner scrolled during the request, not where they asked');
+  }
+  console.log('PASS a finished explanation request never moves the learner back to where they asked');
+
   const contract=sandbox();
   vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function decodeHelp(', 'async function explainSelection('), contract);
   const promptContract=sandbox();
@@ -477,9 +490,12 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   console.log('PASS canonical highlighted context, separate readings, safe text, examples and both UI actions; legacy cards remain readable');
 
   const newer={...sample,id:'newer',text:'Newest',createdAt:'2026-10-11T12:00:00Z'},older={...sample,id:'older',text:'Oldest',createdAt:'2026-10-10T12:00:00Z'};
-  rendered.renderSavedHelp({id:'C',help:[older,newer]},v);
-  assert.deepEqual(Array.from(rendered.$('reader-help').childNodes,node=>node.dataset.helpId),['newer','older']);
-  console.log('PASS saved explanations render newest first without changing their stored order');
+  const late={...sample,id:'late',start:9,end:10,createdAt:'2026-10-09T12:00:00Z'},early={...sample,id:'early',start:0,end:2,createdAt:'2026-10-12T12:00:00Z'},wide={...sample,id:'wide',start:0,end:5,createdAt:'2026-10-13T12:00:00Z'},noOffset={...sample,id:'nooffset',start:undefined,end:undefined,createdAt:'2026-10-14T12:00:00Z'};
+  const ordered=[late,noOffset,older,wide,newer,early];
+  rendered.renderSavedHelp({id:'C',help:ordered},v);
+  assert.deepEqual(Array.from(rendered.$('reader-help').childNodes,node=>node.dataset.helpId),['early','wide','newer','older','late','nooffset']);
+  assert.deepEqual(ordered.map(item=>item.id),['late','nooffset','older','wide','newer','early']);
+  console.log('PASS saved explanations follow the text (start, then end, then newest) without changing their stored order');
 
   const removal=sandbox({state:{stories:[{id:'a'},{id:'b'}],selectedStoryIds:new Set(['a']),storySelectionMode:true},persistStories(){if(removal.fail)throw Error('disk');},updateCount(){},renderLibrary(){},syncStorySelection(){},window:{scrollY:0,scrollTo(){}},toast(){},fail:false});
   vm.runInContext(section('function pendingDeletionBlocked(', 'function wireLongPress('),removal);
