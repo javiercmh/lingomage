@@ -27,6 +27,24 @@ function build(extra = {}) {
 }
 const visible = (t, id) => !t.element(id).hidden;
 
+// Review is unnecessary while the matching recovery card is in view, but returns elsewhere.
+{
+  const t=build({window:{innerWidth:360,innerHeight:800},pipeline:{records:[{target:{storyId:'story'}}],busy:false}}), {context}=t;
+  context.state.readerId='story';t.element('reader-dialog').open=true;
+  let top=300;
+  const card=t.element('checkpoint-recovery-reader');
+  card.getClientRects=()=>[{}];card.getBoundingClientRect=()=>({left:12,right:348,top,bottom:top+200,height:200});
+  t.element('reader-navigation-bar').getBoundingClientRect=()=>({bottom:80});
+  context.setReaderGeneration({storyId:'story',phase:'error',message:'Generation stopped.'});
+  assert.equal(visible(t,'reader-generation-bar'),false);assert.equal(visible(t,'generation-status-bar'),false);
+  top=900;context.renderReaderGeneration();assert.equal(visible(t,'reader-generation-bar'),true);
+  assert.equal(t.element('reader-generation-action').textContent,'Review');
+  top=-150;context.renderReaderGeneration();assert.equal(visible(t,'reader-generation-bar'),true,'a card covered by fixed navigation does not hide Review');
+  top=300;context.state.readerId='other';context.renderReaderGeneration();
+  assert.equal(visible(t,'generation-status-bar'),true,'a recovery card behind another reader does not hide Review');
+  context.state.readerId='story';context.renderReaderGeneration();assert.equal(visible(t,'reader-generation-bar'),false);
+}
+
 // Reader open on the status' own story: only the reader bar, with the phase's action.
 {
   const t = build({pipeline: {busy: true}}), {context} = t;
@@ -79,8 +97,8 @@ const visible = (t, id) => !t.element(id).hidden;
   assert.equal(visible(t, 'generation-status-bar'), false, 'Create tab keeps its own visible progress card');
   t.element('loading-card').hidden = true; context.renderReaderGeneration();
   assert.equal(visible(t, 'generation-status-bar'), true, 'the bar returns as soon as the card is hidden');
-  context.setReaderGeneration({storyId: null, phase: 'error', message: 'Story generation stopped. View recovery.'});
-  assert.equal(visible(t, 'generation-status-bar'), true); assert.equal(t.element('generation-status-action').textContent, 'View recovery');
+  context.setReaderGeneration({storyId: null, phase: 'error', message: 'Story generation stopped.'});
+  assert.equal(visible(t, 'generation-status-bar'), true); assert.equal(t.element('generation-status-action').textContent, 'Review');
 }
 
 // Saved-response recovery and terminal phases never claim to be working.
@@ -94,7 +112,7 @@ const visible = (t, id) => !t.element(id).hidden;
   context.state.pendingReaderResult.saved = true; context.renderReaderGeneration();
   assert.equal(t.element('reader-generation-action').textContent, 'Finish request');
   context.state.pendingReaderResult = null;
-  for (const [phase, label] of [['ready', 'View result'], ['error', 'View recovery'], ['cleanup', 'Finish request']]) {
+  for (const [phase, label] of [['ready', 'View result'], ['error', 'Review'], ['cleanup', 'Finish request']]) {
     context.setReaderGeneration({storyId: 'story', phase, message: phase});
     assert.equal(t.element('reader-generation-action').textContent, label); assert.equal(t.element('reader-generation-dismiss').hidden, false);
   }
@@ -158,7 +176,7 @@ const visible = (t, id) => !t.element(id).hidden;
     w.element('reader-dialog').open = true; c.state.readerId = 'other'; c.state.stories = [];
     c.setView = name => order.push(`view:${name}:${w.element('reader-dialog').open ? 'open' : 'closed'}`);
     c.revealRecovery = value => order.push(`reveal:${value === op}`);
-    c.setReaderGeneration({storyId: null, phase: 'error', message: 'Story generation stopped. View recovery.'});
+    c.setReaderGeneration({storyId: null, phase: 'error', message: 'Story generation stopped.'});
     await c.generationAction();
     assert.deepEqual(order, ['view:create:closed', 'reveal:true']);
   }

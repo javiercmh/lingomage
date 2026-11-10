@@ -92,7 +92,7 @@ function generationView(status) {
   const pending = state.pendingReaderResult;
   if (pending && pending.story.id === status.storyId) return { message: pending.saved ? 'Response saved. Finish request.' : 'Response needs saving.', action: pending.saved ? 'Finish request' : 'Save response', dismiss: false };
   if (status.phase === 'working') return generationLive() ? { message: status.message, action: 'Cancel request', dismiss: false, working: true } : null;
-  return { message: status.message, action: { cleanup: 'Finish request', error: 'View recovery', ready: 'View result' }[status.phase] || '', dismiss: true };
+  return { message: status.message, action: { cleanup: 'Finish request', error: 'Review', ready: 'View result' }[status.phase] || '', dismiss: true };
 }
 function paintGenerationBar(bar, view) {
   bar.hidden = !view;
@@ -128,10 +128,27 @@ function restartReadyCountdown() {
   if (!readyStatus) return;
   clearTimeout(readyTimer); readyTimer = setTimeout(expireReadyStatus, READY_STATUS_MS);
 }
+function recoveryCardInView(status) {
+  if (status?.phase !== 'error') return false;
+  const inReader=$('reader-dialog').open, op=pipeline?.records?.[0];
+  if (inReader && status.storyId !== state.readerId) return false;
+  const checkpoint=op && (op.target?.storyId ?? null) === (status.storyId ?? null);
+  const cards=checkpoint
+    ? (inReader ? [$('checkpoint-recovery-reader')] : [$('checkpoint-recovery-create'),$('checkpoint-recovery-profile')])
+    : inReader ? [...document.querySelectorAll('.help-request-recovery')] : [];
+  return cards.some(card=>{
+    if (!card || card.hidden || !card.getClientRects?.().length) return false;
+    const rect=card.getBoundingClientRect();
+    const top=inReader ? $('reader-navigation-bar').getBoundingClientRect?.().bottom || 0 : 0;
+    const bottom=inReader ? window.innerHeight : document.querySelector('.tabbar')?.getBoundingClientRect?.().top || window.innerHeight;
+    // Ignore a sliver behind fixed navigation; do not use the status bar itself as a boundary.
+    return rect.right > 0 && rect.left < window.innerWidth && Math.min(rect.bottom,bottom)-Math.max(rect.top,top) >= Math.min(44,rect.height);
+  });
+}
 function renderReaderGeneration() {
   const bar = $('reader-generation-bar'), appBar = $('generation-status-bar');
   if (!bar || !appBar) return;
-  const status = readerGeneration, view = generationView(status);
+  const status = readerGeneration, view = recoveryCardInView(status) ? null : generationView(status);
   scheduleReadyDismiss(status, view);
   const inReader = Boolean(view) && status.storyId != null && status.storyId === state.readerId && $('reader-dialog').open;
   // Create's visible progress card (with Cancel) is the indicator on its tab; a resumed Create has no such card.
@@ -203,6 +220,11 @@ async function settleBackgroundContext(storyId, entries) {
   if (run.cancelledByUser) throw new Error('Request cancelled.');
 }
 for (const id of ['reader-generation-dismiss', 'generation-status-dismiss']) $(id).addEventListener('click', () => setReaderGeneration(null));
+let recoveryVisibilityFrame=0;
+function scheduleRecoveryVisibility() {
+  if (readerGeneration?.phase !== 'error' || recoveryVisibilityFrame) return;
+  recoveryVisibilityFrame=requestAnimationFrame(()=>{ recoveryVisibilityFrame=0; renderReaderGeneration(); });
+}
 // Resolves after the reader's own close handler has run (the close event is dispatched asynchronously).
 function closeReader() {
   const dialog = $('reader-dialog');
@@ -798,7 +820,6 @@ function renderCheckpointRecovery() {
     if (readerGeneration && (readerGeneration.storyId ?? null) === (op.target?.storyId ?? null)) { readerGeneration.phase='working'; readerGeneration.message=op.discardRequested ? 'Cancelling…' : progressSummary(op).text; }
     if (state.activeChapterRequest && state.activeChapterRequest.storyId === op.target?.storyId) { state.activeChapterRequest.loading.querySelector('strong').textContent=stageMessage; paintChapterProgress(state.activeChapterRequest, op); }
   }
-  renderReaderGeneration(); // busy and idle transitions both reach here through the pipeline's changed callback
   for (const id of ['checkpoint-recovery-create','checkpoint-recovery-profile','checkpoint-recovery-reader']) {
     const box = $(id);
     if (id === 'checkpoint-recovery-reader') { const anchor = op?.kind === 'examples' ? $('reader-help-section') : $('reader-edit-panel'); if (anchor.nextElementSibling !== box) anchor.after?.(box); }
@@ -837,6 +858,7 @@ function renderCheckpointRecovery() {
     // While the operation runs, Resume has nothing to do; only Cancel request is offered.
     const actions = document.createElement('div'); actions.className='recovery-actions'; actions.append(...(pipeline.busy ? [discard] : op.discardRequested ? [resume] : [resume, discard])); box.append(actions);
   }
+  renderReaderGeneration(); // Re-evaluate visibility after the recovery panels have been updated.
 }
 async function resumeCheckpoint(op) {
   if (state.storageBlocked) { toast('Retry loading your workspace before resuming generation.'); return; }
@@ -858,7 +880,7 @@ async function resumeCheckpoint(op) {
   } catch (error) {
     if (error.code === 'generation_cancelled') { setReaderGeneration(null); toast('Generation cancelled'); return; }
     op.error=failureInfo(error,op.stage).message; if (op.failure?.message !== failureInfo(error,op.stage).message) op.failure = failureInfo(error, op.stage);
-    if (readerGeneration && (readerGeneration.storyId ?? null) === (op.target?.storyId ?? null)) setReaderGeneration({...readerGeneration,phase:'error',message:op.discardRequested ? discardFailureMessage(op) : 'Generation stopped. View recovery.'});
+    if (readerGeneration && (readerGeneration.storyId ?? null) === (op.target?.storyId ?? null)) setReaderGeneration({...readerGeneration,phase:'error',message:op.discardRequested ? discardFailureMessage(op) : 'Generation stopped.'});
     renderCheckpointRecovery(); revealRecovery(op);
   }
 }
@@ -1168,7 +1190,7 @@ async function generate(event) {
     if (!op) appendFailureDetails($('create-error-details'), failureInfo(error,'setup'));
     else requestAnimationFrame(()=>revealRecovery(op));
     // A deliberate cancel leaves no status; a failure with saved progress points to its recovery.
-    if (readerGeneration?.storyId == null) setReaderGeneration(op ? {storyId:null,phase:'error',message:op.discardRequested ? discardFailureMessage(op) : 'Story generation stopped. View recovery.'} : null);
+    if (readerGeneration?.storyId == null) setReaderGeneration(op ? {storyId:null,phase:'error',message:op.discardRequested ? discardFailureMessage(op) : 'Story generation stopped.'} : null);
   } finally { creatingStory = false; $('loading-card').hidden = true; $('story-form').hidden = false; renderCheckpointRecovery(); renderReaderGeneration(); }
 }
 $('story-form').addEventListener('submit', generate);
@@ -2617,7 +2639,7 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
       if (readerGeneration?.storyId === story.id) {
         setReaderGeneration(cancelled
           ? (state.pendingReaderRequestId ? { ...readerGeneration, phase: 'cleanup', message: 'Could not finish cancelled request.' } : null)
-          : { ...readerGeneration, phase: 'error', message: 'Request stopped. View recovery below.' });
+          : { ...readerGeneration, phase: 'error', message: 'Request stopped.' });
       }
       if (state.readerId === story.id && activeChapter().id === chapter.id && activeVersion().id === version.id) {
         renderSavedHelp(chapter, version);
@@ -2808,7 +2830,7 @@ $('reader-edit-submit').addEventListener('click', async () => {
   } catch (error) {
     try { await releaseInvalidReaderResponse(); } catch {}
     // A deliberate cancel clears the status instead of reporting a failure.
-    if (readerGeneration?.storyId === story.id) setReaderGeneration(error.code === 'generation_cancelled' || request.cancelledByUser ? null : { ...readerGeneration, phase: 'error', message: pipeline?.records[0]?.discardRequested ? discardFailureMessage(pipeline.records[0]) : 'Generation stopped. View recovery below.' });
+    if (readerGeneration?.storyId === story.id) setReaderGeneration(error.code === 'generation_cancelled' || request.cancelledByUser ? null : { ...readerGeneration, phase: 'error', message: pipeline?.records[0]?.discardRequested ? discardFailureMessage(pipeline.records[0]) : 'Generation stopped.' });
     if ((error.code === 'generation_cancelled' || request.cancelledByUser) && !pipeline?.records.length) toast('Generation cancelled');
     const message = error.code === 'generation_cancelled' || request.cancelledByUser ? '' : pipeline?.records.length ? '' : `${error.message} Submit again to retry.`;
     state.readerEditDraft = { storyId: story.id, pathId: path.id, chapterId: chapter.id, mode, prompt, difficulty, scope, error: message };
@@ -2913,6 +2935,9 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('pagehide', () => usage.setVisible(false));
 window.addEventListener('pageshow', () => usage.setVisible(document.visibilityState === 'visible'));
+document.addEventListener('scroll',scheduleRecoveryVisibility,{capture:true,passive:true});
+document.addEventListener('toggle',scheduleRecoveryVisibility,true);
+window.visualViewport?.addEventListener('resize',scheduleRecoveryVisibility);
 initializePipeline();
 showStorageErrors();
 refreshModels();
