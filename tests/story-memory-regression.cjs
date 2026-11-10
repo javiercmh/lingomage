@@ -74,18 +74,29 @@ const loading={querySelector:()=>({textContent:''})};
  const ev=(id,importance='minor',extra={})=>({id,event:`Event ${id}.`,importance,who:[],causes:[],threads:[],knownBy:[],source:{version:'b',chunk:0},...extra});
  const graph={...emptyMemory(),characters:[{id:'C1',name:'Mia',asWritten:'Mia',about:''}],
   threads:[{id:'T1',thread:'Debt.',openedBy:'E2'}],beliefs:[{id:'B1',who:'C1',belief:'Wrong.',contradicts:'E6'}],
-  events:[ev('E1'),ev('E2','major'),ev('E3','minor',{causes:['E1']}),ev('E4'),ev('E5','minor',{threads:['T1']}),ev('E6'),ev('E7','major'),ev('E8')]};
+  events:[ev('E1'),ev('E2','major'),ev('E3','minor',{causes:['E1']}),ev('E4'),ev('E5','minor',{threads:['T1']}),ev('E6'),ev('E7','major'),ev('E8'),ev('E9','minor',{threads:['T1']}),ev('E10'),ev('E11'),ev('E12')]};
  const degree=c.connections(graph);assert.equal(degree.get('E1'),1);assert.equal(degree.get('E3'),1);assert.equal(degree.get('E2'),1);assert.equal(degree.get('E6'),1);
- assert.deepEqual(c.compactionCandidates(graph).map(e=>e.id),['E4','E8'],'least connected minor events first; events tied to an open thread or a belief are kept');
- assert.deepEqual(c.compactionCandidates({...graph,events:graph.events.filter(e=>e.importance==='major'||['E5','E6'].includes(e.id))}).map(e=>e.id),['E7'],'then major events without an open thread or belief');
- assert.deepEqual(c.compactionCandidates({...graph,events:[graph.events[1],graph.events[4],graph.events[5]]}),[],'nothing to condense');
+ // Kept: E2 opened T1, B1 contradicts E6, E9–E12 are the four newest, E9 is the latest event on T1. The rest are
+ // taken until the projected size reaches COMPACT_TO: minor events on no open thread (least connected first),
+ // then major ones, then events on open threads.
+ const padded=n=>({...graph,events:graph.events.map(e=>({...e,event:`${e.event} ${'x'.repeat(n)}`}))});
+ assert.deepEqual(c.compactionCandidates(graph),[],'a memory under COMPACT_TO needs nothing');
+ assert.deepEqual(c.compactionCandidates(padded(500)),[],'a gain under 1500 characters makes no request');
+ assert.deepEqual(c.compactionCandidates(padded(550)).map(e=>e.id),['E1','E3','E4','E8'],'minor events on no open thread first');
+ assert.deepEqual(c.compactionCandidates(padded(600)).map(e=>e.id),['E1','E3','E4','E7','E8'],'then major events');
+ assert.deepEqual(c.compactionCandidates(padded(650)).map(e=>e.id),['E1','E3','E4','E5','E7','E8'],'then older events on open threads; protected events never');
+ // A memory shaped like a long story: every event is major and on a never-resolved theme thread.
+ const themes={...emptyMemory(),threads:[{id:'T1',thread:'Settling in.',openedBy:null},{id:'T2',thread:'A secret.',openedBy:'E20'}],
+  events:Array.from({length:22},(_,i)=>ev(`E${i+1}`,'major',{event:`Event E${i+1}. ${'y'.repeat(380)}`,threads:[i>=19?'T2':'T1'],causes:i?[`E${i}`]:[]}))};
+ const themed=c.compactionCandidates(themes).map(e=>e.id);
+ assert.ok(themed.length>=10&&!themed.some(id=>['E19','E20','E21','E22'].includes(id)),'open theme threads no longer block condensing; the newest, openers and the latest per thread stay');
 
  // Applying a compaction answer.
  const sample={...graph,arcs:[{id:'A1',text:'Mia moves to Osaka.',covers:['E0'],knownBy:{E0:['C1']}}],events:graph.events.map(e=>e.id==='E4'?{...e,knownBy:['C1']}:e)};
- const candidates=c.compactionCandidates(sample);
+ const candidates=sample.events.filter(e=>['E4','E8'].includes(e.id));
  const compacted=c.applyCompaction(sample,candidates,JSON.stringify({arcs:[{text:'Mia moves; days pass.',covers:['E0','E4','E8','E99']}]}));
  assert.deepEqual(plain(compacted.arcs),[{id:'A2',text:'Mia moves; days pass.',covers:['E0','E4','E8'],knownBy:{E0:['C1'],E4:['C1']}}],'code assigns arc ids, drops unknown ids and keeps who knew each event');
- assert.deepEqual(compacted.events.map(e=>e.id),['E1','E2','E3','E5','E6','E7']);
+ assert.deepEqual(compacted.events.map(e=>e.id),['E1','E2','E3','E5','E6','E7','E9','E10','E11','E12']);
  assert.deepEqual([compacted.characters,compacted.threads,compacted.beliefs],[sample.characters,sample.threads,sample.beliefs],'code copies every other list');
  assert.throws(()=>c.applyCompaction(sample,candidates,JSON.stringify({arcs:[{text:'Mia moves.',covers:['E0','E4']}]})),/leave E8 uncovered/);
  assert.throws(()=>c.applyCompaction(sample,candidates,JSON.stringify({arcs:[{text:'Hiro arrives.',covers:['E0','E4','E8']}]})),/name Hiro/);
@@ -105,18 +116,32 @@ const loading={querySelector:()=>({textContent:''})};
  story.memories=[];failAck=true;await assert.rejects(c.prepareStoryMemory(story,entries,loading),/release/);assert.equal(story.memories.length,1);failAck=false;await c.savePendingReaderResult();const before=calls;await c.prepareStoryMemory(story,entries,loading);assert.equal(calls-before,3);
  story.memories=[];let stages=0;c.readerAi=async(kind,input)=>{if(++stages===2)throw Error('cancelled');return oneEvent(input);};await assert.rejects(c.prepareStoryMemory(story,entries,loading),/cancelled/);assert.equal(story.memories.length,1);
 
- // Compaction inside preparation: failure keeps the summary; retry condenses without a new summary; sources go along.
- story.memories=[];calls=0;const compactCalls=[];let failCompact=true,summaryCalls=0;
- c.readerAi=async(kind,input)=>{calls++;if(kind==='memory-compact'){compactCalls.push({...input,summariesSoFar:summaryCalls});const covers=[...input.previousArcs.flatMap(a=>a.covers),...input.events.map(e=>e.id)];if(failCompact)return JSON.stringify({arcs:[{text:'Zed arrives.',covers}]});return JSON.stringify({arcs:[{text:'Earlier days pass.',covers}]});}
+ // Compaction inside preparation: an invalid answer is released and never blocks; a later run condenses the
+ // same saved summary without a new summary request; sources go along; other errors still stop.
+ story.memories=[];calls=0;const compactCalls=[];let failCompact=true,summaryCalls=0,discards=0;c.discardResponse=async()=>{discards++;};
+ c.readerAi=async(kind,input)=>{calls++;if(kind==='memory-compact'){compactCalls.push(input);const covers=[...input.previousArcs.flatMap(a=>a.covers),...input.events.map(e=>e.id)];if(failCompact)return JSON.stringify({arcs:[{text:'Zed arrives.',covers}]});return JSON.stringify({arcs:[{text:'Earlier days pass.',covers}]});}
   summaryCalls++;return JSON.stringify({newEvents:Array.from({length:14},(_,i)=>({ref:`e${i}`,event:`day ${i} `+'y'.repeat(400)}))});};
- await assert.rejects(c.prepareStoryMemory(story,entries,loading),/name Zed/);const summaries=story.memories.length;assert.ok(summaries>=1&&story.memories.every(r=>!r.compactedFrom),'a failed compaction keeps the saved summary');
+ const unblocked=await c.prepareStoryMemory(story,entries,loading);
+ assert.equal(compactCalls.length,1,'one compaction attempt per run');assert.equal(discards,1,'the invalid answer is released');
+ assert.ok(story.memories.length>=2&&story.memories.every(r=>!r.compactedFrom),'every chunk is summarized and nothing condensed is saved');
+ assert.equal(unblocked.events.length,summaryCalls*14,'the run goes on with the full memory');
  failCompact=false;const summariesBefore=summaryCalls;const prepared=await c.prepareStoryMemory(story,entries,loading);
- assert.deepEqual(compactCalls[1],compactCalls[0],'retry condenses the same saved summary');assert.equal(compactCalls[0].events.length,14,'half of 28 minor events');
+ assert.deepEqual(compactCalls[1],compactCalls[0],'the next run condenses the same saved summary');assert.equal(summaryCalls,summariesBefore,'no summary is regenerated');
+ assert.ok(compactCalls[0].events.length>0&&compactCalls[0].events.length<=24,'enough events to reach the target, never the four newest');
+ assert.equal(compactCalls[0].maxArcTextCharacters,[...compactCalls[0].previousArcs.map(a=>a.text),...compactCalls[0].events.map(e=>e.event)].join('\n').length-1,'the arc budget matches the shorter-than-source check');
  assert.ok(compactCalls[0].sourceExcerpts.length>=1&&compactCalls[0].sourceExcerpts.every(x=>x.text&&estimateTokens(x.text)<=3000),'source passages go with the compaction');
- assert.ok(summaryCalls>summariesBefore&&story.memories.filter(r=>!r.compactedFrom).length>summaries,'later chunks are summarized after the retry');
  const condensed=story.memories.filter(r=>r.compactedFrom);assert.ok(condensed.length>=1&&condensed.every(r=>r.condensedEvents.length>0&&r.sizeAfter<r.sizeBefore&&story.memories.some(s=>s.key===r.compactedFrom)),'condensed records keep provenance and the summary they replace');
  assert.ok(prepared.arcs.some(a=>a.text==='Earlier days pass.'));const afterPrepare=calls;await c.prepareStoryMemory(story,entries,loading);assert.equal(calls,afterPrepare,'condensed memory is reused from the cache');
- console.log('PASS lineage, language-aware chunks and recent prose, change merging with code-assigned ids and checked links, knowledge and beliefs, connection-ranked compaction with coverage, name and length checks, source excerpts, retry without regenerating summaries, shared-cache reuse, save/release recovery and staged cancellation');
+ story.memories=story.memories.filter(r=>!r.compactedFrom);c.readerAi=async kind=>{assert.equal(kind,'memory-compact');throw Error('Request cancelled.');};
+ await assert.rejects(c.prepareStoryMemory(story,entries,loading),/cancelled/,'cancellation during compaction still stops');
+
+ // Memory cache keys use the memory prompt versions, not the app prompt version; older memory versions are dropped on save.
+ const {SUMMARY_PROMPT_VERSION,COMPACTION_PROMPT_VERSION,MEMORY_VERSION}=await import('../js/story-memory.js');
+ const summaryRecord=story.memories.find(r=>!r.compactedFrom);assert.equal(JSON.parse(summaryRecord.key)[1],SUMMARY_PROMPT_VERSION);assert.equal(summaryRecord.promptVersion,SUMMARY_PROMPT_VERSION);
+ assert.ok(condensed.every(r=>JSON.parse(r.key)[1]===COMPACTION_PROMPT_VERSION&&r.promptVersion===COMPACTION_PROMPT_VERSION));
+ story.memories=[{key:'legacy',memoryVersion:'1',memory:{}}];c.readerAi=async(kind,input)=>oneEvent(input);
+ await c.prepareStoryMemory(story,entries,loading);assert.ok(story.memories.length&&story.memories.every(r=>r.memoryVersion===MEMORY_VERSION),'records of another memory version are dropped in the same save');
+ console.log('PASS lineage, language-aware chunks and recent prose, change merging with code-assigned ids and checked links, knowledge and beliefs, target-sized compaction that keeps protected events, never blocks on an invalid answer, coverage, name and length checks, source excerpts, retry without regenerating summaries, shared-cache reuse, save/release recovery and staged cancellation');
 })().catch(e=>{console.error(e);process.exitCode=1;});
 
 })().catch(error=>{console.error(error);process.exitCode=1;});

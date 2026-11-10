@@ -32,6 +32,11 @@ export function createAiSession({ ai, isVisible = () => typeof document === 'und
     return opening;
   }
 
+  // A session the host has ended or lost stays ended for the rest of this operation.
+  function endOn(error) {
+    if (SESSION_ERRORS.has(error?.code) || error?.code === 'not_found') { current = null; ended = error; }
+  }
+
   async function close() {
     const session = current; current = null; ended = null;
     if (!session) return;
@@ -55,8 +60,18 @@ export function createAiSession({ ai, isVisible = () => typeof document === 'und
       }
       try { return await ai.start(session ? { ...args, sessionId: session.id } : args); }
       catch (error) {
-        // A session the host has ended or lost stays ended for the rest of this operation.
-        if (session && (SESSION_ERRORS.has(error?.code) || error?.code === 'not_found')) { current = null; ended = error; }
+        // session_idle on a start means the host released the session during a gap between steps (for
+        // example while the page was suspended) and refused this start before any inference. On a visible
+        // page the start opens a new session and is sent once more; nothing was generated, so this is not a
+        // retry of inference. A hidden page, any other session error or a second refusal ends the operation.
+        if (session && error?.code === 'session_idle' && isVisible()) {
+          current = null;
+          const fresh = await ensure(args);
+          if (!fresh) throw error;
+          try { return await ai.start({ ...args, sessionId: fresh.id }); }
+          catch (second) { endOn(second); throw second; }
+        }
+        if (session) endOn(error);
         throw error;
       }
     },

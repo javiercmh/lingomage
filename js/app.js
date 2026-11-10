@@ -1,6 +1,6 @@
 import { createStoryModel } from './story-model.js';
 import { markStoryActivity, planLibrary, dateSegments, describeDates } from './library-activity.js';
-import { createStoryMemory } from './story-memory.js';
+import { beginMemoryRebuild, finishMemoryRebuild, createStoryMemory } from './story-memory.js';
 import { createGenerationController } from './generation-controller.js';
 import { createReaderPanels } from './reader-panels.js';
 import { ai, readFile, writeFile, listFiles, speech, translation, selectionMenu } from './bridge.js';
@@ -31,7 +31,7 @@ const SPEECH_LANGUAGES = { de: 'de-DE', ja: 'ja-JP', ru: 'ru-RU', 'es-CL': 'es-C
 const PROFILE_DEFINITIONS = readJson('data/learning-profiles.json', {});
 const STORY_GUIDES = PROFILE_DEFINITIONS.generationGuides;
 const JOURNEY_DESCRIPTIONS = PROFILE_DEFINITIONS.languages;
-const PROMPT_VERSION = '2026-11-10.2';
+const PROMPT_VERSION = '2026-11-10.3';
 const LEVELS = PROFILE_DEFINITIONS.standardizedLevels;
 const SCOPES = PROFILE_DEFINITIONS.scopes;
 function levelDefinition(language, id) { return LEVELS[language]?.levels.find(level => level.id === id); }
@@ -135,7 +135,7 @@ function recoveryCardInView(status) {
   const checkpoint=op && (op.target?.storyId ?? null) === (status.storyId ?? null);
   const cards=checkpoint
     ? (inReader ? [$('checkpoint-recovery-reader')] : [$('checkpoint-recovery-create'),$('checkpoint-recovery-profile')])
-    : inReader ? [...document.querySelectorAll('.help-request-recovery')] : [];
+    : inReader ? [...document.querySelectorAll('.help-request-recovery'), $('reader-memory-recovery')] : [];
   return cards.some(card=>{
     if (!card || card.hidden || !card.getClientRects?.().length) return false;
     const rect=card.getBoundingClientRect();
@@ -264,7 +264,7 @@ async function generationAction() {
     if (!story) { await closeReader(); setView('create'); if (op) revealRecovery(op); return; } // a modal reader would leave the Create page inert
     await ensureReaderOpen(story);
     if (op?.target?.storyId === story.id) { revealRecovery(op); return; }
-    revealCard(document.querySelector('.help-request-recovery') || $('reader-edit-panel')); return;
+    revealCard(story.memoryRebuild ? $('reader-memory-recovery') : document.querySelector('.help-request-recovery') || $('reader-edit-panel')); return;
   }
   if (!story) { toast('That story is no longer available.'); setReaderGeneration(null); return; }
   await ensureReaderOpen(story);
@@ -1154,7 +1154,7 @@ async function generate(event) {
   if (state.pendingReaderResult) { $('form-error').textContent = 'Save the completed reader response before generating another story.'; return; }
   if (state.pendingGeneration) { $('form-error').textContent = 'Finish saving the completed story before generating another.'; return; }
   if (backgroundRun) await stopBackgroundContext();
-  if (state.requestId) { $('form-error').textContent = 'Finish the current AI request before generating another story.'; return; }
+  if (state.requestId || state.readerEditBusy || state.readerHelpBusy) { $('form-error').textContent = 'Finish the current AI request before generating another story.'; return; }
   if (!ai.available) { $('form-error').textContent = 'Open App² → Settings → AI and connect a provider, then return here.'; return; }
   try {
     const {providers} = await ai.providers();
@@ -1480,6 +1480,8 @@ function renderReaderActions() {
   const remove = $('reader-remove-chapters'), removePath = $('reader-delete-path');
   remove.textContent = index === path.entries.length - 1 ? `Remove Chapter ${index + 1}…` : `Remove Chapter ${index + 1} onward…`;
   removePath.textContent = story.paths.length > 1 ? 'Delete this path…' : 'Delete story…';
+  $('reader-rebuild-memory').disabled = blocked || state.storageBlocked;
+  $('reader-rebuild-memory').textContent = story.memoryRebuild ? 'Resume memory rebuild…' : 'Rebuild story memory…';
   remove.disabled = blocked; removePath.disabled = blocked; $('reader-actions-note').hidden = !blocked;
 }
 function toggleReaderActions() {
@@ -1533,6 +1535,7 @@ function pruneStoryContent(story) {
   });
   story.memories = (story.memories || []).filter(record => Array.isArray(record.lineage) && record.lineage.length && story.paths.some(path =>
     record.lineage.length <= path.entries.length && record.lineage.every((id, index) => path.entries[index].versionId === id)));
+  if (story.memoryRebuild && !story.paths.some(path => story.memoryRebuild.entries.length <= path.entries.length && story.memoryRebuild.entries.every((entry, index) => path.entries[index].versionId === entry.versionId))) story.memoryRebuild = null;
   const path = story.paths.find(item => item.id === story.activePathId) || story.paths[0];
   const first = path.entries[0], chapter = story.chapters.find(item => item.id === first.chapterId), version = chapter.versions.find(item => item.id === first.versionId);
   for (const key of ['title', 'story', 'glossary', 'titleSegments', 'storySegments', 'providerId', 'model', 'promptVersion']) story[key] = version[key];
@@ -1586,7 +1589,7 @@ function pathForkDescription(story, path) {
   return `Different version from Chapter ${path.forkChapter}.${parent ? ` Later chapters remain on ${parent.name}.` : ''}`;
 }
 const { normalizeChapters, ensureStoryPaths, initializePathCounter, selectedPath, pathChapters, activeChapter, activeVersion } = createStoryModel({state, readerStory});
-const { memoryChunks, recentProse, decodeMemory, prepareStoryMemory, storyContextReady } = createStoryMemory({state, promptVersion:PROMPT_VERSION, normalizeChapters, readerAi:(...args)=>readerAi(...args), savePendingReaderResult:(...args)=>savePendingReaderResult(...args)});
+const { memoryChunks, recentProse, decodeMemory, prepareStoryMemory, storyContextReady } = createStoryMemory({state, normalizeChapters, readerAi:(...args)=>readerAi(...args), savePendingReaderResult:(...args)=>savePendingReaderResult(...args), discardResponse:()=>releaseInvalidReaderResponse()});
 function readerStory() { return state.stories.find(item => item.id === state.readerId) || (state.current?.id === state.readerId ? state.current : null); }
 function profileSnapshot(story) {
   const version = state.readerId === story.id ? activeVersion(activeChapter(), story) : null;
@@ -1643,7 +1646,7 @@ function updateReader(keepNavigation = false) {
   startExposure(story, version);
   $('selection-toolbar').hidden = true; state.readerSelection = null;
   renderPendingReaderResult();
-  renderChapterRequest(); renderReaderActions(); renderReaderGeneration();
+  renderMemoryRebuild(); renderChapterRequest(); renderReaderActions(); renderReaderGeneration();
   if (keepNavigation && !$('reader-navigation-panel').hidden) positionReaderPanel('navigation');
   updateReaderNavigation();
 }
@@ -2507,7 +2510,7 @@ async function savePendingReaderResult() {
       onSaved: () => { pending.saved = true; },
       acknowledge: acknowledgeReaderResult
     });
-    if (readerGeneration?.storyId === pending.story.id) { readerGeneration.phase = 'ready'; readerGeneration.message = 'Ready'; }
+    if (readerGeneration?.storyId === pending.story.id && !(state.readerEditBusy && pending.story.memoryRebuild)) { readerGeneration.phase = 'ready'; readerGeneration.message = 'Ready'; }
   } catch (error) { pending.failure=failureInfo(error,'saving',pending.saved ? 'release' : 'save'); throw error; }
   finally { pending.saving = false; renderReaderGeneration(); }
 }
@@ -2740,6 +2743,77 @@ $('reader-copy').addEventListener('click', async () => {
 // Android's own selection menu would compete with the LingoMage bar on story text, but fields need Cut/Copy/Paste.
 const selectionMenuRouter = createSelectionMenuRouter({ host: selectionMenu, document, window });
 $('reader-copy').addEventListener('click', () => closeReaderActions());
+let memoryRebuildStory = null;
+function renderMemoryRebuild() {
+  const story = readerStory(), panel = $('reader-memory-recovery');
+  panel.hidden = !story?.memoryRebuild || state.readerEditBusy;
+  panel.replaceChildren();
+  if (panel.hidden) return;
+  const title = document.createElement('h3'); title.textContent = 'Story memory rebuild unfinished';
+  const text = document.createElement('p'); text.textContent = 'Your chapters are unchanged. Saved summary steps will be reused when you resume. Rebuilding uses AI and may still fail validation.';
+  const button = document.createElement('button'); button.type = 'button'; button.className = 'secondary-btn'; button.textContent = 'Resume memory rebuild';
+  button.disabled = pendingDeletionBlocked() || state.storageBlocked;
+  button.addEventListener('click', () => runMemoryRebuild(story));
+  panel.append(title, text, button);
+  if (state.memoryRebuildFailure?.storyId === story.id) appendFailureDetails(panel, state.memoryRebuildFailure.failure);
+}
+$('reader-rebuild-memory').addEventListener('click', () => {
+  if (pendingDeletionBlocked() || state.storageBlocked) return;
+  memoryRebuildStory = readerStory();
+  if (!memoryRebuildStory) return;
+  closeReaderActions();
+  const rebuild = memoryRebuildStory.memoryRebuild;
+  $('memory-rebuild-title').textContent = rebuild ? 'Resume story memory rebuild?' : 'Rebuild story memory?';
+  $('memory-rebuild-description').textContent = `Story: ${memoryRebuildStory.title}. Path: ${rebuild?.pathName || selectedPath(memoryRebuildStory).name}. All chapters on this path will be summarized with ${state.model}.`;
+  $('memory-rebuild-effect').textContent = rebuild
+    ? 'This uses AI to finish rebuilding story context. Completed summaries will be reused. Your chapters, paths, vocabulary notes and explanations stay as they are.'
+    : 'This uses AI to recreate summaries, characters, events and story context from saved chapters. Your chapters, paths, vocabulary notes and explanations stay as they are. Saved summaries for this story will be cleared; other paths prepare their context when needed.';
+  $('memory-rebuild-submit').textContent = rebuild ? 'Resume' : 'Rebuild';
+  $('memory-rebuild-error').textContent = '';
+  $('memory-rebuild-dialog').showModal(); $('memory-rebuild-cancel').focus();
+});
+$('memory-rebuild-cancel').addEventListener('click', () => $('memory-rebuild-dialog').close());
+$('memory-rebuild-dialog').addEventListener('close', () => $('reader-actions-toggle').focus({ preventScroll: true }));
+$('memory-rebuild-submit').addEventListener('click', () => runMemoryRebuild(memoryRebuildStory));
+async function runMemoryRebuild(story) {
+  if (!story || pendingDeletionBlocked() || state.storageBlocked) return;
+  state.readerEditBusy = true; $('memory-rebuild-submit').disabled = true;
+  state.memoryRebuildFailure = null;
+  const loading = createHelpLoading('continue');
+  loading.querySelector('strong').textContent = 'Rebuilding story memory…';
+  const request = state.activeChapterRequest = { storyId: story.id, loading, stopped: false, cancelledByUser: false };
+  const config = { providerId: state.providerId, model: state.model, reasoning: state.reasoning, signal: request };
+  try {
+    await stopBackgroundContext();
+    await releaseSavedInference();
+    // Check configuration before discarding the old cache.
+    workspaceStorage.assertWritable();
+    if (!ai.available || !state.models.some(model => model.id === config.model)) throw new Error('Choose an available AI model in Settings first.');
+    if (request.cancelledByUser) throw new Error('Request cancelled.');
+    const rebuild = beginMemoryRebuild(story, selectedPath(story), persistReaderStory);
+    $('memory-rebuild-dialog').close();
+    renderMemoryRebuild(); renderChapterRequest(); renderReaderActions();
+    setReaderGeneration({ storyId: story.id, phase: 'working', message: 'Rebuilding story memory…' });
+    await aiSession.run(() => prepareStoryMemory(story, rebuild.entries, loading, config));
+    if (request.cancelledByUser) throw new Error('Request cancelled.');
+    finishMemoryRebuild(story, persistReaderStory);
+    setReaderGeneration(null); toast('Story memory rebuilt');
+  } catch (error) {
+    try { await releaseInvalidReaderResponse(); } catch {}
+    state.memoryRebuildFailure = { storyId: story.id, failure: failureInfo(error, 'context', 'request') };
+    if ($('memory-rebuild-dialog').open) $('memory-rebuild-error').textContent = error.message;
+    else {
+      setReaderGeneration(state.pendingReaderResult || state.pendingReaderRequestId
+        ? { storyId: story.id, phase: 'cleanup', message: error.message }
+        : request.cancelledByUser ? null : { storyId: story.id, phase: 'error', message: 'Story memory rebuild stopped.' });
+      if (!request.cancelledByUser) toast(`${error.message} Resume memory rebuild to retry.`);
+    }
+  } finally {
+    state.readerEditBusy = false; state.activeChapterRequest = null; loading.remove(); $('memory-rebuild-submit').disabled = false;
+    renderChapterRequest(); renderMemoryRebuild(); renderReaderActions(); renderReaderGeneration();
+  }
+}
+
 $('reader-actions-toggle').addEventListener('click', toggleReaderActions);
 $('reader-remove-chapters').addEventListener('click', () => confirmReaderRemoval('chapters'));
 $('reader-delete-path').addEventListener('click', () => confirmReaderRemoval('path'));

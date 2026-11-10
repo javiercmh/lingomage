@@ -11,7 +11,7 @@ What LingoMage does now, its confirmed requirements and its defaults. Interactio
 | Reader | Canonical text, furigana (Japanese), text size, vocabulary notes at first occurrence | [PED-002](../pedagogy/PED-002-contextual-reading-support.md) |
 | Help | Explain a selection, More detail, examples, device Translate, Speak | [PED-002](../pedagogy/PED-002-contextual-reading-support.md) |
 | Listening | Chapter listening with a sentence player | [PED-002](../pedagogy/PED-002-contextual-reading-support.md) |
-| Story growth | Continue, Rewrite as alternate paths, remove chapters or paths | [PED-003](../pedagogy/PED-003-story-memory-and-paths.md) |
+| Story growth | Continue, Rewrite as alternate paths, remove chapters or paths, rebuild derived story memory from saved chapters | [PED-003](../pedagogy/PED-003-story-memory-and-paths.md) |
 | Library | Local stories, latest-activity hero, sort, language filter, bulk delete | `DESIGN.md` (navigation only) |
 | Profile | Time in LingoMage, Most looked up with detail sheet, language list and levels | [PED-005](../pedagogy/PED-005-consultation-signals.md) |
 | Recovery | Checkpointed generation with explicit Resume, Retry, Discard | [runtime](../architecture/generation-pipeline.md#generation) |

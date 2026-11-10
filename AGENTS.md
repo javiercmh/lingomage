@@ -48,7 +48,7 @@ Every doc, what it contains, and when to read or update it. Update the matching 
 - Structure: `index.html`, `css/style.css`, `js/app.js`, `js/bridge.js`, `manifest.json`, `data/`. Keep `manifest.json` `files` and `app2Update` current.
 - Only `js/bridge.js` calls host APIs. No dependencies, no build step.
 - Domain data lives in inspectable JSON under `data/`, never in opaque host preferences. Optional stores (`data/usage.json`, `data/learning-signals.json`) must never block stories, settings or generation and are never overwritten while unreadable. Saved records must stay readable; there is no general migration.
-- AI only through the App² managed `ai` bridge (providers in App² Settings → AI). Never store credentials or request headers. Every `ai.start` passes `title`/`body` from `js/ai-notification.js`. Save completed data before acknowledging a request. Never retry inference silently.
+- AI only through the App² managed `ai` bridge (providers in App² Settings → AI). Never store credentials or request headers. Every `ai.start` passes `title`/`body` from `js/ai-notification.js`. Save completed data before acknowledging a request. Never retry inference silently; the one automatic resend is a start the host refused with `session_idle` before any inference (`js/ai-session.js`).
 - 44px touch targets, safe-area insets, no `alert()`/`confirm()`, user and model text via `textContent` or text nodes.
 
 ## Safeguards

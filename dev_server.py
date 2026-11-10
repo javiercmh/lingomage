@@ -432,7 +432,8 @@ class Handler(SimpleHTTPRequestHandler):
                 events = [event for event in request_data.get('events', []) if isinstance(event, dict)]
                 arcs = [{'text': str(arc.get('text', '')), 'covers': list(arc.get('covers', []))} for arc in previous]
                 if events:
-                    arcs.append({'text': ' '.join(str(event.get('event', ''))[:60] for event in events), 'covers': [event.get('id') for event in events]})
+                    # Whole words only: a cut name would fail the no-new-names check.
+                    arcs.append({'text': ' '.join(self.mock_words(str(event.get('event', '')), 60) for event in events), 'covers': [event.get('id') for event in events]})
                 response_text = json.dumps({'arcs': arcs})
             elif request_data.get('kind') == 'language-plan':
                 code = request_data.get('languageCode', 'de')
@@ -651,6 +652,10 @@ class Handler(SimpleHTTPRequestHandler):
                 return json.dumps({'error': 'This kanji span has no offline reading fixture.'})
             readings.append({'id': span['id'], 'reading': reading})
         return json.dumps({'readings': readings}, ensure_ascii=False)
+
+    @staticmethod
+    def mock_words(text, limit):
+        return text if len(text) <= limit else text[:limit].rsplit(' ', 1)[0]
 
     @staticmethod
     def mock_notes(data):

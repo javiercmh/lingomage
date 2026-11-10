@@ -89,7 +89,7 @@ for (const bad of [undefined, null, 'ok', {}, { sessionId: '' }, { sessionId: 7 
 }
 {
   // A cancelled, expired or lost session ends the operation's session for good: no automatic reopen or unsessioned fallback.
-  for (const code of ['session_cancelled', 'session_idle', 'session_timeout', 'not_found', 'background_service']) {
+  for (const code of ['session_cancelled', 'session_timeout', 'not_found', 'background_service']) {
     const h = host({ failStart: kind => kind === 'notes' ? coded('x', code) : null });
     await h.session.run(async () => {
       await h.session.start(args('create'));
@@ -102,6 +102,38 @@ for (const bad of [undefined, null, 'ok', {}, { sessionId: '' }, { sessionId: 7 
     await h.session.run(async () => { await h.session.start(args('notes')).catch(() => {}); });
     assert.equal(h.events.filter(e => e === 'begin').length, 2);
   }
+}
+{
+  // session_idle refuses a start before inference. On a visible page that start opens a new session and is sent once more.
+  let refusals = 1;
+  const h = host({ failStart: kind => kind === 'notes' && refusals-- > 0 ? coded('released', 'session_idle') : null });
+  await h.session.run(async () => {
+    await h.session.start(args('create'));
+    assert.equal(await h.session.start(args('notes')), 'notes');
+    await h.session.start(args('readings'));
+  });
+  assert.deepEqual(h.events, ['supported', 'begin', 'start create @s1', 'start notes @s1', 'supported', 'begin', 'start notes @s2', 'start readings @s2', 'end s2']);
+}
+{
+  // A second refusal ends the operation's session: no loop, and later starts make no host call.
+  const h = host({ failStart: kind => kind === 'notes' ? coded('released', 'session_idle') : null });
+  await h.session.run(async () => {
+    await h.session.start(args('create'));
+    await assert.rejects(h.session.start(args('notes')), { code: 'session_idle' });
+    await assert.rejects(h.session.start(args('notes')), { code: 'session_idle' });
+  });
+  assert.equal(h.events.filter(e => e === 'begin').length, 2, 'reopened once only');
+  assert.equal(h.events.filter(e => e.startsWith('start notes')).length, 2);
+}
+{
+  // A hidden page never reopens: the step waits for an explicit Retry.
+  let h;
+  h = host({ failStart: kind => { if (kind !== 'notes') return null; h.hide(); return coded('released', 'session_idle'); } });
+  await h.session.run(async () => {
+    await h.session.start(args('create'));
+    await assert.rejects(h.session.start(args('notes')), { code: 'session_idle' });
+  });
+  assert.equal(h.events.filter(e => e === 'begin').length, 1);
 }
 {
   const h = host(); h.ai.sessions.end = async () => { throw coded('gone', 'not_found'); };

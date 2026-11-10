@@ -13,7 +13,7 @@
 - Generation follows [PED-004](../pedagogy/PED-004-level-guided-generation.md): a self-selected standardized reading target, narrative scope (Scene or Chapter) instead of numeric length quotas, an optional language-planning stage, and learner preferences (regional variety, register) from My languages. Level definitions and app-authored guides live in `data/learning-profiles.json`. A self-selected level is orientation, not certified alignment or evidence of individual vocabulary knowledge.
 - Every chapter needs useful integrated English learning notes, validated target-script forms and technical bounds. Correct orthography and natural grammar are requested; the retired beginner curriculum (fixed word counts, tense limits, regional defaults) is not reinstated. Adopted, adapted and rejected legacy rules are in the [safeguard audit](../architecture/safeguards.md).
 - Validators check structure and script; they cannot establish that an inflected form belongs to a lemma, that a reading is correct in context, or that usage is natural. Qualified human language review remains a requirement for every language.
-- Saved stories keep their original text and prompt provenance; new rules never rewrite them.
+- Saved stories keep their original text and prompt provenance; new rules never rewrite them. Rebuild story memory recreates summaries from canonical text in every language, preserving readings and notes (PED-003).
 
 ## Maintaining these files
 

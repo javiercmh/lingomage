@@ -36,3 +36,6 @@ docs/evaluation/generation-tests/ai-evals/runs/
 
 # Development server learner data (stories, settings, history)
 .dev-data/
+
+# Local assistant attachments
+.codex-attachments/

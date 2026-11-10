@@ -60,6 +60,14 @@ function target(story,pathId,kind,index=1){return {storyId:story.id,pathId,kind,
  const {c,story,$}=harness();c.renderReaderActions();assert.equal($('reader-remove-chapters').textContent,'Remove Chapter 2 onward…');c.state.readerChapter=2;c.renderReaderActions();assert.equal($('reader-remove-chapters').textContent,'Remove Chapter 3…');c.toggleReaderActions();assert.equal($('reader-actions-menu').hidden,false);c.closeReaderActions(true);assert.equal($('reader-actions-toggle')['aria-expanded'],'false');assert.equal($('reader-actions-toggle').focused,true);
  const legacy={id:'legacy',title:'Old',story:'Old',glossary:[]};c.ensureStoryPaths(legacy);assert.equal(legacy.paths.length,1);assert.equal(legacy.nextAlternateNumber,1);
 }
+{
+ const {c,story}=harness();story.memoryRebuild={entries:JSON.parse(JSON.stringify(story.paths[0].entries))};
+ assert.equal(c.removeReaderContent(target(story,'original','chapters',1)),true);assert.equal(story.memoryRebuild,null,'removing the captured lineage clears its rebuild recovery');
+}
+{
+ const {c,story}=harness();const marker=story.memoryRebuild={entries:JSON.parse(JSON.stringify(story.paths[1].entries))};
+ assert.equal(c.removeReaderContent(target(story,'original','chapters',1)),true);assert.equal(JSON.stringify(story.memoryRebuild),JSON.stringify(marker),'repair on another surviving path is preserved');
+}
 console.log('PASS chapter/path removal, shared content and memory, mirrors, name counter, reload, save rollback, stale targets, pending-AI guard, final-path routing and focus');
 (async()=>{
  const {c,story,$}=harness();c.removeReaderContent(target(story,'original','chapters',1));
