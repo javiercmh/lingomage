@@ -25,7 +25,7 @@ How stories, chapters, help and examples are generated, validated, checkpointed 
 ## Reader, memory and help
 
 - Canonical text is kept separate from ruby for selection, copy and speech.
-- Memory: summary chunks of 2000 estimated tokens (language-aware; about 8000 characters of German, 2000 of Japanese), 12000-unit serialized memory cap, bounded recent prose, all lineage-specific. Rewrites include the current chapter as source but exclude its events from preceding context. Removal prunes only unreferenced versions, help and memory.
+- Memory: summary chunks of 2000 estimated tokens (language-aware; about 8000 characters of German, 2000 of Japanese). Memory version 3 is an event graph with code-assigned ids (characters, facts, threads, events with causes and `knownBy`, beliefs, arcs); each `summary` request returns only changes, which code checks and merges. Above 10800 characters a separate `memory-compact` request condenses the least connected unprotected events into arcs, with source excerpts, saved as its own record; answers over 30000 characters are rejected; rules in PED-003, bounded recent prose, all lineage-specific. Rewrites include the current chapter as source but exclude its events from preceding context. Removal prunes only unreferenced versions, help and memory.
 - Initial help returns UTF-16 excerpt boundaries in the source, an optional English context translation and one short explanation. Detail returns plain text (legacy JSON accepted). Examples return three canonical sentences with English translations and validated highlight ranges; Japanese readings use the staged pipeline.
 
 ## Background operation sessions

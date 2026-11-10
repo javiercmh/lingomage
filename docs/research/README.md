@@ -16,7 +16,7 @@ demonstrated learning effectiveness.
 
 ## Evidence record
 
-Use [references.bib](references.bib) for shared bibliographic metadata and stable citation keys. Link implemented choices from the [pedagogical decision log](../pedagogy/README.md); research reviews retain study findings and access limitations. The bibliography holds sources cited by the reviews, including self-assessment, level-guided generation, reading and glossing, retrieval and spacing, instruction, feedback, listening and production, lexical-unit terminology and level descriptors. It does not cover every historical research candidate: some review notes still cite sources by link only. Where volume, issue, pages or an access date could not be confirmed, the record says so in its `note` field instead of guessing.
+Use [references.bib](references.bib) for shared bibliographic metadata and stable citation keys. Link implemented choices from the [pedagogical decision log](../pedagogy/README.md); research reviews retain study findings and access limitations. The bibliography holds sources cited by the reviews, including self-assessment, level-guided generation, reading and glossing, retrieval and spacing, instruction, feedback, listening and production, lexical-unit terminology, level descriptors and story memory. It does not cover every historical research candidate: some review notes still cite sources by link only. Where volume, issue, pages or an access date could not be confirmed, the record says so in its `note` field instead of guessing.
 
 Add a Markdown record under this directory for each reviewed topic. Include:
 
@@ -74,6 +74,7 @@ not systematic, unless a review says otherwise.
 | Learner self-report and levels | [Reading self-assessment](self-assessment.md), [level descriptors](level-descriptors.md) | [PED-001](../pedagogy/PED-001-learner-self-report.md) |
 | Generation at a target level | [Level-guided generation](level-guided-generation.md) | [PED-004](../pedagogy/PED-004-level-guided-generation.md) |
 | Reading support, glossing, extensive reading and repeated encounters | [Reading and glossing](reading-and-glossing.md), [lexical-unit terminology](lexical-units.md) | [PED-002](../pedagogy/PED-002-contextual-reading-support.md) |
+| Story memory: rolling summaries, compaction, event importance and graph structure | [Story memory](story-memory.md) | [PED-003](../pedagogy/PED-003-story-memory-and-paths.md) |
 | Lookups, probable-reading exposure and learner modelling | [Consultation signals](consultation-signals.md) | [PED-005](../pedagogy/PED-005-consultation-signals.md) |
 | Spaced retrieval and review (not implemented) | [Spaced review](spaced-review.md) | [Future directions](../product/future-directions.md) |
 | Explicit instruction, corrective feedback, listening and production (not implemented) | [Instruction, feedback, listening and production](instruction-feedback-listening-production.md) | [Future directions](../product/future-directions.md) |

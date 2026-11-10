@@ -6,7 +6,7 @@ Every JSON file the app reads or writes, what it holds, and how unreadable or fa
 
 | File | Owner | Contents |
 | --- | --- | --- |
-| `data/stories.json` | user, required | Stories, ordered chapters, immutable alternate versions and paths, rolling memory, version-scoped explanations and examples, reading positions, `lastActivityAt` |
+| `data/stories.json` | user, required | Stories, ordered chapters, immutable alternate versions and paths, rolling memory (`memories`: summary records with `updateReport`, condensed records with `compactedFrom`, `condensedEvents` (event ids), `excerpts`, `sizeBefore`, `sizeAfter`; memory format in PED-003), version-scoped explanations and examples, reading positions, `lastActivityAt` |
 | `data/settings.json` | user, required | Model and reasoning, language enablement and order, standardized reading targets, legacy self-assessments, regional preferences, `readingPreferences` |
 | `data/generation-checkpoints.json` | user, required, seeded empty | At most one unfinished operation: ID, kind, destination and path lineage, learner input, prompt and safeguard versions, AI configuration, scope, stage, validated plan and content, outstanding request ID. Contains learner text; never packaged |
 | `data/usage.json` | user, optional | Time-tracking aggregates, seed `{"version":1,"days":{}}` |
