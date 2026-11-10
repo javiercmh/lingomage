@@ -6,7 +6,8 @@ const cases = [
   ['continue', 'prose', 'Writing the next chapter'], ['rewrite', 'prose', 'Rewriting this chapter'],
   ['examples', 'prose', 'Writing examples'], ['continue', 'notes', 'Writing study notes'],
   ['create', 'readings', 'Adding readings'], ['explain', undefined, 'Explaining your selection'],
-  ['summary', undefined, 'Preparing story context']
+  ['summary', undefined, 'Preparing story context'],
+  ['memory-compact', undefined, 'Condensing story memory']
 ];
 for (const [kind, stage, title] of cases) {
   const copy = aiNotification(kind, stage);

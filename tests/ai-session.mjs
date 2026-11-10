@@ -126,7 +126,7 @@ function workflow({ kind, language, ...options }) {
   let durable = [];
   const responses = (input) => {
     if (input.kind === 'language-plan') return plan;
-    if (input.kind === 'summary') return { characters: [], facts: [], plot: [], unresolved: [], uncertainties: [], situation: [] };
+    if (input.kind === 'summary') return { newEvents: [] , situation: [] };
     if (input.kind === 'notes') return language === 'ja' ? { glossary: jaProse.glossary } : deNotes;
     if (input.kind === 'readings') return { readings: readingPlan(language === 'ja' ? (kind === 'examples' ? exampleSet('町は') : jaProse) : deProse, kind).spans.map(s => ({ id: s.id, reading: 'まち' })) };
     if (kind === 'examples') return exampleSet(language === 'ja' ? '町は' : 'Brot');

@@ -16,7 +16,8 @@ const PROSE = {
 };
 const OTHER = {
   explain: 'Explaining your selection',
-  summary: 'Preparing story context'
+  summary: 'Preparing story context',
+  'memory-compact': 'Condensing story memory'
 };
 
 export function aiNotification(kind, stage = 'prose') {

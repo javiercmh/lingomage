@@ -517,7 +517,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   const story3={id:'S',language:'ja',chapters:[chapter('one'),chapter('two'),chapter('three')]};
   let requested, generationInstructions;
   story3.topic = 'A mountain mystery'; story3.practice = 'Hiking vocabulary'; story3.difficulty = 'beginner'; story3.language = 'de';
-  const gen=sandbox({state:{readerId:'S',readerChapter:0,model:'mock',providerId:'mock'},readerStory:()=>story3,normalizeChapters:s=>s.chapters,activeVersion:c=>c.versions.find(v=>v.id===c.activeVersionId),activeChapter:()=>story3.chapters[gen.state.readerChapter],profileSnapshot:()=>({}),persistReaderStory(){},decodeResponse:JSON.parse,readerAi:async(kind,input,instructions,loading)=>{if(kind==='summary'){gen.state.pendingReaderRequestId='r';return JSON.stringify({...input.previousMemory,plot:[...input.previousMemory.plot,input.chapterChunk]});} requested=input;generationInstructions=instructions;assert.ok(loading.textContent.includes(kind === 'continue' ? 'Writing the next chapter' : 'Rewriting this chapter'));gen.state.pendingReaderRequestId='r';return JSON.stringify({title:'four',story:'Text four',glossary:[{word:'four',meaning:'four',forms:['four']}]});},readerPanel:()=>({scrollTop:0}),updateReader(){},window:{addEventListener(){}},document:{documentElement:{style:{}},querySelectorAll:()=>[]},ai:{acknowledge:async()=>{}}});
+  const gen=sandbox({state:{readerId:'S',readerChapter:0,model:'mock',providerId:'mock'},readerStory:()=>story3,normalizeChapters:s=>s.chapters,activeVersion:c=>c.versions.find(v=>v.id===c.activeVersionId),activeChapter:()=>story3.chapters[gen.state.readerChapter],profileSnapshot:()=>({}),persistReaderStory(){},decodeResponse:JSON.parse,readerAi:async(kind,input,instructions,loading)=>{if(kind==='summary'){gen.state.pendingReaderRequestId='r';return JSON.stringify({newEvents:[{ref:'e1',event:input.chapterChunk}]});} requested=input;generationInstructions=instructions;assert.ok(loading.textContent.includes(kind === 'continue' ? 'Writing the next chapter' : 'Rewriting this chapter'));gen.state.pendingReaderRequestId='r';return JSON.stringify({title:'four',story:'Text four',glossary:[{word:'four',meaning:'four',forms:['four']}]});},readerPanel:()=>({scrollTop:0}),updateReader(){},window:{addEventListener(){}},document:{documentElement:{style:{}},querySelectorAll:()=>[]},ai:{acknowledge:async()=>{}}});
   gen.state.languageExpectations={};gen.levelDefinition=()=>({id:'A1'});gen.guideFor=()=> 'Simple';gen.readingDescription=()=> 'Simple reading';gen.LEVELS={de:{framework:'CEFR'}};gen.SCOPES={scene:{description:'One event'}};gen.setScopeDisabled=()=>{};gen.$('reader-level').value='A1';gen.$('reader-scope').value='scene';
   gen.runContentOperation=async spec=>{
     const result=JSON.parse(await gen.readerAi(spec.kind,spec.input,spec.instructions,gen.state.activeChapterRequest.loading));
@@ -535,7 +535,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   bindStory(gen);
   vm.runInContext(section('function storyInstructions(', 'function storyInput(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section("$('reader-edit-submit').addEventListener", "$('reader-dialog').addEventListener"),gen);
   await submit();
-  assert.ok(requested.storyMemory.plot.includes('Text three'));assert.equal(requested.recentProse,'Text three');assert.equal(requested.priorActiveChapters,undefined);assert.equal(requested.precedingChapters,undefined);
+  assert.ok(requested.storyMemory.events.some(item=>item.event==='Text three'));assert.equal(requested.recentProse,'Text three');assert.equal(requested.priorActiveChapters,undefined);assert.equal(requested.precedingChapters,undefined);
   assert.equal(story3.chapters.length,4);assert.equal(story3.chapters[3].basedOnVersionId,'threev');assert.equal(story3.chapters[1].versions.length,1);
   assert.equal(requested.topic, 'A mountain mystery'); assert.equal(requested.practice, 'Hiking vocabulary');
   assert.ok(generationInstructions.includes('requests contextual vocabulary notes'));
@@ -556,7 +556,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.equal(JSON.stringify(story3.chapters.slice(1)),later);
   assert.equal(story3.chapters[0].versions[1].glossary[0].word,'four');
   assert.equal(requested.practice,'Hiking vocabulary');
-  assert.equal(gen.selectedPath(story3).entries.length,1);assert.equal(requested.storyMemory.plot.length,0);assert.equal(requested.currentChapter.story,'Text one');assert.equal(story3.paths[0].entries.length,5);
+  assert.equal(gen.selectedPath(story3).entries.length,1);assert.equal(requested.storyMemory.events.length,0);assert.equal(requested.currentChapter.story,'Text one');assert.equal(story3.paths[0].entries.length,5);
   console.log('PASS chapter-only rewrite preserves original and all later chapters');
   gen.$('reader-prompt').value='';await submit();assert.equal(requested.prompt,'');
   assert.equal(story3.chapters[0].versions.length,3);
@@ -564,8 +564,8 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   story3.activePathId='original';gen.state.readerChapter=1;
   const untouchedOriginal=JSON.stringify(story3.paths[0].entries);
   await submit();
-  assert.equal(requested.storyMemory.plot.length,1);
-  assert.equal(requested.storyMemory.plot[0],'Text one');
+  assert.equal(requested.storyMemory.events.length,1);
+  assert.equal(requested.storyMemory.events[0].event,'Text one');
   assert.equal(requested.recentProse,'Text one');
   assert.equal(requested.currentChapter.story,'Text two');
   assert.equal(gen.selectedPath(story3).entries.length,2);

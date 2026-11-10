@@ -420,11 +420,20 @@ class Handler(SimpleHTTPRequestHandler):
             except (TypeError, ValueError):
                 request_data = {}
             if request_data.get('kind') == 'summary':
-                memory = request_data.get('previousMemory', {})
-                memory = {key: list(memory.get(key, [])) for key in ('characters', 'facts', 'plot', 'unresolved', 'uncertainties', 'situation')}
-                memory['plot'] = (memory['plot'] + [request_data.get('chapterChunk', '')[:500]])[-8:]
-                memory['situation'] = [request_data.get('chapterChunk', '')[-500:]]
-                response_text = json.dumps(memory)
+                # Memory version 3: the answer lists changes only. The mock adds one minor event per piece
+                # (never dropping any), so long stories reach the compaction step as with a real model.
+                chunk = request_data.get('chapterChunk', '')
+                response_text = json.dumps({
+                    'newEvents': [{'ref': 'e1', 'event': chunk[:500], 'importance': 'minor', 'who': [], 'causes': [], 'threads': []}],
+                    'situation': [chunk[-500:]],
+                })
+            elif request_data.get('kind') == 'memory-compact':
+                previous = [arc for arc in request_data.get('previousArcs', []) if isinstance(arc, dict)]
+                events = [event for event in request_data.get('events', []) if isinstance(event, dict)]
+                arcs = [{'text': str(arc.get('text', '')), 'covers': list(arc.get('covers', []))} for arc in previous]
+                if events:
+                    arcs.append({'text': ' '.join(str(event.get('event', ''))[:60] for event in events), 'covers': [event.get('id') for event in events]})
+                response_text = json.dumps({'arcs': arcs})
             elif request_data.get('kind') == 'language-plan':
                 code = request_data.get('languageCode', 'de')
                 words = {'de': ('Markt', 'market'), 'ja': ('公園', 'park'), 'ru': ('рынок', 'market'), 'es-CL': ('feria', 'market')}
