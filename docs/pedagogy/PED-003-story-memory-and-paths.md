@@ -14,7 +14,7 @@
 
 ## Product defaults and limits
 
-- Budgets (JavaScript characters, not tokens): memory JSON at most 12000; input chunks at most 8000, consumed sequentially without omission (surrogate pairs preserved); recent prose is the whole chapter up to 8000, otherwise its last 4000, preferring a sentence or paragraph boundary. The rewrite source is complete.
+- Budgets (JavaScript characters, not tokens): memory JSON at most 12000; story text is budgeted in estimated tokens so each language gets comparable story content per request: summary pieces at most 2000, consumed sequentially without omission (surrogate pairs preserved), cut at a paragraph or sentence end (Japanese 「。！？」 need no following space); recent prose is the whole chapter up to 2000, otherwise its last 1000, preferring a sentence or paragraph boundary. The estimate (`estimateTokens`) counts Han, kana, Hangul, CJK punctuation and full-width characters as one, Cyrillic and Greek letters as a third and everything else as a quarter: about 8000 characters per piece for German and Spanish prose, about 6400 for Russian and about 2000 for Japanese. The ratios are a product approximation of typical tokenizers, not measured on any model. The rewrite source is complete.
 - Memory is cached by exact ordered version lineage, chunk index, `MEMORY_VERSION` and prompt version; shared path prefixes reuse it. Summaries are inspectable in `data/stories.json` with provider, model and prompt provenance. Completed summary stages are saved before acknowledgement.
 - These choices limit history growth and duplication but do not guarantee fidelity, prevent summary drift or establish improved learning. Long uncached stories need several initial requests. No live-model review of long or branched stories has been done.
 
@@ -39,3 +39,4 @@ Live-model review of long and branched stories shows drift or omissions; then re
 - 2026-10-11: memory and paths introduced.
 - 2026-10-12: chapter and path removal.
 - 2026-10-14: continuity-checking prose candidate prepared (not shipped).
+- 2026-11-10: story-text budgets in estimated tokens instead of characters, so Japanese pieces hold comparable content; Japanese pieces end at sentence boundaries.

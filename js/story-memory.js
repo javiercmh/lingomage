@@ -1,14 +1,48 @@
 // Bounded, lineage-specific memory. Persistence and inference are injected.
 // The single authoritative memory version: cache keys and saved version provenance both use it.
 export const MEMORY_VERSION = '1';
+// Story-text budgets in estimated tokens. CHUNK is one summary request's piece of a chapter; a chapter up to
+// RECENT_WHOLE is sent whole as recent prose, otherwise its last RECENT_TAIL. For Latin-script text these
+// equal the earlier 8000/8000/4000-character budgets; Japanese gets about a quarter of the characters.
+export const PROSE_BUDGETS = Object.freeze({ CHUNK: 2000, RECENT_WHOLE: 2000, RECENT_TAIL: 1000 });
+// A deterministic, tokenizer-independent estimate, not a count: Han, kana, Hangul, CJK punctuation and
+// full-width characters count as one
+// token each, Cyrillic and Greek letters as a third, everything else (Latin letters, digits, spaces,
+// punctuation) as a quarter. Typical tokenizers are close to these ratios; the goal is comparable story
+// content per request across languages, not an exact token count.
+function tokenWeight(char) {
+  const code = char.codePointAt(0);
+  if ((code >= 0x3000 && code <= 0x30ff) || (code >= 0x3400 && code <= 0x9fff) || (code >= 0xf900 && code <= 0xfaff) || (code >= 0xac00 && code <= 0xd7af) || (code >= 0x20000 && code <= 0x2fa1f) || (code >= 0xff00 && code <= 0xffef)) return 1;
+  if ((code >= 0x0370 && code <= 0x03ff) || (code >= 0x0400 && code <= 0x052f)) return 1 / 3;
+  return 1 / 4;
+}
+export function estimateTokens(text) {
+  let total = 0;
+  for (const char of text) total += tokenWeight(char);
+  return total;
+}
+// The UTF-16 index where the running estimate first exceeds budget (text.length if it never does).
+function indexAtBudget(text, budget) {
+  let total = 0, index = 0;
+  for (const char of text) {
+    total += tokenWeight(char);
+    if (total > budget) return index;
+    index += char.length;
+  }
+  return text.length;
+}
 export function createStoryMemory({state, promptVersion:PROMPT_VERSION, normalizeChapters, readerAi, savePendingReaderResult}) {
   const MEMORY_KEYS = ['characters', 'facts', 'plot', 'unresolved', 'uncertainties', 'situation'];
-  function memoryChunks(text, limit = 8000) {
+  // Chunks and recent prose are bounded in estimated tokens, not characters, so each language gets about
+  // the same amount of story per request (see estimateTokens and PED-003).
+  function memoryChunks(text, budget = PROSE_BUDGETS.CHUNK) {
     const chunks = [];
-    while (text.length > limit) {
+    while (estimateTokens(text) > budget) {
+      const limit = indexAtBudget(text, budget);
       let end = text.lastIndexOf('\n', limit);
       if (end < limit / 2) {
-        const boundaries = [...text.slice(0, limit).matchAll(/[。！？.!?](?:\s+|$)/g)];
+        // Japanese sentence ends take no following space; Latin-script ones need a space or the end of text.
+        const boundaries = [...text.slice(0, limit).matchAll(/[。！？]\s*|[.!?](?:\s+|$)/g)];
         const boundary = boundaries[boundaries.length - 1];
         end = boundary && boundary.index > limit / 2 ? boundary.index + boundary[0].length : limit;
       }
@@ -20,10 +54,13 @@ export function createStoryMemory({state, promptVersion:PROMPT_VERSION, normaliz
     return chunks.length ? chunks : [''];
   }
   function recentProse(text) {
-    if (text.length <= 8000) return text;
-    let start = text.length - 4000;
+    if (estimateTokens(text) <= PROSE_BUDGETS.RECENT_WHOLE) return text;
+    // Start where the last RECENT_TAIL estimated tokens begin, then move to the next sentence or paragraph
+    // boundary when one is close.
+    let start = text.length - indexAtBudget([...text].reverse().join(''), PROSE_BUDGETS.RECENT_TAIL);
+    const window = Math.max(1, Math.ceil((text.length - start) / 4));
     const match = /[\n。！？.!?]\s*/.exec(text.slice(start));
-    if (match && match.index < 1000) start += match.index + match[0].length;
+    if (match && match.index < window) start += match.index + match[0].length;
     if (/[\uDC00-\uDFFF]/.test(text[start])) start++;
     return text.slice(start);
   }
