@@ -611,7 +611,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   pos.$('reader-dialog').querySelector=()=>panel;pos.$('reader-dialog').showModal=()=>{};
   bindStory(pos);
   vm.runInContext(section('function readerPanel(', 'function sentenceContext('),pos);story3.activePathId='original';
-  pos.rememberReaderPosition();panel.scrollTop=0;pos.openReader(story3);
+  pos.$('reader-dialog').open=true;pos.rememberReaderPosition();panel.scrollTop=0;pos.openReader(story3);
   assert.equal(pos.state.readerChapter,2);assert.equal(panel.scrollTop,321);
   console.log('PASS actual scroll panel and chapter restored on reopen');
   pos.state.readerEditDraft={storyId:'S',chapterId:story3.chapters[0].id,mode:'rewrite',prompt:'Keep a clue',error:'Provider failed'};

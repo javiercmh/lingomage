@@ -1598,7 +1598,8 @@ function showWordNote(trigger, notes, surface = '', helpId = '') {
 }
 function readerPanel() { return $('reader-dialog').querySelector('.reader-panel'); }
 function rememberReaderPosition() {
-  const story = readerStory(); if (!story) return;
+  // A closed dialog is display:none and reports scrollTop 0; keep the position recorded while it was open.
+  const story = readerStory(); if (!story || !$('reader-dialog').open) return;
   state.readerPositions[`${story.id}:${selectedPath(story).id}`] = { chapterId: activeChapter(story).id, scrollTop: readerPanel().scrollTop };
 }
 // Positions live in memory while scrolling; they are saved with the story when the reader closes or the page is hidden.
