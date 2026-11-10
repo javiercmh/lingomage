@@ -190,12 +190,12 @@ export function createWorkspaceStorage({read, write, exists}) {
 }
 
 const SETTINGS_PATH = 'data/settings.json';
-const SCALARS = ['providerId','model','reasoning','languageSetupDismissed','theme'];
+const SCALARS = ['providerId','model','reasoning','languageSetupDismissed','backgroundStoryContext','theme'];
 const MAPS = ['targetLanguages','standardizedLevels','learnerProfiles','languageExpectations'];
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 export function settingsSnapshot(state) {
-  return clone({providerId:state.providerId,model:state.model,reasoning:state.reasoning,targetLanguages:state.targetLanguages,languageOrder:state.languageOrder,learnerProfiles:state.learnerProfiles,languageExpectations:state.languageExpectations,languageSetupDismissed:state.languageSetupDismissed,standardizedLevels:state.standardizedLevels,readingPreferences:{furigana:state.furigana,fontSize:state.readerFontSize,speechRate:state.speechRate,followAlong:state.followAlong},theme:'dark'});
+  return clone({providerId:state.providerId,model:state.model,reasoning:state.reasoning,targetLanguages:state.targetLanguages,languageOrder:state.languageOrder,learnerProfiles:state.learnerProfiles,languageExpectations:state.languageExpectations,languageSetupDismissed:state.languageSetupDismissed,backgroundStoryContext:state.backgroundStoryContext !== false,standardizedLevels:state.standardizedLevels,readingPreferences:{furigana:state.furigana,fontSize:state.readerFontSize,speechRate:state.speechRate,followAlong:state.followAlong},theme:'dark'});
 }
 export function restoreSettingsSnapshot(state, value) {
   const {readingPreferences, theme, ...fields} = clone(value);

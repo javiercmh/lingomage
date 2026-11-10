@@ -71,7 +71,7 @@ function fillScopeOptions(input, selected = 'scene', describe) {
 
 const PREFERRED_MODEL = 'gpt-6-luna';
 const $ = id => document.getElementById(id);
-const state = { languageOrder: Object.keys(LANGUAGES), standardizedLevels: {}, checkpointBlocked: false, stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, libraryLanguage: 'all', librarySort: 'recent', storyMenu: null, libraryStale: false, libraryPlainHero: false, deleteTrigger: null, deleteStoryIds: new Set(), storySelectionMode: false, selectedStoryIds: new Set(), storySelectionFocusId: '', explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', readerHistoryEntry: false, speechVersionKey: '', playerEnabled: false, player: null, playerUnits: [], speechRate: 1, followAlong: true, following: true, wordNoteTrigger: null, readerEditBusy: false, activeChapterRequest: null, readerEditDraft: null };
+const state = { languageOrder: Object.keys(LANGUAGES), standardizedLevels: {}, checkpointBlocked: false, stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, libraryLanguage: 'all', librarySort: 'recent', storyMenu: null, libraryStale: false, libraryPlainHero: false, deleteTrigger: null, deleteStoryIds: new Set(), storySelectionMode: false, selectedStoryIds: new Set(), storySelectionFocusId: '', explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', readerHistoryEntry: false, speechVersionKey: '', playerEnabled: false, player: null, playerUnits: [], speechRate: 1, followAlong: true, following: true, wordNoteTrigger: null, backgroundStoryContext: true, readerEditBusy: false, activeChapterRequest: null, readerEditDraft: null };
 
 let readerSpeechRun = 0;
 let readerSpeechKey = '';
@@ -86,7 +86,7 @@ function setReaderGeneration(value) {
   renderReaderGeneration();
 }
 // "Working" is displayed only while a request is actually live, so a cancelled, failed or abandoned request never leaves a stale status.
-function generationLive() { return Boolean(creatingStory || pipeline?.busy || state.readerEditBusy || state.readerHelpBusy || state.requestId); }
+function generationLive() { return Boolean(creatingStory || backgroundRun || pipeline?.busy || state.readerEditBusy || state.readerHelpBusy || state.requestId); }
 function generationView(status) {
   if (!status) return null;
   const pending = state.pendingReaderResult;
@@ -148,6 +148,59 @@ function renderReaderGeneration() {
   document.body.classList.toggle('has-app-generation-status', Boolean(page) && !inDialog);
   // A modal dialog makes the page inert, so the page-level bar moves into the topmost open dialog, as the toast does.
   if (page) { const host = [...document.querySelectorAll('dialog[open]')].at(-1) || document.body; if (appBar.parentNode !== host) host.append(appBar); }
+  maybeStartBackgroundContext();
+}
+// Background story context (Settings → Story memory, on by default): after a chapter is saved, the story memory for
+// its path is prepared while the learner reads, so Continue usually finds it saved. A queued target starts only once
+// no request, unsaved response, saved progress or status is showing (so "Chapter 3 is ready" is seen first). It never
+// retries by itself; any other AI action stops it, and Continue or Rewrite on the same lineage waits for it instead.
+let backgroundTarget = null, backgroundRun = null;
+function queueBackgroundContext(storyId, pathId = null) {
+  if (!state.backgroundStoryContext) return;
+  backgroundTarget = { storyId, pathId };
+  maybeStartBackgroundContext();
+}
+function maybeStartBackgroundContext() {
+  const target = backgroundTarget;
+  if (!target || backgroundRun || readerGeneration || generationLive() || state.pendingReaderResult || state.pendingGeneration || state.pendingReaderRequestId || pipeline?.records.length || state.storageBlocked || state.checkpointBlocked) return;
+  backgroundTarget = null;
+  const story = state.stories.find(item => item.id === target.storyId);
+  if (!state.backgroundStoryContext || !story || !ai.available || !state.model) return;
+  const path = target.pathId ? story.paths?.find(item => item.id === target.pathId) : selectedPath(story);
+  const entries = (path?.entries || []).map(entry => ({ ...entry }));
+  if (!entries.length || storyContextReady(story, entries)) return;
+  const run = backgroundRun = { storyId: story.id, entries, stopped: false, cancelledByUser: false };
+  const loading = document.createElement('div'); loading.append(document.createElement('strong'));
+  run.host = document.createElement('span'); run.host.hidden = true; document.body.append(run.host);
+  const status = { storyId: story.id, phase: 'working', message: 'Preparing story context in the background…' };
+  setReaderGeneration(status);
+  run.promise = (async () => {
+    try { await prepareStoryMemory(story, entries, loading, { providerId: state.providerId, model: state.model, reasoning: state.reasoning, signal: run }, run.host); }
+    catch (error) {
+      // Stopping, cancelling or a hidden page is not a failure; Continue prepares whatever is missing.
+      if (!run.stopped && !run.cancelledByUser && error.message !== 'Request cancelled.' && error.code !== 'background_paused') toast(`Story context was not prepared in the background: ${error.message} Continue will prepare it.`);
+    } finally {
+      run.host.remove(); backgroundRun = null;
+      // An unsaved summary keeps the status, which then offers Save response.
+      if (readerGeneration === status && !state.pendingReaderResult) setReaderGeneration(null); else renderReaderGeneration();
+    }
+  })();
+}
+async function stopBackgroundContext() {
+  backgroundTarget = null;
+  const run = backgroundRun; if (!run) return;
+  run.stopped = true;
+  run.host.querySelector('.reader-ai-cancel')?.click();
+  await run.promise;
+}
+// Continue and Rewrite reuse a background run on the same lineage (summaries are keyed by lineage prefix).
+async function settleBackgroundContext(storyId, entries) {
+  backgroundTarget = null;
+  const run = backgroundRun; if (!run) return;
+  const sameLineage = run.storyId === storyId && run.entries.length <= entries.length && run.entries.every((entry, index) => entry.versionId === entries[index].versionId);
+  if (!sameLineage) { await stopBackgroundContext(); return; }
+  await run.promise;
+  if (run.cancelledByUser) throw new Error('Request cancelled.');
 }
 for (const id of ['reader-generation-dismiss', 'generation-status-dismiss']) $(id).addEventListener('click', () => setReaderGeneration(null));
 // Resolves after the reader's own close handler has run (the close event is dispatched asynchronously).
@@ -313,6 +366,7 @@ function syncSettingsControls() {
   if (state.player && state.playerRate !== state.speechRate) { state.playerRate=state.speechRate; state.player.setRate(state.speechRate); }
   // During playback `following` may differ from the preference (manual scroll); otherwise it mirrors the saved Follow setting.
   if (!state.player) { state.following=state.followAlong; renderPlayerFollow(); }
+  $('background-context').checked = state.backgroundStoryContext;
   syncModelControls();
 }
 function syncModelControls() {
@@ -605,6 +659,11 @@ function setView(name) {
   window.scrollTo(0, 0);
   renderReaderGeneration();
 }
+$('background-context').addEventListener('change', () => {
+  state.backgroundStoryContext = $('background-context').checked;
+  if (!trySaveSettings()) return;
+  if (!state.backgroundStoryContext) stopBackgroundContext().catch(() => {});
+});
 $('open-settings').addEventListener('click', () => { setView('settings'); $('settings-back').focus({ preventScroll: true }); });
 $('settings-back').addEventListener('click', () => { setView('profile'); $('open-settings').focus({ preventScroll: true }); });
 document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => setView(tab.dataset.view)));
@@ -756,6 +815,7 @@ function renderCheckpointRecovery() {
 async function resumeCheckpoint(op) {
   if (state.storageBlocked) { toast('Retry loading your workspace before resuming generation.'); return; }
   if (!pipeline.records.includes(op) || pipeline.busy) return;
+  if (backgroundRun) { await stopBackgroundContext(); if (!pipeline.records.includes(op) || pipeline.busy) return; }
   if (state.requestId || state.readerEditBusy || state.readerHelpBusy || state.pendingReaderResult || state.pendingGeneration) { toast('Finish the active request first.'); return; }
   try {
     if (op.promptVersion !== PROMPT_VERSION || op.safeguardVersion !== SAFEGUARD_VERSION) throw new Error('This saved operation belongs to an older app definition. Discard it to start with the current requirements.');
@@ -790,6 +850,7 @@ const { operationProvenance, applyContentOperation } = createGenerationControlle
 function showOperationResult(op) {
   const story=state.stories.find(s=>op.kind === 'create' ? s.operationId === op.id : s.id === op.target.storyId);
   if (!story) return;
+  if (op.kind !== 'examples') queueBackgroundContext(story.id, op.kind === 'continue' ? op.target.pathId : op.kind === 'rewrite' ? `path-${op.id}` : null);
   if (op.kind === 'create') { setReaderGeneration(null); ensureReaderOpen(story).catch(error => toast(error.message)); return; }
   if (readerGeneration && readerGeneration.storyId === story.id) {
     Object.assign(readerGeneration,{phase:'ready',message:op.kind === 'continue' ? `Chapter ${op.target.entries.length + 1} is ready` : 'Ready',pathId:op.kind === 'continue' ? op.target.pathId : op.kind === 'rewrite' ? `path-${op.id}` : readerGeneration.pathId,chapterId:op.kind === 'examples' ? op.target.chapterId : op.kind === 'continue' ? `chapter-${op.id}` : op.target?.chapterId,versionId:op.kind === 'examples' ? op.target.versionId : `version-${op.id}`,helpId:op.kind === 'examples' ? op.target.helpId : ''});
@@ -1035,6 +1096,7 @@ async function generate(event) {
   if (state.checkpointBlocked || pipeline?.records.length) { $('form-error').textContent='Resume or discard saved generation progress first.'; return; }
   if (state.pendingReaderResult) { $('form-error').textContent = 'Save the completed reader response before generating another story.'; return; }
   if (state.pendingGeneration) { $('form-error').textContent = 'Finish saving the completed story before generating another.'; return; }
+  if (backgroundRun) await stopBackgroundContext();
   if (state.requestId) { $('form-error').textContent = 'Finish the current AI request before generating another story.'; return; }
   if (!ai.available) { $('form-error').textContent = 'Open App² → Settings → AI and connect a provider, then return here.'; return; }
   try {
@@ -1466,7 +1528,7 @@ function pathForkDescription(story, path) {
   return `Different version from Chapter ${path.forkChapter}.${parent ? ` Later chapters remain on ${parent.name}.` : ''}`;
 }
 const { normalizeChapters, ensureStoryPaths, initializePathCounter, selectedPath, pathChapters, activeChapter, activeVersion } = createStoryModel({state, readerStory});
-const { memoryChunks, recentProse, decodeMemory, prepareStoryMemory } = createStoryMemory({state, promptVersion:PROMPT_VERSION, normalizeChapters, readerAi:(...args)=>readerAi(...args), savePendingReaderResult:(...args)=>savePendingReaderResult(...args)});
+const { memoryChunks, recentProse, decodeMemory, prepareStoryMemory, storyContextReady } = createStoryMemory({state, promptVersion:PROMPT_VERSION, normalizeChapters, readerAi:(...args)=>readerAi(...args), savePendingReaderResult:(...args)=>savePendingReaderResult(...args)});
 function readerStory() { return state.stories.find(item => item.id === state.readerId) || (state.current?.id === state.readerId ? state.current : null); }
 function profileSnapshot(story) {
   const version = state.readerId === story.id ? activeVersion(activeChapter(), story) : null;
@@ -2316,6 +2378,7 @@ const activateReaderText = createReaderActivation({
 $('reader-story').addEventListener('click', activateStoryText);
 $('reader-story').addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') activateReaderText(event); });
 async function readerAi(kind, input, instructions, requestPanel, config = { providerId: state.providerId, model: state.model, reasoning: state.reasoning }) {
+  if (config.signal?.stopped) throw new Error('Request cancelled.');
   workspaceStorage.assertWritable();
   if (state.pendingReaderResult) throw new Error('Save the completed response before starting another request.');
   if (state.requestId) throw new Error('Another AI request is still running. Wait for it to finish before starting another.');
@@ -2343,6 +2406,7 @@ async function readerAi(kind, input, instructions, requestPanel, config = { prov
   catch (error) {
     state.pendingReaderRequestId = id;
     try { await releaseInvalidReaderResponse(); } catch (releaseError) { error.releaseFailure = releaseError.message; }
+    if (cancelled && config.signal && !config.signal.stopped) config.signal.cancelledByUser = true;
     throw cancelled ? new Error('Request cancelled.') : error;
   }
   finally { if (state.requestId === id) state.requestId = null; cancel.remove(); }
@@ -2440,6 +2504,7 @@ function decodeHelp(text, action = 'initial') {
 }
 async function explainSelection(kind = 'explain', action = 'initial', followUp = '', selected = state.readerSelection, onTaskStarted) {
   const passage = selected; if (!passage) return;
+  if (backgroundRun) await stopBackgroundContext();
   if (state.checkpointBlocked || pipeline?.records.length || state.readerHelpBusy || state.readerEditBusy || state.requestId) { toast('Another AI request is still running. Wait for it to finish.'); return; }
   const story = readerStory();
   const chapter = normalizeChapters(story).find(item => item.id === passage.chapterId);
@@ -2678,18 +2743,20 @@ $('reader-edit-submit').addEventListener('click', async () => {
   const loading = createChapterLoading(mode);
   const request = state.activeChapterRequest = { storyId: story.id, loading, clockId: `chapter-request-${Date.now()}` };
   // Earlier chapters are summarized before the operation exists; the checklist shows that as its first step.
-  const provisional = { id: request.clockId, kind: mode, language: story.language, stage: 'context', target: { index: rewriteIndex } };
+  const memoryEntries = mode === 'continue' ? entries : entries.slice(0, rewriteIndex);
+  const provisional = { id: request.clockId, kind: mode, language: story.language, stage: storyContextReady(story, memoryEntries) && !backgroundRun ? 'plan' : 'context', target: { index: rewriteIndex } };
   if (hasStoryContext(provisional)) { loading.querySelector('strong').textContent = 'Preparing story context…'; paintChapterProgress(request, provisional); }
   renderChapterRequest();
   setReaderGeneration({ storyId: story.id, phase: 'working', message: hasStoryContext(provisional) ? progressSummary(provisional).text : mode === 'continue' ? 'Preparing next chapter…' : 'Preparing rewrite…' });
   $('reader-edit-cancel').disabled = true; $('reader-prompt').disabled = true; $('reader-level').disabled = true; setScopeDisabled($('reader-scope'), true);
   const button = $('reader-edit-submit'); button.disabled = true; button.textContent = 'Working…'; $('reader-edit-error').textContent = '';
   try {
+    await settleBackgroundContext(story.id, memoryEntries);
     persistReaderStory(story);
     await releaseSavedInference();
     // Summary preparation and every generation stage share one session; readerAi joins it and never ends it.
     const op = await aiSession.run(async () => {
-      input.storyMemory = await prepareStoryMemory(story, mode === 'continue' ? entries : entries.slice(0, rewriteIndex), loading, config, loading.requestHost);
+      input.storyMemory = await prepareStoryMemory(story, memoryEntries, loading, config, loading.requestHost);
       const priorEntry = mode === 'continue' ? entries[entries.length - 1] : entries[rewriteIndex - 1];
       const priorVersion = priorEntry ? normalizeChapters(story).find(c => c.id === priorEntry.chapterId).versions.find(v => v.id === priorEntry.versionId) : null;
       input.recentProse = priorVersion ? recentProse(priorVersion.story) : '';
@@ -2780,6 +2847,8 @@ state.furigana = settings.readingPreferences?.furigana !== false;
 state.readerFontSize = Math.max(15, Math.min(30, Number(settings.readingPreferences?.fontSize) || 19));
 state.speechRate = SPEECH_RATES.includes(Number(settings.readingPreferences?.speechRate)) ? Number(settings.readingPreferences.speechRate) : 1;
 state.followAlong = settings.readingPreferences?.followAlong !== false;
+state.backgroundStoryContext = settings.backgroundStoryContext !== false;
+$('background-context').checked = state.backgroundStoryContext;
 state.languageSetupDismissed = settings.languageSetupDismissed === true;
 state.languageOrder = [...new Set([...(Array.isArray(settings.languageOrder) ? settings.languageOrder : []), ...Object.keys(LANGUAGES)])].filter(code => Object.hasOwn(LANGUAGES, code));
 const admitted = (field, map) => Object.entries(map || {}).filter(([code, value]) => SETTINGS_ADMIT[field](code, value));

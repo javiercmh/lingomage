@@ -30,6 +30,7 @@ What LingoMage does now, its confirmed requirements and its defaults. Interactio
 - Language plan of up to five vocabulary candidates and two grammar focuses, possibly none.
 - Notes for most meaningful words and expressions, no density cap.
 - Reasoning choices only where the provider advertises them, plus provider default; higher reasoning may add latency and usage. Model and reasoning are stored in `data/settings.json`, not per account.
+- Background story context (Settings → Story memory, on by default): each new chapter's story memory is summarized while the learner reads, so Continue usually starts with planning. Costs one AI request per new chapter, also when never continued.
 - Existing Spanish stories keep `es-CL`; new ones honor the requested variety.
 
 Never claim certified CEFR/JLPT/TORFL alignment, map one framework to another, or claim proven learning effectiveness. Model-suggested vocabulary and difficulty are estimates.

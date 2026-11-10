@@ -364,6 +364,20 @@ export function createStoryMemory({state, promptVersion:PROMPT_VERSION, normaliz
     return next;
   }
 
+  // True when the whole lineage already has a saved memory that needs no condensing, so preparing it makes no request.
+  function storyContextReady(story, entries) {
+    if (!entries.length) return true;
+    const chapters = normalizeChapters(story);
+    const versionOf = entry => chapters.find(chapter => chapter.id === entry.chapterId)?.versions.find(v => v.id === entry.versionId);
+    const last = versionOf(entries[entries.length - 1]);
+    if (!last || entries.some(entry => !versionOf(entry))) return true; // nothing valid to prepare
+    const cache = new Map((story.memories || []).map(item => [item.key, item]));
+    const ids = entries.map(entry => entry.versionId), index = memoryChunks(last.story).length - 1;
+    const record = cache.get(compactKey(ids, index)) || cache.get(summaryKey(ids, index));
+    if (!record) return false;
+    try { return !needsCompaction(decodeMemory(record.memory)) || cache.has(compactKey(ids, index)); } catch { return true; }
+  }
+
   // `requestPanel` receives each request's cancel control; it defaults to the loading card itself.
   async function prepareStoryMemory(story, entries, loading, config = { providerId: state.providerId, model: state.model, reasoning: state.reasoning }, requestPanel = loading) {
     let memory = emptyMemory();
@@ -405,5 +419,5 @@ export function createStoryMemory({state, promptVersion:PROMPT_VERSION, normaliz
     return memory;
   }
 
-  return {memoryChunks, recentProse, decodeMemory, prepareStoryMemory, applyUpdate, compactionCandidates, applyCompaction, connections};
+  return {memoryChunks, recentProse, decodeMemory, prepareStoryMemory, storyContextReady, applyUpdate, compactionCandidates, applyCompaction, connections};
 }

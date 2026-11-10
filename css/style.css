@@ -539,6 +539,9 @@ body.has-app-generation-status .toast { bottom: calc(var(--tabbar-h) + 88px + va
 .settings-section-label { margin: 0 0 12px; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 .language-preferences legend.settings-section-label { margin-bottom: 6px; }
 .settings-hint { margin: 6px 0 18px; }
+.memory-settings { margin-top: 6px; padding-top: 16px; border-top: 1px solid var(--line, rgba(255,255,255,.08)); }
+.settings-check { display: flex; min-height: 44px; align-items: center; gap: 10px; color: var(--ink); font-size: 14px; cursor: pointer; }
+.settings-check input { flex: none; width: 20px; height: 20px; margin: 0; accent-color: var(--accent-strong); }
 #reasoning-select[hidden] ~ #reasoning-hint { display: none; }
 #reasoning-hint { margin-bottom: 0; }
 .settings-footer { margin: 0 0 14px; text-align: center; }

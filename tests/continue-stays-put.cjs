@@ -13,7 +13,7 @@ function build({open = true, viewedPath = 'original', chapter = 0} = {}) {
     renderChapterNavigation() { calls.push('nav'); panel.scrollTop = 0; context.document.activeElement = null; },
     renderReaderActions() { calls.push('actions'); }, updateReaderNavigation() { calls.push('sticky'); },
     updateReader() { calls.push('updateReader'); }, renderReaderGeneration() { calls.push('status'); },
-    ensureReaderOpen: async s => { calls.push(`open:${s.id}`); }, setReaderGeneration(v) { vm.runInContext('readerGeneration = null', context); calls.push(`status:${v}`); }, toast: m => context.toasts.push(m)};
+    ensureReaderOpen: async s => { calls.push(`open:${s.id}`); }, queueBackgroundContext: (storyId, pathId) => calls.push(`background:${storyId}:${pathId}`), setReaderGeneration(v) { vm.runInContext('readerGeneration = null', context); calls.push(`status:${v}`); }, toast: m => context.toasts.push(m)};
   context.document.activeElement = focused;
   vm.createContext(context);
   vm.runInContext('let readerGeneration = null;', context);
@@ -31,7 +31,7 @@ const continueOp = (extra = {}) => ({id: 'op1', kind: 'continue', target: {story
   assert.equal(t.context.state.readerChapter, 0, 'viewed chapter unchanged');
   assert.ok(!t.calls.includes('updateReader'), 'no full reader navigation');
   assert.ok(t.calls.includes('nav') && t.calls.includes('actions') && t.calls.includes('sticky'), 'chapter count and navigation controls refresh');
-  assert.equal(t.panel.scrollTop, 240, 'scroll offset restored'); assert.ok(t.calls.includes('focus'), 'focus restored');
+  assert.equal(t.panel.scrollTop, 240, 'scroll offset restored'); assert.ok(t.calls.includes('focus'), 'focus restored'); assert.ok(t.calls.some(c => c.startsWith('background:') && !c.endsWith(':null')), 'a continued chapter queues background story context for its path');
   assert.equal(t.edit.hidden, true); assert.equal(t.context.state.readerEditDraft, null);
   assert.deepEqual(t.status(), {storyId: 'story', phase: 'ready', message: 'Chapter 3 is ready', pathId: 'original', chapterId: 'chapter-op1', versionId: 'version-op1', helpId: ''});
   assert.deepEqual(t.context.toasts, ['Chapter added']);
