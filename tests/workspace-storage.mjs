@@ -207,3 +207,14 @@ console.log('PASS settings merge keeps unknown nested/legacy values and honours 
   settings.storage.load('data/settings.json');assert.equal(settings.writes(),0);
 }
 console.log('PASS glossary alias migration: term/text normalized once, conflicts fail closed, reload is idempotent, failed writes keep the original file');
+
+// Share sheet preference: optional boolean, absent means off, saved and restored like other scalar settings.
+{
+  assert.equal(validSettings({shareVocabularyNotes:true}),true);assert.equal(validSettings({}),true);
+  assert.equal(validSettings({shareVocabularyNotes:'yes'}),false);
+  const state={providerId:'',model:'',reasoning:'',targetLanguages:{},languageOrder:[],learnerProfiles:{},languageExpectations:{},standardizedLevels:{},furigana:true,readerFontSize:19,speechRate:1,followAlong:true};
+  assert.equal(settingsSnapshot(state).shareVocabularyNotes,false,'absent means off');
+  state.shareVocabularyNotes=true;const snapshot=settingsSnapshot(state);assert.equal(snapshot.shareVocabularyNotes,true);
+  state.shareVocabularyNotes=false;restoreSettingsSnapshot(state,snapshot);assert.equal(state.shareVocabularyNotes,true,'a rollback restores the saved choice');
+  console.log('PASS share vocabulary-notes preference: validation, default off, snapshot and rollback');
+}

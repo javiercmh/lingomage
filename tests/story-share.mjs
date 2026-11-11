@@ -52,7 +52,7 @@ const legacy={id:'L',title:'Old',story:'Body'};storyShareText(legacy,model);asse
 }
 // Execute the real Library action, dialog setup, each action button and close wiring, including rebuilt opener focus.
 const app=fs.readFileSync('js/app.js','utf8');
-const elements=new Map(), element=()=>({children:[],style:{},dataset:{},attributes:{},isConnected:true,append(...children){this.children.push(...children);},setAttribute(name,value){this.attributes[name]=value;},addEventListener(name,fn){this[name]=fn;},getBoundingClientRect(){return {height:144,top:60,bottom:104,right:300};},focus(){this.focused=true;},remove(){},showModal(){this.open=true;},close(){this.open=false;this.onclose?.();}});
+const elements=new Map(), element=()=>({children:[],style:{},dataset:{},attributes:{},isConnected:true,classes:new Set(),get classList(){const c=this.classes;return {toggle:(name,on)=>on?c.add(name):c.delete(name),contains:name=>c.has(name)};},querySelector(){return this.label||(this.label={textContent:''});},append(...children){this.children.push(...children);},setAttribute(name,value){this.attributes[name]=value;},addEventListener(name,fn){this[name]=fn;},getBoundingClientRect(){return {height:144,top:60,bottom:104,right:300};},focus(){this.focused=true;},remove(){},showModal(){this.open=true;},close(){this.open=false;this.onclose?.();}});
 const $=id=>{if(!elements.has(id))elements.set(id,element());return elements.get(id);};
 const trigger=element(), rebuilt=element();let rendered=0;const toasts=[], delivered=[];
 $('library-list').querySelectorAll=()=>[{dataset:{storyId:'S'},querySelector:()=>rebuilt}];
@@ -61,30 +61,39 @@ const context={$,state:{},workspaceStorage:{entries:new Map([['data/stories.json
   chapterShareText,storyShareText,storyExportFile,shareTargets,readJson:()=>({version:'9'}),
   downloadStoryFile:async(payload,options)=>{delivered.push(['download',payload.name,options.isNative]);return {done:'downloaded'};},shareStoryFile:async payload=>{delivered.push(['shareFile',payload.name]);return {launched:true};},
   shareText:async payload=>{delivered.push(['shareText',payload.text]);return {cancelled:true};},copyText:async payload=>{delivered.push(['copy',payload.text]);return {done:'copied'};},
-  save:{available:false},share:{available:false},isNative:false,document:{createElement:element,body:element(),querySelector:()=>null},window:{innerHeight:800,innerWidth:375},renderLibrary(){rendered++;},navigator:{clipboard:{}},toast:message=>toasts.push(message),console:{warn(){}},beginStorySelection(){},confirmStoryDeletion(){}};
+  save:{available:false},share:{available:false},isNative:false,document:{createElement:element,body:element(),querySelector:()=>null},window:{innerHeight:800,innerWidth:375},setTimeout:(fn)=>{context.pendingReset=fn;return 1;},clearTimeout(){},renderLibrary(){rendered++;},navigator:{clipboard:{}},trySaveSettings(){context.saves=(context.saves||0)+1;return context.saveResult!==false;},toast:message=>toasts.push(message),console:{warn(){}},beginStorySelection(){},confirmStoryDeletion(){}};
 vm.createContext(context);
 vm.runInContext(app.slice(app.indexOf('function closeStoryMenu('),app.indexOf('function confirmStoryDeletion('))+app.slice(app.indexOf('function openShareDialog('),app.indexOf('// Library → Import story…')),context);
 const dialog=$('share-dialog');
 context.openStoryMenu(longer2,trigger);assert.equal(context.state.storyMenu.popover.children.length,3);
 context.state.storyMenu.popover.children[1].click();
-assert.equal(dialog.open,true);assert.equal($('share-title').textContent,'Share “日本の話”');
+assert.equal(dialog.open,true);assert.equal($('share-story-title').textContent,'日本の話');
 assert.equal($('share-chapter-row').hidden,true,'Library share has no chapter row');
 assert.equal($('share-download').hidden,false);assert.equal($('share-send-file').hidden,true);assert.equal($('share-story-send').hidden,true,'browser: Copy only');
-assert.equal($('share-download').focused,true,'Download story file is the default action');
-assert.equal($('share-path-label').textContent,'Branch 1');
-await $('share-story-copy').click();assert.deepEqual(delivered.at(-1),['copy',storyShareText(longer2,model)]);assert.equal(toasts.at(-1),'Story text copied');
-context.openStoryMenu(longer2,trigger);context.state.storyMenu.popover.children[1].click();
-await $('share-download').click();assert.deepEqual(delivered.at(-1),['download','日本の話.lingomage.json',false]);assert.equal(toasts.at(-1),'Story file downloaded');
-// Reader share in App² with Save as and AppShare: every action visible; chapter row names the chapter.
+assert.ok($('share-download').classList.contains('primary-btn'),'without sharing, Download backup is the primary action');
+assert.equal($('share-download').focused,true,'focus starts on the primary file action');
+assert.equal($('share-story-sub').textContent,'All chapters · Branch 1');
+assert.equal($('share-notes').checked,false,'notes start off without a saved preference');
+$('share-notes').checked=true;$('share-notes').change();assert.equal($('share-story-sub').textContent,'All chapters · Branch 1','summaries do not repeat the notes switch');
+assert.equal(context.state.shareVocabularyNotes,true);assert.equal(context.saves,1,'the notes choice is saved to settings');
+await $('share-story-copy').click();assert.deepEqual(delivered.at(-1),['copy',storyShareText(longer2,model,{notes:true})]);
+assert.equal($('share-story-copy').label.textContent,'Copied');assert.equal($('share-live').textContent,'Story text copied');
+assert.equal(context.state.shareDialog.id,'S','Copy keeps the sheet open');assert.equal(toasts.length,0,'Copy confirms in place, not with a toast');
+context.pendingReset();assert.equal($('share-story-copy').label.textContent,'Copy');
+await $('share-download').click();assert.deepEqual(delivered.at(-1),['download','日本の話.lingomage.json',false]);assert.equal(toasts.at(-1),'Story file downloaded');assert.equal(context.state.shareDialog,null,'a finished download closes the sheet');
+// Reader share in App² with Save as and AppShare: Share story file is primary; the chapter row names the chapter.
 context.save={available:true};context.share={available:true};context.isNative=true;context.state.readerChapter=0;
 context.openShareDialog(longer2,{chapterIndex:1,trigger});
-assert.equal($('share-chapter-row').hidden,false);assert.equal($('share-chapter-label').textContent,'Chapter 2');assert.equal($('share-chapter-title').textContent,'Next');
+assert.ok($('share-send-file').classList.contains('primary-btn'));assert.ok($('share-download').classList.contains('secondary-btn'));assert.equal($('share-send-file').focused,true);
+assert.equal($('share-notes').checked,true,'the saved notes choice is restored on open');
+assert.equal($('share-chapter-row').hidden,false);assert.equal($('share-chapter-name').textContent,'Chapter 2 · Next');assert.equal($('share-chapter-sub').textContent,'This chapter');
 assert.equal($('share-send-file').hidden,false);assert.equal($('share-chapter-send').hidden,false);assert.equal($('share-chapter-copy').attributes['aria-label'],'Copy Chapter 2 text');
 $('share-notes').checked=true;const before2=toasts.length;await $('share-chapter-send').click();
 assert.deepEqual(delivered.at(-1),['shareText',chapterShareText(longer2,longer2.chapters[1],longer2.chapters[1].versions[0],{notes:true})]);assert.equal(toasts.length,before2,'cancel is silent');
-await $('share-send-file').click();assert.deepEqual(delivered.at(-1),['shareFile','日本の話.lingomage.json']);
+await $('share-send-file').click();assert.deepEqual(delivered.at(-1),['shareFile','日本の話.lingomage.json']);assert.equal(context.state.shareDialog,null,'a launched share sheet closes it');
 context.copyText=async()=>{throw Error('denied');};context.openShareDialog(longer2,{chapterIndex:1,trigger});await $('share-chapter-copy').click();
-assert.equal(toasts.at(-1),'Could not copy the text.');assert.equal(context.state.shareDialog.id,'S','failure keeps the dialog open');assert.equal($('share-chapter-copy').disabled,false);
+assert.equal(toasts.at(-1),'Could not copy the text.');assert.equal(context.state.shareDialog.id,'S','failure keeps the sheet open');assert.equal($('share-chapter-copy').disabled,false);
+const sheet=$('share-dialog');let closed=0;const realClose=sheet.close;sheet.close=()=>{closed++;};sheet.click({target:sheet});assert.equal(closed,1,'tapping the backdrop closes');sheet.click({target:$('share-title')});assert.equal(closed,1);sheet.close=realClose;
 context.state.libraryStale=true;trigger.isConnected=false;rendered=0;$('share-cancel').click();assert.equal(context.state.shareDialog,null);assert.equal(rendered,1);assert.equal(rebuilt.focused,true);
 console.log('PASS story sharing canonical text, path selection, notes, complete saved export, delivery and Library focus');
 // Bridge channel: correlation, host errors, malformed replies and timeout cleanup.

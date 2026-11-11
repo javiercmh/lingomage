@@ -7,7 +7,7 @@ Every JSON file the app reads or writes, what it holds, and how unreadable or fa
 | File | Owner | Contents |
 | --- | --- | --- |
 | `data/stories.json` | user, required | Stories, ordered chapters, immutable alternate versions and paths, rolling memory (`memories`: summary records with `updateReport`, condensed records with `compactedFrom`, `condensedEvents` (event ids), `excerpts`, `sizeBefore`, `sizeAfter`; a memory record's `promptVersion` is its memory prompt's version; memory format in PED-003), version-scoped explanations and examples, reading positions, `lastActivityAt`; optional `memoryRebuild` captures `{pathId, pathName, entries}` for explicit summary repair and reload recovery |
-| `data/settings.json` | user, required | Model and reasoning, language enablement and order, standardized reading targets, legacy self-assessments, regional preferences, `backgroundStoryContext` (boolean, absent means on), `readingPreferences` |
+| `data/settings.json` | user, required | Model and reasoning, language enablement and order, standardized reading targets, legacy self-assessments, regional preferences, `backgroundStoryContext` (boolean, absent means on), `shareVocabularyNotes` (boolean, absent means off: the Share sheet’s Include vocabulary notes switch), `readingPreferences` |
 | `data/generation-checkpoints.json` | user, required, seeded empty | At most one unfinished operation: ID, kind, destination and path lineage, learner input, prompt and safeguard versions, AI configuration, scope, stage, validated plan and content, outstanding request ID. Optional `discardRequested: true` records an explicit in-app cancellation or Discard; it permits cleanup only, including after reload. Absent means ordinary recovery. Contains learner text; never packaged |
 | `data/usage.json` | user, optional | Time-tracking aggregates, seed `{"version":1,"days":{}}` |
 | `data/learning-signals.json` | user, optional | Lookup history and probable reading, seed `{"version":1,"languages":{}}` |
@@ -30,7 +30,7 @@ User files are seeded only when absent, preserved by updates and never packaged 
 
 ## Story export
 
-A `.lingomage.json` file contains `{format:"lingomage-story", formatVersion:1, appVersion, exportedAt, story}`. The story is a deep clone of the saved record, including unknown fields, all paths and versions, explanations, memories and memory rebuild state. No settings, checkpoints, usage or learning signals are exported. Share → Download story file saves it (App² Save as, or a browser download) and Share story file sends it through the share sheet; it is never copied. Sharing never writes a store.
+A `.lingomage.json` file contains `{format:"lingomage-story", formatVersion:1, appVersion, exportedAt, story}`. The story is a deep clone of the saved record, including unknown fields, all paths and versions, explanations, memories and memory rebuild state. No settings, checkpoints, usage or learning signals are exported. Share → Download backup saves it (App² Save as, or a browser download) and Share story file sends it through the share sheet; it is never copied. Sharing never writes a store.
 
 ## Story import
 
