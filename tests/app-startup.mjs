@@ -91,18 +91,21 @@ assert.ok(findAll(app.el('target-language-add'), node => node.className === 'lan
 assert.equal(app.el('settings-write-error').hidden, false);
 app.failWrites('data/settings.json', false); app.click(app.buttonWithText(app.el('settings-write-error'), 'Retry save'));
 assert.equal(settingsFile(app).targetLanguages.ru, 'enabled', 'Retry repeats the Add'); assert.equal(settingsFile(app).targetLanguages.fr, 'enabled');
-// Background-work failures render through the real app: accurate wording, the code in Technical details, and an explicit Retry (nothing resumes by itself).
+// Host failures render through the real app: accurate wording, the code in Technical details, and an explicit Retry (nothing resumes by itself).
 {
   const {failureInfo} = await import('../js/generation-errors.js'), {SAFEGUARD_VERSION} = await import('../js/learning-validation.js');
   const {readFileSync} = await import('node:fs');
   const promptVersion = /const PROMPT_VERSION = '([^']+)'/.exec(readFileSync('js/app.js', 'utf8'))[1];
   const cases = {
     background_service: ['Android could not start background work (ForegroundServiceStartNotAllowedException).', /Android could not keep background work running\. Steps that finished earlier are saved\./],
-    session_idle: ['The background session was released after a period without a running request.', /about 90 seconds without a running step/],
+    session_idle: ['The background session was released after a period without a running request.', /after a pause without a running step/],
     session_timeout: ['Background work stopped at a time limit.', /stopped at a time limit\. A step in progress was stopped\./],
     session_cancelled: ['Background work was cancelled.', /The request was cancelled\./],
     not_found: ['Request not found.', /no longer available\. Earlier steps remain saved; Retry runs the unfinished step again\./],
     background_paused: ['This step did not start because LingoMage was in the background.', /LingoMage was in the background when the next step was due, so it did not start\./],
+    response_too_large: ['The answer text exceeds the device limit.', /The answer text exceeds the device limit\./],
+    incomplete: ['The model ended early: max_output_tokens.', /The model ended early: max_output_tokens\./],
+    timeout: ['No streamed data arrived for 45 seconds.', /No streamed data arrived for 45 seconds\./],
   };
   for (const [code, [message, wording]] of Object.entries(cases)) {
     const failure = failureInfo(Object.assign(new Error(message), {code}), 'plan', 'wait');

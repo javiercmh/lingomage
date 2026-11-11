@@ -162,15 +162,32 @@ export const ai = {
     return cached || { id, done: value !== null, value };
   },
   // -> completed text, including persisted request IDs after page recreation.
+  // Host completion messages run even when Android freezes background page timers, so the
+  // next stage can start. Polling is the fallback and the only path for earlier-page IDs.
   wait: (id) => new Promise((resolve, reject) => {
     const request = aiResults.get(id);
-    if (request?.done) { request.error ? reject(Object.assign(new Error(request.error.message), { code: request.error.code })) : resolve(request.value); return; }
+    let settled = false;
+    const finish = (error, value) => {
+      if (settled) return;
+      settled = true;
+      request?.listeners.delete(onDone);
+      error ? reject(error) : resolve(value);
+    };
+    const onDone = (result) => {
+      if (!result?.done) return;
+      if (result.error) finish(Object.assign(new Error(result.error.message), { code: result.error.code }));
+      else finish(null, result.value);
+    };
+    if (request?.done) { onDone(request); return; }
+    request?.listeners.add(onDone);
     const poll = async () => {
+      if (settled) return;
       try {
         const result = await ai.result(id);
-        if (result?.done) return result.error ? reject(Object.assign(new Error(result.error.message), { code: result.error.code })) : resolve(result.value);
-        setTimeout(poll, 400);
-      } catch (error) { reject(error); }
+        if (settled) return;
+        if (result?.done) onDone(result);
+        else setTimeout(poll, 400);
+      } catch (error) { finish(error); }
     };
     poll();
   }),

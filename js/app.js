@@ -196,7 +196,7 @@ function maybeStartBackgroundContext() {
     try { await prepareStoryMemory(story, entries, loading, { providerId: state.providerId, model: state.model, reasoning: state.reasoning, signal: run }, run.host); }
     catch (error) {
       // Stopping, cancelling or a hidden page is not a failure; Continue prepares whatever is missing.
-      if (!run.stopped && !run.cancelledByUser && error.message !== 'Request cancelled.' && error.code !== 'background_paused') toast(`Story context was not prepared in the background: ${error.message} Continue will prepare it.`);
+      if (!run.stopped && !run.cancelledByUser && error.message !== 'Request cancelled.' && error.code !== 'background_paused') toast(`Story context was not prepared in the background: ${failureInfo(error, 'context', 'request').message} Continue will prepare it.`);
     } finally {
       run.host.remove(); backgroundRun = null;
       // An unsaved summary keeps the status, which then offers Save response.
@@ -2860,13 +2860,15 @@ async function runMemoryRebuild(story) {
     setReaderGeneration(null); toast('Story memory rebuilt');
   } catch (error) {
     try { await releaseInvalidReaderResponse(); } catch {}
-    state.memoryRebuildFailure = { storyId: story.id, failure: failureInfo(error, 'context', 'request') };
-    if ($('memory-rebuild-dialog').open) $('memory-rebuild-error').textContent = error.message;
+    // Host text is shown only in its bounded, redacted form.
+    const failure = failureInfo(error, 'context', 'request');
+    state.memoryRebuildFailure = { storyId: story.id, failure };
+    if ($('memory-rebuild-dialog').open) $('memory-rebuild-error').textContent = failure.message;
     else {
       setReaderGeneration(state.pendingReaderResult || state.pendingReaderRequestId
-        ? { storyId: story.id, phase: 'cleanup', message: error.message }
+        ? { storyId: story.id, phase: 'cleanup', message: failure.message }
         : request.cancelledByUser ? null : { storyId: story.id, phase: 'error', message: 'Story memory rebuild stopped.' });
-      if (!request.cancelledByUser) toast(`${error.message} Resume memory rebuild to retry.`);
+      if (!request.cancelledByUser) toast(`${failure.message} Resume memory rebuild to retry.`);
     }
   } finally {
     state.readerEditBusy = false; state.activeChapterRequest = null; loading.remove(); $('memory-rebuild-submit').disabled = false;
@@ -2966,7 +2968,7 @@ $('reader-edit-submit').addEventListener('click', async () => {
     // A deliberate cancel clears the status instead of reporting a failure.
     if (readerGeneration?.storyId === story.id) setReaderGeneration(error.code === 'generation_cancelled' || request.cancelledByUser ? null : { ...readerGeneration, phase: 'error', message: pipeline?.records[0]?.discardRequested ? discardFailureMessage(pipeline.records[0]) : 'Generation stopped.' });
     if ((error.code === 'generation_cancelled' || request.cancelledByUser) && !pipeline?.records.length) toast('Generation cancelled');
-    const message = error.code === 'generation_cancelled' || request.cancelledByUser ? '' : pipeline?.records.length ? '' : `${error.message} Submit again to retry.`;
+    const message = error.code === 'generation_cancelled' || request.cancelledByUser ? '' : pipeline?.records.length ? '' : `${failureInfo(error, 'context').message} Submit again to retry.`;
     state.readerEditDraft = { storyId: story.id, pathId: path.id, chapterId: chapter.id, mode, prompt, difficulty, scope, error: message };
     if (state.readerId === story.id) {
       state.readerChapter = chapters.indexOf(chapter); updateReader();

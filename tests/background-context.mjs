@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { createStoryMemory } from '../js/story-memory.js';
+import { failureInfo } from '../js/generation-errors.js';
 
 const source = fs.readFileSync('js/app.js', 'utf8');
 const code = source.slice(source.indexOf('let backgroundTarget = null'), source.indexOf("for (const id of ['reader-generation-dismiss'"));
@@ -13,7 +14,7 @@ function harness({ ready = false, enabled = true } = {}) {
   const story = { id: 'story', paths: [{ id: 'main', entries: [{ chapterId: 'c1', versionId: 'v1' }] }, { id: 'alt', entries: [{ chapterId: 'c1', versionId: 'v2' }] }] };
   const calls = [], toasts = [];
   const ctx = { state: { backgroundStoryContext: enabled, stories: [story], model: 'mock', providerId: 'p', reasoning: '' }, ai: { available: true }, pipeline: { records: [] },
-    readerGeneration: null, calls, toasts, story, console,
+    readerGeneration: null, calls, toasts, story, console, failureInfo,
     document: { createElement: element, body: element() },
     generationLive: () => false, selectedPath: s => s.paths[0], storyContextReady: () => ready, toast: message => toasts.push(message),
     renderReaderGeneration() {},
@@ -77,6 +78,17 @@ function harness({ ready = false, enabled = true } = {}) {
   hidden.pending.reject(Object.assign(new Error('background'), { code: 'background_paused' })); await hidden.run().promise;
   assert.deepEqual(hidden.toasts, []);
 }
+{ // A host reason is shown bounded and redacted, keeping the reason and the explicit retry.
+  const h = harness(); h.queueBackgroundContext('story');
+  h.pending.reject(Object.assign(new Error(`The model ended early: max_output_tokens. sessionId=secret-session https://private.invalid/x Bearer secret-token ${'x'.repeat(3000)}`), { code: 'incomplete' }));
+  await h.run().promise;
+  const [text] = h.toasts, frame = 'Story context was not prepared in the background:  Continue will prepare it.';
+  assert.match(text, /^Story context was not prepared in the background: The model ended early: max_output_tokens\./);
+  assert.match(text, / Continue will prepare it\.$/);
+  assert.doesNotMatch(text, /secret-session|private\.invalid|secret-token|\[redacted\]/);
+  assert.ok(text.length <= frame.length + 1500, 'displayed host text is bounded');
+  assert.equal(h.calls.length, 1, 'no automatic retry');
+}
 { // storyContextReady: false before the newest chapter is summarized, true once its record is saved.
   const state = {};
   const story = { id: 's', chapters: [{ id: 'c1', versions: [{ id: 'v1', story: 'Mia kauft Brot.' }] }], memories: [] };
@@ -94,4 +106,4 @@ function harness({ ready = false, enabled = true } = {}) {
   assert.match(html, /<input id="background-context" type="checkbox" checked aria-describedby="background-context-hint">/);
   assert.match(source, /if \(!state\.backgroundStoryContext\) stopBackgroundContext\(\)/, 'turning it off stops a running summary');
 }
-console.log('PASS background story context: waits for status, setting and saved context, stops for other AI work, Continue reuses it, quiet cancels, one reported failure');
+console.log('PASS background story context: waits for status, setting and saved context, stops for other AI work, Continue reuses it, quiet cancels, one reported failure with bounded redacted host text');

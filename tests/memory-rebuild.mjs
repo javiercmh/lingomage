@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { beginMemoryRebuild, finishMemoryRebuild, createStoryMemory } from '../js/story-memory.js';
+import { failureInfo } from '../js/generation-errors.js';
 
 const fixture = () => ({ id: 's', title: 'Saved story', language: 'de', promptVersion: 'original', activePathId: 'main',
   chapters: [{ id: 'c1', help: [{ text: 'Kept explanation' }], versions: [{ id: 'v1', title: 'First', story: 'Mia waits.', glossary: [{ word: 'waits' }] }] },
@@ -41,14 +42,14 @@ function harness(story = fixture()) {
     closeReaderActions() {}, renderChapterRequest() {}, renderReaderActions() {}, renderReaderGeneration() {},
     createHelpLoading: node, toast: message => calls.push(message), ai: { available: true },
     aiSession: { async run(fn) { calls.push('session'); return fn(); } }, workspaceStorage: { assertWritable() {} },
-    async stopBackgroundContext() { calls.push('stop-background'); }, async releaseSavedInference() {}, async releaseInvalidReaderResponse() {},
+    async stopBackgroundContext() { calls.push('stop-background'); }, async releaseSavedInference() { if (ctx.releaseError) throw ctx.releaseError; }, async releaseInvalidReaderResponse() {},
     persistReaderStory(s) { if (ctx.failSave) throw Error('disk'); disk = json(s); calls.push('save'); },
-    setReaderGeneration(status) { ctx.status = status; }, failureInfo: error => ({ message: error.message }), appendFailureDetails() {} };
+    setReaderGeneration(status) { ctx.status = status; }, failureInfo, appendFailureDetails() {} };
   const memory = createStoryMemory({ state, promptVersion: 'test', normalizeChapters: s => s.chapters,
     async readerAi(kind, input, instructions, panel, config) {
       assert.equal(kind, 'summary'); assert.ok(config.signal); summaries++;
       if (ctx.cancel) { config.signal.cancelledByUser = true; throw Error('cancelled'); }
-      if (ctx.failAt === summaries) throw Error('invalid response');
+      if (ctx.failAt === summaries) throw ctx.failWith || Error('invalid response');
       return JSON.stringify({ newEvents: [{ event: input.chapterChunk }] });
     }, async savePendingReaderResult() {
       const pending = state.pendingReaderResult, undo = pending.apply();
@@ -93,7 +94,39 @@ function harness(story = fixture()) {
   h.state.pendingReaderResult = null; h.ctx.failSave = true;
   await h.ctx.runMemoryRebuild(h.story); assert.equal(h.summaries(), 0); assert.deepEqual(h.story, before);
 }
-console.log('PASS explicit memory rebuild: invalidation rollback, preserved chapters/paths/help/provenance, captured lineage, sessions, cancellation, save blocking and reload/resume without repeating summaries');
+// Host reasons in the dialog, toast and Technical details are bounded and redacted, keep the actual reason
+// and the explicit Resume, and leave the summary saved before the failure in place.
+const hostError = code => Object.assign(Error(`The model ended early: max_output_tokens. sessionId=secret-session https://private.invalid/x Bearer secret-token ${'x'.repeat(3000)}`), { code });
+const assertHostText = (text, suffix = '') => {
+  assert.ok(text.startsWith('The model ended early: max_output_tokens.'), 'the actual host reason stays visible');
+  assert.ok(text.endsWith(suffix));
+  assert.doesNotMatch(text, /secret-session|private\.invalid|secret-token|\[redacted\]/);
+  assert.ok(text.length <= 1500 + suffix.length, 'displayed host text is bounded');
+};
+{
+  const h = harness(); h.ctx.failAt = 2; h.ctx.failWith = hostError('incomplete');
+  await h.ctx.runMemoryRebuild(h.story);
+  const toast = h.calls.find(item => typeof item === 'string' && item.includes('Resume memory rebuild'));
+  assertHostText(toast, ' Resume memory rebuild to retry.');
+  assert.equal(h.ctx.status.phase, 'error'); assert.equal(h.ctx.status.message, 'Story memory rebuild stopped.');
+  assert.equal(h.state.memoryRebuildFailure.failure.code, 'incomplete'); assert.equal(h.state.memoryRebuildFailure.failure.category, 'service');
+  assertHostText(h.state.memoryRebuildFailure.failure.message);
+  assert.equal(h.disk().memories.length, 1, 'the first saved summary stays'); assert.ok(h.disk().memoryRebuild, 'Resume stays available');
+  assert.equal(h.summaries(), 2, 'no automatic retry');
+}
+{
+  const h = harness(); h.ctx.$('memory-rebuild-dialog').open = true; h.ctx.releaseError = hostError('timeout');
+  await h.ctx.runMemoryRebuild(h.story);
+  assertHostText(h.ctx.$('memory-rebuild-error').textContent);
+  assert.equal(h.summaries(), 0); assert.equal(h.disk().memoryRebuild, undefined, 'nothing was invalidated');
+}
+{ // A request whose release failed keeps its cleanup status, now with the bounded, redacted reason.
+  const h = harness(); h.ctx.failAt = 1; h.ctx.failWith = hostError('response_too_large');
+  h.ctx.releaseInvalidReaderResponse = async () => { h.state.pendingReaderRequestId = 'held'; throw Error('Cannot release'); };
+  await h.ctx.runMemoryRebuild(h.story);
+  assert.equal(h.ctx.status.phase, 'cleanup'); assertHostText(h.ctx.status.message);
+}
+console.log('PASS explicit memory rebuild: invalidation rollback, preserved chapters/paths/help/provenance, captured lineage, sessions, cancellation, save blocking, reload/resume without repeating summaries, and bounded redacted host reasons');
 
 // A memory whose only eligible event is tiny (the rest are the four newest) makes no compaction request,
 // and preparation succeeds. A memory with enough eligible events condenses them in one request

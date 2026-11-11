@@ -274,8 +274,11 @@ for (const [kind, language, stages] of [
 for (const text of ['session_id=abc123', 'sessionId: abc123', 'Session ID = abc123', 'request id: abc123 sessionId=abc123 account_id=abc123']) {
   const failure = failureInfo(new Error(`Failed. ${text} end`), 'prose');
   assert.ok(!failure.message.includes('abc123'), `${text}: identifiers are redacted from stored diagnostics`);
-  assert.match(failure.message, /\[redacted\]/);
+  assert.equal(failure.message, 'Failed. end');
 }
+assert.equal(failureInfo(new Error('Bearer secret'), 'prose').message, 'The request could not complete.');
+assert.equal(failureInfo(new Error('Ended early. [redacted] [redacted]'), 'prose').message, 'Ended early.');
+assert.equal(recoverySummary({kind:'continue', stage:'prose', error:'old', failure:{category:'service',code:'incomplete',message:'Ended early. [redacted]'}}), 'Story continuation stopped during writing. Ended early.');
 
 // ---------- Failure wording ----------
 const info = (code, message = 'x', stage = 'prose', phase = 'wait') => failureInfo(coded(message, code), stage, phase);
@@ -295,10 +298,47 @@ for (const [code, text] of Object.entries(wording)) assert.match(text, /Story co
 assert.match(wording.background_service, /Android could not keep background work running/);
 assert.doesNotMatch(wording.background_service, /never ran|did not run|not start/i, 'A denial after inference started is not described as the step never running');
 assert.match(wording.session_timeout, /time limit/); assert.doesNotMatch(wording.session_timeout, /30|minutes/, 'The limit may be Android\'s earlier one');
-assert.match(wording.session_idle, /about 90 seconds/); assert.doesNotMatch(wording.session_idle, /Android could not/);
+assert.match(wording.session_idle, /after a pause without a running step/); assert.doesNotMatch(wording.session_idle, /90|Android could not/);
 assert.match(wording.not_found, /no longer available/); assert.match(wording.not_found, /Earlier steps remain saved/); assert.match(wording.not_found, /Retry/);
 assert.doesNotMatch(wording.not_found, /crash|stopped LingoMage|Android stopped|restart/i, 'not_found is not diagnosed as a process death');
 for (const text of Object.values(wording)) assert.doesNotMatch(text, /nothing was lost/i);
+
+for (const [code, message] of [
+  ['response_too_large', 'The AI response text exceeds the device limit of 4194304 UTF-16 units.'],
+  ['incomplete', 'The model ended early: max_output_tokens.'],
+  ['timeout', 'The streamed response received no data for 45 seconds.'],
+  ['timeout', 'The request exceeded 30 minutes.'],
+  ['timeout', 'Connection timed out.'],
+  ...['response_too_large', 'incomplete', 'timeout'].map(code => [code, 'The provider model could not write the AI response; cancel or retry.']),
+]) {
+  assert.equal(info(code, message).category, 'service', `${code}: host codes take precedence over message heuristics`);
+  assert.ok(summaryFor(code, message).includes(message), `${code}: the actual host reason is visible`);
+  assert.equal(info(code, message, 'ready', 'release').category, 'release', 'Cleanup keeps its own category');
+  assert.equal(info(code, message, 'ready', 'checkpoint').category, 'storage');
+}
+assert.match(summaryFor('invalid_response', 'Malformed answer.'), /The AI service could not complete the request\./);
+assert.doesNotMatch(summaryFor('incomplete', 'Ended early. sessionId=private-id https://private.invalid/x'), /private-id|private\.invalid/);
+for (const code of ['response_too_large', 'incomplete', 'timeout']) {
+  const h = host();
+  // Finish prose, then fail notes: completed content is preserved and inference is not retried.
+  const ai = {
+    start: a => h.session.start(a),
+    wait: async id => {
+      if (id === 'notes') throw coded(`Host reason for ${code}.`, code);
+      return JSON.stringify(id === 'language-plan' ? plan : deProse);
+    },
+    acknowledge: async () => {},
+  };
+  const p = createPipeline({ records: [], persist() {}, ai, apply() { assert.fail('Failed notes cannot publish a chapter'); } });
+  const pending = p.create({ kind: 'create', language: 'de', planned: true, input: {}, config: { providerId: 'p', model: 'm' }, instructions: 'i' });
+  await assert.rejects(h.session.run(() => p.run(pending)), { code });
+  assert.equal(pending.failure.category, 'service');
+  assert.equal(pending.stage, 'notes');
+  assert.deepEqual(pending.prose, deProse);
+  assert.equal(h.events.filter(e => e.startsWith('start notes')).length, 1);
+  assert.ok(recoverySummary(pending).includes(`Host reason for ${code}.`));
+  assert.equal(p.busy, false);
+}
 
 // ---------- Capability probe in the real bridge.js ----------
 function bridge(handler) {

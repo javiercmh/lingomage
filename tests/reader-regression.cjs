@@ -602,6 +602,14 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.equal(gen.state.readerEditDraft.chapterId,story3.chapters[0].id);
   assert.ok(gen.$('reader-edit-error').textContent.includes('Submit again to retry'));
   console.log('PASS failed chapter request clears loading and retains an anchored prompt for explicit retry');
+  gen.readerAi=async()=>{throw Object.assign(Error(`The model ended early: max_output_tokens. sessionId=secret-session https://private.invalid/x Bearer secret-token ${'x'.repeat(3000)}`),{code:'incomplete'});};
+  await submit();
+  const contextError=gen.$('reader-edit-error').textContent;
+  assert.ok(contextError.startsWith('The model ended early: max_output_tokens.'),'the actual host reason stays visible');
+  assert.ok(contextError.endsWith(' Submit again to retry.'));assert.doesNotMatch(contextError,/secret-session|private\.invalid|secret-token|\[redacted\]/);
+  assert.ok(contextError.length<=1500+' Submit again to retry.'.length,'displayed host text is bounded');
+  assert.equal(gen.state.readerEditDraft.error,contextError);assert.equal(gen.$('reader-prompt').value,'Next');
+  console.log('PASS story-context failures before a checkpoint show bounded, redacted host reasons with explicit retry');
 
   let cancelAction, rejectWait, cancelCalls=0;
   const cancelContext=sandbox({state:{models:[{id:'mock'}],model:'mock'},ai:{available:true,providers:async()=>({providers:[{id:'openrouter',connected:true}]}),start:async args=>{assert.equal(args.providerId,'openrouter');assert.deepEqual({title:args.title,body:args.body},{title:'Explaining your selection',body:'Working now. Reopen LingoMage if it pauses between steps.'});return 'cancel-id';},wait:()=>new Promise((_,reject)=>rejectWait=reject),cancel:async()=>{cancelCalls++;rejectWait(Error('cancelled'));},acknowledge:async()=>{}},document:{createElement:()=>({addEventListener:(_,fn)=>cancelAction=fn,remove(){}})}});

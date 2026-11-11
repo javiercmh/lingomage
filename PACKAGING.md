@@ -25,6 +25,8 @@ Package with App²'s `scripts/package_subapp.py`. It writes empty declared seed 
 
 All host calls go through `js/bridge.js`.
 
+AI completion uses pushed host messages with polling fallback, including polling persisted IDs after page recreation. Background operation sessions, host-version differences and AI error meanings are described in the [generation pipeline](docs/architecture/generation-pipeline.md#background-operation-sessions).
+
 - **AI:** connect providers only in App² Settings → AI (ChatGPT, OpenRouter, or one Combined provider). LingoMage discovers the connected provider and its models at runtime; Combined model IDs are opaque and names include their source. A provider change clears unavailable model and reasoning choices; pending checkpoints keep their original configuration. Any provider's output must pass LingoMage validation; nothing retries automatically. Save completed content before acknowledging a request.
 - **Device translation:** `translation.availability()` → `{available: boolean}`; `translation.open({text})` → `{opened: true}`. App² forwards text to the configured Android ACTION_TRANSLATE handler; it returns no translation and takes no language settings. Call only after a user action, with canonical text without readings. Browsers and older hosts report unavailable. Blank text or more than 100000 UTF-16 units is rejected. Errors (`invalid_request`, `unavailable`, `timeout`) are shown without retry. The external tool may process text online.
 - **Speech, selection menu, files:** see `js/bridge.js` and [`docs/architecture/overview.md`](docs/architecture/overview.md).
