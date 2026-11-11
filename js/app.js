@@ -9,6 +9,7 @@ import { speakSelection, prepareSpeechOptions, speakChapter, chapterSpeechText }
 import { createSelectionMenuRouter } from './selection-menu.js';
 import { createReaderActivation, glossaryForTrigger, indexGlossaryTriggers, normalizeReaderControls } from './reader-activation.js';
 import { annotatedText, applyExplainedMarks, findGlossaryMatches, getCanonicalSelection, japaneseSegments } from './reader-text.js';
+import { markParagraphGaps } from './paragraph-gaps.js';
 import { SPEECH_RATES, canonicalRange, createReaderPlayer, speechUnits } from './reader-player.js';
 import { createPipeline, pendingRequests } from './generation-pipeline.js';
 import { hasStoryContext, progressSummary } from './generation-progress.js';
@@ -1653,6 +1654,7 @@ function updateReader(keepNavigation = false) {
     glossary: version.glossary || [],
     onNote: event => activateStoryText(event)
   });
+  markParagraphGaps($('reader-story'));
   indexGlossaryTriggers($('reader-story'), version.story, version.glossary || []);
   setReaderTextSize(state.readerFontSize);
   $('reader-story').classList.toggle('hide-furigana', story.language === 'ja' && !state.furigana);

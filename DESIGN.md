@@ -53,6 +53,7 @@ Bottom tab bar: Create, Library, Profile, icons above labels (starter style). Se
 
 ### Story text and vocabulary notes
 
+- **Paragraphs:** line breaks are kept as written. Models separate paragraphs with one line break or with blank lines; any run of blank lines shows as one half-line gap, so every story has the same paragraph spacing. Display only: saved text, offsets, copy and speech keep the original characters.
 - Canonical story text has comfortable line spacing; Japanese readings are separate ruby annotations above contiguous kanji runs (compounds together; kana, okurigana and punctuation plain). Legacy mixed annotations are normalized for display only when they align uniquely; never guess.
 - `spellcheck="false"` only on the story body and title, never on fields or containers.
 - **Glossary links:** subtle dotted underline at the first eligible occurrence of each normalized headword/meaning pair in the displayed chapter version; later occurrences stay selectable. Alternate forms share a note; different meanings stay separate. Recomputed on reopen and chapter or version change. A Japanese match across ruby and plain segments keeps full readings, shares one popup and exposes only the first fragment as a keyboard button; all fragments activate it (PED-002).

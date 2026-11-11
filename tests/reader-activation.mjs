@@ -8,6 +8,7 @@ const { document, window, dispatch } = dom;
 const { annotatedText, applyExplainedMarks } = await import('../js/reader-text.js');
 const { createReaderActivation, glossaryForTrigger, indexGlossaryTriggers, normalizeReaderControls } = await import('../js/reader-activation.js');
 const { createSelectionMenuRouter } = await import('../js/selection-menu.js');
+const { markParagraphGaps } = await import('../js/paragraph-gaps.js');
 
 const make = (tag, attrs = {}, parent = document.body) => {
   const element = document.createElement(tag);
@@ -222,4 +223,16 @@ const BREAD = [{ word: 'Brot', meaning: 'bread', forms: ['Brot'] }];
   assert.match(app, /onNote: event => activateStoryText\(event\)/, 'trigger controls share the single dispatcher');
   assert.match(app, /\$\('reader-story'\)\.addEventListener\('click', activateStoryText\)/, 'story taps go through the same note-dismissal gate');
   console.log('PASS chooser removed; note action is 44px, divided, focus-visible; Back dismisses the note first');
+}
+
+// --- Paragraph gaps --------------------------------------------------------------------------------
+{
+  const root = make('div');
+  const text = '学校から帰ると。\n\n「ただいま」\n私は手をのせた。\n \n\n「おかえり」';
+  annotatedText(root, text, null, { language: 'ja' });
+  markParagraphGaps(root);
+  const gaps = [...root.childNodes].filter(node => node.className === 'paragraph-gap');
+  assert.deepEqual(gaps.map(gap => gap.textContent), ['\n\n', '\n \n\n'], 'each run of blank lines becomes one gap; a single line break does not');
+  assert.equal(canonicalOf(root), text, 'gaps keep the canonical characters');
+  console.log('PASS paragraph gaps: blank-line runs shown as one gap, canonical text unchanged');
 }

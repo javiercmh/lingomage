@@ -245,6 +245,8 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 .story-text ruby rt, .reader-title ruby rt { user-select: none; -webkit-user-select: none; }
 /* Hidden readings keep their space so toggling furigana never moves the text. */
 .story-text.hide-furigana ruby rt, .reader-title.hide-furigana ruby rt { visibility: hidden; }
+/* A run of blank lines between paragraphs shows as one short gap (js/paragraph-gaps.js). */
+.paragraph-gap { display: block; height: .5em; overflow: hidden; }
 .reader-panel .reader-title ruby rt { color: #a9c5ff; font: 500 12px sans-serif; }
 .reader-panel .reader-title:has(rt) { line-height: 1.7; }
 .selectable-story { user-select: text; -webkit-user-select: text; cursor: text; }
