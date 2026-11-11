@@ -20,27 +20,35 @@ export function storyExportFile(story, {appVersion, now = new Date()} = {}) {
   return {name: `${slugify(story.title)}.lingomage.json`, mimeType: 'application/json',
     content: JSON.stringify({format:'lingomage-story', formatVersion:1, appVersion, exportedAt:new Date(now).toISOString(), story:JSON.parse(JSON.stringify(story))}, null, 2)};
 }
-// Story files are for re-import, so they are downloaded, never copied: App² Save as first, a browser download in
-// previews, and the Sharesheet only on hosts without Save as.
-export async function deliverStoryFile(payload, {save, share, download, isNative = false}) {
-  try {
-    if (save?.available) {
-      const result = await save.text({name:payload.name, mimeType:payload.mimeType, content:payload.content});
-      return result?.saved ? {method:'saved'} : {cancelled:true};
-    }
-    if (!isNative && download) { await download(payload); return {method:'downloaded'}; }
-    if (share?.available) { await share.file(payload); return {launched:true}; }
-    throw Object.assign(new Error('Downloading story files is unavailable.'), {code:'unavailable'});
-  } catch (error) { if (error.code === 'cancelled') return {cancelled:true}; throw error; }
+// Each Share dialog action does exactly what its label says; nothing falls back to another delivery.
+// Download: App² Save as, or a browser download in previews (App² WebViews do not handle <a download>).
+// Share: the Android Sharesheet (AppShare). Copy: the clipboard.
+export function shareTargets({save, share, isNative = false} = {}) {
+  const canShare = Boolean(share?.available), canDownload = Boolean(save?.available) || !isNative;
+  return {download:canDownload || !canShare, shareFile:canShare, shareText:canShare};
 }
-export function storyFileAction({save, share, isNative = false}) { return save?.available || !isNative || !share?.available ? 'Download' : 'Share'; }
-export async function deliverShare(payload, {share, clipboard, download, isNative = false}) {
-  try {
-    if (share?.available) { await (payload.content !== undefined ? share.file(payload) : share.text(payload)); return {launched:true}; }
-    if (payload.content !== undefined && !isNative && download) { await download(payload); return {method:'downloaded'}; }
-    if (clipboard) { await clipboard.writeText(payload.content ?? payload.text); return {method:'copied'}; }
-    throw Object.assign(new Error('Sharing is unavailable.'), {code:'unavailable'});
-  } catch (error) { if (error.code === 'cancelled') return {cancelled:true}; throw error; }
+const cancelled = error => { if (error?.code === 'cancelled') return {cancelled:true}; throw error; };
+export async function downloadStoryFile(payload, {save, download, isNative = false}) {
+  if (save?.available) {
+    const result = await save.text({name:payload.name, mimeType:payload.mimeType, content:payload.content}).catch(cancelled);
+    return result?.saved ? {done:'saved'} : {cancelled:true};
+  }
+  if (!isNative && download) { await download(payload); return {done:'downloaded'}; }
+  throw Object.assign(new Error('Downloading story files is unavailable.'), {code:'unavailable'});
+}
+export async function shareStoryFile(payload, {share}) {
+  if (!share?.available) throw Object.assign(new Error('Sharing is unavailable.'), {code:'unavailable'});
+  const result = await share.file(payload).catch(cancelled);
+  return result?.cancelled ? result : {launched:true};
+}
+export async function shareText(payload, {share}) {
+  if (!share?.available) throw Object.assign(new Error('Sharing is unavailable.'), {code:'unavailable'});
+  const result = await share.text(payload).catch(cancelled);
+  return result?.cancelled ? result : {launched:true};
+}
+export async function copyText(payload, {clipboard}) {
+  if (!clipboard) throw Object.assign(new Error('Copying is unavailable.'), {code:'unavailable'});
+  await clipboard.writeText(payload.text); return {done:'copied'};
 }
 // Story-file import: the inverse of storyExportFile. Pure; the caller persists the returned copy through the
 // normal stories save and keeps existing data untouched on any thrown error.

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import {chapterShareText, storyShareText, storyExportFile, slugify, deliverShare, deliverStoryFile, storyFileAction} from '../js/story-share.js';
+import {chapterShareText, storyShareText, storyExportFile, slugify, shareTargets, downloadStoryFile, shareStoryFile, shareText, copyText} from '../js/story-share.js';
 import {createStoryModel, pathLabel} from '../js/story-model.js';
 const version = {id:'v',title:'買い物',story:'買います。',storySegments:[{text:'買',reading:'か'},{text:'います。'}],glossary:[{word:'買う',meaning:'buy'}]};
 const alternate = {...version,id:'a',title:'別',story:'帰ります。'};
@@ -22,48 +22,70 @@ assert.equal(file.name,'日本の話.lingomage.json');assert.equal(file.mimeType
 for(const key of ['settings','checkpoints','usage','learningSignals'])assert.equal(exported[key],undefined);
 assert.equal(slugify(' ../ A / B ! '),'a-b');assert.equal(slugify('!!!'),'story');
 const legacy={id:'L',title:'Old',story:'Body'};storyShareText(legacy,model);assert.equal(legacy.paths,undefined,'formatter does not initialize paths on caller');
-const calls=[],clipboard={writeText:async text=>calls.push(['copy',text])},download=async payload=>calls.push(['download',payload]);
-const share={available:true,text:async payload=>calls.push(['text',payload]),file:async payload=>calls.push(['file',payload])};
-assert.deepEqual(await deliverShare({text:'x'},{share,clipboard,download}),{launched:true});assert.equal(calls.at(-1)[0],'text');
-await deliverShare(file,{share,clipboard,download});assert.equal(calls.at(-1)[0],'file');
-assert.deepEqual(await deliverShare({text:'x'},{clipboard,download}),{method:'copied'});
-assert.deepEqual(await deliverShare(file,{clipboard,download}),{method:'downloaded'});
-assert.deepEqual(await deliverShare(file,{clipboard,download,isNative:true}),{method:'copied'});assert.equal(calls.at(-1)[1],file.content);
-assert.deepEqual(await deliverShare({text:'x'},{share:{available:true,text:async()=>{throw Object.assign(Error(),{code:'cancelled'});}},clipboard}),{cancelled:true});
-const count=calls.length;await assert.rejects(deliverShare({text:'x'},{share:{available:true,text:async()=>{throw Error('host failed');}},clipboard}));assert.equal(calls.length,count,'host errors do not silently copy');
-await assert.rejects(deliverShare({text:'x'},{}));
-// Story files download for re-import: Save as, browser download, Sharesheet only without Save as; never the clipboard.
+// Each action does only what its label says; no action falls back to another delivery.
 {
-  const log=[], saveOk={available:true,text:async options=>{log.push(['save',options]);return {saved:true,name:options.name};}};
-  const shareFile={available:true,file:async payload=>log.push(['share',payload])}, dl=async payload=>log.push(['download',payload]);
-  assert.deepEqual(await deliverStoryFile(file,{save:saveOk,share:shareFile,download:dl,isNative:true}),{method:'saved'});
+  const log=[], clipboard={writeText:async text=>log.push(['copy',text])}, dl=async payload=>log.push(['download',payload]);
+  const share={available:true,text:async payload=>log.push(['text',payload]),file:async payload=>log.push(['file',payload])};
+  const saveOk={available:true,text:async options=>{log.push(['save',options]);return {saved:true,name:options.name};}};
+  assert.deepEqual(shareTargets({save:saveOk,share,isNative:true}),{download:true,shareFile:true,shareText:true});
+  assert.deepEqual(shareTargets({save:{available:false},share:{available:false},isNative:false}),{download:true,shareFile:false,shareText:false},'browser: download and copy');
+  assert.deepEqual(shareTargets({save:{available:false},share,isNative:true}),{download:false,shareFile:true,shareText:true},'App² without Save as: no broken Download');
+  assert.deepEqual(shareTargets({save:{available:false},share:{available:false},isNative:true}),{download:true,shareFile:false,shareText:false},'never an empty file group');
+  assert.deepEqual(await downloadStoryFile(file,{save:saveOk,download:dl,isNative:true}),{done:'saved'});
   assert.deepEqual(log.at(-1),['save',{name:file.name,mimeType:'application/json',content:file.content}]);
-  assert.deepEqual(await deliverStoryFile(file,{save:{available:true,text:async()=>({saved:false,cancelled:true})},share:shareFile,download:dl,isNative:true}),{cancelled:true});
-  assert.deepEqual(await deliverStoryFile(file,{save:{available:false},share:shareFile,download:dl,isNative:false}),{method:'downloaded'});
-  assert.deepEqual(await deliverStoryFile(file,{save:{available:false},share:shareFile,download:dl,isNative:true}),{launched:true});assert.equal(log.at(-1)[0],'share','native never uses <a download>');
-  const count=log.length;
-  await assert.rejects(deliverStoryFile(file,{save:{available:true,text:async()=>{throw Object.assign(Error('big'),{code:'too_large'});}},share:shareFile,download:dl,isNative:true}),error=>error.code==='too_large');
-  assert.equal(log.length,count,'a failed save does not fall back');
-  await assert.rejects(deliverStoryFile(file,{save:{available:false},share:{available:false},isNative:true}),error=>error.code==='unavailable');
-  assert.equal(storyFileAction({save:{available:true},share:{available:true},isNative:true}),'Download');
-  assert.equal(storyFileAction({save:{available:false},share:{available:true},isNative:false}),'Download');
-  assert.equal(storyFileAction({save:{available:false},share:{available:true},isNative:true}),'Share');
-  const app=fs.readFileSync('js/app.js','utf8');
-  assert.match(app,/kind === 'file' \? await deliverStoryFile\(payload, \{save, share, download:downloadStoryFile, isNative\}\) : await deliverShare\(payload, \{share, clipboard:navigator\.clipboard, isNative\}\)/,'story files never reach the clipboard path');
-  console.log('PASS story file downloads via Save as or browser download, never copied; cancel silent; host errors kept');
+  assert.deepEqual(await downloadStoryFile(file,{save:{available:true,text:async()=>({saved:false,cancelled:true})},download:dl,isNative:true}),{cancelled:true});
+  assert.deepEqual(await downloadStoryFile(file,{save:{available:false},download:dl,isNative:false}),{done:'downloaded'});
+  let count=log.length;
+  await assert.rejects(downloadStoryFile(file,{save:{available:false},download:dl,isNative:true}),error=>error.code==='unavailable','native never uses <a download>');
+  await assert.rejects(downloadStoryFile(file,{save:{available:true,text:async()=>{throw Object.assign(Error('big'),{code:'too_large'});}},download:dl,isNative:true}),error=>error.code==='too_large');
+  assert.equal(log.length,count,'failed downloads do not fall back');
+  assert.deepEqual(await shareStoryFile(file,{share}),{launched:true});assert.deepEqual(log.at(-1),['file',file]);
+  assert.deepEqual(await shareText({title:'T',text:'x'},{share}),{launched:true});assert.equal(log.at(-1)[0],'text');
+  assert.deepEqual(await shareText({text:'x'},{share:{available:true,text:async()=>{throw Object.assign(Error(),{code:'cancelled'});}}}),{cancelled:true});
+  count=log.length;
+  await assert.rejects(shareText({text:'x'},{share:{available:true,text:async()=>{throw Error('host failed');}}}));
+  await assert.rejects(shareStoryFile(file,{share:{available:false}}),error=>error.code==='unavailable');
+  assert.equal(log.length,count,'host errors do not silently copy');
+  assert.deepEqual(await copyText({text:'body'},{clipboard}),{done:'copied'});assert.deepEqual(log.at(-1),['copy','body']);
+  await assert.rejects(copyText({text:'x'},{}),error=>error.code==='unavailable');
+  console.log('PASS share actions: download via Save as or browser, share file or text, copy text; cancel silent; no fallback');
 }
-// Execute real Library action and dialog close wiring, including rebuilt opener focus.
+// Execute the real Library action, dialog setup, each action button and close wiring, including rebuilt opener focus.
 const app=fs.readFileSync('js/app.js','utf8');
-const elements=new Map(), element=()=>({children:[],style:{},dataset:{},isConnected:true,append(...children){this.children.push(...children);},setAttribute(){},addEventListener(name,fn){this[name]=fn;},getBoundingClientRect(){return {height:144,top:60,bottom:104,right:300};},focus(){this.focused=true;},remove(){},showModal(){this.open=true;}});
+const elements=new Map(), element=()=>({children:[],style:{},dataset:{},attributes:{},isConnected:true,append(...children){this.children.push(...children);},setAttribute(name,value){this.attributes[name]=value;},addEventListener(name,fn){this[name]=fn;},getBoundingClientRect(){return {height:144,top:60,bottom:104,right:300};},focus(){this.focused=true;},remove(){},showModal(){this.open=true;},close(){this.open=false;this.onclose?.();}});
 const $=id=>{if(!elements.has(id))elements.set(id,element());return elements.get(id);};
-const trigger=element(), rebuilt=element();let rendered=0;
+const trigger=element(), rebuilt=element();let rendered=0;const toasts=[], delivered=[];
 $('library-list').querySelectorAll=()=>[{dataset:{storyId:'S'},querySelector:()=>rebuilt}];
-const context={$,state:{},workspaceStorage:{entries:new Map([['data/stories.json',{value:[story]}]])},pathChapters:model.pathChapters,selectedPath:model.selectedPath,pathLabel,share:{available:false},isNative:false,document:{createElement:element,body:element(),querySelector:()=>null},window:{innerHeight:800,innerWidth:375},renderLibrary(){rendered++;},navigator:{},toast(){},beginStorySelection(){},confirmStoryDeletion(){}};
+const longer2=structuredClone(longer);
+const context={$,state:{},workspaceStorage:{entries:new Map([['data/stories.json',{value:[longer2]}]])},pathChapters:model.pathChapters,selectedPath:model.selectedPath,activeVersion:model.activeVersion,pathLabel,
+  chapterShareText,storyShareText,storyExportFile,shareTargets,readJson:()=>({version:'9'}),
+  downloadStoryFile:async(payload,options)=>{delivered.push(['download',payload.name,options.isNative]);return {done:'downloaded'};},shareStoryFile:async payload=>{delivered.push(['shareFile',payload.name]);return {launched:true};},
+  shareText:async payload=>{delivered.push(['shareText',payload.text]);return {cancelled:true};},copyText:async payload=>{delivered.push(['copy',payload.text]);return {done:'copied'};},
+  save:{available:false},share:{available:false},isNative:false,document:{createElement:element,body:element(),querySelector:()=>null},window:{innerHeight:800,innerWidth:375},renderLibrary(){rendered++;},navigator:{clipboard:{}},toast:message=>toasts.push(message),console:{warn(){}},beginStorySelection(){},confirmStoryDeletion(){}};
 vm.createContext(context);
-vm.runInContext(app.slice(app.indexOf('function closeStoryMenu('),app.indexOf('function confirmStoryDeletion('))+app.slice(app.indexOf('function openShareDialog('),app.indexOf("$('reader-share').addEventListener")),context);
-context.openStoryMenu(story,trigger);assert.equal(context.state.storyMenu.popover.children.length,3);
-context.state.storyMenu.popover.children[1].click();assert.equal($('share-dialog').open,true);assert.equal($('share-chapter-row').hidden,true);assert.equal($('share-submit').textContent,'Copy');
-context.state.libraryStale=true;trigger.isConnected=false;$('share-dialog').close();assert.equal(rendered,1);assert.equal(rebuilt.focused,true);
+vm.runInContext(app.slice(app.indexOf('function closeStoryMenu('),app.indexOf('function confirmStoryDeletion('))+app.slice(app.indexOf('function openShareDialog('),app.indexOf('// Library → Import story…')),context);
+const dialog=$('share-dialog');
+context.openStoryMenu(longer2,trigger);assert.equal(context.state.storyMenu.popover.children.length,3);
+context.state.storyMenu.popover.children[1].click();
+assert.equal(dialog.open,true);assert.equal($('share-title').textContent,'Share “日本の話”');
+assert.equal($('share-chapter-row').hidden,true,'Library share has no chapter row');
+assert.equal($('share-download').hidden,false);assert.equal($('share-send-file').hidden,true);assert.equal($('share-story-send').hidden,true,'browser: Copy only');
+assert.equal($('share-download').focused,true,'Download story file is the default action');
+assert.equal($('share-path-label').textContent,'Branch 1');
+await $('share-story-copy').click();assert.deepEqual(delivered.at(-1),['copy',storyShareText(longer2,model)]);assert.equal(toasts.at(-1),'Story text copied');
+context.openStoryMenu(longer2,trigger);context.state.storyMenu.popover.children[1].click();
+await $('share-download').click();assert.deepEqual(delivered.at(-1),['download','日本の話.lingomage.json',false]);assert.equal(toasts.at(-1),'Story file downloaded');
+// Reader share in App² with Save as and AppShare: every action visible; chapter row names the chapter.
+context.save={available:true};context.share={available:true};context.isNative=true;context.state.readerChapter=0;
+context.openShareDialog(longer2,{chapterIndex:1,trigger});
+assert.equal($('share-chapter-row').hidden,false);assert.equal($('share-chapter-label').textContent,'Chapter 2');assert.equal($('share-chapter-title').textContent,'Next');
+assert.equal($('share-send-file').hidden,false);assert.equal($('share-chapter-send').hidden,false);assert.equal($('share-chapter-copy').attributes['aria-label'],'Copy Chapter 2 text');
+$('share-notes').checked=true;const before2=toasts.length;await $('share-chapter-send').click();
+assert.deepEqual(delivered.at(-1),['shareText',chapterShareText(longer2,longer2.chapters[1],longer2.chapters[1].versions[0],{notes:true})]);assert.equal(toasts.length,before2,'cancel is silent');
+await $('share-send-file').click();assert.deepEqual(delivered.at(-1),['shareFile','日本の話.lingomage.json']);
+context.copyText=async()=>{throw Error('denied');};context.openShareDialog(longer2,{chapterIndex:1,trigger});await $('share-chapter-copy').click();
+assert.equal(toasts.at(-1),'Could not copy the text.');assert.equal(context.state.shareDialog.id,'S','failure keeps the dialog open');assert.equal($('share-chapter-copy').disabled,false);
+context.state.libraryStale=true;trigger.isConnected=false;rendered=0;$('share-cancel').click();assert.equal(context.state.shareDialog,null);assert.equal(rendered,1);assert.equal(rebuilt.focused,true);
 console.log('PASS story sharing canonical text, path selection, notes, complete saved export, delivery and Library focus');
 // Bridge channel: correlation, host errors, malformed replies and timeout cleanup.
 const bridge=fs.readFileSync('js/bridge.js','utf8');

@@ -643,8 +643,22 @@ body.has-app-generation-status .toast { bottom: calc(var(--tabbar-h) + 88px + va
 .pending-progress > button { flex-shrink: 0; }
 
 /* Native share controls retain generous label targets at narrow widths. */
-.share-options { border: 0; padding: 0; margin: 16px 0 0; min-width: 0; }
+.share-dialog h2 { overflow-wrap: anywhere; }
+.share-group { margin: 0 0 18px; }
+.share-group-label { margin: 0 0 8px; color: var(--muted); font-size: 12px; font-weight: 680; letter-spacing: .04em; text-transform: uppercase; }
+.share-action { display: flex; width: 100%; min-height: 56px; align-items: center; gap: 12px; margin: 0 0 8px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--tint); color: var(--ink); text-align: left; }
+.share-action svg, .share-chip svg { flex: 0 0 auto; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.share-action b, .share-text-name b { display: block; font-size: 15px; font-weight: 650; }
+.share-action small, .share-text-name small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
+.share-action-primary { border-color: var(--accent-strong); background: rgba(59,130,246,.16); }
+.share-action-primary svg { color: var(--accent); }
+.share-action[hidden], .share-text-row[hidden], .share-chip[hidden] { display: none; }
+.share-group .helper { margin: 0; }
+.share-text-row { display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.share-text-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.share-chip { display: inline-flex; flex: 0 0 auto; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; gap: 6px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--tint); color: var(--ink); font-size: 13px; font-weight: 650; }
+.share-action:focus-visible, .share-chip:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+.share-action:disabled, .share-chip:disabled { opacity: .55; }
 .share-row { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 6px 0; cursor: pointer; }
 .share-row input { flex: 0 0 auto; width: 20px; height: 20px; }
-.share-row small { display: block; }
-.share-row:has(input:disabled) { opacity: .6; }
+.share-close { margin-top: 4px; }

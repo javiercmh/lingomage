@@ -1,4 +1,4 @@
-import { chapterShareText, storyShareText, storyExportFile, deliverShare, deliverStoryFile, storyFileAction, importStoryFile, STORY_IMPORT_MAX_BYTES } from './story-share.js';
+import { chapterShareText, storyShareText, storyExportFile, shareTargets, downloadStoryFile, shareStoryFile, shareText, copyText, importStoryFile, STORY_IMPORT_MAX_BYTES } from './story-share.js';
 import { createStoryModel, pathLabel } from './story-model.js';
 import { markStoryActivity, planLibrary, dateSegments, describeDates } from './library-activity.js';
 import { beginMemoryRebuild, finishMemoryRebuild, createStoryMemory } from './story-memory.js';
@@ -2753,21 +2753,21 @@ function openShareDialog(story, {chapterIndex = null, trigger}) {
   const snapshot = JSON.parse(JSON.stringify(saved));
   const modelStory = JSON.parse(JSON.stringify(snapshot));
   const chapter = chapterIndex === null ? null : pathChapters(modelStory)[chapterIndex];
-  state.shareDialog = {story:snapshot, modelStory, chapter, trigger, id:story.id};
+  state.shareDialog = {story:snapshot, modelStory, chapter, chapterIndex, trigger, id:story.id};
+  const targets = shareTargets({save, share, isNative});
+  $('share-title').textContent = `Share “${snapshot.title || 'Untitled story'}”`;
+  $('share-download').hidden = !targets.download; $('share-send-file').hidden = !targets.shareFile;
+  $('share-chapter-send').hidden = $('share-story-send').hidden = !targets.shareText;
   $('share-chapter-row').hidden = !chapter;
-  $('share-chapter').disabled = !chapter;
-  $('share-chapter').checked = Boolean(chapter); $('share-story').checked = !chapter; $('share-file').checked = false;
   $('share-chapter-label').textContent = chapter ? `Chapter ${chapterIndex + 1}` : '';
+  $('share-chapter-title').textContent = chapter ? activeVersion(chapter, modelStory).title || '' : '';
   $('share-path-label').textContent = modelStory.paths.length > 1 ? pathLabel(modelStory, selectedPath(modelStory)) : '';
-  $('share-notes').checked = false; updateShareControls();
-  $('share-dialog').showModal(); (chapter ? $('share-chapter') : $('share-story')).focus();
+  const name = chapter ? `Chapter ${chapterIndex + 1}` : '';
+  $('share-chapter-copy').setAttribute('aria-label', `Copy ${name} text`); $('share-chapter-send').setAttribute('aria-label', `Share ${name} text`);
+  $('share-story-copy').setAttribute('aria-label', 'Copy whole story text'); $('share-story-send').setAttribute('aria-label', 'Share whole story text');
+  $('share-notes').checked = false;
+  $('share-dialog').showModal(); (targets.download ? $('share-download') : $('share-send-file')).focus();
 }
-function shareKind() { return $('share-file').checked ? 'file' : $('share-chapter').checked ? 'chapter' : 'story'; }
-function updateShareControls() {
-  const file = shareKind() === 'file'; $('share-notes').disabled = file;
-  $('share-submit').textContent = file ? storyFileAction({save, share, isNative}) : share.available ? 'Share' : 'Copy';
-}
-for (const id of ['share-chapter', 'share-story', 'share-file']) $(id).addEventListener('change', updateShareControls);
 $('share-cancel').addEventListener('click', () => $('share-dialog').close());
 $('share-dialog').addEventListener('close', () => {
   const opener = state.shareDialog; state.shareDialog = null;
@@ -2775,26 +2775,41 @@ $('share-dialog').addEventListener('close', () => {
   const target = opener?.trigger?.isConnected ? opener.trigger : [...$('library-list').querySelectorAll('[data-story-id]')].find(card => card.dataset.storyId === opener?.id)?.querySelector('.story-menu-toggle');
   target?.focus({preventScroll:true});
 });
-function downloadStoryFile({name, mimeType, content}) {
+function browserDownload({name, mimeType, content}) {
   const url = URL.createObjectURL(new Blob([content], {type:mimeType}));
   const link = document.createElement('a'); link.href = url; link.download = name;
   document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-$('share-submit').addEventListener('click', async () => {
+const SHARE_ACTIONS = ['share-download', 'share-send-file', 'share-chapter-copy', 'share-chapter-send', 'share-story-copy', 'share-story-send'];
+// Each button does exactly what it says; a failure keeps the dialog open and never falls back to another delivery.
+async function runShareAction(action, scope) {
   const context = state.shareDialog; if (!context || context.busy) return;
-  context.busy = true; $('share-submit').disabled = true;
-  const kind = shareKind(), notes = $('share-notes').checked;
+  context.busy = true; SHARE_ACTIONS.forEach(id => { $(id).disabled = true; });
+  const file = scope === 'file', notes = $('share-notes').checked;
   try {
-    const payload = kind === 'file' ? storyExportFile(context.story, {appVersion:readJson('manifest.json', {}).version}) : {
-      title:context.story.title, text:kind === 'chapter' ? chapterShareText(context.story, context.chapter, activeVersion(context.chapter, context.modelStory), {notes}) : storyShareText(context.story, {pathChapters, activeVersion}, {notes})
-    };
-    const result = kind === 'file' ? await deliverStoryFile(payload, {save, share, download:downloadStoryFile, isNative}) : await deliverShare(payload, {share, clipboard:navigator.clipboard, isNative});
+    let result;
+    if (file) {
+      const payload = storyExportFile(context.story, {appVersion:readJson('manifest.json', {}).version});
+      result = action === 'download' ? await downloadStoryFile(payload, {save, download:browserDownload, isNative}) : await shareStoryFile(payload, {share});
+    } else {
+      const text = scope === 'chapter' ? chapterShareText(context.story, context.chapter, activeVersion(context.chapter, context.modelStory), {notes}) : storyShareText(context.story, {pathChapters, activeVersion}, {notes});
+      const payload = {title:context.story.title, text};
+      result = action === 'copy' ? await copyText(payload, {clipboard:navigator.clipboard}) : await shareText(payload, {share});
+    }
     if (result.cancelled) return;
-    if (result.method) toast(`${kind === 'chapter' ? 'Chapter' : kind === 'file' ? 'Story file' : 'Story'} ${result.method}`);
+    if (result.done) toast(`${file ? 'Story file' : scope === 'chapter' ? 'Chapter text' : 'Story text'} ${result.done}`);
     if (state.shareDialog === context) $('share-dialog').close();
-  } catch (error) { console.warn(error); toast(kind === 'file' ? (error.code === 'too_large' ? 'This story is too large to download.' : 'Could not download the story file.') : 'Could not share the story.'); }
-  finally { context.busy = false; $('share-submit').disabled = false; }
-});
+  } catch (error) {
+    console.warn(error);
+    toast(file && action === 'download' ? (error.code === 'too_large' ? 'This story is too large to download.' : 'Could not download the story file.') : action === 'copy' ? 'Could not copy the text.' : 'Could not share the story.');
+  } finally { context.busy = false; SHARE_ACTIONS.forEach(id => { $(id).disabled = false; }); }
+}
+$('share-download').addEventListener('click', () => runShareAction('download', 'file'));
+$('share-send-file').addEventListener('click', () => runShareAction('share', 'file'));
+$('share-chapter-copy').addEventListener('click', () => runShareAction('copy', 'chapter'));
+$('share-chapter-send').addEventListener('click', () => runShareAction('share', 'chapter'));
+$('share-story-copy').addEventListener('click', () => runShareAction('copy', 'story'));
+$('share-story-send').addEventListener('click', () => runShareAction('share', 'story'));
 
 // Library → Import story…: a standard file input (App² serves Android's document picker). The copy gets a new
 // identity and joins the Library through the normal stories save; cancellation and any failure leave data unchanged.

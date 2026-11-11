@@ -16,7 +16,7 @@ What LingoMage does now, its confirmed requirements and its defaults. Interactio
 | Profile | Time in LingoMage, Most looked up with detail sheet, language list and levels | [PED-005](../pedagogy/PED-005-consultation-signals.md) |
 | Recovery | Checkpointed generation with explicit Resume, Retry, Discard | [runtime](../architecture/generation-pipeline.md#generation) |
 
-Stories can be shared from the reader or Library: canonical chapter or selected-path whole-story text, with optional vocabulary notes, or a complete JSON story file, which is downloaded (App² Save as, or a browser download) rather than copied. Text sharing falls back to copying. Library → Import story… adds a shared story file back as a new story, never replacing an existing one.
+Stories can be shared from the reader or Library: canonical chapter or selected-path whole-story text, with optional vocabulary notes, or a complete JSON story file. The dialog offers each action directly: Download or Share story file, and Copy or Share chapter or whole-story text. A story file is never copied. Library → Import story… adds a shared story file back as a new story, never replacing an existing one.
 
 ## Confirmed requirements
 
