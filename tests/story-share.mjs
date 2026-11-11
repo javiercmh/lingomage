@@ -52,7 +52,7 @@ const legacy={id:'L',title:'Old',story:'Body'};storyShareText(legacy,model);asse
 }
 // Execute the real Library action, dialog setup, each action button and close wiring, including rebuilt opener focus.
 const app=fs.readFileSync('js/app.js','utf8');
-const elements=new Map(), element=()=>({children:[],style:{},dataset:{},attributes:{},isConnected:true,classes:new Set(),get classList(){const c=this.classes;return {toggle:(name,on)=>on?c.add(name):c.delete(name),contains:name=>c.has(name)};},querySelector(){return this.label||(this.label={textContent:''});},append(...children){this.children.push(...children);},setAttribute(name,value){this.attributes[name]=value;},addEventListener(name,fn){this[name]=fn;},getBoundingClientRect(){return {height:144,top:60,bottom:104,right:300};},focus(){this.focused=true;},remove(){},showModal(){this.open=true;},close(){this.open=false;this.onclose?.();}});
+const elements=new Map(), element=()=>({children:[],style:{},dataset:{},attributes:{},isConnected:true,classes:new Set(),get classList(){const c=this.classes;return {toggle:(name,on)=>on?c.add(name):c.delete(name),contains:name=>c.has(name)};},querySelector(){return this.child||(this.child=element());},append(...children){this.children.push(...children);},setAttribute(name,value){this.attributes[name]=value;},addEventListener(name,fn){this[name]=fn;},getBoundingClientRect(){return {height:144,top:60,bottom:104,right:300};},focus(){this.focused=true;},remove(){},showModal(){this.open=true;},close(){this.open=false;this.onclose?.();}});
 const $=id=>{if(!elements.has(id))elements.set(id,element());return elements.get(id);};
 const trigger=element(), rebuilt=element();let rendered=0;const toasts=[], delivered=[];
 $('library-list').querySelectorAll=()=>[{dataset:{storyId:'S'},querySelector:()=>rebuilt}];
@@ -67,26 +67,26 @@ vm.runInContext(app.slice(app.indexOf('function closeStoryMenu('),app.indexOf('f
 const dialog=$('share-dialog');
 context.openStoryMenu(longer2,trigger);assert.equal(context.state.storyMenu.popover.children.length,3);
 context.state.storyMenu.popover.children[1].click();
-assert.equal(dialog.open,true);assert.equal($('share-story-title').textContent,'日本の話');
+assert.equal(dialog.open,true);assert.equal($('share-title').textContent,'日本の話','the story title is the heading');
 assert.equal($('share-chapter-row').hidden,true,'Library share has no chapter row');
 assert.equal($('share-download').hidden,false);assert.equal($('share-send-file').hidden,true);assert.equal($('share-story-send').hidden,true,'browser: Copy only');
-assert.ok($('share-download').classList.contains('primary-btn'),'without sharing, Download backup is the primary action');
+assert.ok($('share-download').querySelector('.share-row-icon').classList.contains('small-btn-strong'),'without sharing, Save backup is the primary action');
 assert.equal($('share-download').focused,true,'focus starts on the primary file action');
 assert.equal($('share-story-sub').textContent,'All chapters · Branch 1');
 assert.equal($('share-notes').checked,false,'notes start off without a saved preference');
 $('share-notes').checked=true;$('share-notes').change();assert.equal($('share-story-sub').textContent,'All chapters · Branch 1','summaries do not repeat the notes switch');
 assert.equal(context.state.shareVocabularyNotes,true);assert.equal(context.saves,1,'the notes choice is saved to settings');
 await $('share-story-copy').click();assert.deepEqual(delivered.at(-1),['copy',storyShareText(longer2,model,{notes:true})]);
-assert.equal($('share-story-copy').label.textContent,'Copied');assert.equal($('share-live').textContent,'Story text copied');
+assert.ok($('share-story-copy').classList.contains('copied'),'Copy shows a check');assert.equal($('share-live').textContent,'Story text copied');
 assert.equal(context.state.shareDialog.id,'S','Copy keeps the sheet open');assert.equal(toasts.length,0,'Copy confirms in place, not with a toast');
-context.pendingReset();assert.equal($('share-story-copy').label.textContent,'Copy');
+context.pendingReset();assert.ok(!$('share-story-copy').classList.contains('copied'));
 await $('share-download').click();assert.deepEqual(delivered.at(-1),['download','日本の話.lingomage.json',false]);assert.equal(toasts.at(-1),'Story file downloaded');assert.equal(context.state.shareDialog,null,'a finished download closes the sheet');
 // Reader share in App² with Save as and AppShare: Share story file is primary; the chapter row names the chapter.
 context.save={available:true};context.share={available:true};context.isNative=true;context.state.readerChapter=0;
 context.openShareDialog(longer2,{chapterIndex:1,trigger});
-assert.ok($('share-send-file').classList.contains('primary-btn'));assert.ok($('share-download').classList.contains('secondary-btn'));assert.equal($('share-send-file').focused,true);
+assert.ok($('share-send-file').querySelector('.share-row-icon').classList.contains('small-btn-strong'));assert.ok(!$('share-download').querySelector('.share-row-icon').classList.contains('small-btn-strong'),'only one accent action');assert.equal($('share-send-file').focused,true);
 assert.equal($('share-notes').checked,true,'the saved notes choice is restored on open');
-assert.equal($('share-chapter-row').hidden,false);assert.equal($('share-chapter-name').textContent,'Chapter 2 · Next');assert.equal($('share-chapter-sub').textContent,'This chapter');
+assert.equal($('share-chapter-row').hidden,false);assert.equal($('share-chapter-name').textContent,'Chapter 2');assert.equal($('share-chapter-sub').textContent,'Next');
 assert.equal($('share-send-file').hidden,false);assert.equal($('share-chapter-send').hidden,false);assert.equal($('share-chapter-copy').attributes['aria-label'],'Copy Chapter 2 text');
 $('share-notes').checked=true;const before2=toasts.length;await $('share-chapter-send').click();
 assert.deepEqual(delivered.at(-1),['shareText',chapterShareText(longer2,longer2.chapters[1],longer2.chapters[1].versions[0],{notes:true})]);assert.equal(toasts.length,before2,'cancel is silent');

@@ -2755,15 +2755,16 @@ function openShareDialog(story, {chapterIndex = null, trigger}) {
   const chapter = chapterIndex === null ? null : pathChapters(modelStory)[chapterIndex];
   state.shareDialog = {story:snapshot, modelStory, chapter, chapterIndex, trigger, id:story.id};
   const targets = shareTargets({save, share, isNative});
-  $('share-story-title').textContent = snapshot.title || 'Untitled story';
+  $('share-title').textContent = snapshot.title || 'Untitled story';
   $('share-send-file').hidden = !targets.shareFile; $('share-download').hidden = !targets.download;
-  // The first available file action is the primary one: Share story file in App², Download backup otherwise.
+  // The first available file action is the primary one (Share in App², Save backup otherwise): only its icon is accent-tinted.
   const primary = targets.shareFile ? $('share-send-file') : $('share-download');
-  for (const button of [$('share-send-file'), $('share-download')]) { button.classList.toggle('primary-btn', button === primary); button.classList.toggle('secondary-btn', button !== primary); }
+  for (const button of [$('share-send-file'), $('share-download')]) button.querySelector('.share-row-icon').classList.toggle('small-btn-strong', button === primary);
   $('share-chapter-send').hidden = $('share-story-send').hidden = !targets.shareText;
   $('share-chapter-row').hidden = !chapter;
-  const name = chapter ? `Chapter ${chapterIndex + 1}` : '', chapterTitle = chapter ? activeVersion(chapter, modelStory).title || '' : '';
-  $('share-chapter-name').textContent = chapterTitle ? `${name} · ${chapterTitle}` : name;
+  const name = chapter ? `Chapter ${chapterIndex + 1}` : '';
+  $('share-chapter-name').textContent = name;
+  state.shareDialog.chapterTitle = chapter ? activeVersion(chapter, modelStory).title || '' : '';
   state.shareDialog.storyline = modelStory.paths.length > 1 ? pathLabel(modelStory, selectedPath(modelStory)) : '';
   $('share-chapter-copy').setAttribute('aria-label', `Copy ${name} text`); $('share-chapter-send').setAttribute('aria-label', `Share ${name} text`);
   $('share-story-copy').setAttribute('aria-label', 'Copy whole story text'); $('share-story-send').setAttribute('aria-label', 'Share whole story text');
@@ -2774,11 +2775,11 @@ function openShareDialog(story, {chapterIndex = null, trigger}) {
 function updateShareSummaries() {
   const context = state.shareDialog; if (!context) return;
   $('share-story-sub').textContent = `All chapters${context.storyline ? ` · ${context.storyline}` : ''}`;
-  $('share-chapter-sub').textContent = 'This chapter';
+  $('share-chapter-sub').textContent = context.chapterTitle || '';
 }
 function resetCopyLabels() {
   clearTimeout(state.shareCopiedTimer);
-  for (const id of ['share-story-copy', 'share-chapter-copy']) $(id).querySelector('span').textContent = 'Copy';
+  for (const id of ['share-story-copy', 'share-chapter-copy']) $(id).classList.toggle('copied', false);
 }
 // The notes choice is remembered in settings. A failed save is reported by the settings notice and rolls back
 // only the remembered value; the switch still applies to this share.
@@ -2818,7 +2819,7 @@ async function runShareAction(action, scope) {
     if (result.done === 'copied') {
       // Copying keeps the sheet open so both texts can be copied; the button confirms in place.
       const button = $(`share-${scope}-copy`); resetCopyLabels();
-      button.querySelector('span').textContent = 'Copied';
+      button.classList.toggle('copied', true);
       $('share-live').textContent = `${scope === 'chapter' ? 'Chapter text' : 'Story text'} copied`;
       state.shareCopiedTimer = setTimeout(resetCopyLabels, 1500);
       return;

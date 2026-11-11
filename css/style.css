@@ -656,28 +656,30 @@ body.has-app-generation-status .toast { bottom: calc(var(--tabbar-h) + 88px + va
 .pending-progress > button { flex-shrink: 0; }
 
 /* Native share controls retain generous label targets at narrow widths. */
-/* Share sheet: the shared dialog panel anchored to the bottom edge, built from shared buttons and labels. */
+/* Share sheet: the shared dialog panel anchored to the bottom edge; every action is a row of the same shape. */
 .share-sheet { width: 100%; max-width: 520px; max-height: 92dvh; margin: auto auto 0; }
 .share-sheet .dialog-panel { display: flex; flex-direction: column; gap: 22px; max-height: 92dvh; padding: 21px max(21px, var(--sa-right)) calc(21px + var(--sa-bottom)) max(21px, var(--sa-left)); border-bottom: 0; border-radius: 20px 20px 0 0; }
 .share-sheet .dialog-head { margin: 0; }
 .share-head-text { min-width: 0; }
-.share-head-text .helper { margin: 2px 0 0; overflow: hidden; font-size: 14px; white-space: nowrap; text-overflow: ellipsis; }
+.share-head-text h2 { overflow-wrap: anywhere; }
+.share-head-text .helper { margin: 2px 0 0; font-size: 14px; }
 .share-group { display: flex; flex-direction: column; gap: 8px; }
-.share-group .settings-section-label, .share-group > .helper { margin: 0; }
-.share-group > .helper { margin-bottom: 4px; }
+.share-group .settings-section-label { margin: 0 0 2px; }
 .share-sheet svg { flex: 0 0 auto; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.share-action { display: flex; min-height: 56px; align-items: center; gap: 12px; padding: 8px 16px; text-align: left; }
-.share-action b, .share-text-name b { display: block; font-size: 15px; font-weight: 650; }
-.share-action small { display: block; margin-top: 1px; color: var(--muted); font-size: 12px; font-weight: 500; }
-.share-action.primary-btn small { color: rgba(255,255,255,.88); }
-.share-action.secondary-btn { background: transparent; }
-.share-divider { width: 100%; height: 1px; margin: 0; border: 0; background: var(--line); }
-.share-text-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; }
-
-.share-text-row { display: flex; flex-wrap: wrap; min-height: 56px; align-items: center; justify-content: flex-end; gap: 4px 8px; padding: 6px 6px 6px 16px; border-radius: 18px; background: rgba(255,255,255,.07); }
-.share-text-name { flex: 1 1 140px; min-width: 0; padding: 4px 0; overflow-wrap: anywhere; }
-.share-text-name .helper { margin: 1px 0 0; }
-.share-text-actions { display: flex; flex: 0 0 auto; gap: 4px; margin-left: auto; }
-.share-small { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; font-size: 13px; }
-.share-small svg { width: 16px; height: 16px; }
-.share-action[hidden], .share-text-row[hidden], .share-small[hidden] { display: none; }
+.share-row { display: flex; width: 100%; min-height: 56px; align-items: center; gap: 12px; padding: 6px 6px 6px 16px; border: 0; border-radius: 18px; background: rgba(255,255,255,.07); color: var(--ink); text-align: left; }
+.share-row-btn { cursor: pointer; }
+.share-row-btn:hover { background: rgba(255,255,255,.1); }
+.share-row-lead { color: var(--muted); }
+.share-row-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.share-row-text b { display: block; font-size: 15px; font-weight: 650; }
+.share-row-text .helper { margin: 1px 0 0; }
+.share-row-text .helper:empty { display: none; }
+.share-row-actions { display: flex; flex: 0 0 auto; gap: 4px; }
+.share-icon-btn { display: inline-flex; width: 44px; padding: 0; align-items: center; justify-content: center; }
+.share-row-icon { flex: 0 0 auto; pointer-events: none; }
+.share-copied-icon, .share-icon-btn.copied .share-copy-icon { display: none; }
+.share-icon-btn.copied .share-copied-icon { display: block; color: var(--accent); }
+.share-notes-row { justify-content: space-between; margin-top: 4px; font-size: 14px; }
+.share-sheet button:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+.share-row-btn:disabled, .share-icon-btn:disabled { opacity: .55; }
+.share-row[hidden], .share-icon-btn[hidden] { display: none; }
