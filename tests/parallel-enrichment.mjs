@@ -27,6 +27,7 @@ assert.equal(h.events.at(-1),'apply');assert.equal(h.pipeline.records.length,0);
 h=harness({failReadings:true});await assert.rejects(h.pipeline.run(h.op),/Service failed/);
 assert.equal(h.op.stage,'enrich');assert.ok(h.op.parallel.notes.done&&!h.op.parallel.readings.done);assert.deepEqual(pendingRequests(h.op),[]);
 assert.equal(progressSummary(h.op).text,'Step 4 of 4 · Kanji readings');
+assert.deepEqual(progressSteps(h.op).map(s=>[s.key,s.state]).slice(2),[['readings','active'],['notes','done']],'readings are listed before notes');
 const before=h.events.filter(e=>e.startsWith('start')).length;
 h.pipeline.records[0].parallel.readings.request=null;
 const ok=createPipeline({records:h.pipeline.records,persist(){},parallel:true,ai:{start:async()=>'r',wait:async()=>JSON.stringify({readings:readingPlan(prose).spans.map(s=>({id:s.id,reading:'まち'}))}),acknowledge:async()=>{},cancel:async()=>{}},apply(op){assert.equal(op.result.glossary.length,1);}});
@@ -36,7 +37,10 @@ h=harness({cancelAt:'readings'});await assert.rejects(h.pipeline.run(h.op),/canc
 assert.ok(!h.events.includes('apply'));assert.equal(h.op.stage,'enrich');assert.deepEqual(h.durable,[]);assert.equal(h.pipeline.records.length,0);
 // Progress presentation.
 const steps=progressSteps({kind:'create',language:'ja',stage:'enrich',parallel:{notes:{done:true},readings:{done:false}}});
-assert.deepEqual(steps.map(s=>s.state),['done','done','done','active']);
+assert.deepEqual(steps.map(s=>s.state),['done','done','active','done']);
+assert.deepEqual(progressSteps({kind:'create',language:'ja',stage:'enrich',parallel:{notes:{done:false},readings:{done:true}}}).map(s=>[s.key,s.state]).slice(2),[['readings','done'],['notes','active']]);
+assert.deepEqual(progressSteps({kind:'create',language:'ja',stage:'notes'}).map(s=>[s.key,s.state]).slice(2),[['readings','pending'],['notes','active']],'an older sequential checkpoint marks the running stage active');
+assert.deepEqual(progressSteps({kind:'create',language:'ja',stage:'readings'}).map(s=>[s.key,s.state]).slice(2),[['readings','active'],['notes','done']]);
 assert.deepEqual(progressSteps({kind:'create',language:'ja',stage:'enrich',parallel:{notes:{done:false},readings:{done:false}}}).map(s=>s.state),['done','done','active','active']);
 assert.deepEqual(progressSteps({kind:'continue',language:'de',stage:'prose'}).map(s=>s.state),['done','done','active','pending']);
 assert.deepEqual(progressSteps({kind:'continue',language:'de',stage:'context'}).map(s=>[s.key,s.state]),[['context','active'],['plan','pending'],['prose','pending'],['notes','pending']],'Continue shows story memory as its first step');

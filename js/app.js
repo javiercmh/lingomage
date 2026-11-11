@@ -384,6 +384,7 @@ function syncSettingsControls() {
   setReaderTextSize(state.readerFontSize);
   $('furigana-toggle').checked=state.furigana;
   $('reader-story').classList.toggle('hide-furigana', !state.furigana);
+  $('reader-title').classList.toggle('hide-furigana', !state.furigana);
   document.querySelectorAll('#reader-help .story-text').forEach(node=>node.classList.toggle('hide-furigana', !state.furigana));
   $('language-setup').hidden=Boolean(enabledLanguages().length) || state.languageSetupDismissed;
   $('player-rate').value=String(state.speechRate);
@@ -811,7 +812,7 @@ function renderCheckpointRecovery() {
   if (heading) heading.textContent=op?.discardRequested ? 'A cancelled generation needs attention' : 'An unfinished generation needs attention';
   if (task) task.textContent=taskLabel;
   if (instruction) instruction.textContent=op?.discardRequested ? discardFailureMessage(op) : 'Finish it or discard it before starting another generation.';
-  const stageMessage=op?.discardRequested ? 'Cancelling…' : op?.kind === 'examples' && op.stage === 'prose' ? 'Generating examples…' : op?.stage === 'plan' ? 'Planning suitable language…' : op?.stage === 'notes' ? 'Adding vocabulary notes…' : op?.stage === 'readings' ? 'Adding kanji readings…' : op?.stage === 'enrich' ? 'Adding vocabulary notes and kanji readings…' : op?.kind === 'continue' ? 'Writing the next chapter…' : op?.kind === 'rewrite' ? 'Rewriting this chapter…' : 'Writing your story…';
+  const stageMessage=op?.discardRequested ? 'Cancelling…' : op?.kind === 'examples' && op.stage === 'prose' ? 'Generating examples…' : op?.stage === 'plan' ? 'Planning suitable language…' : op?.stage === 'notes' ? 'Adding vocabulary notes…' : op?.stage === 'readings' ? 'Adding kanji readings…' : op?.stage === 'enrich' ? 'Adding kanji readings and vocabulary notes…' : op?.kind === 'continue' ? 'Writing the next chapter…' : op?.kind === 'rewrite' ? 'Rewriting this chapter…' : 'Writing your story…';
   // A running operation always uses the same status card, whether it started here or was resumed from recovery.
   if (op && pipeline.busy && op.kind === 'create' && !creatingStory && $('loading-card').hidden) { resumedCreateCard = true; $('story-form').hidden = true; $('loading-card').hidden = false; }
   if (resumedCreateCard && !pipeline.busy) { resumedCreateCard = false; $('loading-card').hidden = true; $('story-form').hidden = false; }
@@ -1641,9 +1642,10 @@ function updateReader(keepNavigation = false) {
   if (state.speechVersionKey && state.speechVersionKey !== speechVersionKey) stopSpeech();
   state.speechVersionKey = speechVersionKey;
   renderReaderListen();
-  $('reader-title').textContent = version.title || story.title;
+  const title = version.title || story.title;
+  annotatedText($('reader-title'), title, version.title ? version.titleSegments : story.titleSegments, { language: SPEECH_LANGUAGES[story.language] || 'en' });
+  $('reader-title').classList.toggle('hide-furigana', story.language === 'ja' && !state.furigana);
   requestAnimationFrame(fitReaderTitle);
-  $('reader-title').lang = SPEECH_LANGUAGES[story.language] || 'en';
   renderChapterNavigation(story);
   closeWordNote();
   annotatedText($('reader-story'), version.story, version.storySegments, {
@@ -2092,7 +2094,9 @@ function fitReaderTitle() {
   if (!title.getClientRects().length || !title.firstChild) return;
   const range = document.createRange();
   range.selectNodeContents(title);
-  const width = Math.max(0, ...Array.from(range.getClientRects(), rect => rect.width));
+  // Furigana splits a line into several rects, so measure from the title's left edge to the furthest right.
+  const left = title.getBoundingClientRect().left;
+  const width = Math.max(0, ...Array.from(range.getClientRects(), rect => rect.right - left));
   if (width) title.style.maxWidth = `${Math.ceil(width)}px`;
 }
 new ResizeObserver(fitReaderTitle).observe($('reader-title').parentElement);
@@ -2177,8 +2181,7 @@ async function runReaderPlayer(story, version, isCurrent) {
 function clearSpeechHighlight() { if (typeof CSS !== 'undefined' && CSS.highlights) CSS.highlights.delete('speaking'); }
 function speechRange(unit) {
   if (unit.source === 'title') {
-    const node = $('reader-title').firstChild; if (!node) return null;
-    const range = document.createRange(); range.setStart(node, 0); range.setEnd(node, Math.min(unit.end, node.nodeValue.length)); return range;
+    return canonicalRange($('reader-title'), unit.start, unit.end);
   }
   return canonicalRange($('reader-story'), unit.start, unit.end);
 }
@@ -3060,7 +3063,7 @@ $('path-select').addEventListener('change', () => {
 $('chapter-prev').addEventListener('click', () => { if (state.readerChapter > 0) { state.readerChapter--; clearExplanationSelection(); } updateReader(); });
 $('chapter-next').addEventListener('click', () => { if (state.readerChapter < pathChapters(readerStory()).length - 1) { state.readerChapter++; clearExplanationSelection(); } updateReader(); });
 readerPanels.initialize();
-$('furigana-toggle').addEventListener('change', () => { state.furigana = $('furigana-toggle').checked; keepReaderLocation(() => $('reader-story').classList.toggle('hide-furigana', !state.furigana)); document.querySelectorAll('#reader-help .story-text').forEach(node => node.classList.toggle('hide-furigana', !state.furigana)); trySaveSettings(); });
+$('furigana-toggle').addEventListener('change', () => { state.furigana = $('furigana-toggle').checked; keepReaderLocation(() => { $('reader-story').classList.toggle('hide-furigana', !state.furigana); $('reader-title').classList.toggle('hide-furigana', !state.furigana); requestAnimationFrame(fitReaderTitle); }); document.querySelectorAll('#reader-help .story-text').forEach(node => node.classList.toggle('hide-furigana', !state.furigana)); trySaveSettings(); });
 function showEditPanel(mode) {
   if (state.readerEditBusy) return;
   const story = readerStory(), version = activeVersion();

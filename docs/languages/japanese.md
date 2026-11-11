@@ -4,7 +4,7 @@ Shared rules: [languages README](README.md).
 
 ## Current requirements
 
-- **Furigana shown by default** (product requirement): kana readings above the kanji they annotate; hiragana and katakana for the rest; kanji are preserved (a kana-only rewrite or a glossary reading does not satisfy the requirement). Learners can turn furigana off in the reader's Aa panel; the choice is saved in `readingPreferences`. Supporting the display is a product decision, not a claim about its learning effect.
+- **Furigana shown by default** (product requirement): kana readings above the kanji they annotate; hiragana and katakana for the rest; kanji are preserved (a kana-only rewrite or a glossary reading does not satisfy the requirement). The reader shows furigana on the chapter title as well as the story. Learners can turn furigana off for both in the reader's Aa panel; the choice is saved in `readingPreferences`. Supporting the display is a product decision, not a claim about its learning effect.
 - **No romaji** anywhere in stories or examples. Kana literacy is assumed at every level; kanji familiarity is described by the level.
 - **Canonical text vs annotations:** canonical title and story are stored as plain strings; `titleSegments`/`storySegments` are ordered `{text, reading}` annotations for display. Selection, glossary matching, copy, speech and accessibility use canonical text. Concatenated segment text must reproduce canonical text exactly.
 - **Reading placement:** readings only on contiguous kanji runs, whole compounds kept together (学校/がっこう); kana, okurigana, punctuation and whitespace unannotated (行/い + きます; 食/た + べ + 物/もの). Katakana anchors may match their hiragana equivalents during alignment.
