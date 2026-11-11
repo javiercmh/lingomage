@@ -35,3 +35,7 @@ A `.lingomage.json` file contains `{format:"lingomage-story", formatVersion:1, a
 ## Story import
 
 Library → Import story… reads one chosen `.lingomage.json` file (at most 16 MiB) and accepts only `format:"lingomage-story"` with `formatVersion:1` (a higher version asks the learner to update LingoMage) and a story that passes the `data/stories.json` validator on its own. The story is deep-cloned with every field kept, given a new `id` (never colliding with a saved story) and `importedAt`, and stamped as `updated` Library activity; the original `createdAt` stays. Legacy single-text stories get their derived chapter written out first so version IDs are unchanged. It is added at the front of `data/stories.json` through the normal save; existing stories are never replaced or merged, and the same file imported twice gives two stories. Envelope fields (`appVersion`, `exportedAt`) are not stored. Cancelling, an unreadable, oversized or invalid file, an invalid stories store or a failed save leaves the saved stories unchanged.
+
+## Reading location
+
+Per-path reader positions keep `chapterId` and `scrollTop`, with optional `textOffset`, `textTop` and `versionId` for a canonical text anchor (excluding furigana). Matching versions restore the passage after line wrapping changes; older positions retain pixel restoration. The current view and open reader location also live in the browser history entry for page recreation, without adding navigation entries. These transient fields do not replace story-file persistence.

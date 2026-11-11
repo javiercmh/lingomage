@@ -681,6 +681,7 @@ function setView(name) {
   if (name === 'profile') { renderStats(); renderLookups(); startStatsRefresh(); } else stopStatsRefresh();
   if (name === 'profile' || name === 'settings') { if (name === 'profile') renderTargetLanguageSettings(); if (state.storageBlocked) showStorageErrors(); }
   window.scrollTo(0, 0);
+  history.replaceState?.({ ...history.state, lingomageView: name }, '');
   renderReaderGeneration();
 }
 $('background-context').addEventListener('change', () => {
@@ -1771,13 +1772,46 @@ function showWordNote(trigger, notes, surface = '', helpId = '') {
   });
 }
 function readerPanel() { return $('reader-dialog').querySelector('.reader-panel'); }
+// Canonical offsets exclude ruby readings and survive a change in line wrapping.
+function readerTextAnchor() {
+  const root = $('reader-story');
+  if (!root.textContent || typeof canonicalRange !== 'function') return {};
+  const text = activeVersion().story || '', top = readerPanel().getBoundingClientRect().top + 64;
+  let low = 0, high = text.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    const rect = canonicalRange(root, middle, middle + 1)?.getBoundingClientRect();
+    if (!rect || rect.bottom <= top) low = middle + 1; else high = middle;
+  }
+  if (low >= text.length) return {};
+  const rect = canonicalRange(root, low, low + 1).getBoundingClientRect();
+  // Above the prose (title, edit form, etc.) keep the ordinary scroll offset.
+  if (rect.top > top + 64) return {};
+  return { textOffset: low, textTop: rect.top - readerPanel().getBoundingClientRect().top, versionId: activeVersion().id };
+}
+function restoreReaderPosition(position) {
+  const panel = readerPanel();
+  panel.scrollTop = position?.scrollTop || 0;
+  if (!Number.isInteger(position?.textOffset) || position.textOffset < 0 || position.textOffset >= (activeVersion().story || '').length || !Number.isFinite(position.textTop) || position.versionId !== activeVersion().id) return;
+  const rect = canonicalRange($('reader-story'), position.textOffset, position.textOffset + 1)?.getBoundingClientRect();
+  if (rect) panel.scrollTop += rect.top - panel.getBoundingClientRect().top - position.textTop;
+}
+function rememberReaderLocation() {
+  if (!$('reader-dialog').open) return;
+  const story = readerStory();
+  history.replaceState?.({ ...history.state, lingomageReader: story.id, lingomagePathId: selectedPath(story).id, lingomagePosition: state.readerPositions[`${story.id}:${selectedPath(story).id}`] }, '');
+}
+let resizingReader = false;
+let readerViewport = { width: window.innerWidth, height: window.innerHeight };
 function rememberReaderPosition() {
   // A closed dialog is display:none and reports scrollTop 0; keep the position recorded while it was open.
   const story = readerStory(); if (!story || !$('reader-dialog').open) return;
-  state.readerPositions[`${story.id}:${selectedPath(story).id}`] = { chapterId: activeChapter(story).id, scrollTop: readerPanel().scrollTop };
+  if (resizingReader || readerViewport.width !== window.innerWidth || readerViewport.height !== window.innerHeight) return;
+  state.readerPositions[`${story.id}:${selectedPath(story).id}`] = { chapterId: activeChapter(story).id, scrollTop: readerPanel().scrollTop, ...readerTextAnchor() };
 }
 // Positions live in memory while scrolling; they are saved with the story when the reader closes or the page is hidden.
 function persistReaderPosition() {
+  rememberReaderLocation();
   const story = readerStory(); if (!story || !state.stories.includes(story)) return;
   const saved = {};
   for (const path of story.paths || []) { const position = state.readerPositions[`${story.id}:${path.id}`]; if (position) saved[path.id] = position; }
@@ -1788,7 +1822,7 @@ function persistReaderPosition() {
 }
 function loadReaderPositions() {
   for (const story of state.stories) for (const [pathId, value] of Object.entries(story?.readerPositions || {})) {
-    if (typeof value?.chapterId === 'string' && Number.isFinite(value.scrollTop)) state.readerPositions[`${story.id}:${pathId}`] = { chapterId: value.chapterId, scrollTop: Math.max(0, value.scrollTop) };
+    if (typeof value?.chapterId === 'string' && Number.isFinite(value.scrollTop)) state.readerPositions[`${story.id}:${pathId}`] = { ...value, chapterId: value.chapterId, scrollTop: Math.max(0, value.scrollTop) };
   }
 }
 function openReader(story) {
@@ -1806,11 +1840,12 @@ function openReader(story) {
   const entry = { ...(history.state && typeof history.state === 'object' ? history.state : {}), lingomageReader: story.id };
   if (state.readerHistoryEntry) history.replaceState(entry, ''); else history.pushState(entry, '');
   state.readerHistoryEntry = true;
-  selectionMenuRouter.reset(); $('reader-dialog').showModal(); usage.setReader({ storyId: story.id, language: story.language }); readerPanel().scrollTop = position?.scrollTop || 0; updateReaderNavigation(); renderGenerationRecovery(); settingsFeedback.sync();
+  selectionMenuRouter.reset(); $('reader-dialog').showModal(); usage.setReader({ storyId: story.id, language: story.language }); restoreReaderPosition(position); rememberReaderPosition(); rememberReaderLocation(); updateReaderNavigation(); renderGenerationRecovery(); settingsFeedback.sync();
 }
 $('reader-dialog').addEventListener('close', () => {
   usage.setReader(null); stopExposure();
   settingsFeedback.sync();
+  if (!state.switchingReader) history.replaceState?.({ ...history.state, lingomageReader: null, lingomagePosition: null }, '');
   if (state.readerHistoryEntry && !state.switchingReader) { state.readerHistoryEntry = false; history.back(); }
   if ($('reader-removal-dialog').open) $('reader-removal-dialog').close();
   closeReaderPanels(); closeReaderActions(); stopSpeech(); state.speechVersionKey = ''; closeWordNote(); rememberReaderPosition(); persistReaderPosition(); clearExplanationSelection(); setView('library');
@@ -1828,6 +1863,7 @@ window.addEventListener('popstate', () => {
 });
 readerPanel().addEventListener('scroll', event => {
   if (event.target !== readerPanel()) return;
+  if (resizingReader || readerViewport.width !== window.innerWidth || readerViewport.height !== window.innerHeight) return;
   // Resizing prose can emit scroll events through reflow/scroll anchoring.
   // Keep the native range mounted and still while its preferences panel is open.
   if (!restoringPathPosition && $('reader-preferences-panel').hidden) closeReaderPanels();
@@ -2960,7 +2996,18 @@ document.addEventListener('click', event => { if (!event.target.closest?.('#read
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && !$('reader-actions-menu').hidden) { event.preventDefault(); event.stopPropagation(); closeReaderActions(true); }
 }, true);
-window.addEventListener('resize', () => { closeReaderPanels(); closeReaderActions(); closeWordNote(); updateReaderNavigation(); renderReaderGeneration(); });
+window.addEventListener('resize', () => {
+  closeReaderActions(); closeWordNote();
+  const story = readerStory();
+  const position = story && state.readerPositions[`${story.id}:${selectedPath(story).id}`];
+  readerViewport = { width: window.innerWidth, height: window.innerHeight };
+  if ($('reader-dialog').open) {
+    resizingReader = true; restoreReaderPosition(position);
+    for (const name of ['navigation', 'preferences']) if (!$(`reader-${name}-panel`).hidden) positionReaderPanel(name);
+    requestAnimationFrame(() => { resizingReader = false; });
+  }
+  updateReaderNavigation(); renderReaderGeneration();
+});
 $('chapter-select').addEventListener('change', () => { closeReaderPanels(true); state.readerChapter = Number($('chapter-select').value); state.readerVersion = 0; clearExplanationSelection(); updateReader(); });
 $('path-select').addEventListener('change', () => {
   if (state.readerEditBusy) { $('path-select').value = selectedPath().id; return; }
@@ -3151,3 +3198,15 @@ window.visualViewport?.addEventListener('resize',scheduleRecoveryVisibility);
 initializePipeline();
 showStorageErrors();
 refreshModels();
+
+// A recreated page keeps the current tab and reader entry, rather than returning to Create.
+const restoredNavigation = history.state;
+if (['create', 'library', 'profile', 'settings'].includes(restoredNavigation?.lingomageView)) setView(restoredNavigation.lingomageView);
+const restoredStory = state.stories.find(story => story.id === restoredNavigation?.lingomageReader);
+if (restoredStory) {
+  if (restoredStory.paths?.some(path => path.id === restoredNavigation.lingomagePathId)) restoredStory.activePathId = restoredNavigation.lingomagePathId;
+  const position = restoredNavigation.lingomagePosition;
+  if (position?.chapterId && Number.isFinite(position.scrollTop)) state.readerPositions[`${restoredStory.id}:${selectedPath(restoredStory).id}`] = position;
+  state.readerHistoryEntry = true;
+  openReader(restoredStory);
+}

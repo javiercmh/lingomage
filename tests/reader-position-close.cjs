@@ -17,7 +17,7 @@ function build(story) {
   };
   const panel = element('panel');
   Object.defineProperty(panel, 'scrollTop', {get() { return this._top || 0; }, set(value) { this._top = value; if (element('reader-dialog').open) this.rendered = value; }});
-  const context = {saves, history: {state: null, pushState() {}, replaceState() {}, back() {}}, console,
+  const context = {saves, window: {innerWidth: 390, innerHeight: 844}, history: {state: null, pushState() {}, replaceState() {}, back() {}}, console,
     state: {stories: [story], readerPositions: {}, readerEditDraft: null, readerId: null, readerChapter: 0},
     $: element, readerStory: () => context.state.stories.find(item => item.id === context.state.readerId) || null,
     selectedPath: () => ({id: 'original'}), pathChapters: () => [{id: 'c1'}, {id: 'c2'}],

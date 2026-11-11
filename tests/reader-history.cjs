@@ -21,7 +21,7 @@ function build() {
   const context = {log, history, state: {readerPositions: {}, readerEditDraft: null, readerId: null}, $: element, window: {addEventListener: (type, fn) => (listeners[type] ||= []).push(fn)},
     selectionMenuRouter: {reset() {}}, usage: {setReader() {}}, stopExposure() {}, settingsFeedback: {sync() {}}, readerPanel: () => element('panel'),
     closeStoryMenu() {}, clearExplanationSelection() {}, normalizeChapters: s => s.chapters, pathChapters: () => [{id: 'c1'}], selectedPath: () => ({id: 'p'}), updateReader() {}, updateReaderNavigation() {}, renderGenerationRecovery() {},
-    closeReaderPanels() {}, closeReaderActions() {}, stopSpeech() {}, closeWordNote() {}, rememberReaderPosition() {}, persistReaderPosition() {}, setView: name => log.views.push(name), showEditPanel() {}};
+    closeReaderPanels() {}, closeReaderActions() {}, stopSpeech() {}, closeWordNote() {}, restoreReaderPosition(position) { element('panel').scrollTop = position?.scrollTop || 0; }, rememberReaderPosition() {}, rememberReaderLocation() {}, persistReaderPosition() {}, setView: name => log.views.push(name), showEditPanel() {}};
   vm.createContext(context);
   element('word-note-popover').hidden = true;
   vm.runInContext(between('function openReader(', 'readerPanel().addEventListener(\'scroll\''), context);
