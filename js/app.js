@@ -1,10 +1,10 @@
-import { chapterShareText, storyShareText, storyExportFile, deliverShare, importStoryFile, STORY_IMPORT_MAX_BYTES } from './story-share.js';
+import { chapterShareText, storyShareText, storyExportFile, deliverShare, deliverStoryFile, storyFileAction, importStoryFile, STORY_IMPORT_MAX_BYTES } from './story-share.js';
 import { createStoryModel, pathLabel } from './story-model.js';
 import { markStoryActivity, planLibrary, dateSegments, describeDates } from './library-activity.js';
 import { beginMemoryRebuild, finishMemoryRebuild, createStoryMemory } from './story-memory.js';
 import { createGenerationController } from './generation-controller.js';
 import { createReaderPanels } from './reader-panels.js';
-import { ai, readFile, writeFile, listFiles, speech, translation, selectionMenu, share, isNative } from './bridge.js';
+import { ai, readFile, writeFile, listFiles, speech, translation, selectionMenu, share, save, isNative } from './bridge.js';
 import { speakSelection, prepareSpeechOptions, speakChapter, chapterSpeechText } from './reader-speech.js';
 import { createSelectionMenuRouter } from './selection-menu.js';
 import { createReaderActivation, glossaryForTrigger, indexGlossaryTriggers, normalizeReaderControls } from './reader-activation.js';
@@ -2765,7 +2765,7 @@ function openShareDialog(story, {chapterIndex = null, trigger}) {
 function shareKind() { return $('share-file').checked ? 'file' : $('share-chapter').checked ? 'chapter' : 'story'; }
 function updateShareControls() {
   const file = shareKind() === 'file'; $('share-notes').disabled = file;
-  $('share-submit').textContent = share.available ? 'Share' : file && !isNative ? 'Download' : 'Copy';
+  $('share-submit').textContent = file ? storyFileAction({save, share, isNative}) : share.available ? 'Share' : 'Copy';
 }
 for (const id of ['share-chapter', 'share-story', 'share-file']) $(id).addEventListener('change', updateShareControls);
 $('share-cancel').addEventListener('click', () => $('share-dialog').close());
@@ -2788,11 +2788,11 @@ $('share-submit').addEventListener('click', async () => {
     const payload = kind === 'file' ? storyExportFile(context.story, {appVersion:readJson('manifest.json', {}).version}) : {
       title:context.story.title, text:kind === 'chapter' ? chapterShareText(context.story, context.chapter, activeVersion(context.chapter, context.modelStory), {notes}) : storyShareText(context.story, {pathChapters, activeVersion}, {notes})
     };
-    const result = await deliverShare(payload, {share, clipboard:navigator.clipboard, download:downloadStoryFile, isNative});
+    const result = kind === 'file' ? await deliverStoryFile(payload, {save, share, download:downloadStoryFile, isNative}) : await deliverShare(payload, {share, clipboard:navigator.clipboard, isNative});
     if (result.cancelled) return;
     if (result.method) toast(`${kind === 'chapter' ? 'Chapter' : kind === 'file' ? 'Story file' : 'Story'} ${result.method}`);
     if (state.shareDialog === context) $('share-dialog').close();
-  } catch { toast('Could not share the story.'); }
+  } catch (error) { console.warn(error); toast(kind === 'file' ? (error.code === 'too_large' ? 'This story is too large to download.' : 'Could not download the story file.') : 'Could not share the story.'); }
   finally { context.busy = false; $('share-submit').disabled = false; }
 });
 

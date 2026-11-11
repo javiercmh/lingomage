@@ -486,3 +486,31 @@ export const share = {
   text: options => shareCommand('text', options),
   file: options => shareCommand('file', options)
 };
+
+// Save as (AppSave): Android's create-document picker. Resolves {saved:true, name} only after the destination was
+// written, or {saved:false, cancelled:true}. No wrapper timeout: the picker is user-paced and a timer could report a
+// failure for a save that then succeeds. After a page reload the outcome of an earlier call is unknown.
+const SAVE = window.AppSave || null;
+const saveRequests = new Map();
+if (SAVE) SAVE.onmessage = event => {
+  let message;
+  try { message = JSON.parse(event.data); } catch { return; }
+  const pending = saveRequests.get(message && message.id);
+  if (!pending) return;
+  saveRequests.delete(message.id);
+  if (message.error) pending.reject(Object.assign(new Error(message.error.message), {code: message.error.code}));
+  else pending.resolve(message.value);
+};
+function saveCommand(action, options) {
+  if (!SAVE) return Promise.reject(Object.assign(new Error('Save requires a supported App² host.'), {code: 'unavailable'}));
+  const id = `save-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return new Promise((resolve, reject) => {
+    saveRequests.set(id, {resolve, reject});
+    try { SAVE.postMessage(JSON.stringify({id, action, options})); }
+    catch (error) { saveRequests.delete(id); reject(error); }
+  });
+}
+export const save = {
+  available: !!SAVE,
+  text: options => saveCommand('text', options)
+};

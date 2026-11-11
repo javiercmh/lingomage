@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import {chapterShareText, storyShareText, storyExportFile, slugify, deliverShare} from '../js/story-share.js';
+import {chapterShareText, storyShareText, storyExportFile, slugify, deliverShare, deliverStoryFile, storyFileAction} from '../js/story-share.js';
 import {createStoryModel, pathLabel} from '../js/story-model.js';
 const version = {id:'v',title:'買い物',story:'買います。',storySegments:[{text:'買',reading:'か'},{text:'います。'}],glossary:[{word:'買う',meaning:'buy'}]};
 const alternate = {...version,id:'a',title:'別',story:'帰ります。'};
@@ -32,6 +32,26 @@ assert.deepEqual(await deliverShare(file,{clipboard,download,isNative:true}),{me
 assert.deepEqual(await deliverShare({text:'x'},{share:{available:true,text:async()=>{throw Object.assign(Error(),{code:'cancelled'});}},clipboard}),{cancelled:true});
 const count=calls.length;await assert.rejects(deliverShare({text:'x'},{share:{available:true,text:async()=>{throw Error('host failed');}},clipboard}));assert.equal(calls.length,count,'host errors do not silently copy');
 await assert.rejects(deliverShare({text:'x'},{}));
+// Story files download for re-import: Save as, browser download, Sharesheet only without Save as; never the clipboard.
+{
+  const log=[], saveOk={available:true,text:async options=>{log.push(['save',options]);return {saved:true,name:options.name};}};
+  const shareFile={available:true,file:async payload=>log.push(['share',payload])}, dl=async payload=>log.push(['download',payload]);
+  assert.deepEqual(await deliverStoryFile(file,{save:saveOk,share:shareFile,download:dl,isNative:true}),{method:'saved'});
+  assert.deepEqual(log.at(-1),['save',{name:file.name,mimeType:'application/json',content:file.content}]);
+  assert.deepEqual(await deliverStoryFile(file,{save:{available:true,text:async()=>({saved:false,cancelled:true})},share:shareFile,download:dl,isNative:true}),{cancelled:true});
+  assert.deepEqual(await deliverStoryFile(file,{save:{available:false},share:shareFile,download:dl,isNative:false}),{method:'downloaded'});
+  assert.deepEqual(await deliverStoryFile(file,{save:{available:false},share:shareFile,download:dl,isNative:true}),{launched:true});assert.equal(log.at(-1)[0],'share','native never uses <a download>');
+  const count=log.length;
+  await assert.rejects(deliverStoryFile(file,{save:{available:true,text:async()=>{throw Object.assign(Error('big'),{code:'too_large'});}},share:shareFile,download:dl,isNative:true}),error=>error.code==='too_large');
+  assert.equal(log.length,count,'a failed save does not fall back');
+  await assert.rejects(deliverStoryFile(file,{save:{available:false},share:{available:false},isNative:true}),error=>error.code==='unavailable');
+  assert.equal(storyFileAction({save:{available:true},share:{available:true},isNative:true}),'Download');
+  assert.equal(storyFileAction({save:{available:false},share:{available:true},isNative:false}),'Download');
+  assert.equal(storyFileAction({save:{available:false},share:{available:true},isNative:true}),'Share');
+  const app=fs.readFileSync('js/app.js','utf8');
+  assert.match(app,/kind === 'file' \? await deliverStoryFile\(payload, \{save, share, download:downloadStoryFile, isNative\}\) : await deliverShare\(payload, \{share, clipboard:navigator\.clipboard, isNative\}\)/,'story files never reach the clipboard path');
+  console.log('PASS story file downloads via Save as or browser download, never copied; cancel silent; host errors kept');
+}
 // Execute real Library action and dialog close wiring, including rebuilt opener focus.
 const app=fs.readFileSync('js/app.js','utf8');
 const elements=new Map(), element=()=>({children:[],style:{},dataset:{},isConnected:true,append(...children){this.children.push(...children);},setAttribute(){},addEventListener(name,fn){this[name]=fn;},getBoundingClientRect(){return {height:144,top:60,bottom:104,right:300};},focus(){this.focused=true;},remove(){},showModal(){this.open=true;}});
@@ -47,7 +67,7 @@ context.state.libraryStale=true;trigger.isConnected=false;$('share-dialog').clos
 console.log('PASS story sharing canonical text, path selection, notes, complete saved export, delivery and Library focus');
 // Bridge channel: correlation, host errors, malformed replies and timeout cleanup.
 const bridge=fs.readFileSync('js/bridge.js','utf8');
-const bridgeCode=bridge.slice(bridge.indexOf('const SHARE =')).replace('export const share =','globalThis.share =');
+const bridgeCode=bridge.slice(bridge.indexOf('const SHARE ='),bridge.indexOf('// Save as (AppSave)')).replace('export const share =','globalThis.share =');
 let request, timeoutCallback, cleared=0;
 const channel={postMessage(value){request=JSON.parse(value);}};
 const host={window:{AppShare:channel},setTimeout(fn){timeoutCallback=fn;return 1;},clearTimeout(){cleared++;}};
@@ -59,6 +79,16 @@ channel.onmessage({data:JSON.stringify({id:request.id,value:{launched:true}})});
 pending=host.share.file(file);assert.equal(request.action,'file');channel.onmessage({data:JSON.stringify({id:request.id,error:{code:'too_large',message:'Too large'}})});await assert.rejects(pending,error=>error.code==='too_large');
 pending=host.share.text({text:'x'});timeoutCallback();await assert.rejects(pending,error=>error.code==='timeout');
 const absent={window:{},setTimeout,clearTimeout};vm.createContext(absent);vm.runInContext(bridgeCode,absent);assert.equal(absent.share.available,false);await assert.rejects(absent.share.text({text:'x'}),error=>error.code==='unavailable');
+{
+  const saveCode=bridge.slice(bridge.indexOf('const SAVE =')).replace('export const save =','globalThis.save =');
+  let sent;const ch={postMessage(value){sent=JSON.parse(value);}};const h={window:{AppSave:ch}};vm.createContext(h);vm.runInContext(saveCode,h);
+  assert.equal(h.save.available,true);
+  let p=h.save.text({name:'a.lingomage.json',mimeType:'application/json',content:'{}'});assert.equal(sent.action,'text');assert.equal(sent.options.mimeType,'application/json');
+  ch.onmessage({data:'junk'});ch.onmessage({data:JSON.stringify({id:sent.id,value:{saved:true,name:'a.lingomage.json'}})});assert.equal((await p).saved,true);
+  p=h.save.text({name:'b',mimeType:'application/json',content:'{}'});ch.onmessage({data:JSON.stringify({id:sent.id,error:{code:'busy',message:'Busy'}})});await assert.rejects(p,error=>error.code==='busy');
+  const none={window:{}};vm.createContext(none);vm.runInContext(saveCode,none);assert.equal(none.save.available,false);await assert.rejects(none.save.text({}),error=>error.code==='unavailable');
+}
+console.log('PASS AppSave bridge correlation, host errors and unavailable channel');
 console.log('PASS AppShare bridge correlation, launch acknowledgement, host errors, timeout and unavailable channel');
 // Storyline labels derive from saved structure; saved names are never rewritten.
 {

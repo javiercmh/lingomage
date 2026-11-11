@@ -30,7 +30,7 @@ User files are seeded only when absent, preserved by updates and never packaged 
 
 ## Story export
 
-A `.lingomage.json` file contains `{format:"lingomage-story", formatVersion:1, appVersion, exportedAt, story}`. The story is a deep clone of the saved record, including unknown fields, all paths and versions, explanations, memories and memory rebuild state. No settings, checkpoints, usage or learning signals are exported. Sharing never writes a store.
+A `.lingomage.json` file contains `{format:"lingomage-story", formatVersion:1, appVersion, exportedAt, story}`. The story is a deep clone of the saved record, including unknown fields, all paths and versions, explanations, memories and memory rebuild state. No settings, checkpoints, usage or learning signals are exported. Share → Story file downloads it (App² Save as, or a browser download); it is never copied. Sharing never writes a store.
 
 ## Story import
 
