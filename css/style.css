@@ -243,10 +243,10 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 .furigana-control input { width: 20px; height: 20px; accent-color: var(--accent-strong); }
 .story-text ruby { user-select: text; -webkit-user-select: text; }
 .story-text ruby rt, .reader-title ruby rt { user-select: none; -webkit-user-select: none; }
-.story-text.hide-furigana ruby rt, .reader-title.hide-furigana ruby rt { display: none; }
+/* Hidden readings keep their space so toggling furigana never moves the text. */
+.story-text.hide-furigana ruby rt, .reader-title.hide-furigana ruby rt { visibility: hidden; }
 .reader-panel .reader-title ruby rt { color: #a9c5ff; font: 500 12px sans-serif; }
 .reader-panel .reader-title:has(rt) { line-height: 1.7; }
-.reader-panel .reader-title.hide-furigana:has(rt) { line-height: 1.3; }
 .selectable-story { user-select: text; -webkit-user-select: text; cursor: text; }
 .reader-help-section { margin: 20px 0 24px; }
 .reader-help-section > h3 { margin: 0 2px 12px; color: var(--ink); font-size: 19px; font-weight: 700; }
