@@ -1,5 +1,5 @@
 // Nonmodal reader panel interactions with explicit lifecycle and injected DOM.
-export function createReaderPanels({state, $, window, document, getComputedStyle, readerPanel, closeWordNote, persistSettings, toast}) {
+export function createReaderPanels({state, $, window, document, getComputedStyle, readerPanel, closeWordNote, persistSettings, toast, keepReadingLocation = change => change()}) {
   function closeReaderActions(restoreFocus = false) {
     $('reader-actions-menu').hidden = true; $('reader-actions-toggle').setAttribute('aria-expanded', 'false');
     if (restoreFocus) $('reader-actions-toggle').focus();
@@ -63,10 +63,11 @@ export function createReaderPanels({state, $, window, document, getComputedStyle
       cleanup.push(() => target.removeEventListener(type, handler, options));
     };
     for (const name of READER_PANELS) listen($(`reader-${name}-toggle`), 'click', () => toggleReaderPanel(name));
-    listen($('reader-text-size'), 'input', () => setReaderTextSize($('reader-text-size').value));
+    // Resizing text keeps the passage at the middle of the view in place.
+    listen($('reader-text-size'), 'input', () => keepReadingLocation(() => setReaderTextSize($('reader-text-size').value)));
     for (const [id, direction] of [['reader-text-smaller', -1], ['reader-text-larger', 1]]) listen($(id), 'click', () => {
       const slider = $('reader-text-size');
-      setReaderTextSize(Number(slider.value) + direction * Number(slider.step || 1));
+      keepReadingLocation(() => setReaderTextSize(Number(slider.value) + direction * Number(slider.step || 1)));
       try { persistSettings(); } catch (error) { toast(error.message); }
     });
     listen($('reader-text-size'), 'change', () => { try { persistSettings(); } catch (error) { toast(error.message); } });

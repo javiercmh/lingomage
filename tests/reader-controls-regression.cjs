@@ -25,7 +25,7 @@ const c = {state: {readerFontSize: 19, readerEditBusy: false, readerPositions: p
   readerStory: () => story, selectedPath: () => ({id: story.activePathId}),
   pathChapters: () => [{id: 'A'}, {id: 'B'}], rememberReaderPosition() {}, clearExplanationSelection() {},
   persistReaderStory() { if (failed) throw Error('disk'); saved++; },
-  updateReader(keep) { updates.push(keep); }, requestAnimationFrame: fn => fn()
+  updateReader(keep) { updates.push(keep); }, requestAnimationFrame: fn => fn(), restoreReaderPosition(position) { reader.scrollTop = position?.scrollTop || 0; }
 };
 c.readerViewport={width:320,height:640}; c.resizingReader=false; c.restoringPathPosition=false; vm.createContext(c);
 const panels=bindPanels(c);

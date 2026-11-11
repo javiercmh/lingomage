@@ -38,4 +38,4 @@ Library → Import story… reads one chosen `.lingomage.json` file (at most 16 
 
 ## Reading location
 
-Per-path reader positions keep `chapterId` and `scrollTop`, with optional `textOffset`, `textTop` and `versionId` for a canonical text anchor (excluding furigana). Matching versions restore the passage after line wrapping changes; older positions retain pixel restoration. The current view and open reader location also live in the browser history entry for page recreation, without adding navigation entries. These transient fields do not replace story-file persistence.
+Per-path reader positions keep `chapterId` and `scrollTop`, with optional `textOffset` and `versionId`: the canonical offset (excluding furigana) of the story character at the middle of the visible reader. For a matching version that character is centred again after any change in wrapping; otherwise, and for older positions, `scrollTop` is restored. The current view and open reader location also live in the browser history entry for page recreation, without adding navigation entries. These transient fields do not replace story-file persistence.

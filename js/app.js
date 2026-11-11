@@ -1477,7 +1477,7 @@ $('confirm-delete-stories').addEventListener('click', () => {
 });
 // Reader management preserves exact shared versions across surviving paths.
 let restoringPathPosition = false;
-const readerPanels = createReaderPanels({state, $, window, document, getComputedStyle, readerPanel, closeWordNote, persistSettings: trySaveSettings, toast});
+const readerPanels = createReaderPanels({state, $, window, document, getComputedStyle, readerPanel, closeWordNote, persistSettings: trySaveSettings, toast, keepReadingLocation: change => keepReaderLocation(change)});
 const { closeReaderActions, closeReaderPanels, positionReaderPanel, toggleReaderPanel, setReaderTextSize, updateReaderNavigation } = readerPanels;
 function renderReaderActions() {
   const story = readerStory(); if (!story) return;
@@ -1772,42 +1772,80 @@ function showWordNote(trigger, notes, surface = '', helpId = '') {
   });
 }
 function readerPanel() { return $('reader-dialog').querySelector('.reader-panel'); }
-// Canonical offsets exclude ruby readings and survive a change in line wrapping.
+// The reading location is the story character at the middle of the visible reader. Canonical
+// offsets exclude ruby readings, so the same passage can be centred again after wrapping changes.
+function readerViewMiddle() {
+  const box = readerPanel().getBoundingClientRect();
+  return { x: (box.left + box.right) / 2, y: (Math.max(0, box.top) + Math.min(window.innerHeight, box.bottom)) / 2 };
+}
+// Line breaks and other unrendered characters have no box; measure the next visible one.
+function storyCharRect(root, offset, length) {
+  for (let index = offset; index < Math.min(length, offset + 16); index++) {
+    const rect = canonicalRange(root, index, index + 1)?.getBoundingClientRect();
+    if (rect?.height > 0) return rect;
+  }
+  return null;
+}
 function readerTextAnchor() {
-  const root = $('reader-story');
-  if (!root.textContent || typeof canonicalRange !== 'function') return {};
-  const text = activeVersion().story || '', top = readerPanel().getBoundingClientRect().top + 64;
+  const root = $('reader-story'); if (!root.textContent) return {};
+  const text = activeVersion().story || ''; if (!text) return {};
+  const middle = readerViewMiddle();
+  // First character whose line reaches the middle of the view.
   let low = 0, high = text.length;
   while (low < high) {
-    const middle = Math.floor((low + high) / 2);
-    const rect = canonicalRange(root, middle, middle + 1)?.getBoundingClientRect();
-    if (!rect || rect.bottom <= top) low = middle + 1; else high = middle;
+    const index = Math.floor((low + high) / 2), rect = storyCharRect(root, index, text.length);
+    if (!rect || rect.bottom <= middle.y) low = index + 1; else high = index;
   }
-  if (low >= text.length) return {};
-  const rect = canonicalRange(root, low, low + 1).getBoundingClientRect();
-  // Above the prose (title, edit form, etc.) keep the ordinary scroll offset.
-  if (rect.top > top + 64) return {};
-  return { textOffset: low, textTop: rect.top - readerPanel().getBoundingClientRect().top, versionId: activeVersion().id };
+  const line = low < text.length && storyCharRect(root, low, text.length);
+  // With the title above or the explanations below the middle, keep the pixel offset alone.
+  if (!line || line.top - middle.y > line.height * 2) return {};
+  // Then the character on that line nearest the horizontal middle.
+  const sameLine = rect => rect && Math.abs(rect.top - line.top) < line.height / 2;
+  let left = low, right = Math.min(text.length, low + 400);
+  while (left < right) {
+    const index = Math.floor((left + right) / 2), rect = storyCharRect(root, index, text.length);
+    if (!sameLine(rect) || rect.right > middle.x) right = index; else left = index + 1;
+  }
+  const offset = left < text.length && sameLine(storyCharRect(root, left, text.length)) ? left : Math.max(low, left - 1);
+  return { textOffset: offset, versionId: activeVersion().id };
 }
 function restoreReaderPosition(position) {
   const panel = readerPanel();
   panel.scrollTop = position?.scrollTop || 0;
-  if (!Number.isInteger(position?.textOffset) || position.textOffset < 0 || position.textOffset >= (activeVersion().story || '').length || !Number.isFinite(position.textTop) || position.versionId !== activeVersion().id) return;
-  const rect = canonicalRange($('reader-story'), position.textOffset, position.textOffset + 1)?.getBoundingClientRect();
-  if (rect) panel.scrollTop += rect.top - panel.getBoundingClientRect().top - position.textTop;
+  if (!Number.isInteger(position?.textOffset) || position.textOffset < 0) return;
+  const version = activeVersion(), text = version.story || '';
+  if (position.textOffset >= text.length || position.versionId !== version.id) return;
+  const rect = storyCharRect($('reader-story'), position.textOffset, text.length);
+  if (rect) panel.scrollTop += (rect.top + rect.bottom) / 2 - readerViewMiddle().y;
+  restoredScrollTop = panel.scrollTop;
 }
+// The offset a restore produced: its own scroll events must not pick a new anchor from the recentred view.
+let restoredScrollTop = null;
 function rememberReaderLocation() {
   if (!$('reader-dialog').open) return;
   const story = readerStory();
   history.replaceState?.({ ...history.state, lingomageReader: story.id, lingomagePathId: selectedPath(story).id, lingomagePosition: state.readerPositions[`${story.id}:${selectedPath(story).id}`] }, '');
 }
 let resizingReader = false;
+// The viewport the reader was laid out for; recorded when it opens and on every resize.
 let readerViewport = { width: window.innerWidth, height: window.innerHeight };
 function rememberReaderPosition() {
   // A closed dialog is display:none and reports scrollTop 0; keep the position recorded while it was open.
   const story = readerStory(); if (!story || !$('reader-dialog').open) return;
   if (resizingReader || readerViewport.width !== window.innerWidth || readerViewport.height !== window.innerHeight) return;
+  if (restoredScrollTop !== null && readerPanel().scrollTop === restoredScrollTop) return;
+  restoredScrollTop = null;
   state.readerPositions[`${story.id}:${selectedPath(story).id}`] = { chapterId: activeChapter(story).id, scrollTop: readerPanel().scrollTop, ...readerTextAnchor() };
+}
+// Rotation, text size and furigana reflow the story: the remembered middle passage is centred
+// again, and the scrolls that reflow causes never replace it.
+function keepReaderLocation(change = () => {}) {
+  change();
+  const story = readerStory(); if (!story || !$('reader-dialog').open) return;
+  const position = state.readerPositions[`${story.id}:${selectedPath(story).id}`];
+  if (position?.chapterId !== activeChapter(story).id) return;
+  resizingReader = true; restoreReaderPosition(position);
+  requestAnimationFrame(() => { resizingReader = false; });
 }
 // Positions live in memory while scrolling; they are saved with the story when the reader closes or the page is hidden.
 function persistReaderPosition() {
@@ -1840,7 +1878,7 @@ function openReader(story) {
   const entry = { ...(history.state && typeof history.state === 'object' ? history.state : {}), lingomageReader: story.id };
   if (state.readerHistoryEntry) history.replaceState(entry, ''); else history.pushState(entry, '');
   state.readerHistoryEntry = true;
-  selectionMenuRouter.reset(); $('reader-dialog').showModal(); usage.setReader({ storyId: story.id, language: story.language }); restoreReaderPosition(position); rememberReaderPosition(); rememberReaderLocation(); updateReaderNavigation(); renderGenerationRecovery(); settingsFeedback.sync();
+  selectionMenuRouter.reset(); $('reader-dialog').showModal(); usage.setReader({ storyId: story.id, language: story.language }); readerViewport = { width: window.innerWidth, height: window.innerHeight }; restoreReaderPosition(position); rememberReaderPosition(); rememberReaderLocation(); updateReaderNavigation(); renderGenerationRecovery(); settingsFeedback.sync();
 }
 $('reader-dialog').addEventListener('close', () => {
   usage.setReader(null); stopExposure();
@@ -2998,13 +3036,11 @@ document.addEventListener('keydown', event => {
 }, true);
 window.addEventListener('resize', () => {
   closeReaderActions(); closeWordNote();
-  const story = readerStory();
-  const position = story && state.readerPositions[`${story.id}:${selectedPath(story).id}`];
   readerViewport = { width: window.innerWidth, height: window.innerHeight };
   if ($('reader-dialog').open) {
-    resizingReader = true; restoreReaderPosition(position);
+    // Refit the title first: its stale width would wrap it and move the story after centring.
+    keepReaderLocation(fitReaderTitle);
     for (const name of ['navigation', 'preferences']) if (!$(`reader-${name}-panel`).hidden) positionReaderPanel(name);
-    requestAnimationFrame(() => { resizingReader = false; });
   }
   updateReaderNavigation(); renderReaderGeneration();
 });
@@ -3018,13 +3054,13 @@ $('path-select').addEventListener('change', () => {
   state.readerChapter = Math.max(0, pathChapters(story).findIndex(chapter => chapter.id === position?.chapterId));
   const keepNavigation = !$('reader-navigation-panel').hidden;
   $('reader-edit-panel').hidden = true; state.readerEditDraft = null; updateReader(keepNavigation);
-  restoringPathPosition = true; readerPanel().scrollTop = position?.scrollTop || 0;
+  restoringPathPosition = true; restoreReaderPosition(position);
   requestAnimationFrame(() => { restoringPathPosition = false; if (keepNavigation && !$('reader-navigation-panel').hidden) positionReaderPanel('navigation'); });
 });
 $('chapter-prev').addEventListener('click', () => { if (state.readerChapter > 0) { state.readerChapter--; clearExplanationSelection(); } updateReader(); });
 $('chapter-next').addEventListener('click', () => { if (state.readerChapter < pathChapters(readerStory()).length - 1) { state.readerChapter++; clearExplanationSelection(); } updateReader(); });
 readerPanels.initialize();
-$('furigana-toggle').addEventListener('change', () => { state.furigana = $('furigana-toggle').checked; $('reader-story').classList.toggle('hide-furigana', !state.furigana); document.querySelectorAll('#reader-help .story-text').forEach(node => node.classList.toggle('hide-furigana', !state.furigana)); trySaveSettings(); });
+$('furigana-toggle').addEventListener('change', () => { state.furigana = $('furigana-toggle').checked; keepReaderLocation(() => $('reader-story').classList.toggle('hide-furigana', !state.furigana)); document.querySelectorAll('#reader-help .story-text').forEach(node => node.classList.toggle('hide-furigana', !state.furigana)); trySaveSettings(); });
 function showEditPanel(mode) {
   if (state.readerEditBusy) return;
   const story = readerStory(), version = activeVersion();

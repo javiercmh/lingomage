@@ -238,7 +238,7 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 .reader-panel .story-text { margin-bottom: 10px; }
 .reader-dialog { width: 100%; max-width: none; height: 100dvh; max-height: 100dvh; margin: 0; inset: 0; }
 .reader-dialog::backdrop { background: var(--paper); backdrop-filter: none; }
-.reader-panel { width: 100%; max-width: 780px; height: 100%; max-height: 100%; margin: 0 auto; padding: calc(12px + var(--sa-top)) max(18px, var(--sa-right)) calc(24px + var(--sa-bottom)) max(18px, var(--sa-left)); border: 0; border-radius: 0; background: #0f172a; overflow: auto; }
+.reader-panel { width: 100%; max-width: 780px; height: 100%; max-height: 100%; margin: 0 auto; padding: calc(12px + var(--sa-top)) max(18px, var(--sa-right)) calc(24px + var(--sa-bottom)) max(18px, var(--sa-left)); border: 0; border-radius: 0; background: #0f172a; overflow: auto; overflow-anchor: none; }
 .furigana-control { display: flex; min-height: 44px; align-items: center; gap: 7px; color: var(--muted); font-size: 13px; }
 .furigana-control input { width: 20px; height: 20px; accent-color: var(--accent-strong); }
 .story-text ruby rt { user-select: none; -webkit-user-select: none; }
