@@ -173,6 +173,8 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 .story-menu-toggle svg { width: 20px; height: 20px; }
 .story-menu-toggle circle { fill: currentColor; stroke: none; }
 .library-heading .library-count { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+.library-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.library-import-btn { width: auto; min-height: 44px; padding: 0 14px; }
 .library-sort { display: block; flex: 0 0 auto; }
 .library-sort[hidden], .language-chips[hidden] { display: none; }
 .library-sort .filter-select { min-height: 44px; max-width: 170px; }

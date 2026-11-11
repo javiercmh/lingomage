@@ -1,4 +1,4 @@
-import { chapterShareText, storyShareText, storyExportFile, deliverShare } from './story-share.js';
+import { chapterShareText, storyShareText, storyExportFile, deliverShare, importStoryFile, STORY_IMPORT_MAX_BYTES } from './story-share.js';
 import { createStoryModel, pathLabel } from './story-model.js';
 import { markStoryActivity, planLibrary, dateSegments, describeDates } from './library-activity.js';
 import { beginMemoryRebuild, finishMemoryRebuild, createStoryMemory } from './story-memory.js';
@@ -2796,6 +2796,37 @@ $('share-submit').addEventListener('click', async () => {
   finally { context.busy = false; $('share-submit').disabled = false; }
 });
 
+// Library → Import story…: a standard file input (App² serves Android's document picker). The copy gets a new
+// identity and joins the Library through the normal stories save; cancellation and any failure leave data unchanged.
+async function importStoryFromFile(file) {
+  if (file.size > STORY_IMPORT_MAX_BYTES) throw Object.assign(new Error('too large'), {userMessage:'This file is too large to be a LingoMage story file.'});
+  let text;
+  try { text = await file.text(); } catch { throw Object.assign(new Error('unreadable'), {userMessage:'Could not read this file.'}); }
+  workspaceStorage.assertWritable(['data/stories.json']);
+  const story = importStoryFile(text, {existingIds:state.stories.map(item => item.id), normalizeChapters});
+  markStoryActivity(story, new Date(), 'updated');
+  state.stories.unshift(story);
+  try { persistStories(); }
+  catch (error) { state.stories = state.stories.filter(item => item !== story); throw error; }
+  return story;
+}
+$('import-story').addEventListener('click', () => {
+  const input = $('import-story-input');
+  input.value = ''; // choosing the same file again must fire change
+  input.click();
+});
+$('import-story-input').addEventListener('change', async () => {
+  const input = $('import-story-input'), file = input.files?.[0];
+  if (!file || state.importingStory) return; // cancelled: nothing changes, no message
+  state.importingStory = true; $('import-story').disabled = true;
+  try {
+    const story = await importStoryFromFile(file);
+    libraryChanged(); toast(`Imported “${story.title || 'Untitled story'}”`);
+  } catch (error) {
+    console.warn(error);
+    toast(error.userMessage || (['store_invalid', 'write_failed'].includes(error.code) ? error.message : 'Could not import the story. Your stories are unchanged.'));
+  } finally { state.importingStory = false; $('import-story').disabled = false; input.value = ''; $('import-story').focus({preventScroll:true}); }
+});
 $('reader-share').addEventListener('click', () => {
   const story = readerStory(); if (!story) return;
   closeReaderActions(); openShareDialog(story, {chapterIndex:state.readerChapter, trigger:$('reader-actions-toggle')});
