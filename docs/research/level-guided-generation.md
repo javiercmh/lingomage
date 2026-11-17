@@ -24,6 +24,14 @@ Official orientation sources (stable keys `councilEuropeCEFRLevels`, `jlptLevelS
 
 A two-call language-plan/writing pipeline, maximum five practice vocabulary candidates and two grammar focuses, and Scene/Chapter scopes (Longer passage retired) are product assumptions. No cited study validates those counts or stages. Removing the former story-length quota gives context room to develop; it is not a research claim that longer or unrestricted texts are better. Candidates may be omitted to preserve natural prose. There is no reader-feedback or automatic advancement feature.
 
+## Scene-specific vocabulary
+
+Consensus follow-up on 2026-11-17. Reviewed the vocabulary-selection paper and the reading-study abstracts.
+
+- `hidalgoRufat2022VocabularySelection` compared corpus frequency, native-speaker lexical availability and Instituto Cervantes thematic inventories. The sources covered different needs. The published pilot reports body parts and draws its native-speaker sample from Spain. This supports consulting complementary sources and checking regional usage when selecting examples. [Paper](https://dialnet.unirioja.es/descarga/articulo/8816136.pdf)
+- `pulido2007LexicalInferencing` studied 35 adult L2 Spanish learners reading narratives with invented target words. Topic familiarity and knowledge of the surrounding vocabulary were associated with successful inference. [DOI](https://doi.org/10.1093/applin/aml049)
+- `kaivanpanahRahimi2017ContextualClues` studied 67 learners of English. More contextual clues and topic familiarity helped, with about 56% inference accuracy overall. The two reading studies used human-authored texts. Accessible clues in generated prose are an evidence-informed design choice awaiting qualified review across the four languages. [DOI](https://doi.org/10.30827/digibug.53951)
+
 ## Open validation
 
 Qualified review across all four languages and low, middle and high levels; usability evaluation; learner comprehension and retention. Offline fixtures verify engineering behavior, not language suitability.

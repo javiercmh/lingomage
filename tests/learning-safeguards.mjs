@@ -1,3 +1,4 @@
+import { PLAN_INSTRUCTIONS } from '../js/story-generation.js';
 import { bindGeneration } from './support/controllers.mjs';
 import { failureInfo, recoverySummary, operationLabel, discardFailureMessage } from '../js/generation-errors.js';
 import { progressSummary } from '../js/generation-progress.js';
@@ -69,6 +70,17 @@ for (const language of ['German','Japanese','Russian','Spanish']) {
 }
 for (const text of ['Define most meaningful vocabulary','including common words','fixed canonical chapter','Every form must be copied exactly','English explanations only','At least one useful note','do not pad a quota']) assert.ok(NOTES_INSTRUCTIONS.includes(text),text);
 assert.ok(prompts.storyInstructions('Russian','A1','test').includes('canonical title and story'));
+for (const text of ['everyday terms and expressions', 'Use guidance to flag', 'nearby clue in simpler language', 'especially at beginner levels', 'fewer or none are allowed']) {
+  assert.ok(PLAN_INSTRUCTIONS.includes(text), text);
+}
+for (const prompt of [
+  prompts.storyInstructions('Spanish', 'A1', 'Use connected simple clauses.'),
+  ...['continue', 'rewrite'].map(mode => prompts.chapterInstructions('Spanish', 'A1', 'Use connected simple clauses.', mode)),
+]) {
+  for (const text of ['familiar words and constructions for the surrounding narration', 'everyday terms and expressions', 'At beginner levels', 'matters to understanding what happens', 'nearby clue in simpler language', 'At higher levels']) {
+    assert.ok(prompt.includes(text), text);
+  }
+}
 tested('LANG-008');
 // Exercise the production renderer: notes stay inline and canonical text is intact.
 function element(tag) { return {tagName:tag,children:[],events:{},querySelector(tag){return this.children.find(node=>node.tagName===tag) || null;},append(...nodes){this.children.push(...nodes);},setAttribute(){},addEventListener(n,f){this.events[n]=f;},set textContent(v){this.children=v?[{textContent:v}]:[];},get textContent(){return this.children.map(n=>n.textContent).join('');}}; }

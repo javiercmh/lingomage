@@ -11,6 +11,7 @@
 - **Level:** one self-selected Reading level per language with a short English reading-task description, plus separate regional and tone preferences; per-story and per-version overrides. Labels orient generation; they do not measure proficiency. CEFR names are explanatory shorthand; JLPT and TORFL keep their own labels. New generation requires an explicit selection; no conversion from old bands is guessed.
 - **Scope instead of quotas:** Scene (default) or Chapter replaces numeric word and sentence quotas (safeguard LANG-001 retired). Longer passage was dropped because it was hard to distinguish from Chapter (product decision); saved `longer` reads as Chapter. A 30000-unit technical bound remains.
 - **Language plan:** a bounded optional plan first (at most five vocabulary candidates and two grammar focuses, possibly none), then natural prose, then contextual notes ([PED-002](PED-002-contextual-reading-support.md)), then Japanese readings. Focuses are optional practice targets, not an allowed-language list or a repetition schedule; coherence and suitable surrounding language take priority over coverage. The five candidates do not cap the glossary. Underlines are support links, not measured unknown-word coverage.
+- **Scene vocabulary:** use familiar surrounding narration and keep everyday terms that fit the scene. At beginner levels, support a potentially unfamiliar term essential to understanding events with a nearby clue in simpler language. At higher levels, allow more precision and subtler cues. This evidence-informed writing rule is a product assumption. See the [research review](../research/level-guided-generation.md#scene-specific-vocabulary).
 - **No adaptive progression:** no reader feedback or automatic level change. Lookup signals ([PED-005](PED-005-consultation-signals.md)) never change the level, guidance or plan.
 - Stages are checkpointed before acknowledgement; retries are explicit ([runtime](../architecture/generation-pipeline.md#generation)).
 
@@ -52,3 +53,4 @@ Level choices confuse learners, generated prose is consistently unsuitable for t
 - 2026-10-14: prose candidate prepared (not shipped).
 - 2026-10-19: evidence note on repetition and extensive reading; no behavior change.
 - 2026-11-08: lookup signals confirmed not to affect the level.
+- 2026-11-17: added scene-specific vocabulary and accessible contextual clues to planning and writing (prompt 2026-11-17.1).

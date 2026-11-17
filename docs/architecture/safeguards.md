@@ -2,6 +2,8 @@
 
 The current App² product is the specification. The former Kotlin application supplies selected implementation techniques and test cases, not a curriculum to reinstate. Its last retained source is [commit f8fef125](https://github.com/javiercmh/lingomage/tree/f8fef1255e608240301a13202168d4f6c41a1fea/android). Git preserves it; no copied native source is needed in the subapp.
 
+The LANG-008 prompt-contract test checks scene vocabulary guidance in planning and in Create, Continue and Rewrite. Whether an output uses natural terms and gives accessible clues requires qualified language review.
+
 ## Adopted, adapted and rejected decisions
 
 | Legacy candidate | Decision | Current behavior and rationale |
