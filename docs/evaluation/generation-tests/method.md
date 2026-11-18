@@ -20,7 +20,7 @@ Validated prose is saved before its request is released. Rejected notes retain p
 
 ## Running
 
-Use Node 22+ and Python 3.9+, with no project dependencies. Start a dedicated server (not the server currently serving learner work):
+Use Node 22+ and Python 3.12+, with no project dependencies. Start a dedicated server (not the server currently serving learner work):
 
 ```sh
 python3 dev_server.py 8889 --chatgpt

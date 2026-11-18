@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Dependency-free test entry point. Run from any directory with Python 3.9+ and Node 22."""
+"""Dependency-free test entry point. Run from any directory with Python 3.12+ and Node 22."""
 import json
 import re
 import subprocess

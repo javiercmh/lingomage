@@ -32,7 +32,7 @@ Reading levels are targets you choose, not official assessments.
 
 ## For developers
 
-Plain HTML, CSS and JavaScript, with no build step. To preview in your browser (Python 3.9+), run:
+Plain HTML, CSS and JavaScript, with no build step. To preview in your browser (Python 3.12+), run:
 
 ```sh
 python3 dev_server.py --mock-ai

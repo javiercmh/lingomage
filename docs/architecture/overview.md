@@ -5,7 +5,7 @@ What the app is made of: platform, modules, version constants and tests. Archite
 ## Overview
 
 - Dependency-free HTML/CSS/JavaScript App² subapp at the repository root; no build step, framework, native code or production server. Historical Kotlin is in Git; the [safeguard audit](safeguards.md) records what was adopted.
-- `dev_server.py` (Python 3.9+) serves the workspace for browser testing with deterministic `--mock-ai`, or development-only `--chatgpt` through the Codex CLI login.
+- `dev_server.py` (Python 3.12+) serves the workspace for browser testing with deterministic `--mock-ai`, or development-only `--chatgpt` through the Codex CLI login.
 - Versions: prompt `PROMPT_VERSION` in `js/app.js`, safeguards `SAFEGUARD_VERSION` in `js/learning-validation.js`, memory `MEMORY_VERSION` and memory prompts `SUMMARY_PROMPT_VERSION`/`COMPACTION_PROMPT_VERSION` in `js/story-memory.js`, app `version` in `manifest.json`.
 
 ## Modules
@@ -22,6 +22,6 @@ What the app is made of: platform, modules, version constants and tests. Archite
 
 ## Testing
 
-- `python3 scripts/check.py` (Node 22.12+, Python 3.9+) runs every Node and Python test.
+- `python3 scripts/check.py` (Node 22.12+, Python 3.12+) runs every Node and Python test.
 - `python3 scripts/browser_smoke.py` prints a runner URL; Run smoke checks needs its disposable-workspace marker and offline mock. It covers the four language flows, notes, reopening, continuation and rewrite, cancel/reload/resume, malformed and blank stores with Retry loading, unreadable settings and injected settings write failures. `tests/browser/inspect.html` gives screenshot fixtures for recovery and write-failure states. `tests/app-startup.mjs` boots `js/app.js` against a stub DOM.
 - Mock fixtures establish interface and contract behavior only. Host (Android) behavior is tested in App², not here; live-model evidence is in the [generation test results](../evaluation/generation-tests/results.md).
