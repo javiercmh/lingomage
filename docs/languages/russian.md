@@ -5,7 +5,7 @@ Shared rules: [languages README](README.md).
 ## Current requirements
 
 - **Cyrillic only** (confirmed requirement) for story text, notes and headwords, including names; no Latin transliteration anywhere. Target-script validation rejects Latin text. Cyrillic literacy is assumed.
-- **Stress marks** absent by default (product simplification preserving normal spelling) but allowed when the learner requests them; the earlier unconditional rejection is retired. Intent is prompt guidance, not a validator ban.
+- **Stress marks** absent by default (product simplification preserving normal spelling) in story prose and generated examples unless the learner requests them. Vocabulary notes show lexical stress on dictionary headwords, with ё retained as written. Headwords are saved without combining acute marks, with optional stress positions for display.
 - Correct case, number, gender, aspect and agreement; notes link inflected forms to dictionary headwords.
 
 ## Earlier designs
@@ -16,7 +16,6 @@ Shared rules: [languages README](README.md).
 ## Open questions
 
 - Whether learners need Cyrillic instruction.
-- Where stress marks help (stories, notes) and how ё is treated.
 - Vocabulary representation: dictionary form, gender, inflected forms.
 - Grammar progression: cases, aspect, agreement, tenses.
 

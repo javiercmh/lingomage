@@ -1,4 +1,5 @@
 import { localCalendar } from './usage-stats.js';
+import { stripRussianStress } from './reader-text.js';
 import { emptySignals } from './workspace-storage.js';
 
 // Learning signals (PED-005). Records what the learner looked up and which tracked items they later met
@@ -19,7 +20,8 @@ const nfc = value => String(value ?? '').normalize('NFC');
 const selectionText = value => nfc(value).trim().replace(/\s+/g, ' ');
 // One item per word or passage text. Glossary meanings are written per chapter, so they are not part of the
 // identity: a note and a selection of the same text, or the same headword in two chapters, are one item.
-export const itemKey = word => selectionText(word).toLocaleLowerCase();
+const lexicalText = (text, language) => language === 'ru' ? stripRussianStress(text) : text;
+export const itemKey = (word, language) => lexicalText(selectionText(word), language).toLocaleLowerCase();
 const dayNumber = key => { const [y, m, d] = key.split('-').map(Number); return Date.UTC(y, m - 1, d) / 86400000; };
 export const daysBetween = (from, to) => Math.max(0, dayNumber(to) - dayNumber(from));
 const lookups = item => Object.values(item.counts).reduce((sum, value) => sum + value, 0);
@@ -88,12 +90,13 @@ function mergeItem(old, item) {
 
 // Re-keys items saved under older keys (headword|meaning, sel:text) and merges duplicates. Idempotent.
 function rekey(signals) {
-  for (const lang of Object.values(signals.languages)) {
+  for (const [language, lang] of Object.entries(signals.languages)) {
     if (!lang.items) continue;
     const items = {};
     for (const item of Object.values(lang.items)) {
       if (item.meaning && !item.meanings) item.meanings = meaningsOf(item);
-      const key = itemKey(item.word);
+      item.word = lexicalText(item.word, language);
+      const key = itemKey(item.word, language);
       if (items[key]) mergeItem(items[key], item); else items[key] = item;
     }
     lang.items = items;
@@ -145,9 +148,9 @@ export function createSignalsTracker({clock = {now: () => Date.now()}, calendar 
     // meaning) or 'selection' (canonical selected text, without readings); both are keyed by text.
     record({language, kind, word, meaning = '', action, sentence = '', where = ''}) {
       if (!LANGUAGE_ID.test(language || '') || !['note', 'selection'].includes(kind) || !/^[a-z][a-z0-9-]{0,31}$/.test(action || '')) return false;
-      const text = kind === 'note' ? nfc(word).trim() : selectionText(word);
+      const text = lexicalText(kind === 'note' ? nfc(word).trim() : selectionText(word), language);
       if (!text) return false;
-      const key = itemKey(text), now = clock.now(), tag = `${language}\u0000${key}\u0000${action}`;
+      const key = itemKey(text, language), now = clock.now(), tag = `${language}\u0000${key}\u0000${action}`;
       if (now - (recent.get(tag) ?? -Infinity) < DEDUPE_MS) return false;
       recent.set(tag, now);
       const date = today(), items = languageData(language).items ||= {};
@@ -183,10 +186,10 @@ export function createSignalsTracker({clock = {now: () => Date.now()}, calendar 
       marks[paragraphIndex] = date;
       const day = (lang.reading ||= {})[date] ||= {words:0, paragraphs:0};
       day.words += Math.max(0, Math.round(words || 0)); day.paragraphs += 1;
-      const items = lang.items || {}, paragraph = selectionText(text).toLocaleLowerCase();
+      const items = lang.items || {}, paragraph = itemKey(text, language);
       const seen = new Map();
       // Note items are seen through glossary matches (any inflected form); selection items as literal text.
-      for (const note of notes) { const key = itemKey(note.word); if (items[key]?.kind === 'note') seen.set(key, (seen.get(key) || 0) + (note.count || 1)); }
+      for (const note of notes) { const key = itemKey(note.word, language); if (items[key]?.kind === 'note') seen.set(key, (seen.get(key) || 0) + (note.count || 1)); }
       for (const [key, item] of Object.entries(items)) if (item.kind === 'selection') { const found = occurrences(paragraph, key); if (found) seen.set(key, found); }
       for (const [key, found] of seen) {
         const item = items[key];

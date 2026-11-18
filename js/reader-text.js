@@ -308,3 +308,16 @@ export function applyExplainedMarks(container, ranges) {
     node.replaceWith(fragment);
   }
 }
+
+
+// Russian lexical stress is a combining acute. Keep ё, й and all other spelling intact.
+export function stripRussianStress(text) {
+  return text.normalize('NFC').replace(/\u0301/gu, '');
+}
+
+export function withRussianStress(word, positions) {
+  if (!Array.isArray(positions)) return word;
+  return Array.from(word, (letter, index) =>
+    positions.includes(index) && /[аеёиоуыэюя]/iu.test(letter) ? letter + '\u0301' : letter
+  ).join('');
+}

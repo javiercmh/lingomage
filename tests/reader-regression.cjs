@@ -191,6 +191,14 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   const view=popover.childNodes[popover.childNodes.length-1];
   assert.equal(view.className,'word-note-view');assert.equal(view.textContent,'View saved explanation ↓');assert.equal(view.type,'button');
   await view.events.click();assert.deepEqual(revealed,['h7'],'View reuses the saved-card reveal once');assert.equal(popover.hidden,true,'View closes the note');
+  noteUi.readerStory=()=>({language:'ru'});
+  const russianNote={word:'молоко',meaning:'milk',stress:[5]};
+  noteUi.closeWordNote();noteUi.showWordNote(trigger,[russianNote],'Молоко');
+  assert.equal(popover.childNodes[0].childNodes[0].childNodes[0].textContent,'Молоко\u0301');
+  assert.equal(popover.childNodes[0].childNodes[0].childNodes[1].attributes['aria-label'],'Listen to Молоко');
+  noteUi.closeWordNote();noteUi.showWordNote(trigger,[russianNote],'молока');
+  assert.equal(popover.childNodes[0].childNodes[1].textContent,'Dictionary form: молоко\u0301');
+
   console.log('PASS note offers View saved explanation only for activated text with one, closing the note before revealing the card');
   console.log('PASS glossary Listen speaks the text form (dictionary form follows) with source locale, restores focus and disables browser playback');
 

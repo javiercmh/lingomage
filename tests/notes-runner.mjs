@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import http from 'node:http';import {spawn} from 'node:child_process';
 const directory=fs.mkdtempSync(path.join(os.tmpdir(),'notes-runner-'));
 const manifest=JSON.parse(fs.readFileSync('docs/evaluation/generation-tests/notes-prompt-experiment/corpus.json'));
-manifest.cases=manifest.cases.slice(0,1);manifest.focused=[];fs.writeFileSync(path.join(directory,'corpus.json'),JSON.stringify(manifest));
+manifest.cases=manifest.cases.slice(0,1);manifest.focused=[];
+// The runner invokes today's validator. Keep the published experimental corpus frozen.
+for (const file of Object.keys(manifest.validatorSources)) manifest.validatorSources[file]=fs.readFileSync(file,'utf8');
+fs.writeFileSync(path.join(directory,'corpus.json'),JSON.stringify(manifest));
 let starts=0,failRelease=true,valid=false;const requests=new Map();
 const server=http.createServer(async(req,res)=>{
  res.setHeader('Content-Type','application/json');

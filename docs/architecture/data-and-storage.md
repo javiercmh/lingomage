@@ -26,6 +26,8 @@ User files are seeded only when absent, preserved by updates and never packaged 
 
 ## Library activity
 
+Russian glossary entries store an unstressed `word` and optional zero-based `stress` character positions. `forms` still records exact text from the chapter. Lookup history folds Russian combining acute marks out of item keys and saved words while retaining ё and й. Older notes can omit the annotation.
+
 A saved follow-up edit replaces its question and answer and drops the later entries in the same explanation's ordered history, including examples. The story write updates legacy latest-detail fields in the same operation and rolls back the whole edit if the write fails. Deleting one follow-up preserves other entries and updates or clears the legacy latest-detail fields in the same write.
 
 `lastActivityAt` (optional ISO string on a story) orders the Library and drives "Updated". It is stamped in the same save as new content: on first save of a new story with `lastActivityKind: "created"`, and on saving a continue, rewrite, examples, explanation or detail result (`updated`). It is also stamped (`updated`) on an imported story. It rolls back with the content if the save fails, is never lowered, and is not stamped by opening, scrolling, reader positions, pre-request saves, path switching, removals, deletion, failed or cancelled requests, checkpoint stages or story-memory rebuilds; re-applying an operation does not restamp. Stories without it derive activity from the latest valid `createdAt` among story, chapters, versions, explanations and follow-ups (ignoring invalid values and those over a day in the future). Presentation only: prompts, provenance and `PROMPT_VERSION` are unaffected; nothing is backfilled.

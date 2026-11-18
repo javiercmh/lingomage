@@ -8,7 +8,7 @@ import { ai, readFile, writeFile, listFiles, speech, translation, selectionMenu,
 import { speakSelection, prepareSpeechOptions, speakChapter, chapterSpeechText } from './reader-speech.js';
 import { createSelectionMenuRouter } from './selection-menu.js';
 import { createReaderActivation, glossaryForTrigger, indexGlossaryTriggers, normalizeReaderControls } from './reader-activation.js';
-import { annotatedText, applyExplainedMarks, findGlossaryMatches, getCanonicalSelection, japaneseSegments } from './reader-text.js';
+import { annotatedText, applyExplainedMarks, findGlossaryMatches, getCanonicalSelection, japaneseSegments, stripRussianStress, withRussianStress } from './reader-text.js';
 import { markParagraphGaps } from './paragraph-gaps.js';
 import { SPEECH_RATES, canonicalRange, createReaderPlayer, speechUnits } from './reader-player.js';
 import { createPipeline, pendingRequests } from './generation-pipeline.js';
@@ -33,7 +33,7 @@ const SPEECH_LANGUAGES = { de: 'de-DE', ja: 'ja-JP', ru: 'ru-RU', 'es-CL': 'es-C
 const PROFILE_DEFINITIONS = readJson('data/learning-profiles.json', {});
 const STORY_GUIDES = PROFILE_DEFINITIONS.generationGuides;
 const JOURNEY_DESCRIPTIONS = PROFILE_DEFINITIONS.languages;
-const PROMPT_VERSION = '2026-11-18.1';
+const PROMPT_VERSION = '2026-11-18.2';
 const LEVELS = PROFILE_DEFINITIONS.standardizedLevels;
 const SCOPES = PROFILE_DEFINITIONS.scopes;
 function levelDefinition(language, id) { return LEVELS[language]?.levels.find(level => level.id === id); }
@@ -1760,15 +1760,23 @@ function showWordNote(trigger, notes, surface = '', helpId = '') {
     const item = document.createElement('p'); item.className = 'word-note-entry';
     // Lead with the wording as it appears in the text, so Listen plays the real text; the dictionary form follows.
     const shown = surface.trim() || note.word || '';
-    const word = document.createElement('strong'); word.textContent = shown || 'Word note';
+    const russian = readerStory().language === 'ru';
+    const canonical = russian ? stripRussianStress(note.word || '') : note.word || '';
+    const sameForm = (russian ? stripRussianStress(shown) : shown).toLowerCase() === canonical.trim().toLowerCase();
+    const marked = russian ? withRussianStress(note.word || '', note.stress) : canonical;
+    let display = shown;
+    if (russian && sameForm && marked !== canonical) {
+      display = note.stress ? withRussianStress(stripRussianStress(shown), note.stress) : marked;
+    }
+    const word = document.createElement('strong'); word.textContent = display || 'Word note';
     const meaning = document.createElement('span'); meaning.textContent = note.meaning;
     const heading = document.createElement('span'); heading.className = 'word-note-heading';
     const listen = createInlineListenButton(shown, readerStory().language, () => {
       recordNoteLookup([note], glossaryForTrigger(trigger), 'listen');
     });
     heading.append(word, listen); item.append(heading);
-    if (note.word && shown.toLowerCase() !== note.word.trim().toLowerCase()) {
-      const form = document.createElement('span'); form.className = 'word-note-form'; form.textContent = `Dictionary form: ${note.word}`; item.append(form);
+    if (note.word && !sameForm) {
+      const form = document.createElement('span'); form.className = 'word-note-form'; form.textContent = `Dictionary form: ${marked}`; item.append(form);
     }
     item.append(meaning); popover.append(item);
   }

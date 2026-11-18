@@ -13,7 +13,7 @@ The LANG-008 prompt-contract test checks scene vocabulary guidance in planning a
 | Mandatory Japanese glossary-headword readings | Rejected | Keep current word-note headword presentation unchanged; only title, story and examples receive readings. |
 | Fixed 100–150 words / 8–12 Japanese sentences | Adapted | Retired by PED-004 during integration: scene/chapter narrative scope replaces numerical quotas; technical bounds remain active. |
 | Japanese without romaji; Russian Cyrillic without Latin transliteration | Adopted | Script checks include canonical title, story, headwords/forms and examples; names use the target script. |
-| Unconditional Russian stress-mark ban | Rejected | Default normal spelling, but permit explicitly requested stress marks. The validator does not claim to infer learner intent or linguistic correctness. |
+| Unconditional Russian stress-mark ban | Rejected | Default normal spelling in prose and examples, with stress allowed on request. Russian vocabulary notes annotate headword stress separately. The validator does not claim to infer learner intent or linguistic correctness. |
 | Exact real story forms; no substring coverage trick | Adopted | Notes use the same exact forms and word-boundary matching as reader underlines. |
 | Exactly one glossary entry per selected vocabulary item | Rejected | Practice is optional freeform context, not a required vocabulary list. Every new chapter instead requires at least one useful valid learning note. |
 | Vocabulary suggestion confirmation and 5–10 distinct words | Rejected | That workflow is absent from the current app. |

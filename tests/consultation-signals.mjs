@@ -22,6 +22,16 @@ function harness({stored = null, invalid = false} = {}) {
 }
 const note = (extra = {}) => ({language: 'de', kind: 'note', word: 'kaufen', meaning: 'buy', action: 'note', sentence: 'Sie kauft Brot.', ...extra});
 
+{
+  const h = harness();
+  const russian = {language:'ru',word:'молоко\u0301',meaning:'milk'};
+  assert.equal(h.tracker.record(note(russian)),true);
+  assert.equal(h.tracker.record(note({...russian,word:'молоко'})),false);
+  const items = h.stored().languages.ru.items;
+  assert.deepEqual(Object.keys(items),['молоко']);
+  assert.equal(items.молоко.word,'молоко');
+  assert.notEqual(itemKey('всё','ru'),itemKey('все','ru'));
+}
 // --- Recording: note identity, counts, days, contexts, whole-file write ---------------------------------
 {
   const h = harness();
