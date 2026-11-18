@@ -384,6 +384,103 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   }
   console.log('PASS all languages share focused instructions; steered and blank follow-ups preserve legacy history and save before acknowledgement');
 
+  for (const index of [0, 2, 4]) {
+    const history = [
+      {followUp:'First?',text:'First answer'},
+      {action:'examples',examples:[]},
+      {followUp:'Middle?',text:'Middle answer'},
+      {action:'examples',examples:[]},
+      {followUp:'Last?',text:'Last answer'},
+      {action:'examples',examples:[]}
+    ];
+    const entry = {id:'H',text:'Original explanation',followUps:history,more:'Last answer',detailProvenance:history[4]};
+    const version = {id:'V',story:'Ein Wort.'}, other = {id:'other',followUps:[{followUp:'Unrelated?'}]};
+    const chapter = {id:'C',help:[entry,other],versions:[version]}, story = {id:'S',language:'de',chapters:[chapter]};
+    const draft = {item:entry,index,question:'Edited question?'};
+    const before = JSON.stringify(story);
+    let failGeneration = index === 2, failSave = index === 2, requests = 0, releases = 0, stored;
+    const f = sandbox({
+      state:{readerId:'S',followUpEdit:draft},readerStory:()=>story,normalizeChapters:s=>s.chapters,
+      activeChapter:()=>chapter,activeVersion:()=>version,renderSavedHelp(){},decodeHelp:text=>({explanation:text}),
+      persistReaderStory(){
+        if (failSave && entry.followUps !== history) throw Error('Disk unavailable');
+        stored=JSON.stringify(story);
+      },
+      async readerAi(_kind,input){
+        requests++;
+        assert.equal(JSON.stringify(story),before);
+        const context=JSON.parse(input.previousExplanation);
+        assert.equal(context.explanation,entry.text);
+        assert.deepEqual(context.followUps.map(item=>item.question),history.slice(0,index).filter(item=>item.followUp).map(item=>item.followUp));
+        assert.equal(input.followUp,draft.question);
+        if (failGeneration) throw Error('Provider unavailable');
+        f.state.pendingReaderRequestId='edit-request';
+        return 'Replacement answer';
+      },
+      ai:{async acknowledge(){
+        releases++;
+        assert.equal(JSON.parse(stored).chapters[0].help[0].followUps.at(-1).followUp,draft.question);
+      }}
+    });
+    vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(', "$('selection-translate')"),f);
+    const selected = {storyId:'S',chapterId:'C',versionId:'V',helpId:'H',text:'Wort',start:4,end:8,profile:{}};
+    const regenerate = () => f.explainSelection('explain','detail',draft.question,selected,undefined,draft);
+    if (failGeneration) {
+      await regenerate();
+      assert.equal(JSON.stringify(story),before);
+      assert.equal(f.state.followUpEdit,draft);
+      assert.equal(f.state.pendingReaderResult,undefined);
+      failGeneration=false;
+    }
+    await regenerate();
+    if (failSave) {
+      assert.equal(JSON.stringify(story),before);
+      assert.equal(stored,before);
+      assert.equal(f.state.followUpEdit,draft);
+      assert.equal(releases,0);
+      failSave=false; await f.savePendingReaderResult();
+      assert.equal(requests,2);
+    }
+    const reopened = JSON.parse(stored).chapters[0].help;
+    assert.deepEqual(reopened[0].followUps.slice(0,-1),history.slice(0,index));
+    assert.equal(reopened[0].followUps.at(-1).followUp,draft.question);
+    assert.equal(reopened[0].followUps.at(-1).text,'Replacement answer');
+    assert.deepEqual(reopened[0].detailProvenance,reopened[0].followUps.at(-1));
+    assert.equal(reopened[0].more,'Replacement answer');
+    assert.deepEqual(reopened[1],other);
+    assert.equal(f.state.followUpEdit,null);
+    assert.equal(releases,1);
+  }
+  console.log('PASS editing first, middle and last follow-ups truncates saved history after the edited answer, with generation and save retry');
+
+  {
+    const first = {followUp:'First?',text:'First answer'}, last = {followUp:'Last?',text:'Last answer'};
+    const examples = {action:'examples',examples:[]};
+    const story = {help:{followUps:[first,examples,last],more:last.text,detailProvenance:last}};
+    const draft = {item:story.help,index:2,question:'Draft'};
+    let failSave = true;
+    const c = sandbox({
+      state:{followUpEdit:draft},pendingDeletionBlocked:()=>false,
+      persistReaderStory(){ if (failSave) throw Error('Disk unavailable'); }
+    });
+    vm.runInContext(section('function savedFollowUps(', 'function helpInstructions(')+section('function deleteFollowUp(', 'function confirmDeleteFollowUp('),c);
+    const before = JSON.stringify(story);
+    assert.throws(() => c.deleteFollowUp(story,story.help,0), /Disk unavailable/);
+    assert.equal(JSON.stringify(story),before);
+    assert.equal(draft.index,2);
+    failSave = false;
+    c.deleteFollowUp(story,story.help,0);
+    assert.equal(JSON.stringify(story.help.followUps),JSON.stringify([examples,last]));
+    assert.equal(draft.index,1);
+    c.deleteFollowUp(story,story.help,1);
+    assert.equal(JSON.stringify(story.help),JSON.stringify({followUps:[examples]}));
+    assert.equal(c.state.followUpEdit,null);
+    const legacy = {more:first.text,detailProvenance:first};
+    c.deleteFollowUp(story,legacy,0);
+    assert.equal(JSON.stringify(legacy),JSON.stringify({followUps:[]}));
+  }
+  console.log('PASS deleting one follow-up preserves the rest, updates legacy detail fields and rolls back failed writes');
+
   {
     const entry = {id:'H',passage:'く',start:3,end:4,text:'Original explanation'};
     const version = {id:'V',story:'空は青く、遠く。'}, chapter = {id:'C',help:[entry],versions:[version]}, story = {id:'S',language:'ja',chapters:[chapter]};

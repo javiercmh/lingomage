@@ -343,6 +343,23 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 .help-card > .small-btn { margin-top: 14px; color: var(--accent); }
 .help-follow-up { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
 .help-follow-up .field { margin-bottom: 12px; }
+.help-question-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px; margin-top: 18px; border-top: 1px solid var(--line); padding-top: 8px; }
+.help-question-row > .help-question { margin: 0; padding: 10px 0; border: 0; overflow-wrap: anywhere; }
+.follow-up-menu { position: relative; }
+.follow-up-menu-toggle.icon-btn { display: flex; width: 44px; height: 44px; background: transparent; border-color: transparent; color: var(--muted); cursor: pointer; list-style: none; }
+.follow-up-menu-toggle::-webkit-details-marker { display: none; }
+.follow-up-menu-toggle circle { fill: currentColor; stroke: none; }
+.follow-up-menu[open] .follow-up-menu-toggle, .follow-up-menu-toggle:hover { background: rgba(116, 167, 255, .12); color: var(--accent); }
+.follow-up-menu-actions { position: absolute; z-index: 3; right: 0; top: 100%; min-width: 124px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--card-solid); box-shadow: 0 8px 24px #0006; }
+.follow-up-menu-actions button { display: block; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); text-align: left; }
+.follow-up-menu-actions button:is(:hover, :focus-visible) { background: rgba(116, 167, 255, .12); }
+.follow-up-menu-actions .follow-up-delete { color: #fda4af; }
+.help-edit-follow-up { margin: 4px 0 14px; padding: 14px; border: 1px solid rgba(116, 167, 255, .26); border-radius: 14px; background: rgba(116, 167, 255, .05); }
+.help-edit-follow-up .field { height: auto; min-height: 70px; margin: 0; padding: 10px 12px; line-height: 1.45; resize: vertical; }
+.help-edit-follow-up .helper { margin: 10px 0 0; }
+.help-edit-follow-up .reader-edit-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; margin-top: 12px; }
+.help-edit-follow-up .reader-edit-actions button { width: auto; min-height: 44px; padding: 0 16px; }
+#delete-follow-up-question { color: var(--accent); overflow-wrap: anywhere; }
 .help-question { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--accent); font-weight: 650; }
 button:disabled { opacity: .55; cursor: default; }
 button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
@@ -359,10 +376,9 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px
 .help-examples h3 { margin: 0 0 12px; font-size: 15px; }
 .help-examples ol { margin: 0; padding-left: 24px; }
 .help-examples li { padding-left: 4px; }
-.help-example-sentence.story-text { margin: 14px 0 4px; font-size: 18px; line-height: 1.9; }
-.help-example-line { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-.help-example-line .help-example-sentence { min-width: 0; overflow-wrap: anywhere; }
-.help-example-line .inline-listen { width: 44px; height: 44px; margin-top: 21px; }
+.help-example-line { display: flex; align-items: center; gap: 8px; }
+.reader-panel .help-example-line .help-example-sentence { min-width: 0; margin: 0; padding: 0; font-size: 18px; line-height: 1.9; overflow-wrap: anywhere; }
+.help-example-line .inline-listen { flex: 0 0 44px; width: 44px; height: 44px; border: 0; background: transparent; }
 .help-example-line + .help-context-translation { margin-top: 4px; }
 
 /* Only the reader selection bar floats; the library retains its sticky bar. */

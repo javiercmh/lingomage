@@ -33,7 +33,7 @@ const SPEECH_LANGUAGES = { de: 'de-DE', ja: 'ja-JP', ru: 'ru-RU', 'es-CL': 'es-C
 const PROFILE_DEFINITIONS = readJson('data/learning-profiles.json', {});
 const STORY_GUIDES = PROFILE_DEFINITIONS.generationGuides;
 const JOURNEY_DESCRIPTIONS = PROFILE_DEFINITIONS.languages;
-const PROMPT_VERSION = '2026-11-17.1';
+const PROMPT_VERSION = '2026-11-18.1';
 const LEVELS = PROFILE_DEFINITIONS.standardizedLevels;
 const SCOPES = PROFILE_DEFINITIONS.scopes;
 function levelDefinition(language, id) { return LEVELS[language]?.levels.find(level => level.id === id); }
@@ -1355,7 +1355,7 @@ function wireLongPress(card, onLongPress, onMove, allowStoryOpen = false, ignore
   card.addEventListener('pointerdown', event => {
     if (event.button !== undefined && event.button !== 0) return;
     if (ignoreTarget(event)) return;
-    if (event.target.closest?.('input, select, textarea, a, form') || (event.target.closest?.('button') && !(allowStoryOpen && event.target.closest?.('.story-open')))) return;
+    if (event.target.closest?.('input, select, textarea, a, form, summary') || (event.target.closest?.('button') && !(allowStoryOpen && event.target.closest?.('.story-open')))) return;
     clear(); completed = false; origin = {x:event.clientX,y:event.clientY};
     document.addEventListener('pointerup', clear, true);
     document.addEventListener('pointercancel', clear, true);
@@ -1454,6 +1454,12 @@ function renderLibrary() {
 }
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && state.storyMenu && !document.querySelector('dialog[open]')) { event.preventDefault(); closeStoryMenu(true); }
+});
+document.addEventListener('click', event => {
+  const active = event.target.closest?.('.follow-up-menu');
+  $('reader-help').querySelectorAll('.follow-up-menu[open]').forEach(menu => {
+    if (menu !== active) menu.open = false;
+  });
 });
 document.addEventListener('pointerdown', event => {
   if (state.storyMenu && !event.target.closest?.('.story-popover, .story-menu-toggle')) closeStoryMenu();
@@ -2405,6 +2411,81 @@ function createShowInTextButton(item) {
   const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', 'M12 19V5M6 11l6-6 6 6'); svg.append(path);
   show.append(label, svg); show.addEventListener('click', () => showPassageInText(item.id)); return show;
 }
+function deleteFollowUp(story, item, index) {
+  if (pendingDeletionBlocked()) throw new Error('Finish or save the current AI response before deleting.');
+  const before = { ...item };
+  const followUps = savedFollowUps(item).filter((_, position) => position !== index);
+  const latestDetail = followUps.findLast(entry => entry.action !== 'examples');
+  item.followUps = followUps;
+  if (latestDetail) Object.assign(item, { more: latestDetail.text, detailProvenance: latestDetail });
+  else { delete item.more; delete item.detailProvenance; }
+  try { persistReaderStory(story); }
+  catch (error) { Object.assign(item, before); if (!('followUps' in before)) delete item.followUps; throw error; }
+  const draft = state.followUpEdit;
+  if (draft?.item === item) {
+    if (draft.index === index) state.followUpEdit = null;
+    else if (draft.index > index) draft.index--;
+  }
+}
+function confirmDeleteFollowUp(trigger, question, remove) {
+  const dialog = $('delete-follow-up-dialog');
+  if (dialog.open) return;
+  const cancel = $('cancel-delete-follow-up'), confirm = $('confirm-delete-follow-up');
+  const error = $('delete-follow-up-error');
+  $('delete-follow-up-question').textContent = question;
+  error.textContent = '';
+  let focusAfterDelete;
+  function onConfirm() {
+    try { focusAfterDelete = remove(); dialog.close(); }
+    catch (failure) { error.textContent = failure.message; }
+  }
+  const onCancel = () => dialog.close();
+  confirm.addEventListener('click', onConfirm);
+  cancel.addEventListener('click', onCancel);
+  dialog.addEventListener('close', () => {
+    confirm.removeEventListener('click', onConfirm);
+    cancel.removeEventListener('click', onCancel);
+    (focusAfterDelete || trigger).focus({ preventScroll: true });
+  }, { once: true });
+  dialog.showModal(); cancel.focus();
+}
+function renderFollowUpEdit(card, trigger, draft, removesLaterContent, selected) {
+  const form = document.createElement('form'); form.className = 'help-edit-follow-up';
+  form.id = `edit-follow-up-${draft.item.id}-${draft.index}`;
+  const label = document.createElement('label'); label.className = 'field-label'; label.textContent = 'Edit follow-up question';
+  const input = document.createElement('textarea'); input.rows = 2; input.className = 'field'; input.required = true; input.maxLength = 500;
+  input.id = `${form.id}-input`; label.htmlFor = input.id; input.value = draft.question;
+  input.addEventListener('input', () => { draft.question = input.value; });
+  form.append(label, input);
+  if (removesLaterContent) {
+    const warning = document.createElement('p'); warning.className = 'helper'; warning.id = `${form.id}-warning`;
+    warning.textContent = 'Later explanations and examples will be removed.';
+    input.setAttribute('aria-describedby', warning.id); form.append(warning);
+  }
+  const actions = document.createElement('div'); actions.className = 'reader-edit-actions';
+  const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'secondary-btn'; cancel.textContent = 'Cancel';
+  const submit = document.createElement('button'); submit.type = 'submit'; submit.className = 'primary-btn'; submit.textContent = 'Regenerate';
+  actions.append(cancel, submit); form.append(actions); card.append(form);
+  draft.syncControls = () => {
+    const locked = draft.running || state.pendingReaderResult?.followUpEdit === draft;
+    input.readOnly = cancel.disabled = submit.disabled = Boolean(locked);
+  };
+  draft.syncControls();
+  cancel.addEventListener('click', () => {
+    state.followUpEdit = null;
+    form.remove();
+    card.querySelector('.help-request-recovery')?.remove();
+    trigger.focus();
+  });
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const question = input.value.trim();
+    if (!question || submit.disabled) return;
+    draft.question = input.value; draft.running = true; draft.syncControls();
+    try { await explainSelection('explain', 'detail', question, selected(), undefined, draft); }
+    finally { draft.running = false; draft.syncControls(); }
+  });
+}
 function renderSavedHelp(chapter, version) {
   const box = $('reader-help'), section = $('reader-help-section'); box.textContent = '';
   // Cards follow the text: by selection start, then end; equal ranges keep the newest first. Stored order is unchanged.
@@ -2459,16 +2540,59 @@ function renderSavedHelp(chapter, version) {
     if (hasContext && item.contextTranslation) { const translation = document.createElement('p'); translation.className = 'help-context-translation help-text-selectable'; translation.textContent = item.contextTranslation; card.append(translation); }
     card.append(body);
     const followUps = savedFollowUps(item);
-    for (const followUp of followUps) {
+    const selected = () => ({ text: item.passage, start: item.start ?? 0, end: item.end ?? ((item.start ?? 0) + item.passage.length), storyId: readerStory().id, chapterId: chapter.id, versionId: version.id, helpId: item.id, profile: profileSnapshot(readerStory()) });
+    for (const [index, followUp] of followUps.entries()) {
       if (followUp.action === 'examples') { renderHelpExamples(card, followUp.examples, readerStory().language); continue; }
-      if (followUp.followUp) { const question = document.createElement('p'); question.className = 'help-question help-text-selectable'; question.textContent = followUp.followUp; card.append(question); }
+      if (followUp.followUp) {
+        const row = document.createElement('div'); row.className = 'help-question-row';
+        const question = document.createElement('p'); question.className = 'help-question help-text-selectable'; question.textContent = followUp.followUp; row.append(question);
+        card.append(row);
+        if (!state.explanationSelectionMode) {
+          const current = state.followUpEdit;
+          const draft = current?.item === item && current.index === index ? current : null;
+          const menu = document.createElement('details'); menu.className = 'follow-up-menu';
+          const trigger = document.createElement('summary'); trigger.className = 'icon-btn follow-up-menu-toggle';
+          trigger.setAttribute('aria-label', `Actions for follow-up: ${followUp.followUp}`); trigger.title = 'Follow-up actions';
+          trigger.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="12" cy="19" r="1.75"/></svg>';
+          const actions = document.createElement('div'); actions.className = 'follow-up-menu-actions';
+          const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'follow-up-edit'; edit.textContent = 'Edit';
+          const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'follow-up-delete'; remove.textContent = 'Delete';
+          actions.append(edit, remove); menu.append(trigger, actions); row.append(menu);
+          menu.addEventListener('keydown', event => {
+            if (event.key !== 'Escape' || !menu.open) return;
+            event.preventDefault(); event.stopPropagation();
+            menu.open = false; trigger.focus();
+          });
+          if (draft) renderFollowUpEdit(card, trigger, draft, index < followUps.length - 1, selected);
+          remove.addEventListener('click', () => {
+            if (pendingDeletionBlocked()) { toast('Finish or save the current AI response before deleting.'); return; }
+            const story = readerStory();
+            menu.open = false;
+            confirmDeleteFollowUp(trigger, followUp.followUp, () => {
+              deleteFollowUp(story, item, index);
+              renderSavedHelp(chapter, version);
+              const replacement = [...$('reader-help').querySelectorAll('.help-card')].find(node => node.dataset.helpId === item.id);
+              toast('Follow-up deleted');
+              return replacement?.querySelector('.follow-up-menu-toggle') || replacement?.querySelector('.help-actions button');
+            });
+          });
+          edit.addEventListener('click', () => {
+            menu.open = false;
+            if (state.readerHelpBusy || state.pendingReaderResult) return;
+            const open = state.followUpEdit;
+            if (open?.item !== item || open.index !== index) state.followUpEdit = { item, index, question: followUp.followUp };
+            renderSavedHelp(chapter, version);
+            const formId = `edit-follow-up-${item.id}-${index}`;
+            document.getElementById(`${formId}-input`)?.focus();
+          });
+        }
+      }
       const more = document.createElement('div'); more.className = 'help-detail help-text-selectable'; renderDetailText(more, followUp.text); card.append(more);
     }
     if (item.kind === 'explain' && !state.explanationSelectionMode) {
       const buttons = document.createElement('div'); buttons.className = 'help-actions';
       const detail = document.createElement('button'); detail.type = 'button'; detail.className = 'small-btn'; detail.textContent = 'More detail'; detail.setAttribute('aria-expanded', 'false');
       const examples = document.createElement('button'); examples.type = 'button'; examples.className = 'small-btn'; examples.textContent = 'Generate examples';
-      const selected = () => ({ text: item.passage, start: item.start ?? 0, end: item.end ?? ((item.start ?? 0) + item.passage.length), storyId: readerStory().id, chapterId: chapter.id, versionId: version.id, helpId: item.id, profile: profileSnapshot(readerStory()) });
       examples.addEventListener('click', async () => {
         examples.disabled = true;
         try { await explainSelection('explain', 'examples', '', selected()); }
@@ -2606,7 +2730,10 @@ async function savePendingReaderResult() {
       saved: pending.saved,
       apply: pending.apply,
       persist: () => persistReaderStory(pending.story),
-      onSaved: () => { pending.saved = true; },
+      onSaved: () => {
+        pending.saved = true;
+        pending.onSaved?.();
+      },
       acknowledge: acknowledgeReaderResult
     });
     if (readerGeneration?.storyId === pending.story.id && !(state.readerEditBusy && pending.story.memoryRebuild)) { readerGeneration.phase = 'ready'; readerGeneration.message = 'Ready'; }
@@ -2663,7 +2790,7 @@ function decodeHelp(text, action = 'initial') {
   } else if (typeof value.explanation !== 'string' || !value.explanation.trim() || (value.contextTranslation !== undefined && typeof value.contextTranslation !== 'string')) fail();
   return value;
 }
-async function explainSelection(kind = 'explain', action = 'initial', followUp = '', selected = state.readerSelection, onTaskStarted) {
+async function explainSelection(kind = 'explain', action = 'initial', followUp = '', selected = state.readerSelection, onTaskStarted, followUpEdit) {
   const passage = selected; if (!passage) return;
   if (backgroundRun) await stopBackgroundContext();
   if (state.checkpointBlocked || pipeline?.records.length || state.readerHelpBusy || state.readerEditBusy || state.requestId) { toast('Another AI request is still running. Wait for it to finish.'); return; }
@@ -2674,6 +2801,7 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
   if (!validTextRange(version.story, passage.start, passage.end) || version.story.slice(passage.start, passage.end) !== passage.text) { toast('Select the passage again to request help.'); return; }
   const existingHelp = action !== 'initial' ? chapter.help?.find(entry => entry.id === passage.helpId) : null;
   if (action !== 'initial' && !existingHelp) return;
+  if (followUpEdit && (existingHelp !== followUpEdit.item || !savedFollowUps(existingHelp)[followUpEdit.index]?.followUp)) return;
   if (action === 'initial') {
     const overlaps = overlappingHelp(chapter, version.id, passage.start, passage.end);
     if (overlaps.length && !await confirmReplaceHelp(overlaps)) return;
@@ -2695,7 +2823,10 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
     };
     try {
       const context = helpContext(version.story, passage.start, passage.end);
-      const previousExplanation = existingHelp ? JSON.stringify({ explanation: existingHelp.text, followUps: savedFollowUps(existingHelp).map(entry => ({ action: entry.action || 'detail', question: entry.followUp || '', text: entry.text || '', examples: entry.examples })) }) : '';
+      const savedHistory = existingHelp ? savedFollowUps(existingHelp) : [];
+      const retainedHistory = followUpEdit ? savedHistory.slice(0, followUpEdit.index) : savedHistory;
+      const promptHistory = followUpEdit ? retainedHistory.filter(entry => entry.action !== 'examples') : retainedHistory;
+      const previousExplanation = existingHelp ? JSON.stringify({ explanation: existingHelp.text, followUps: promptHistory.map(entry => ({ action: entry.action || 'detail', question: entry.followUp || '', text: entry.text || '', examples: entry.examples })) }) : '';
       const helpInput={ action, language:LANGUAGES[story.language], languageCode:story.language, difficulty:story.difficulty, sourceText:version.story, start:passage.start, end:passage.end, passage:passage.text, ...context, profile:passage.profile, followUp, previousExplanation };
       if (action === 'examples') {
         const op=await runContentOperation({kind:'examples',language:story.language,input:helpInput,instructions:helpInstructions(action),config:{providerId,model,reasoning},target:{storyId:story.id,chapterId:chapter.id,versionId:version.id,helpId:existingHelp.id,start:passage.start,end:passage.end,passage:passage.text}});
@@ -2710,12 +2841,18 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
       if (action === 'initial') Object.assign(item, resolvedHelpContext(version.story, passage, result));
       if (readerGeneration) readerGeneration.helpId = existingHelp?.id || item.id;
       const preview = action === 'examples' ? result.examples.map(example => `${example.sentence}\n${example.translation}`).join('\n\n') : item.text;
-      state.pendingReaderResult = { story, saved: false, preview, readerLocation: { chapterId: chapter.id, versionId: version.id, helpId: existingHelp?.id || '', followUp }, apply() {
+      state.pendingReaderResult = { story, saved: false, preview, followUpEdit, readerLocation: { chapterId: chapter.id, versionId: version.id, helpId: existingHelp?.id || '', followUp }, onSaved: followUpEdit ? () => {
+        if (state.followUpEdit === followUpEdit) state.followUpEdit = null;
+        if (state.readerId === story.id && activeChapter().id === chapter.id && activeVersion().id === version.id) {
+          const panel = readerPanel(), current = panel.scrollTop;
+          renderSavedHelp(chapter, version); panel.scrollTop = current;
+        }
+      } : undefined, apply() {
         // Saved with the explanation in the one write; the returned rollback restores the previous value or its absence.
         const undoActivity = markStoryActivity(story);
         if (existingHelp) {
           const before = { ...existingHelp };
-          const followUps = [...savedFollowUps(existingHelp), item];
+          const followUps = [...retainedHistory, item];
           Object.assign(existingHelp, { followUps });
           // Retain the legacy latest-detail fields for older readers.
           if (action === 'detail') Object.assign(existingHelp, { more: item.text, detailProvenance: item });
@@ -2729,7 +2866,7 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
       // The learner may have kept reading during the request: the re-render keeps where they are now, not where they asked.
       try { await savePendingReaderResult(); }
       catch { if (state.readerId === story.id) renderPendingReaderResult(); return; }
-      if (state.readerId === story.id && activeChapter().id === chapter.id && activeVersion().id === version.id) {
+      if (!followUpEdit && state.readerId === story.id && activeChapter().id === chapter.id && activeVersion().id === version.id) {
         const panel = readerPanel(), current = panel.scrollTop;
         renderSavedHelp(chapter, version); panel.scrollTop = current;
       }
@@ -2746,7 +2883,7 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
       if (state.readerId === story.id && activeChapter().id === chapter.id && activeVersion().id === version.id) {
         renderSavedHelp(chapter, version);
         const card = existingHelp ? [...box.querySelectorAll('.help-card')].find(node => node.dataset.helpId === existingHelp.id) : null;
-        const form = action === 'detail' ? card?.querySelector('.help-follow-up') : null;
+        const form = action === 'detail' && !followUpEdit ? card?.querySelector('.help-follow-up') : null;
         if (form) {
           form.hidden = false;
           const input = form.querySelector('input'); if (input) input.value = followUp;
@@ -2768,13 +2905,16 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
           try {
             const finishing=retry.textContent === 'Finish request';
             await releaseInvalidReaderResponse();
-            if (finishing) { retry.textContent='Retry'; note.textContent='Previous request finished. Retry to request a new response.'; return; }
+            if (finishing) {
+              if (followUpEdit) { recovery.remove(); return; }
+              retry.textContent='Retry'; note.textContent='Previous request finished. Retry to request a new response.'; return;
+            }
             recovery.remove();
             await explainSelection(kind,action,followUp,retrySelection);
           } catch (releaseError) { note.textContent='Could not finish the previous request. Try Finish request again.'; }
           finally { retry.disabled=false; }
         });
-        actions.append(retry); recovery.append(actions);
+        if (!followUpEdit || state.pendingReaderRequestId) { actions.append(retry); recovery.append(actions); }
         if (form) form.append(recovery); else (card || box).append(recovery);
         $('reader-help-section').hidden = false;
       }
