@@ -1,5 +1,6 @@
 import json
 import stat
+import sys
 import tempfile
 import threading
 import time
@@ -12,8 +13,7 @@ from pathlib import Path
 from dev_server import DevServer, Handler, atomic_write
 
 
-FAKE_CODEX = r'''#!/usr/bin/env python3
-import json, os, sys, time
+FAKE_CODEX = r'''import json, os, sys, time
 mode = os.path.basename(sys.argv[0])
 required = ['features.shell_tool=false', 'features.web_search_request=false', 'features.apply_patch_freeform=false', 'mcp_servers={}']
 if any(value not in sys.argv for value in required): sys.exit(3)
@@ -68,7 +68,7 @@ class DevelopmentServerTests(unittest.TestCase):
 
     def fake_executable(self, name='fakecodex'):
         path = self.root / name
-        path.write_text(FAKE_CODEX, encoding='utf-8')
+        path.write_text(f'#!{sys.executable}\n' + FAKE_CODEX, encoding='utf-8')
         path.chmod(path.stat().st_mode | stat.S_IXUSR)
         return str(path)
 
