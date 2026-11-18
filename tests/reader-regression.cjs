@@ -169,8 +169,8 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   noteUi.showWordNote(trigger,[{word:'買う',meaning:'to buy',forms:['買います']}]);
   assert.deepEqual(lookups,[['買う','note']],'opening a word note records one lookup (PED-005)');
   const listen=popover.childNodes[0].childNodes[0].childNodes[1];
-  assert.match(cssSource,/\.word-note-listen\s*\{[^}]*color:\s*#bfdbfe;/,'idle note speaker uses the same bright color as chapter Listen');
-  assert.match(cssSource,/\.word-note-listen\[data-playing="true"\]\s*\{\s*color:\s*var\(--muted\);/,'playing note speaker switches to the same muted color as chapter Listen');
+  assert.match(cssSource,/\.inline-listen\s*\{[^}]*color:\s*#bfdbfe;/,'idle note speaker uses the same bright color as chapter Listen');
+  assert.match(cssSource,/\.inline-listen\[data-playing="true"\]\s*\{\s*color:\s*var\(--muted\);/,'playing note speaker switches to the same muted color as chapter Listen');
   assert.equal(listen.attributes['aria-label'],'Listen to 買う');assert.equal(popover.focused,true);
   const starting=listen.events.click();await Promise.resolve();await Promise.resolve();
   assert.equal(heard.text,'買う');assert.equal(heard.language,'ja-JP');assert.equal(listen.disabled,false);assert.equal(listen.attributes['aria-pressed'],'true');
@@ -433,7 +433,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.throws(()=>contract.decodeHelp('   ','detail'),/invalid/);
   console.log('PASS explanation/example contracts reject malformed counts, ranges, translations and annotations');
 
-  const rendered=sandbox({normalizeReaderControls(){},createReaderActivation:()=>()=>{},activateStoryText(){},glossaryForTrigger:()=>null,state:{furigana:true,explanationSelectionMode:false,selectedExplanationIds:new Set()},readerStory:()=>({id:'S'}),profileSnapshot:()=>({})});
+  const rendered=sandbox({normalizeReaderControls(){},createReaderActivation:()=>()=>{},activateStoryText(){},glossaryForTrigger:()=>null,state:{furigana:true,explanationSelectionMode:false,selectedExplanationIds:new Set()},readerStory:()=>({id:'S',language:'ja'}),profileSnapshot:()=>({})});
   vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function wireLongPress(', 'function renderLibrary(')+section('function renderHighlightedText(', 'async function readerAi('),rendered);
   const formatted=rendered.document.createElement('div');
   rendered.renderDetailText(formatted, 'In “al salir,” **al** contracts **a + el**.\n\nUse **bold with *italic* inside** and `a él`. <img src=x> Unmatched **marker');
@@ -463,6 +463,9 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   const sample = {id:'H',kind:'explain',passage:'く',start:3,end:4,contextStart:0,contextEnd:15,text:'Focused.',versionId:'V',profile:{},followUps:[{action:'examples',examples}]};
   const v={id:'V',story:'空は青く、風はやさしいです。',storySegments:[{text:'空',reading:'そら'},{text:'は'},{text:'青',reading:'あお'},{text:'く、'},{text:'風',reading:'かぜ'},{text:'はやさしいです。'}]};
   sample.contextEnd=v.story.length;
+  const spokenExamples = [];
+  rendered.speech = {available:true,speak:async options=>spokenExamples.push(options)};
+  vm.runInContext(section('let inlineSpeechRun', 'function showWordNote'), rendered);
   rendered.renderSavedHelp({id:'C',help:[sample]},v);
   const card=rendered.$('reader-help').childNodes[0];
   const descendants = node => [node,...(node.childNodes || []).flatMap(descendants)];
@@ -470,6 +473,12 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.equal(nodes.some(node=>node.tagName==='strong' && node.textContent==='Explanation'),false);
   assert.equal(nodes.find(node=>node.tagName==='mark').textContent,'く');
   assert.equal(nodes.filter(node=>node.tagName==='li').length,3);
+  for (const row of nodes.filter(node=>node.tagName==='li')) {
+    const listen = descendants(row).find(node=>node.className==='icon-btn inline-listen');
+    assert.equal(listen.disabled,false);
+    await listen.events.click();
+  }
+  assert.deepEqual(spokenExamples.map(({text,language})=>[text,language]),examples.map(example=>[example.sentence,'ja-JP']));
   assert.ok(nodes.some(node=>node.tagName==='rt' && node.textContent==='そら'));
   const calls=[];rendered.explainSelection=async(...args)=>calls.push(args);
   const detail=nodes.find(node=>node.tagName==='button' && node.textContent==='More detail');

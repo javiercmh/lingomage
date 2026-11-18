@@ -1681,10 +1681,10 @@ function closeWordNote(restoreFocus = false) {
   state.wordNoteTrigger = null;
   document.querySelectorAll('.gloss-note-trigger[aria-expanded="true"]').forEach(button => { button.removeAttribute('aria-expanded'); button.removeAttribute('aria-controls'); });
 }
-let wordNoteSpeechRun = 0;
-let wordNoteSpeechButton = null;
-let wordNoteSpeechStopPending = false;
-function renderWordNoteSpeech(button, playing, stopping = false) {
+let inlineSpeechRun = 0;
+let inlineSpeechButton = null;
+let inlineSpeechStopPending = false;
+function renderInlineSpeech(button, playing, stopping = false) {
   const label = stopping ? 'Stop audio' : playing ? 'Stop audio' : button.dataset.listenLabel;
   button.disabled = !speech.available;
   button.title = speech.available ? label : 'Listening requires App²';
@@ -1692,6 +1692,58 @@ function renderWordNoteSpeech(button, playing, stopping = false) {
   button.setAttribute('aria-pressed', String(playing));
   button.setAttribute('aria-busy', String(stopping));
   button.dataset.playing = String(playing);
+}
+function createInlineListenButton(text, language, onStart) {
+  const listen = document.createElement('button'); listen.type = 'button'; listen.className = 'icon-btn inline-listen';
+  listen.dataset.listenLabel = `Listen to ${text || 'expression'}`;
+  renderInlineSpeech(listen, false);
+  listen.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4zM15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14"/></svg>';
+  listen.disabled = !speech.available || !text;
+  listen.addEventListener('click', async () => {
+    if (inlineSpeechStopPending) return;
+    if (inlineSpeechButton === listen) {
+      const run = inlineSpeechRun;
+      inlineSpeechStopPending = true;
+      renderInlineSpeech(listen, true, true);
+      try {
+        await speech.stop();
+        if (run === inlineSpeechRun && inlineSpeechButton === listen) {
+          inlineSpeechRun++;
+          inlineSpeechButton = null;
+          renderInlineSpeech(listen, false);
+        }
+      } catch (error) {
+        if (run === inlineSpeechRun) { toast(`Could not stop audio: ${error.message}`); renderInlineSpeech(listen, true); }
+      } finally {
+        inlineSpeechStopPending = false;
+      }
+      return;
+    }
+    const run = ++inlineSpeechRun;
+    onStart?.();
+    const previous = inlineSpeechButton;
+    if (previous) {
+      inlineSpeechButton = null;
+      renderInlineSpeech(previous, false);
+      try { await speech.stop(); }
+      catch (error) {
+        if (run === inlineSpeechRun) toast(`Could not stop audio: ${error.message}`);
+        return;
+      }
+      if (run !== inlineSpeechRun) return;
+    }
+    inlineSpeechButton = listen;
+    renderInlineSpeech(listen, true);
+    try {
+      const { options } = await prepareSpeechOptions(speech, text, SPEECH_LANGUAGES[language]);
+      if (run !== inlineSpeechRun) return;
+      await speech.speak(options);
+    } catch (error) { if (run === inlineSpeechRun) toast(`Could not play audio: ${error.message}`); }
+    finally {
+      if (run === inlineSpeechRun) { inlineSpeechButton = null; renderInlineSpeech(listen, false); }
+    }
+  });
+  return listen;
 }
 function showWordNote(trigger, notes, surface = '', helpId = '') {
   const popover = $('word-note-popover');
@@ -1705,54 +1757,8 @@ function showWordNote(trigger, notes, surface = '', helpId = '') {
     const word = document.createElement('strong'); word.textContent = shown || 'Word note';
     const meaning = document.createElement('span'); meaning.textContent = note.meaning;
     const heading = document.createElement('span'); heading.className = 'word-note-heading';
-    const listen = document.createElement('button'); listen.type = 'button'; listen.className = 'icon-btn word-note-listen';
-    listen.dataset.listenLabel = `Listen to ${shown || 'expression'}`;
-    renderWordNoteSpeech(listen, false);
-    listen.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4zM15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14"/></svg>';
-    listen.disabled = !speech.available || !shown;
-    listen.addEventListener('click', async () => {
-      if (wordNoteSpeechStopPending) return;
-      if (wordNoteSpeechButton === listen) {
-        const run = wordNoteSpeechRun;
-        wordNoteSpeechStopPending = true;
-        renderWordNoteSpeech(listen, true, true);
-        try {
-          await speech.stop();
-          if (run === wordNoteSpeechRun && wordNoteSpeechButton === listen) {
-            wordNoteSpeechRun++;
-            wordNoteSpeechButton = null;
-            renderWordNoteSpeech(listen, false);
-          }
-        } catch (error) {
-          if (run === wordNoteSpeechRun) { toast(`Could not stop audio: ${error.message}`); renderWordNoteSpeech(listen, true); }
-        } finally {
-          wordNoteSpeechStopPending = false;
-        }
-        return;
-      }
-      const run = ++wordNoteSpeechRun;
+    const listen = createInlineListenButton(shown, readerStory().language, () => {
       recordNoteLookup([note], glossaryForTrigger(trigger), 'listen');
-      const previous = wordNoteSpeechButton;
-      if (previous) {
-        wordNoteSpeechButton = null;
-        renderWordNoteSpeech(previous, false);
-        try { await speech.stop(); }
-        catch (error) {
-          if (run === wordNoteSpeechRun) toast(`Could not stop audio: ${error.message}`);
-          return;
-        }
-        if (run !== wordNoteSpeechRun) return;
-      }
-      wordNoteSpeechButton = listen;
-      renderWordNoteSpeech(listen, true);
-      try {
-        const { options } = await prepareSpeechOptions(speech, shown, SPEECH_LANGUAGES[readerStory().language]);
-        if (run !== wordNoteSpeechRun) return;
-        await speech.speak(options);
-      } catch (error) { if (run === wordNoteSpeechRun) toast(`Could not play audio: ${error.message}`); }
-      finally {
-        if (run === wordNoteSpeechRun) { wordNoteSpeechButton = null; renderWordNoteSpeech(listen, false); }
-      }
     });
     heading.append(word, listen); item.append(heading);
     if (note.word && shown.toLowerCase() !== note.word.trim().toLowerCase()) {
@@ -2288,7 +2294,9 @@ function renderHelpExamples(card, examples, language = 'en') {
     const sentence = document.createElement('p'); sentence.className = 'help-example-sentence story-text help-text-selectable'; sentence.lang = SPEECH_LANGUAGES[language] || 'en';
     renderHighlightedText(sentence, example.sentence, example.segments, example.highlightStart, example.highlightEnd);
     const translation = document.createElement('p'); translation.className = 'help-context-translation help-text-selectable'; translation.textContent = example.translation;
-    row.append(sentence, translation); list.append(row);
+    const line = document.createElement('div'); line.className = 'help-example-line';
+    line.append(sentence, createInlineListenButton(example.sentence, language));
+    row.append(line, translation); list.append(row);
   }
   section.append(title, list); card.append(section);
 }

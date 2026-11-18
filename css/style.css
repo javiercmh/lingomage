@@ -360,7 +360,10 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px
 .help-examples ol { margin: 0; padding-left: 24px; }
 .help-examples li { padding-left: 4px; }
 .help-example-sentence.story-text { margin: 14px 0 4px; font-size: 18px; line-height: 1.9; }
-.help-example-sentence + .help-context-translation { margin-top: 4px; }
+.help-example-line { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.help-example-line .help-example-sentence { min-width: 0; overflow-wrap: anywhere; }
+.help-example-line .inline-listen { width: 44px; height: 44px; margin-top: 21px; }
+.help-example-line + .help-context-translation { margin-top: 4px; }
 
 /* Only the reader selection bar floats; the library retains its sticky bar. */
 .reader-panel .explanation-selection-toolbar { position: fixed; top: auto; bottom: calc(12px + var(--sa-bottom)); left: 50%; transform: translateX(-50%); width: min(744px, calc(100% - max(28px, var(--sa-left)) - max(28px, var(--sa-right)))); margin: 0; z-index: 8; }
@@ -373,8 +376,8 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px
 
 .story-brief { resize: vertical; min-height: 110px; }
 .word-note-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.word-note-listen { flex-shrink: 0; color: #bfdbfe; }
-.word-note-listen[data-playing="true"] { color: var(--muted); }
+.inline-listen { flex-shrink: 0; color: #bfdbfe; }
+.inline-listen[data-playing="true"] { color: var(--muted); }
 
 .reader-chapter-status { margin: 16px 0; }
 
