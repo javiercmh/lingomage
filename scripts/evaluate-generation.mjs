@@ -11,6 +11,10 @@ import {findGlossaryMatches} from '../js/reader-text.js';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const args=process.argv.slice(2);const option=(key,fallback)=>{const i=args.indexOf(key);return i<0?fallback:args[i+1];};
 const suite=option('--suite','models'),endpoint=option('--endpoint','http://localhost:8889'),model=option('--model','gpt-6.1-sol'),effort=option('--effort','low');
+const beginnerPilot=args.includes('--beginner-pilot');
+if(beginnerPilot && (suite!=='prose' || !args.includes('--output'))) {
+  throw Error('--beginner-pilot requires --suite prose and an explicit --output directory.');
+}
 const output=path.resolve(option('--output',path.join(root,'docs/evaluation/generation-tests',suite)));
 const limit=Number(option('--limit','Infinity'));const retry=args.includes('--retry');const languageFilter=option('--language','');
 if(!['models','pilot','followups','prose'].includes(suite))throw Error('Expected models, pilot, followups or prose suite.');
@@ -37,6 +41,9 @@ function input(language,difficulty,brief=0,scope='scene'){
 async function bridge(command){const response=await fetch(endpoint+'/__bridge/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(command)});const value=await response.json();if(value?.error)throw Object.assign(Error(value.error.message),{code:value.error.code});if(!response.ok)throw Error('Development bridge request failed.');return value;}
 const info=await (await fetch(endpoint+'/__bridge/info')).json();if(!info.liveAi&&!args.includes('--mock'))throw Error('Live evaluation requires --chatgpt. Use --mock only for harness verification.');
 const available=(await bridge({action:'models',providerId:'chatgpt'})).models;
+const frozenSources=beginnerPilot
+  ? read(path.join(root,'docs/evaluation/generation-tests/notes-prompt-experiment/corpus.json')).cases
+  : null;
 let cases=[];
 for(const language of Object.keys(languages))for(const difficulty of language==='ja'?['N5','N3','N1']:['A1','B1','C1']) {
  const variants=suite==='models'?[['sol-low','gpt-6.1-sol','low'],['luna-high','gpt-6-luna','high']]:suite==='prose'?[['current',model,effort],['candidate',model,effort]]:[['baseline',model,effort],['revised',model,effort]];
@@ -45,12 +52,21 @@ for(const language of Object.keys(languages))for(const difficulty of language===
 }
 if(suite==='followups'||suite==='prose')for(const language of Object.keys(languages))for(const kind of ['continue','rewrite','chapter']){
  const difficulty=language==='ja'?'N5':'A1';
- const parentFile=path.join(root,'docs/evaluation/generation-tests/pilot',`${language}-${difficulty}-0-revised.json`);
- if(!fs.existsSync(parentFile)||!read(parentFile).result)throw Error(`A completed pilot source is required: ${path.basename(parentFile)}`);
- const parent=read(parentFile).result;
+ if(beginnerPilot && kind==='chapter')continue;
+ const parentId=`${language}-${difficulty}-0`;
+ const parentFile=path.join(root,'docs/evaluation/generation-tests/pilot',`${parentId}-revised.json`);
+ const parent=beginnerPilot
+   ? frozenSources.find(item=>item.id===parentId)?.input.chapter
+   : fs.existsSync(parentFile) && read(parentFile).result;
+ if(!parent?.title || !parent?.story)throw Error(`A completed pilot source is required: ${parentId}`);
  const value=input(language,difficulty,0,['chapter'].includes(kind)?kind:'scene');
  if(['continue','rewrite'].includes(kind)){value.recentProse=parent.story;value.storyMemory={characters:[],facts:[],plot:[],unresolved:[],uncertainties:[],situation:[]};value.prompt='';if(kind==='rewrite')value.currentChapter={title:parent.title,story:parent.story};}
  for(const variant of suite==='prose'?['current','candidate']:['revised'])cases.push({id:`${language}-${difficulty}-${kind}${suite==='prose'?'-'+variant:''}`,variant,model,effort,input:value,kind:['continue','rewrite'].includes(kind)?kind:'create'});
+}
+if(beginnerPilot) {
+  cases=cases.filter(({variant,input,kind})=>variant==='current'
+    && input.difficulty===(input.languageCode==='ja'?'N5':'A1')
+    && (kind!=='create' || input.scope==='scene'));
 }
 for(const item of cases){if(args.includes('--mock')){item.model='development-mock';item.effort='';}const found=available.find(m=>m.id===item.model);if(!found||item.effort&&!found.reasoningLevels.includes(item.effort))throw Error(`Unavailable evaluation setting: ${item.model} ${item.effort}`);}
 if(languageFilter)cases=cases.filter(item=>item.input.languageCode===languageFilter);
