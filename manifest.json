@@ -4,6 +4,7 @@
   "version": "1.4.2",
   "templateVersion": 3,
   "description": "Create AI-powered stories tailored to your story ideas, topics, and reading level.",
+  "author": "Javier Melo",
   "main": "index.html",
   "files": [
     "icon.png",
