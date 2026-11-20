@@ -5,6 +5,7 @@
   "templateVersion": 3,
   "description": "Create AI-powered stories tailored to your story ideas, topics, and reading level.",
   "author": "Javier Melo",
+  "license": "MIT",
   "main": "index.html",
   "files": [
     "icon.png",
@@ -51,7 +52,8 @@
     "js/consultation-signals.js",
     "js/reading-exposure.js",
     "data/learning-signals.json",
-    "js/story-share.js"
+    "js/story-share.js",
+    "LICENSE"
   ],
   "app2Update": {
     "appId": "com.wynh.lingomage",
@@ -100,7 +102,8 @@
       "js/usage-tracker.js",
       "js/consultation-signals.js",
       "js/reading-exposure.js",
-      "js/story-share.js"
+      "js/story-share.js",
+      "LICENSE"
     ],
     "seedFiles": [
       "data/stories.json",
