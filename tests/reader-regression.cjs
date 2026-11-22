@@ -197,7 +197,12 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.equal(popover.childNodes[0].childNodes[0].childNodes[0].textContent,'Молоко\u0301');
   assert.equal(popover.childNodes[0].childNodes[0].childNodes[1].attributes['aria-label'],'Listen to Молоко');
   noteUi.closeWordNote();noteUi.showWordNote(trigger,[russianNote],'молока');
-  assert.equal(popover.childNodes[0].childNodes[1].textContent,'Dictionary form: молоко\u0301');
+  assert.equal(popover.childNodes[0].childNodes[0].childNodes[0].textContent,'молока','an inflection without saved form stress stays unmarked');
+  assert.equal(popover.childNodes[0].childNodes[1].textContent,'Dictionary form: молоко','the dictionary form line never carries stress');
+  noteUi.closeWordNote();noteUi.showWordNote(trigger,[{word:'вход',meaning:'entrance',formStress:{'входа':[2]}}],'входа');
+  assert.equal(popover.childNodes[0].childNodes[0].childNodes[0].textContent,'вхо\u0301да','stress marks the form from the text');
+  assert.equal(popover.childNodes[0].childNodes[1].textContent,'Dictionary form: вход');
+  assert.equal(popover.childNodes[0].childNodes[0].childNodes[1].attributes['aria-label'],'Listen to входа');
 
   console.log('PASS note offers View saved explanation only for activated text with one, closing the note before revealing the card');
   console.log('PASS glossary Listen speaks the text form (dictionary form follows) with source locale, restores focus and disables browser playback');

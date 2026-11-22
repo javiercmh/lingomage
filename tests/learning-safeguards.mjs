@@ -69,17 +69,20 @@ for (const language of ['German','Japanese','Russian','Spanish']) {
   assert.ok(!prompt.includes('return an empty array'));
 }
 {
-  const prose = {title:'Всё дома', story:'Она купила молоко и свёклу.'};
+  const prose = {title:'Всё дома', story:'Она купила молоко и свёклу у входа.'};
   const result = validateNotes({glossary:[
     {word:'молоко\u0301',meaning:'milk',forms:['молоко\u0301']},
-    {word:'свёкла',meaning:'beetroot',forms:['свёклу']}
+    {word:'свёкла',meaning:'beetroot',forms:['свёклу']},
+    {word:'вход',meaning:'entrance',forms:['вхо\u0301да']}
   ]}, prose, 'ru');
   assert.deepEqual(result.glossary, [
-    {word:'молоко',meaning:'milk',forms:['молоко'],stress:[5]},
-    {word:'свёкла',meaning:'beetroot',forms:['свёклу']}
+    {word:'молоко',meaning:'milk',forms:['молоко'],stress:[5],formStress:{'молоко':[5]}},
+    {word:'свёкла',meaning:'beetroot',forms:['свёклу']},
+    {word:'вход',meaning:'entrance',forms:['входа'],formStress:{'входа':[2]}}
   ]);
   assert.deepEqual(validateStory(JSON.parse(JSON.stringify(result)), 'ru'), result);
   assert.ok(NOTES_INSTRUCTIONS.includes('For Russian only, put a combining acute'));
+  assert.ok(NOTES_INSTRUCTIONS.includes('in the dictionary headword and in each listed form'));
 }
 for (const text of ['Define most meaningful vocabulary','including common words','fixed canonical chapter','Every form must be copied exactly','English explanations only','At least one useful note','do not pad a quota']) assert.ok(NOTES_INSTRUCTIONS.includes(text),text);
 assert.ok(prompts.storyInstructions('Russian','A1','test').includes('canonical title and story'));

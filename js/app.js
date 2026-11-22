@@ -33,7 +33,7 @@ const SPEECH_LANGUAGES = { de: 'de-DE', ja: 'ja-JP', ru: 'ru-RU', 'es-CL': 'es-C
 const PROFILE_DEFINITIONS = readJson('data/learning-profiles.json', {});
 const STORY_GUIDES = PROFILE_DEFINITIONS.generationGuides;
 const JOURNEY_DESCRIPTIONS = PROFILE_DEFINITIONS.languages;
-const PROMPT_VERSION = '2026-11-18.2';
+const PROMPT_VERSION = '2026-11-22.1';
 const LEVELS = PROFILE_DEFINITIONS.standardizedLevels;
 const SCOPES = PROFILE_DEFINITIONS.scopes;
 function levelDefinition(language, id) { return LEVELS[language]?.levels.find(level => level.id === id); }
@@ -1762,11 +1762,15 @@ function showWordNote(trigger, notes, surface = '', helpId = '') {
     const shown = surface.trim() || note.word || '';
     const russian = readerStory().language === 'ru';
     const canonical = russian ? stripRussianStress(note.word || '') : note.word || '';
-    const sameForm = (russian ? stripRussianStress(shown) : shown).toLowerCase() === canonical.trim().toLowerCase();
-    const marked = russian ? withRussianStress(note.word || '', note.stress) : canonical;
+    const bare = russian ? stripRussianStress(shown) : shown;
+    const sameForm = bare.toLowerCase() === canonical.trim().toLowerCase();
+    // Russian stress belongs on the wording from the text, never on the dictionary form line.
     let display = shown;
-    if (russian && sameForm && marked !== canonical) {
-      display = note.stress ? withRussianStress(stripRussianStress(shown), note.stress) : marked;
+    if (russian) {
+      const forms = note.formStress || {};
+      const key = Object.hasOwn(forms, bare) ? bare : Object.keys(forms).find(form => form.toLowerCase() === bare.toLowerCase());
+      const positions = key ? forms[key] : sameForm ? note.stress : null;
+      if (positions) display = withRussianStress(bare, positions);
     }
     const word = document.createElement('strong'); word.textContent = display || 'Word note';
     const meaning = document.createElement('span'); meaning.textContent = note.meaning;
@@ -1776,7 +1780,7 @@ function showWordNote(trigger, notes, surface = '', helpId = '') {
     });
     heading.append(word, listen); item.append(heading);
     if (note.word && !sameForm) {
-      const form = document.createElement('span'); form.className = 'word-note-form'; form.textContent = `Dictionary form: ${marked}`; item.append(form);
+      const form = document.createElement('span'); form.className = 'word-note-form'; form.textContent = `Dictionary form: ${canonical}`; item.append(form);
     }
     item.append(meaning); popover.append(item);
   }

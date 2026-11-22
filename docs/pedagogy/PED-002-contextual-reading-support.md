@@ -14,7 +14,7 @@ Interaction details are in [`DESIGN.md`](../../DESIGN.md); pipeline and storage 
 - The learner selects any word, phrase or fragment and asks for a concise English explanation of its contextual meaning and relevant grammar or usage, silently adapted to the learner's level. It covers the exact selection, including fragments within words; surrounding text only clarifies function. Fragments may have no standalone translation.
 - Initial help is one short paragraph: no unrelated vocabulary, no teaching of assumed scripts, no profile recap, no assessment.
 - The card shows a model-chosen contiguous source excerpt containing the selection, with the exact occurrence highlighted by the app, and an optional short context translation. An invalid excerpt falls back to the containing sentence, dropping any possibly mismatched translation.
-- Russian vocabulary notes give dictionary headword stress as a pronunciation cue. They keep the exact inflected form from the passage available for listening and share one lookup identity across stressed and unstressed spellings.
+- Russian vocabulary notes give stress on the form from the passage as a pronunciation cue; the dictionary form is shown unmarked. They keep the exact inflected form from the passage available for listening and share one lookup identity across stressed and unstressed spellings.
 
 - **More detail** is opt-in (opening the field makes no request) with an optional one-line question; follow-ups stay on the same selection and may build on earlier answers. Plain English paragraphs; light formatting only, model HTML never interpreted. Editing a saved question regenerates its answer from the original explanation and earlier follow-ups. Later answers and examples are removed on save because they may depend on the replaced answer.
 - **Generate examples:** three short sentences showing the same meaning or grammatical function in varied contexts, each with a validated highlight and English translation.
@@ -69,3 +69,4 @@ A controlled contextual-accuracy comparison of notes prompts is designed but not
 - 2026-10-14: consolidated at prompt `2026-10-14.21`.
 - 2026-10-19: evidence revision (extensive reading, repetition) with no behavior change.
 - 2026-11-08: lookups recorded under PED-005.
+- 2026-11-22: Russian note stress moved from the dictionary headword to the form from the passage (prompt `2026-11-22.1`).
