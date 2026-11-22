@@ -56,4 +56,42 @@ for (const [message, kind, expected] of [['Request cancelled. Resume to explicit
   await ctx.resumeCheckpoint(failing);
   assert.equal(ctx.readerGeneration?.phase ?? null,expected,`${kind} resume failure "${message}"`);
 }
+// invalid_request surfaces the real cause (including missing model on legacy checkpoints) instead of blaming the AI service.
+{
+  const legacyBlank = { kind: 'continue', stage: 'plan', config: { providerId: 'chatgpt', model: '' }, error: 'Invalid request.', failure: failureInfo(Object.assign(new Error('Invalid request.'), { code: 'invalid_request' }), 'plan', 'start') };
+  const legacySummary = recoverySummary(legacyBlank);
+  assert.match(legacySummary, /No AI model is selected\. Open Settings and choose an AI model/);
+  assert.doesNotMatch(legacySummary, /The AI service could not complete the request/);
+
+  const hostSpecific = { kind: 'continue', stage: 'plan', config: { providerId: 'chatgpt', model: 'm' }, error: 'Request input or instructions are too large.', failure: failureInfo(Object.assign(new Error('Request input or instructions are too large.'), { code: 'invalid_request' }), 'plan', 'start') };
+  assert.match(recoverySummary(hostSpecific), /Request input or instructions are too large\./);
+  assert.doesNotMatch(recoverySummary(hostSpecific), /The AI service could not complete the request/);
+
+  const genericOther = { kind: 'continue', stage: 'plan', config: { providerId: 'chatgpt', model: 'm' }, error: 'Invalid request.', failure: failureInfo(Object.assign(new Error('Invalid request.'), { code: 'invalid_request' }), 'plan', 'start') };
+  assert.match(recoverySummary(genericOther), /The AI request was rejected as invalid\./);
+  assert.doesNotMatch(recoverySummary(genericOther), /The AI service could not complete the request/);
+
+  // runContentOperation refuses blank model before creating a checkpoint.
+  let created = 0;
+  const runCtx = {
+    workspaceStorage: { assertWritable() {} },
+    pipeline: { records: [], create() { created++; return {}; }, async run() {} },
+    aiSession: { run: fn => fn() },
+    PROMPT_VERSION: 'test',
+    PROFILE_DEFINITIONS: { version: 1 }
+  };
+  vm.createContext(runCtx);
+  vm.runInContext(source.slice(source.indexOf('async function runContentOperation('), source.indexOf('const { operationProvenance')), runCtx);
+  await assert.rejects(runCtx.runContentOperation({ kind: 'continue', config: { providerId: 'chatgpt', model: '' } }), /No AI model is selected/);
+  assert.equal(created, 0, 'No checkpoint is created when no AI model is selected');
+
+  // resumeCheckpoint adopts the newly selected Settings model if an older checkpoint had a blank model.
+  const blankOp = { kind: 'continue', stage: 'plan', config: { providerId: 'chatgpt', model: '', reasoning: '' }, promptVersion: 'test', safeguardVersion: 'test', error: 'Invalid request.' };
+  let resumedModel = '';
+  const resumeCtx = { backgroundRun: null, aiSession, pendingRequests, state: { readerEditDraft: null, providerId: 'chatgpt', model: 'gpt-5', reasoning: 'medium' }, PROMPT_VERSION: 'test', SAFEGUARD_VERSION: 'test', pipeline: { records: [blankOp], busy: false, async run(o) { resumedModel = o.config.model; this.records = []; } }, readerGeneration: null, setReaderGeneration() {}, showOperationResult() {}, toast() {}, renderCheckpointRecovery() {}, revealRecovery() {}, failureInfo };
+  vm.createContext(resumeCtx);
+  vm.runInContext(source.slice(source.indexOf('async function resumeCheckpoint('), source.indexOf('function revealRecovery(')), resumeCtx);
+  await resumeCtx.resumeCheckpoint(blankOp);
+  assert.equal(resumedModel, 'gpt-5', 'Resume adopts the selected model when a saved checkpoint had none');
+}
 console.log('PASS all content kinds: inference/validation/save/release failures, explicit recovery, release-only no inference, stale/double Retry, Create null draft and bounded redacted diagnostics');

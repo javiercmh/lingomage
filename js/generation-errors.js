@@ -61,7 +61,13 @@ export function recoverySummary(op) {
   if (!op.error) return 'An unfinished request has saved progress. Resume it or discard this attempt.';
   const failure=op.failure || failureInfo(new Error(op.error),op.stage);
   const message=failureInfo(new Error(failure.message),op.stage).message;
-  const reason=(failure.category === 'background' && BACKGROUND_REASONS[failure.code]) || {background:`Background work could not continue.${SAVED}`,unavailable:`The request or background session is no longer available. Earlier steps remain saved; Retry runs the unfinished step again.`,service:HOST_REASON_CODES.has(failure.code) ? message : 'The AI service could not complete the request.',validation:'The AI response did not meet the required format or language checks.',storage:'The response or progress could not be saved.',release:'The response is preserved, but the AI request could not be finished.',configuration:message,cancelled:'The request was cancelled.',internal:'An unexpected app error stopped the request.'}[failure.category] || 'The request stopped.';
+  const genericInvalidRequest=!message || /^(?:Invalid request\.?|Unknown error|The request could not complete\.)$/i.test(message);
+  const invalidRequestReason=failure.code === 'invalid_request'
+    ? (!genericInvalidRequest ? message
+      : op.config && !String(op.config.model || '').trim() ? 'No AI model is selected. Open Settings and choose an AI model, then tap Retry.'
+      : 'The AI request was rejected as invalid.')
+    : '';
+  const reason=(failure.category === 'background' && BACKGROUND_REASONS[failure.code]) || invalidRequestReason || {background:`Background work could not continue.${SAVED}`,unavailable:`The request or background session is no longer available. Earlier steps remain saved; Retry runs the unfinished step again.`,service:HOST_REASON_CODES.has(failure.code) ? message : 'The AI service could not complete the request.',validation:'The AI response did not meet the required format or language checks.',storage:'The response or progress could not be saved.',release:'The response is preserved, but the AI request could not be finished.',configuration:message,cancelled:'The request was cancelled.',internal:'An unexpected app error stopped the request.'}[failure.category] || 'The request stopped.';
   const preserved=op.prose ? ' Completed prose is preserved.' : op.result ? ' Completed content is preserved.' : '';
   return `${names[op.kind] || 'Generation'} stopped${stages[op.stage] ? ` during ${stages[op.stage]}` : ''}. ${reason}${preserved}`;
 }

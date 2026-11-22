@@ -878,6 +878,9 @@ async function resumeCheckpoint(op) {
     }
     setReaderGeneration({storyId:op.target?.storyId ?? null,phase:'working',message:'Resuming saved progress…'});
     if (pendingRequests(op).some(request => request.completed) && !['ready','applied'].includes(op.stage)) { await pipeline.finishRequest(op); setReaderGeneration(null); return; }
+    if (op.config && !String(op.config.model || '').trim() && String(state.model || '').trim()) {
+      op.config = { ...op.config, providerId: state.providerId || op.config.providerId || '', model: state.model, reasoning: state.reasoning };
+    }
     // An outstanding request is polled, saved and acknowledged by the pipeline before any new request,
     // and so before any session is opened (sessions open lazily at the next ai.start).
     await aiSession.run(() => pipeline.run(op)); showOperationResult(op);
@@ -902,6 +905,7 @@ function revealRecovery(op) {
 }
 async function runContentOperation(spec) {
   workspaceStorage.assertWritable();
+  if (!String(spec?.config?.model || '').trim()) throw new Error('No AI model is selected. Open Settings and choose an AI model before generating.');
   if (pipeline.records.length) throw new Error('Resume or discard the pending generation before starting another.');
   const op = pipeline.create({...spec, promptVersion:PROMPT_VERSION, profileVersion:PROFILE_DEFINITIONS.version, planned:spec.kind !== 'examples'});
   await aiSession.run(() => pipeline.run(op));
@@ -936,7 +940,7 @@ function initializePipeline() {
   if (entry.status === 'invalid') { state.checkpointBlocked=true; showStorageErrors(); return; }
   const records=entry.value;
   pipeline=createPipeline({records,persist:value=>workspaceStorage.save('data/generation-checkpoints.json',value),apply:applyContentOperation,parallel:true,changed:()=>{if(pipeline && !pipeline.busy) state.requestId=null; renderCheckpointRecovery();},ai:{
-    start:async args=>{workspaceStorage.assertWritable(); state.requestId='starting'; try {const id=await aiSession.start(args); state.requestId=id; return id;} catch(error){state.requestId=null;throw error;}},
+    start:async args=>{workspaceStorage.assertWritable(); if (!String(args?.model || '').trim()) throw new Error('No AI model is selected. Open Settings and choose an AI model before generating.'); state.requestId='starting'; try {const id=await aiSession.start(args); state.requestId=id; return id;} catch(error){state.requestId=null;throw error;}},
     wait:async id=>{state.requestId=id; try {const text=await ai.wait(id); return text;} finally {if(state.requestId===id) state.requestId=null;}},
     acknowledge:id=>ai.acknowledge(id), cancel:id=>ai.cancel(id)
   }});
@@ -1172,7 +1176,7 @@ async function generate(event) {
     const modelsResult = await ai.models(provider.id);
     state.models = modelsResult.models || [];
     const model = state.models.find(item => item.id === state.model);
-    if (!model) throw new Error(state.model ? 'The selected model is not available now. Choose an available model in Settings.' : 'Choose an available AI model in Settings before generating.');
+    if (!model) throw new Error(String(state.model || '').trim() ? 'The selected AI model is not available now. Open Settings and choose an available model.' : 'No AI model is selected. Open Settings and choose an AI model before generating.');
     state.model = model.id;
     const chosenEffort = model.reasoningLevels?.includes(state.reasoning) ? state.reasoning : undefined;
     const languageCode = $('language').value, difficulty = $('difficulty').value;
@@ -2679,7 +2683,7 @@ async function readerAi(kind, input, instructions, requestPanel, config = { prov
   if (state.pendingReaderResult) throw new Error('Save the completed response before starting another request.');
   if (state.requestId) throw new Error('Another AI request is still running. Wait for it to finish before starting another.');
   if (!ai.available) throw new Error('Connect an AI provider in App² Settings → AI first.');
-  const model = state.models.find(item => item.id === config.model); if (!model) throw new Error('Choose an available AI model in Settings first.');
+  const model = state.models.find(item => item.id === config.model); if (!model) throw new Error(String(config.model || '').trim() ? 'The selected AI model is not available now. Open Settings and choose an available model.' : 'No AI model is selected. Open Settings and choose an AI model first.');
   const { providers } = await ai.providers();
   const connected = providers?.filter(provider => provider.connected) || [];
   const provider = connected.find(item => item.id === (config.providerId || state.providerId)) || connected[0];
@@ -3160,7 +3164,8 @@ async function runMemoryRebuild(story) {
     await releaseSavedInference();
     // Check configuration before discarding the old cache.
     workspaceStorage.assertWritable();
-    if (!ai.available || !state.models.some(model => model.id === config.model)) throw new Error('Choose an available AI model in Settings first.');
+    if (!ai.available) throw new Error('Connect an AI provider in App² Settings → AI first.');
+    if (!state.models.some(model => model.id === config.model)) throw new Error(String(config.model || '').trim() ? 'The selected AI model is not available now. Open Settings and choose an available model.' : 'No AI model is selected. Open Settings and choose an AI model first.');
     if (request.cancelledByUser) throw new Error('Request cancelled.');
     const rebuild = beginMemoryRebuild(story, selectedPath(story), persistReaderStory);
     $('memory-rebuild-dialog').close();
@@ -3253,6 +3258,9 @@ $('reader-edit-submit').addEventListener('click', async () => {
   const providerId = state.providerId, model = state.model, config = { providerId, model, reasoning: state.reasoning };
   const difficulty = $('reader-level').value, scope = $('reader-scope').value;
   if (!levelDefinition(story.language,difficulty)) { $('reader-edit-error').textContent='Choose a reading level for this generation.'; return; }
+  if (ai.available === false || (Array.isArray(state.models) && !state.models.length && $('ai-setup')?.hidden === false)) { $('reader-edit-error').textContent='Open App² → Settings → AI and connect a provider, then return here.'; return; }
+  if (!String(model || '').trim()) { $('reader-edit-error').textContent='No AI model is selected. Open Settings and choose an AI model before generating.'; return; }
+  if (Array.isArray(state.models) && !state.models.some(item => item.id === model)) { $('reader-edit-error').textContent='The selected AI model is not available now. Open Settings and choose an available model.'; return; }
   const input = { topic: story.topic || '', practice: story.practice || (story.words || []).join(', '), language: LANGUAGES[story.language], languageCode: story.language, difficulty, framework: LEVELS[story.language].framework, levelDescription: guideFor(story.language, difficulty), readingSelfReport: readingDescription(story.language, difficulty), languageExpectations: state.languageExpectations[story.language] || '', scope, scopeDescription: SCOPES[scope].description, learnerProfile: { ...profileSnapshot(story), readingStartingPoint: difficulty, readingSelfReport: readingDescription(story.language, difficulty) }, prompt };
   const instructions = chapterInstructions(LANGUAGES[story.language], difficulty, guideFor(story.language, difficulty), mode);
   state.readerEditBusy = true; state.readerEditDraft = null; $('path-select').disabled = true;

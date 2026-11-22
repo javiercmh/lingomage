@@ -87,6 +87,9 @@ console.log('PASS chapter/path removal, shared content and memory, mirrors, name
  $('reader-level').value='A1';$('reader-scope').value='scene';
  $('reader-edit-submit').addEventListener=(_,fn)=>submit=fn;$('reader-edit-panel').dataset={mode:'continue'};$('reader-prompt').value='';
  vm.runInContext(slice("$('reader-edit-submit').addEventListener", "$('reader-dialog').addEventListener"),c);
+ c.state.model='';await submit();assert.match($('reader-edit-error').textContent,/No AI model is selected/);assert.equal(requested,undefined,'Continue with no model selected does not start generation');
+ c.state.model='removed';c.state.models=[{id:'mock',name:'Mock'}];await submit();assert.match($('reader-edit-error').textContent,/selected AI model is not available/);assert.equal(requested,undefined,'Continue with an unavailable model does not start generation');
+ c.state.model='mock';
  await submit();assert.deepEqual(painted,['context'],'Continue shows the story-context step before the operation starts');assert.equal(story.paths[0].entries.length,2);assert.equal(requested.recentProse,'Start');assert.equal(story.paths[1].entries[1].versionId,'bx');
  $('reader-edit-panel').dataset.mode='rewrite';c.state.readerChapter=1;await submit();assert.equal(c.selectedPath(story).name,'Alternate 4');assert.equal(c.selectedPath(story).parentPathId,'original');assert.equal(story.nextAlternateNumber,5);
  c.removeReaderContent(target(story,story.activePathId,'path'));c.state.readerChapter=1;await submit();assert.equal(c.selectedPath(story).name,'Alternate 5');assert.equal(story.nextAlternateNumber,6);
