@@ -78,7 +78,8 @@ export function recoverySummary(op) {
     : '';
   const reason=(failure.category === 'background' && BACKGROUND_REASONS[failure.code]) || (failure.code === 'usage_limit' && usageLimitReason(op, failure)) || invalidRequestReason || {background:`Background work could not continue.${SAVED}`,unavailable:`The request or background session is no longer available. Earlier steps remain saved; Retry runs the unfinished step again.`,service:HOST_REASON_CODES.has(failure.code) ? message : 'The AI service could not complete the request.',validation:'The AI response did not meet the required format or language checks.',storage:'The response or progress could not be saved.',release:'The response is preserved, but the AI request could not be finished.',configuration:message,cancelled:'The request was cancelled.',internal:'An unexpected app error stopped the request.'}[failure.category] || 'The request stopped.';
   const preserved=op.prose ? ' Completed prose is preserved.' : op.result ? ' Completed content is preserved.' : '';
-  const resent=failure.code === 'invalid_json' && op.retried?.[failure.stage] ? ' LingoMage already sent this step again once automatically, and the second reply was also broken.' : '';
+  const resends=failure.code === 'invalid_json' ? Number(op.retried?.[failure.stage]) || 0 : 0;
+  const resent=resends ? ` LingoMage already retried this step automatically ${resends === 1 ? 'once' : `${resends} times`}, and every reply was unreadable.` : '';
   return `${names[op.kind] || 'Generation'} stopped${stages[op.stage] ? ` during ${stages[op.stage]}` : ''}. ${reason}${resent}${preserved}`;
 }
 export function appendFailureDetails(box, failure) {

@@ -12,7 +12,7 @@ import { createReaderActivation, glossaryForTrigger, indexGlossaryTriggers, norm
 import { annotatedText, applyExplainedMarks, findGlossaryMatches, getCanonicalSelection, japaneseSegments, stripRussianStress, withRussianStress } from './reader-text.js';
 import { markParagraphGaps } from './paragraph-gaps.js';
 import { SPEECH_RATES, canonicalRange, createReaderPlayer, speechUnits } from './reader-player.js';
-import { createPipeline, pendingRequests, MAX_RUNNING } from './generation-pipeline.js';
+import { createPipeline, pendingRequests, MAX_RUNNING, MAX_BROKEN_RESENDS } from './generation-pipeline.js';
 import { hasStoryContext, progressSummary } from './generation-progress.js';
 import { SAFEGUARD_VERSION, parseContent, validateStory } from './learning-validation.js';
 import { failureInfo, recoverySummary, operationLabel, discardFailureMessage, appendFailureDetails } from './generation-errors.js';
@@ -958,11 +958,19 @@ function showOperationResult(op) {
   }
   toast(op.kind === 'examples' ? 'Examples saved' : op.kind === 'continue' ? 'Chapter added' : 'Branch created');
 }
+// Automatic resends of unreadable replies are announced, never silent (Settings → Advanced).
+function resendStepName(key) {
+  if (key.startsWith('notes-')) return `study notes (part ${key.slice(6)})`;
+  return {plan:'language plan',prose:'story text',notes:'study notes',readings:'kanji readings'}[key] || 'AI';
+}
+function announceResend(op, key, count) {
+  toast(`The ${resendStepName(key)} reply was unreadable. Retrying automatically (${count} of ${MAX_BROKEN_RESENDS}).`);
+}
 function initializePipeline() {
   const entry=workspaceStorage.load('data/generation-checkpoints.json');
   if (entry.status === 'invalid') { state.checkpointBlocked=true; showStorageErrors(); return; }
   const records=entry.value;
-  pipeline=createPipeline({records,persist:value=>workspaceStorage.save('data/generation-checkpoints.json',value),apply:applyContentOperation,parallel:true,changed:()=>{if(pipeline && !pipeline.busy) state.requestId=null; renderCheckpointRecovery();},ai:{
+  pipeline=createPipeline({records,persist:value=>workspaceStorage.save('data/generation-checkpoints.json',value),apply:applyContentOperation,parallel:true,onResend:announceResend,changed:()=>{if(pipeline && !pipeline.busy) state.requestId=null; renderCheckpointRecovery();},ai:{
     start:async args=>{workspaceStorage.assertWritable(); if (!String(args?.model || '').trim()) throw new Error('No AI model is selected. Open Settings and choose an AI model before generating.'); state.requestId='starting'; try {const id=await aiSession.start(args); state.requestId=id; return id;} catch(error){state.requestId=null;throw error;}},
     wait:async id=>{state.requestId=id; try {const text=await ai.wait(id); return text;} finally {if(state.requestId===id) state.requestId=null;}},
     acknowledge:id=>ai.acknowledge(id), cancel:id=>ai.cancel(id)

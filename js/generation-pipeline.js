@@ -18,12 +18,14 @@ export const pendingRequests = op => requestHolders(op).map(holder => holder.req
 // and sets op.partsOneAtATime, so Resume runs the missing parts one at a time. Nothing retries silently.
 // The sequential default keeps offline evaluation request budgets and ordering predictable.
 export const MAX_RUNNING = 3;
-// Broken replies (code invalid_json: the reply is not JSON at all) are resent once per stage or part when
-// the operation captured config.retryBroken (Settings → Retry broken replies automatically, on by default).
-// This is a learner-approved exception to "no silent retries": it is shown in progress, counted in
-// op.retried, and a second broken reply stops with explicit recovery. Other validation failures never resend.
-export const canResendBroken = (op, key, error) => error?.code === 'invalid_json' && op.config.retryBroken === true && !op.retried?.[key];
-const markResent = (op, key) => { op.retried = { ...(op.retried || {}), [key]: 1 }; };
+// Broken replies (code invalid_json: the reply is not JSON at all) are resent automatically, up to
+// MAX_BROKEN_RESENDS times per stage or part, when the operation captured config.retryBroken (Settings →
+// Advanced → Retry broken replies automatically, on by default). Never silent: every resend calls
+// onResend so the app tells the learner, progress shows "retry N of 3", and op.retried counts them.
+// After the limit, or for any other validation failure, the operation stops for explicit recovery.
+export const MAX_BROKEN_RESENDS = 3;
+export const canResendBroken = (op, key, error) => error?.code === 'invalid_json' && op.config.retryBroken === true && (op.retried?.[key] || 0) < MAX_BROKEN_RESENDS;
+const markResent = (op, key) => { op.retried = { ...(op.retried || {}), [key]: (op.retried?.[key] || 0) + 1 }; return op.retried[key]; };
 const START_REFUSALS = new Set(['request_in_progress', 'usage_limit']);
 const isNotesPart = name => name === 'notes' || name.startsWith('notes-');
 // Parts for a finished prose stage: legacy single "notes" or "notes-1".."notes-N" with canonical offsets.
@@ -41,7 +43,7 @@ export function stageModel(op, stage) {
   const light = LIGHT_STAGES.has(stage) && String(op.config.light?.model || '').trim() ? op.config.light : null;
   return {providerId:op.config.providerId, model:light ? light.model : op.config.model, reasoningEffort:(light ? light.reasoning : op.config.reasoning) || undefined};
 }
-export function createPipeline({ records, persist, ai, apply, changed = () => {}, parallel = false }) {
+export function createPipeline({ records, persist, ai, apply, changed = () => {}, onResend = () => {}, parallel = false }) {
   let busy = false;
   let phase = '';
   let stopWaiting, stopped, cancellationError;
@@ -116,7 +118,7 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
       if (op.discardRequested) throw error;
       if (error?.code === 'usage_limit') { op.partsOneAtATime = true; save(); } // a provider limit: Resume goes one part at a time
       fail(error); await invalidate();
-      if (canResendBroken(op, name, error)) { markResent(op, name); save(); changed(); return runPart(op, name); }
+      if (canResendBroken(op, name, error)) { const count = markResent(op, name); save(); onResend(op, name, count); changed(); return runPart(op, name); }
       throw error;
     }
     try {
@@ -197,7 +199,7 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
             if (op.discardRequested) throw error;
             const failure=failureInfo(error,stage,phase);
             if (op.request) { op.request.completed=true; op.request.invalid=true; save(); await release(op); }
-            if (canResendBroken(op, stage, error)) { markResent(op, stage); save(); changed(); continue; }
+            if (canResendBroken(op, stage, error)) { const count = markResent(op, stage); save(); onResend(op, stage, count); changed(); continue; }
             error.generationFailure=failure; throw error;
           }
           let content;

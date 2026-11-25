@@ -1,5 +1,7 @@
 // Presentation of a saved operation's stages for the waiting screen. It reads the checkpoint record
 // and never changes it, so the checklist cannot disagree with what the pipeline will actually do.
+// Mirrors MAX_BROKEN_RESENDS in generation-pipeline.js (kept here so this module stays import-free).
+const MAX_RESENDS = 3;
 const PROSE_LABEL = { create: 'Writing your story', continue: 'Writing the next chapter', rewrite: 'Rewriting the chapter', examples: 'Writing examples' };
 const ORDER = ['context', 'plan', 'prose', 'notes', 'readings'];
 
@@ -34,10 +36,10 @@ export function progressSteps(op) {
   // sequential checkpoints run notes before readings, against display order), else the first unfinished step.
   let activeAssigned = op.stage !== 'enrich' && steps.some(step => step.key === op.stage && !done.has(step.key));
   // A broken reply resent automatically shows on its unfinished step until that step finishes.
-  const retried = Object.keys(op.retried || {}), resent = key => retried.some(name => name === key || (key === 'notes' && name.startsWith('notes-')));
+  const resends = key => Math.max(0, ...Object.entries(op.retried || {}).filter(([name]) => name === key || (key === 'notes' && name.startsWith('notes-'))).map(([, count]) => Number(count) || 0));
   return steps.map(step => {
     if (done.has(step.key)) return { ...step, state: 'done' };
-    if (resent(step.key)) step = { ...step, label: `${step.label} · retrying` };
+    if (resends(step.key)) step = { ...step, label: `${step.label} · retry ${resends(step.key)} of ${MAX_RESENDS}` };
     const parallelPart = op.stage === 'enrich' && (step.key === 'notes' || (step.key === 'readings' && op.parallel?.readings));
     if (parallelPart || step.key === op.stage || !activeAssigned) { activeAssigned = true; return { ...step, state: 'active' }; }
     return { ...step, state: 'pending' };
