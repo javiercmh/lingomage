@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "minimumHostLevel": 11,
+  "identity": {
+    "name": "LingoMage",
+    "android": {
+      "applicationId": "com.wynh.lingomage"
+    },
+    "ios": {
+      "bundleId": "com.wynh.lingomage"
+    },
+    "icon": "icon.png"
+  },
+  "capabilities": {
+    "ai": true,
+    "notifications": false,
+    "network": false
+  },
+  "ai": {
+    "providers": [
+      "chatgpt",
+      "openrouter",
+      "custom"
+    ]
+  },
+  "ui": {
+    "orientation": "any",
+    "settingsEntry": "menu"
+  },
+  "signing": {
+    "android": "LINGOMAGE_RELEASE_*"
+  }
+}

@@ -11,6 +11,12 @@ How LingoMage ships through App². Branch and release rules are in [`AGENTS.md`]
   - All other files are left untouched.
 - Keep `"branch": "main"` in `app2Update.github` for older App² builds; remove it only when the released host no longer needs it, then publish the same manifest to `main`. The manifest is identical on both branches.
 
+## Standalone build (Chimera)
+
+- `chimera.json` configures the standalone Android app built by [Chimera](https://github.com/javiercmh/chimera) (`com.wynh.lingomage`). Name, version, entry point and the shipped files come from `manifest.json`; `chimera.json` adds the application and bundle IDs, icon, capabilities granted from the start, offered AI providers, UI options and the signing-property prefix (`LINGOMAGE_RELEASE_*`). Validate with `./chimera validate ../lingomage` from the Chimera checkout.
+- Chimera bundles only files listed in `manifest.json` (managed files, plus seed files as their empty `seedDefaults`), so docs, tests and the dev server never ship and need no exclude list. `chimera.json` itself is not in `files`.
+- Capabilities: `ai` is on; `notifications` (scheduled reminders) and `network` (direct fetch) stay off because LingoMage uses neither; the AI-request notification belongs to the host. Raise `minimumHostLevel` with `app2Update.minimumHostVersionCode` when LingoMage needs newer host behavior.
+
 ## Updates
 
 - App² follows `javiercmh/lingomage` branch `main` by default, pinned to one commit during download, and offers any change to managed files (a version bump is not required for App² to notice, but every published release increments `version`).

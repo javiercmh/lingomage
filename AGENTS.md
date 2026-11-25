@@ -16,7 +16,7 @@ Every doc, what it contains, and when to read or update it. Update the matching 
 | [`docs/architecture/generation-pipeline.md`](docs/architecture/generation-pipeline.md) | Generation stages, checkpoints, recovery, validation bounds, memory, help requests, background AI sessions | Changing prompts' plumbing, AI requests, retries or recovery |
 | [`docs/architecture/learner-tracking.md`](docs/architecture/learner-tracking.md) | Time tracking and lookup history/probable reading: counting rules and file formats | Changing what is counted or recorded about the learner |
 | [`docs/architecture/safeguards.md`](docs/architecture/safeguards.md) + `data/language-safeguards.json` | Registered language and generation safeguards and their tests | Changing generation or validation |
-| [`PACKAGING.md`](PACKAGING.md) | Manifest ownership, App² updates, packaging, host APIs (AI, translation), local preview | Adding files, changing the manifest or host calls |
+| [`PACKAGING.md`](PACKAGING.md) | Manifest ownership, Chimera standalone build (`chimera.json`), App² updates, packaging, host APIs (AI, translation), local preview | Adding files, changing the manifest or host calls |
 
 **Learning design and evidence (read before changing learning behavior)**
 
