@@ -12,7 +12,7 @@ export function bindStory(context) {
 export function bindGeneration(context) {
   // No background story-context run is active unless a test sets one.
   context.backgroundRun ??= null; context.settleBackgroundContext ??= async () => {};
-  context.lightModelChoice ??= lightModelChoice; context.lightTaskConfig ??= lightTaskConfig;
+  context.lightModelChoice ??= lightModelChoice; context.lightTaskConfig ??= lightTaskConfig; context.noteParts ??= () => 1;
   Object.assign(context, createGenerationController({state:context.state, normalizeChapters:(...args)=>context.normalizeChapters(...args), ensureStoryPaths:(...args)=>context.ensureStoryPaths(...args), persistReaderStory:(...args)=>context.persistReaderStory(...args), savedFollowUps:(...args)=>context.savedFollowUps(...args)}));
 }
 export function bindPanels(context) {

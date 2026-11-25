@@ -6,6 +6,19 @@ The learner requested more definitions, including common words. Prompt policy .1
 
 The fixed 100-note limit was replaced, with explicit user approval, by a serialized content limit of 1,000,000 UTF-16 units. Existing per-field, canonical prose, script, exact-form, Japanese reading and checkpoint safeguards remain. The matcher was optimized and compared with the original behavior in randomized overlap cases; 250-note rendering and repeated-meaning scaling cases pass.
 
+## Split notes comparison (2026-11-25)
+
+Question: is one notes request, three paragraph parts or about six smaller parts better for speed and note quality? `scripts/compare-note-splits.mjs` ran the production notes prompt (`2026-11-25.1`), splitting, validation and merging on six frozen corpus chapters (German B1/C1, Russian B1/C1, Japanese N3/N1). Generator: GPT-6 Luna, low effort, plus a single-request medium-effort reference. Parts ran concurrently through separate development bridges. Judge: one anonymous GPT-6.2 Sol medium review per chapter covering all variants. 67 requests; raw runs stay in the ignored `ai-evals/runs/`.
+
+| Variant | Median time to all notes | Notes per chapter (median) | Judge accuracy (1–5, median) | Major errors (total) | Unparseable replies |
+| --- | --- | --- | --- | --- | --- |
+| One request, low | 43.5 s | 78 | 3 | 5 (5 chapters) | 1 of 6 |
+| 3 parts, low | 30.2 s | 102 | 3 | 3 (5 chapters) | 1 of 17 |
+| ~6 parts, low (half minimum part size) | 19.3 s | 106 | 2 | 12 (6 chapters) | 0 of 32 |
+| One request, medium | 33.4 s | 60 | 3 | 7 (6 chapters) | 0 of 6 |
+
+Times are medians over all six chapters, including the run with an unparseable reply; notes, accuracy and errors cover completed runs only. Interpretation, with limits: six chapters, one uncalibrated judge reply per chapter from the same model family, and wall times that vary with provider load. Splitting shortened time to all notes, most for Russian and Japanese, where single replies are long. Parts also produced more notes (smaller focus means denser coverage; the judge's coverage scores rose and missing-support counts fell), so total output grew and German B1 was not faster. Three parts kept accuracy at the single-request level; about six parts added clearly more major errors (case and aspect explanations) and more headwords with several notes, and would exceed App²'s default six starts per minute alone. Medium effort was neither consistently more accurate nor faster than low. Japanese chapters mostly stay one request at the 600-unit minimum; these Japanese results used a 250-unit minimum, which production adopted for Japanese. Two of 61 generation replies were invalid JSON; with split notes only that part needs a retry. No learning effect or certified accuracy is claimed.
+
 ## Evaluation interpretation
 
 The corrected model comparison contains 24 matched prose/notes samples: German, Russian, Japanese and Chilean Spanish, three requested levels per language, GPT-6.1 Sol low versus GPT-6 Luna high. The earlier GPT-6 Sol comparison is archived separately and excluded. Original prompt/validator provenance and failed requests are retained.

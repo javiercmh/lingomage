@@ -1,7 +1,7 @@
 import { failureInfo } from './generation-errors.js';
 import { aiNotification } from './ai-notification.js';
 import { PLAN_INSTRUCTIONS, decodePlan } from './story-generation.js';
-import { parseContent, validateContentSize, validateProse, validateNotes, validateStory, validateExamples, readingPlan, attachReadings, NOTES_INSTRUCTIONS, READING_INSTRUCTIONS, SAFEGUARD_VERSION } from './learning-validation.js';
+import { parseContent, validateContentSize, validateProse, validateNotes, validateStory, validateExamples, readingPlan, attachReadings, notesParts, noteMinUnits, mergeNoteParts, NOTES_INSTRUCTIONS, READING_INSTRUCTIONS, SAFEGUARD_VERSION } from './learning-validation.js';
 
 // A saved operation can hold several requests: the main one and, for Japanese notes plus readings,
 // one per parallel part. Every cancel, release and recovery path walks all of them.
@@ -10,9 +10,24 @@ export const pendingRequests = op => requestHolders(op).map(holder => holder.req
 
 // Checkpoints are user data. Valid stage results are durable before release;
 // the final application is idempotent via operationId on saved records.
-// parallel: run Japanese notes and readings together. The app enables it. Older App² hosts hold one
-// request per app and answer request_in_progress; the part then starts after the other finishes.
+// parallel: run Japanese notes and readings together, and split notes into paragraph parts when
+// op.config.notesParts > 1 (Settings → Split study notes). The app enables it. At most MAX_RUNNING parts
+// run at once. A start the host refuses before any inference (request_in_progress, or App²'s per-app
+// start limit as usage_limit) waits for a running part to finish and starts once more; with nothing
+// running, the operation stops with saved parts. A provider usage_limit during a request stops new parts
+// and sets op.partsOneAtATime, so Resume runs the missing parts one at a time. Nothing retries silently.
 // The sequential default keeps offline evaluation request budgets and ordering predictable.
+export const MAX_RUNNING = 3;
+const START_REFUSALS = new Set(['request_in_progress', 'usage_limit']);
+const isNotesPart = name => name === 'notes' || name.startsWith('notes-');
+// Parts for a finished prose stage: legacy single "notes" or "notes-1".."notes-N" with canonical offsets.
+export function enrichmentParts(op) {
+  const parts = {}, split = notesParts(op.prose.story, Number(op.config.notesParts) || 1, noteMinUnits(op.language));
+  if (split.length) split.forEach((part, index) => { parts[`notes-${index + 1}`] = {request:null, done:false, start:part.start, end:part.end}; });
+  else parts.notes = {request:null, done:false};
+  if (op.language === 'ja') parts.readings = {request:null, done:false};
+  return parts;
+}
 // Study notes and Japanese readings may use the lighter model saved in op.config.light; the plan and
 // the prose always use the main model. A saved operation without `light` uses the main model throughout.
 export const LIGHT_STAGES = new Set(['notes','readings']);
@@ -77,46 +92,62 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
     };
     const invalidate = async () => { if (part.request) { part.request.completed=true; part.request.invalid=true; save(); await release(op, part); } };
     await checkCancelled(op, part);
-    const canonical = validateProse(op.prose, op.language), plan = readingPlan(canonical, op.kind);
+    const canonical = validateProse(op.prose, op.language), plan = readingPlan(canonical, op.kind), notes = isNotesPart(name);
     if (name === 'readings' && !plan.spans.length) { part.content = attachReadings(canonical, plan, {readings:[]}, op.kind); part.done = true; save(); return; }
     if (!part.request) {
-      const input = name === 'notes' ? {...op.input,kind:'notes',languagePlan:op.plan,chapter:canonical} : {kind:'readings',languageCode:'ja',spans:plan.spans};
-      const id = await ai.start({...stageModel(op,name),instructions:name === 'notes' ? NOTES_INSTRUCTIONS : READING_INSTRUCTIONS,input:JSON.stringify(input),...aiNotification(op.kind,name)});
-      part.request={id,stage:name,completed:false}; save();
+      const focus = notes && Number.isInteger(part.start) ? {part:Number(name.slice(6)), of:Object.keys(op.parallel).filter(isNotesPart).length, text:canonical.story.slice(part.start, part.end)} : null;
+      const input = notes ? {...op.input,kind:'notes',languagePlan:op.plan,chapter:canonical,...(focus ? {focus} : {})} : {kind:'readings',languageCode:'ja',spans:plan.spans};
+      partPhase='start';
+      let id;
+      try { id = await ai.start({...stageModel(op,notes ? 'notes' : name),instructions:notes ? NOTES_INSTRUCTIONS : READING_INSTRUCTIONS,input:JSON.stringify(input),...aiNotification(op.kind,notes ? 'notes' : name)}); }
+      catch (error) { if (START_REFUSALS.has(error?.code)) error.startRefused = true; throw fail(error); }
+      part.request={id,stage:notes ? 'notes' : name,completed:false}; save();
     }
     await checkCancelled(op, part);
     let response;
     try { partPhase='wait'; const raw = await wait(part.request.id); await checkCancelled(op, part); response = parseContent(raw); }
-    catch (error) { if (op.discardRequested) throw error; fail(error); await invalidate(); throw error; }
+    catch (error) {
+      if (op.discardRequested) throw error;
+      if (error?.code === 'usage_limit') { op.partsOneAtATime = true; save(); } // a provider limit: Resume goes one part at a time
+      fail(error); await invalidate(); throw error;
+    }
     try {
       partPhase='validation';
-      part.content = name === 'notes' ? validateNotes(response, op.prose, op.language) : attachReadings(canonical, plan, response, op.kind);
+      part.content = notes ? validateNotes(response, op.prose, op.language, {requireNotes:!Number.isInteger(part.start)}) : attachReadings(canonical, plan, response, op.kind);
       validateContentSize(part.content);
     } catch (error) { fail(error); await invalidate(); throw error; }
     part.request.completed=true; part.done=true; save();
     await release(op, part);
   }
+  // Runs unfinished parts, at most MAX_RUNNING at once (one after a provider usage_limit). After any
+  // failure no new part starts; running parts finish and stay saved, and the first failure is reported.
   async function runParallel(op) {
-    const names = Object.keys(op.parallel), running = new Map();
-    // A host that holds fewer concurrent requests refuses the start before any inference, so the part
-    // waits for the others and then starts once; this is not a retry of generated content.
-    const attempt = async name => {
-      try { await runPart(op, name); }
-      catch (error) {
-        if (error?.code !== 'request_in_progress' || op.parallel[name].request) throw error;
-        await Promise.allSettled([...running].filter(([other]) => other !== name).map(([, task]) => task));
-        await runPart(op, name);
-      }
+    const limit = op.partsOneAtATime ? 1 : MAX_RUNNING;
+    const queue = Object.keys(op.parallel).filter(name => !op.parallel[name].done), running = new Map();
+    let failure = null, held = false;
+    const launch = name => {
+      const task = runPart(op, name).then(() => null, error => error).then(error => {
+        running.delete(name);
+        // Refused before any inference: start again only after a running part has finished.
+        if (error?.startRefused && !op.parallel[name].request && running.size) { queue.unshift(name); held = true; return; }
+        held = false;
+        if (error) failure ||= error;
+      });
+      running.set(name, task);
     };
-    for (const name of names) running.set(name, attempt(name));
-    const settled = await Promise.allSettled(running.values());
-    const failed = settled.find(item => item.status === 'rejected');
-    if (failed) throw failed.reason;
-    const {notes, readings} = op.parallel;
-    op.prose = notes.content;
-    op.result = {...notes.content, titleSegments:readings.content.titleSegments, storySegments:readings.content.storySegments};
-    validateContentSize(op.result);
-    op.stage='ready'; op.parallel=null; save();
+    while (queue.length || running.size) {
+      while (!failure && !held && queue.length && running.size < limit) launch(queue.shift());
+      if (!running.size) break;
+      await Promise.race(running.values());
+    }
+    if (failure) throw failure;
+    const parts = op.parallel, names = Object.keys(parts), noteNames = names.filter(isNotesPart);
+    const notes = noteNames.length === 1 && parts.notes ? parts.notes.content
+      : validateNotes({glossary:mergeNoteParts(noteNames.map(name => parts[name].content))}, op.prose, op.language);
+    const result = parts.readings ? {...notes, titleSegments:parts.readings.content.titleSegments, storySegments:parts.readings.content.storySegments} : notes;
+    validateContentSize(result);
+    op.prose = notes; op.result = result;
+    op.stage='ready'; op.parallel=null; delete op.partsOneAtATime; save();
   }
   return {
     records,
@@ -175,7 +206,8 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
           else if (stage === 'prose') {
             op.prose=content;
             if (op.kind !== 'examples') {
-              if (parallel && op.language === 'ja') { op.stage='enrich'; op.parallel={notes:{request:null,done:false},readings:{request:null,done:false}}; }
+              const parts = parallel ? enrichmentParts(op) : null;
+              if (parts && Object.keys(parts).length > 1) { op.stage='enrich'; op.parallel=parts; }
               else op.stage='notes';
             } else if (op.language === 'ja') op.stage='readings';
             else { op.result=content; op.stage='ready'; }

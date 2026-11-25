@@ -54,9 +54,18 @@ export function discardFailureMessage(op) {
   return 'The AI request or saved progress still needs to be cleared. Try again.';
 }
 
+// Rate limits (code usage_limit). Refused at start: App²'s per-app start limit, before any inference.
+// During a request: the provider's rate limit or quota; for ChatGPT plans the two look the same.
+function usageLimitReason(op, failure) {
+  const parts = Object.entries(op.parallel || {}).filter(([name]) => name === 'notes' || name.startsWith('notes-'));
+  const saved = parts.length > 1 ? ` ${parts.filter(([, part]) => part.done).length} of ${parts.length} note parts are saved.` : SAVED;
+  if (failure.phase === 'start') return `App² limits how many AI requests LingoMage can start per minute, so the next step did not start.${saved} Wait a minute, then tap Resume, or raise the limit in App² → Settings → AI → Request limit per app.`;
+  const message = failureInfo(new Error(failure.message), op.stage).message;
+  return `The AI provider reported a rate limit or usage limit: ${message}${saved} Resume ${parts.length > 1 ? 'runs the missing parts one at a time' : 'runs the unfinished step again'}; if the limit is your plan's quota, it fails again until the quota resets.`;
+}
 export function recoverySummary(op) {
   const names={create:'Story generation',continue:'Story continuation',rewrite:'Chapter rewrite',examples:'Example generation',explain:'Explanation',initial:'Explanation',detail:'More detail'};
-  const stages={plan:'language planning',prose:'writing',notes:'vocabulary notes',readings:'Japanese readings',enrich:'vocabulary notes and readings',ready:'saving',applied:'finishing the request',setup:'setup',detail:'more detail',initial:'explanation'};
+  const stages={plan:'language planning',prose:'writing',notes:'vocabulary notes',readings:'Japanese readings',enrich:op.parallel && !op.parallel.readings ? 'vocabulary notes' : 'vocabulary notes and readings',ready:'saving',applied:'finishing the request',setup:'setup',detail:'more detail',initial:'explanation'};
   if (op.discardRequested) return discardFailureMessage(op);
   if (!op.error) return 'An unfinished request has saved progress. Resume it or discard this attempt.';
   const failure=op.failure || failureInfo(new Error(op.error),op.stage);
@@ -67,7 +76,7 @@ export function recoverySummary(op) {
       : op.config && !String(op.config.model || '').trim() ? 'No AI model is selected. Open Settings and choose an AI model, then tap Retry.'
       : 'The AI request was rejected as invalid.')
     : '';
-  const reason=(failure.category === 'background' && BACKGROUND_REASONS[failure.code]) || invalidRequestReason || {background:`Background work could not continue.${SAVED}`,unavailable:`The request or background session is no longer available. Earlier steps remain saved; Retry runs the unfinished step again.`,service:HOST_REASON_CODES.has(failure.code) ? message : 'The AI service could not complete the request.',validation:'The AI response did not meet the required format or language checks.',storage:'The response or progress could not be saved.',release:'The response is preserved, but the AI request could not be finished.',configuration:message,cancelled:'The request was cancelled.',internal:'An unexpected app error stopped the request.'}[failure.category] || 'The request stopped.';
+  const reason=(failure.category === 'background' && BACKGROUND_REASONS[failure.code]) || (failure.code === 'usage_limit' && usageLimitReason(op, failure)) || invalidRequestReason || {background:`Background work could not continue.${SAVED}`,unavailable:`The request or background session is no longer available. Earlier steps remain saved; Retry runs the unfinished step again.`,service:HOST_REASON_CODES.has(failure.code) ? message : 'The AI service could not complete the request.',validation:'The AI response did not meet the required format or language checks.',storage:'The response or progress could not be saved.',release:'The response is preserved, but the AI request could not be finished.',configuration:message,cancelled:'The request was cancelled.',internal:'An unexpected app error stopped the request.'}[failure.category] || 'The request stopped.';
   const preserved=op.prose ? ' Completed prose is preserved.' : op.result ? ' Completed content is preserved.' : '';
   return `${names[op.kind] || 'Generation'} stopped${stages[op.stage] ? ` during ${stages[op.stage]}` : ''}. ${reason}${preserved}`;
 }

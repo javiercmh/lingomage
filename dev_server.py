@@ -662,6 +662,9 @@ class Handler(SimpleHTTPRequestHandler):
         """Broad offline notes for the fixed fixture, never new prose."""
         notes = json.loads((Path(__file__).parent / 'data/reader-note-fixtures.json').read_text())
         text = data.get('chapter', {}).get('story', '')
+        focus = data.get('focus')
+        if isinstance(focus, dict) and isinstance(focus.get('text'), str):
+            text = focus['text']  # a split notes part: only forms in this part's paragraphs
         glossary = [{'word': word, 'meaning': meaning, 'forms': [form]}
                     for word, meaning, form in notes.get(data.get('languageCode'), []) if form in text]
         return json.dumps({'glossary': glossary}, ensure_ascii=False)

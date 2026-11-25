@@ -29,6 +29,7 @@ Interaction details are in [`DESIGN.md`](../../DESIGN.md); pipeline and storage 
 - Schema: English meaning, headword (`word`, a schema name, not a claim of one orthographic word) and exact `forms`. Forms are resolved tolerantly to attested chapter text; unattested forms are dropped, and a note with none is discarded rather than failing the chapter. Forms only in the title or plan do not count.
 - Grouped forms need compatible explanations. The prompt distinguishes referents, person and number, association versus ownership, prefers disambiguating attested phrases, and explains discontinuous constructions without assigning their meaning to an isolated particle.
 - Display: each note appears once, at its first eligible occurrence in the displayed version (identity = headword + meaning, NFC, trimmed and collapsed whitespace, case and punctuation preserved; longest overlaps first); later occurrences stay selectable for Explain. Recomputed on render without changing stored data.
+- Split notes (Settings → Split study notes, on by default): a long chapter's notes are requested in up to three parts at once, grouped by paragraph (parts of at least 600 UTF-16 units, 250 for denser Japanese). Each part receives the whole chapter as context and a `focus` with its paragraphs, and notes only words in its focus. Parts are merged in chapter order; identical notes (same headword and explanation) are joined, different explanations of one headword stay separate. This is a speed decision, not a learning claim. Assumption: whole-chapter context keeps contextual senses as accurate as one request; limit: a word recurring in several parts may get slightly different explanations from different parts, and the display rule below then shows each distinct note once. Revisit if evaluation finds more inconsistent or less accurate notes from split requests.
 - Terminology for notes: [lexical-unit review](../research/lexical-units.md).
 
 ### Creation and continuation
@@ -70,3 +71,4 @@ A controlled contextual-accuracy comparison of notes prompts is designed but not
 - 2026-10-19: evidence revision (extensive reading, repetition) with no behavior change.
 - 2026-11-08: lookups recorded under PED-005.
 - 2026-11-22: Russian note stress moved from the dictionary headword to the form from the passage (prompt `2026-11-22.1`).
+- 2026-11-25: notes may be split into paragraph parts requested in parallel, each with whole-chapter context (prompt `2026-11-25.1`).
