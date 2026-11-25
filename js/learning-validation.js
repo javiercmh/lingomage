@@ -9,7 +9,7 @@ export function validateContentSize(value) {
 export function parseContent(raw) {
   if (String(raw).length > MAX_CONTENT_UNITS) invalid('The response exceeds the technical size limit of 1000000 UTF-16 units.');
   try { return JSON.parse(String(raw).trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')); }
-  catch { throw new Error('The response was not valid JSON. Explicitly retry or discard this request.'); }
+  catch { throw Object.assign(new Error('The response was not valid JSON. Explicitly retry or discard this request.'), { code: 'invalid_json' }); }
 }
 function invalid(message) { throw new Error(`${message} Explicitly retry or discard this request.`); }
 export function boundedText(value, max, field) {

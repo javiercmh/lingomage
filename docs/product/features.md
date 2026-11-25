@@ -34,8 +34,10 @@ Stories can be shared from the reader or Library: canonical chapter or selected-
 - Language plan of up to five vocabulary candidates and two grammar focuses, possibly none.
 - Notes for most meaningful words and expressions, no density cap.
 - Reasoning choices only where the provider advertises them, plus provider default; higher reasoning may add latency and usage. Model and reasoning are stored in `data/settings.json`, not per account.
-- Split study notes (Settings → Story writer, on by default): long chapters get notes in up to three paragraph parts requested at once, each with the whole chapter as context. Off gives one notes request. Rate limits stop with saved parts and explicit Resume; nothing retries automatically.
-- Light tasks model (Settings → Story writer, default Same as story model): a second model and effort for study notes, Japanese readings and story context summaries and condensing. Language plans, prose, examples and explanations always use the story model. A light model the provider no longer offers falls back to the story model; changing provider clears it.
+- Settings → Story writer shows suggested ChatGPT models as reference: GPT-6.2 Sol at low effort for stories (preselected on first use when offered) and GPT-6 Luna at low effort for light tasks. Specific AI options sit in a collapsed Advanced section.
+- Retry broken replies automatically (Advanced, on by default): an unreadable (non-JSON) reply is resent once per step or notes part; a second one stops for explicit Retry.
+- Split study notes (Settings → Advanced, on by default): long chapters get notes in up to three paragraph parts requested at once, each with the whole chapter as context. Off gives one notes request. Rate limits stop with saved parts and explicit Resume; nothing retries automatically.
+- Light tasks model (Settings → Advanced, default Same as story model): a second model and effort for study notes, Japanese readings and story context summaries and condensing. Language plans, prose, examples and explanations always use the story model. A light model the provider no longer offers falls back to the story model; changing provider clears it.
 - Background story context (Settings → Story memory, on by default): each new chapter's story memory is summarized while the learner reads, so Continue usually starts with planning. Costs one AI request per new chapter, also when never continued.
 - Existing Spanish stories keep `es-CL`; new ones honor the requested variety.
 

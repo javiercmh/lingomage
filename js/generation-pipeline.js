@@ -18,6 +18,12 @@ export const pendingRequests = op => requestHolders(op).map(holder => holder.req
 // and sets op.partsOneAtATime, so Resume runs the missing parts one at a time. Nothing retries silently.
 // The sequential default keeps offline evaluation request budgets and ordering predictable.
 export const MAX_RUNNING = 3;
+// Broken replies (code invalid_json: the reply is not JSON at all) are resent once per stage or part when
+// the operation captured config.retryBroken (Settings → Retry broken replies automatically, on by default).
+// This is a learner-approved exception to "no silent retries": it is shown in progress, counted in
+// op.retried, and a second broken reply stops with explicit recovery. Other validation failures never resend.
+export const canResendBroken = (op, key, error) => error?.code === 'invalid_json' && op.config.retryBroken === true && !op.retried?.[key];
+const markResent = (op, key) => { op.retried = { ...(op.retried || {}), [key]: 1 }; };
 const START_REFUSALS = new Set(['request_in_progress', 'usage_limit']);
 const isNotesPart = name => name === 'notes' || name.startsWith('notes-');
 // Parts for a finished prose stage: legacy single "notes" or "notes-1".."notes-N" with canonical offsets.
@@ -109,7 +115,9 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
     catch (error) {
       if (op.discardRequested) throw error;
       if (error?.code === 'usage_limit') { op.partsOneAtATime = true; save(); } // a provider limit: Resume goes one part at a time
-      fail(error); await invalidate(); throw error;
+      fail(error); await invalidate();
+      if (canResendBroken(op, name, error)) { markResent(op, name); save(); changed(); return runPart(op, name); }
+      throw error;
     }
     try {
       partPhase='validation';
@@ -189,6 +197,7 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
             if (op.discardRequested) throw error;
             const failure=failureInfo(error,stage,phase);
             if (op.request) { op.request.completed=true; op.request.invalid=true; save(); await release(op); }
+            if (canResendBroken(op, stage, error)) { markResent(op, stage); save(); changed(); continue; }
             error.generationFailure=failure; throw error;
           }
           let content;

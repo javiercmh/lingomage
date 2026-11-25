@@ -72,9 +72,11 @@ function fillScopeOptions(input, selected = 'scene', describe) {
   setScope(input, selected, describe);
 }
 
-const PREFERRED_MODEL = 'gpt-6-luna';
+// Suggested ChatGPT starting points (2026-11-25 comparison, generation-tests/results.md) are shown as
+// reference text in index.html. PREFERRED_MODEL preselects the story model on first use only.
+const PREFERRED_MODEL = 'gpt-6.2-sol';
 const $ = id => document.getElementById(id);
-const state = { languageOrder: Object.keys(LANGUAGES), standardizedLevels: {}, checkpointBlocked: false, stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', lightModel: '', lightReasoning: '', splitNotes: true, targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, libraryLanguage: 'all', librarySort: 'recent', storyMenu: null, libraryStale: false, libraryPlainHero: false, deleteTrigger: null, deleteStoryIds: new Set(), storySelectionMode: false, selectedStoryIds: new Set(), storySelectionFocusId: '', explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', readerHistoryEntry: false, speechVersionKey: '', playerEnabled: false, player: null, playerUnits: [], speechRate: 1, followAlong: true, following: true, wordNoteTrigger: null, backgroundStoryContext: true, shareVocabularyNotes: false, readerEditBusy: false, activeChapterRequest: null, readerEditDraft: null };
+const state = { languageOrder: Object.keys(LANGUAGES), standardizedLevels: {}, checkpointBlocked: false, stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', lightModel: '', lightReasoning: '', splitNotes: true, retryBrokenReplies: true, targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, libraryLanguage: 'all', librarySort: 'recent', storyMenu: null, libraryStale: false, libraryPlainHero: false, deleteTrigger: null, deleteStoryIds: new Set(), storySelectionMode: false, selectedStoryIds: new Set(), storySelectionFocusId: '', explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', readerHistoryEntry: false, speechVersionKey: '', playerEnabled: false, player: null, playerUnits: [], speechRate: 1, followAlong: true, following: true, wordNoteTrigger: null, backgroundStoryContext: true, shareVocabularyNotes: false, readerEditBusy: false, activeChapterRequest: null, readerEditDraft: null };
 
 let readerSpeechRun = 0;
 let readerSpeechKey = '';
@@ -395,6 +397,7 @@ function syncSettingsControls() {
   if (!state.player) { state.following=state.followAlong; renderPlayerFollow(); }
   $('background-context').checked = state.backgroundStoryContext;
   $('split-notes').checked = state.splitNotes;
+  $('retry-broken').checked = state.retryBrokenReplies;
   syncModelControls();
 }
 function syncModelControls() {
@@ -1205,7 +1208,7 @@ async function generate(event) {
     $('story-form').hidden = true; $('loading-card').hidden = false; { const root = createProgressRoot(); root.hidden = true; delete root.dataset.signature; }
     creatingStory = true; setReaderGeneration({storyId:null,phase:'working',message:'Writing your story…'});
     $('generation-status').textContent = ai.developmentMock ? 'Using the offline development response.' : 'Weaving your ideas into a story.';
-    const op = await runContentOperation({kind:'create', language:languageCode, input:requestProfile, profileVersion:PROFILE_DEFINITIONS.version, instructions:storyInstructions(LANGUAGES[languageCode],difficulty,guideFor(languageCode,difficulty)), config:{providerId:provider.id,model:model.id,reasoning:chosenEffort,light:lightModelChoice(state),notesParts:noteParts()}});
+    const op = await runContentOperation({kind:'create', language:languageCode, input:requestProfile, profileVersion:PROFILE_DEFINITIONS.version, instructions:storyInstructions(LANGUAGES[languageCode],difficulty,guideFor(languageCode,difficulty)), config:{providerId:provider.id,model:model.id,reasoning:chosenEffort,light:lightModelChoice(state),notesParts:noteParts(),retryBroken:state.retryBrokenReplies !== false}});
     showOperationResult(op);
   } catch (error) {
     if (error.code === 'generation_cancelled') { setReaderGeneration(null); toast('Generation cancelled'); return; }
@@ -2865,7 +2868,7 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
       const previousExplanation = existingHelp ? JSON.stringify({ explanation: existingHelp.text, followUps: promptHistory.map(entry => ({ action: entry.action || 'detail', question: entry.followUp || '', text: entry.text || '', examples: entry.examples })) }) : '';
       const helpInput={ action, language:LANGUAGES[story.language], languageCode:story.language, difficulty:story.difficulty, sourceText:version.story, start:passage.start, end:passage.end, passage:passage.text, ...context, profile:passage.profile, followUp, previousExplanation };
       if (action === 'examples') {
-        const op=await runContentOperation({kind:'examples',language:story.language,input:helpInput,instructions:helpInstructions(action),config:{providerId,model,reasoning,light:lightModelChoice(state)},target:{storyId:story.id,chapterId:chapter.id,versionId:version.id,helpId:existingHelp.id,start:passage.start,end:passage.end,passage:passage.text}});
+        const op=await runContentOperation({kind:'examples',language:story.language,input:helpInput,instructions:helpInstructions(action),config:{providerId,model,reasoning,light:lightModelChoice(state),retryBroken:state.retryBrokenReplies !== false},target:{storyId:story.id,chapterId:chapter.id,versionId:version.id,helpId:existingHelp.id,start:passage.start,end:passage.end,passage:passage.text}});
         clearLoading(); recordSelectionLookup(passage, 'examples'); showOperationResult(op); return;
       }
       const result = decodeHelp(await readerAi(kind, helpInput, helpInstructions(action), helpRequest.loading, {
@@ -3275,7 +3278,7 @@ $('reader-edit-submit').addEventListener('click', async () => {
   const story = readerStory(), chapters = pathChapters(story), chapter = chapters[state.readerChapter], version = activeVersion(chapter), mode = $('reader-edit-panel').dataset.mode;
   const path = selectedPath(story), entries = path.entries.map(entry => ({ ...entry })), rewriteIndex = state.readerChapter;
   const sourceVersion = mode === 'continue' ? activeVersion(chapters[chapters.length - 1]) : version;
-  const providerId = state.providerId, model = state.model, config = { providerId, model, reasoning: state.reasoning, light: lightModelChoice(state), notesParts: noteParts() }, memoryConfig = lightTaskConfig(state);
+  const providerId = state.providerId, model = state.model, config = { providerId, model, reasoning: state.reasoning, light: lightModelChoice(state), notesParts: noteParts(), retryBroken: state.retryBrokenReplies !== false }, memoryConfig = lightTaskConfig(state);
   const difficulty = $('reader-level').value, scope = $('reader-scope').value;
   if (!levelDefinition(story.language,difficulty)) { $('reader-edit-error').textContent='Choose a reading level for this generation.'; return; }
   if (ai.available === false || (Array.isArray(state.models) && !state.models.length && $('ai-setup')?.hidden === false)) { $('reader-edit-error').textContent='Open App² → Settings → AI and connect a provider, then return here.'; return; }
@@ -3389,6 +3392,7 @@ $('light-model-select').addEventListener('change', () => {
   state.lightModel = $('light-model-select').value; state.lightReasoning = '';
   buildLightModelOptions(); trySaveSettings();
 });
+$('retry-broken').addEventListener('change', () => { state.retryBrokenReplies = $('retry-broken').checked; trySaveSettings(); });
 $('split-notes').addEventListener('change', () => { state.splitNotes = $('split-notes').checked; trySaveSettings(); });
 $('light-reasoning-select').addEventListener('change', () => { state.lightReasoning = $('light-reasoning-select').value; trySaveSettings(); });
 window.addEventListener('app2:ai:connection', refreshModels);
@@ -3397,13 +3401,14 @@ window.addEventListener('pageshow', () => { if (document.visibilityState === 'vi
 document.documentElement.style.colorScheme = 'dark';
 state.stories = JSON.parse(JSON.stringify(workspaceStorage.load('data/stories.json').value));
 loadReaderPositions();
-const settings = workspaceStorage.load('data/settings.json').value; state.providerId = settings.providerId || ''; state.model = settings.model || PREFERRED_MODEL; state.reasoning = settings.reasoning || ''; state.lightModel = settings.lightModel || ''; state.lightReasoning = settings.lightReasoning || ''; state.splitNotes = settings.splitNotes !== false;
+const settings = workspaceStorage.load('data/settings.json').value; state.providerId = settings.providerId || ''; state.model = settings.model || PREFERRED_MODEL; state.reasoning = settings.reasoning || ''; state.lightModel = settings.lightModel || ''; state.lightReasoning = settings.lightReasoning || ''; state.splitNotes = settings.splitNotes !== false; state.retryBrokenReplies = settings.retryBrokenReplies !== false;
 state.furigana = settings.readingPreferences?.furigana !== false;
 state.readerFontSize = Math.max(15, Math.min(30, Number(settings.readingPreferences?.fontSize) || 19));
 state.speechRate = SPEECH_RATES.includes(Number(settings.readingPreferences?.speechRate)) ? Number(settings.readingPreferences.speechRate) : 1;
 state.followAlong = settings.readingPreferences?.followAlong !== false;
 state.backgroundStoryContext = settings.backgroundStoryContext !== false;
 state.shareVocabularyNotes = settings.shareVocabularyNotes === true;
+$('retry-broken').checked = state.retryBrokenReplies;
 $('split-notes').checked = state.splitNotes;
 $('background-context').checked = state.backgroundStoryContext;
 state.languageSetupDismissed = settings.languageSetupDismissed === true;

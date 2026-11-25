@@ -586,7 +586,13 @@ body.has-app-generation-status .toast { bottom: calc(var(--tabbar-h) + 88px + va
 .settings-check input { flex: none; width: 20px; height: 20px; margin: 0; accent-color: var(--accent-strong); }
 #reasoning-select[hidden] ~ #reasoning-hint { display: none; }
 #light-model-hint { margin-bottom: 12px; }
-.split-notes-hint { margin-bottom: 0; }
+.retry-broken-hint { margin-bottom: 0; }
+.settings-advanced { margin-top: 6px; padding-top: 4px; border-top: 1px solid var(--line, rgba(255,255,255,.08)); }
+.settings-advanced > summary { display: flex; min-height: 44px; align-items: center; gap: 8px; color: var(--ink); font-size: 14px; font-weight: 600; cursor: pointer; list-style: none; }
+.settings-advanced > summary::-webkit-details-marker { display: none; }
+.settings-advanced > summary::after { content: '›'; margin-left: auto; color: var(--muted); font-size: 20px; transition: transform .15s; }
+.settings-advanced[open] > summary { margin-bottom: 8px; }
+.settings-advanced[open] > summary::after { transform: rotate(90deg); }
 .settings-footer { margin: 0 0 14px; text-align: center; }
 
 /* Storage failures stay visible and selectable without covering navigation. */
