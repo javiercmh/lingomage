@@ -1,4 +1,5 @@
 import { failureInfo } from './generation-errors.js';
+import { timingEntry } from './generation-timing.js';
 import { aiNotification } from './ai-notification.js';
 import { PLAN_INSTRUCTIONS, decodePlan } from './story-generation.js';
 import { parseContent, validateContentSize, validateProse, validateNotes, validateStory, validateExamples, readingPlan, attachReadings, notesParts, noteMinUnits, mergeNoteParts, NOTES_INSTRUCTIONS, READING_INSTRUCTIONS, SAFEGUARD_VERSION } from './learning-validation.js';
@@ -43,8 +44,17 @@ export function stageModel(op, stage) {
   const light = LIGHT_STAGES.has(stage) && String(op.config.light?.model || '').trim() ? op.config.light : null;
   return {providerId:op.config.providerId, model:light ? light.model : op.config.model, reasoningEffort:(light ? light.reasoning : op.config.reasoning) || undefined};
 }
-export function createPipeline({ records, persist, ai, apply, changed = () => {}, onResend = () => {}, parallel = false }) {
+export function createPipeline({ records, persist, ai, apply, changed = () => {}, onResend = () => {}, parallel = false, now = () => Date.now() }) {
   let busy = false;
+  // Requests started by this page. A saved request from an earlier page completes when this page notices,
+  // so its timing is approximate (see js/generation-timing.js).
+  const startedHere = new WeakSet();
+  // Appends one finished attempt to op.timings; the next checkpoint save keeps it. Cancellation records nothing.
+  const track = (op, request, stage, part, outcome) => {
+    if (!request || typeof request.startedAt !== 'number') return;
+    const model = stageModel(op, stage);
+    op.timings = [...(Array.isArray(op.timings) ? op.timings : []), timingEntry({stage, part, model:model.model, reasoning:model.reasoningEffort, startedAt:request.startedAt, completedAt:request.completedAt ?? now(), outcome, approximate:!startedHere.has(request)})];
+  };
   let phase = '';
   let stopWaiting, stopped, cancellationError;
   const wait = id => Promise.race([ai.wait(id), stopped.then(() => { throw cancelled(); })]);
@@ -106,16 +116,18 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
       const focus = notes && Number.isInteger(part.start) ? {part:Number(name.slice(6)), of:Object.keys(op.parallel).filter(isNotesPart).length, text:canonical.story.slice(part.start, part.end)} : null;
       const input = notes ? {...op.input,kind:'notes',languagePlan:op.plan,chapter:canonical,...(focus ? {focus} : {})} : {kind:'readings',languageCode:'ja',spans:plan.spans};
       partPhase='start';
-      let id;
+      let id; const startedAt = now();
       try { id = await ai.start({...stageModel(op,notes ? 'notes' : name),instructions:notes ? NOTES_INSTRUCTIONS : READING_INSTRUCTIONS,input:JSON.stringify(input),...aiNotification(op.kind,notes ? 'notes' : name)}); }
       catch (error) { if (START_REFUSALS.has(error?.code)) error.startRefused = true; throw fail(error); }
-      part.request={id,stage:notes ? 'notes' : name,completed:false}; save();
+      part.request={id,stage:notes ? 'notes' : name,completed:false,startedAt}; startedHere.add(part.request); save();
     }
     await checkCancelled(op, part);
     let response;
-    try { partPhase='wait'; const raw = await wait(part.request.id); await checkCancelled(op, part); response = parseContent(raw); }
+    const stage = notes ? 'notes' : name;
+    try { partPhase='wait'; const raw = await wait(part.request.id); part.request.completedAt = now(); await checkCancelled(op, part); response = parseContent(raw); }
     catch (error) {
       if (op.discardRequested) throw error;
+      if (error?.code !== 'generation_cancelled') track(op, part.request, stage, name, canResendBroken(op, name, error) ? 'resent' : 'failed');
       if (error?.code === 'usage_limit') { op.partsOneAtATime = true; save(); } // a provider limit: Resume goes one part at a time
       fail(error); await invalidate();
       if (canResendBroken(op, name, error)) { const count = markResent(op, name); save(); onResend(op, name, count); changed(); return runPart(op, name); }
@@ -125,7 +137,8 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
       partPhase='validation';
       part.content = notes ? validateNotes(response, op.prose, op.language, {requireNotes:!Number.isInteger(part.start)}) : attachReadings(canonical, plan, response, op.kind);
       validateContentSize(part.content);
-    } catch (error) { fail(error); await invalidate(); throw error; }
+    } catch (error) { track(op, part.request, stage, name, 'invalid'); fail(error); await invalidate(); throw error; }
+    track(op, part.request, stage, name, 'ok');
     part.request.completed=true; part.done=true; save();
     await release(op, part);
   }
@@ -189,14 +202,16 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
           const instructions = stage === 'plan' ? PLAN_INSTRUCTIONS : stage === 'prose' ? op.instructions : stage === 'notes' ? NOTES_INSTRUCTIONS : READING_INSTRUCTIONS;
           if (!op.request) {
             mark('start');
+            const startedAt = now();
             const id = await ai.start({...stageModel(op,stage),instructions,input:JSON.stringify(input),...aiNotification(op.kind,stage)});
-            op.request={id,stage,completed:false}; save();
+            op.request={id,stage,completed:false,startedAt}; startedHere.add(op.request); save();
           }
           await checkCancelled(op);
           let response;
-          try { mark('wait'); const raw = await wait(op.request.id); await checkCancelled(op); response = stage === 'plan' ? decodePlan(raw,op.language) : parseContent(raw); }
+          try { mark('wait'); const raw = await wait(op.request.id); op.request.completedAt = now(); await checkCancelled(op); response = stage === 'plan' ? decodePlan(raw,op.language) : parseContent(raw); }
           catch (error) {
             if (op.discardRequested) throw error;
+            if (error?.code !== 'generation_cancelled') track(op, op.request, stage, stage, canResendBroken(op, stage, error) ? 'resent' : 'failed');
             const failure=failureInfo(error,stage,phase);
             if (op.request) { op.request.completed=true; op.request.invalid=true; save(); await release(op); }
             if (canResendBroken(op, stage, error)) { const count = markResent(op, stage); save(); onResend(op, stage, count); changed(); continue; }
@@ -209,10 +224,12 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
             validateContentSize(content);
           } catch (error) {
             if (op.discardRequested) throw error;
+            track(op, op.request, stage, stage, 'invalid');
             const failure=failureInfo(error,stage,phase);
             if (op.request) { op.request.completed=true; op.request.invalid=true; save(); await release(op); }
             error.generationFailure=failure; throw error;
           }
+          track(op, op.request, stage, stage, 'ok');
           if (stage === 'plan') { op.plan=content; op.stage='prose'; }
           else if (stage === 'prose') {
             op.prose=content;

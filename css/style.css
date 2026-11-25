@@ -151,6 +151,13 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 @keyframes gen-spin { to { transform: rotate(360deg); } }
 .gen-label { flex: 1; min-width: 0; }
 .gen-time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; font-weight: 500; }
+/* Estimates: "Usually 1–2 minutes" under Generate/Continue, "About 1 minute left" under the checklist. */
+.generate-estimate { margin: 8px 0 0; text-align: center; }
+.gen-eta { margin: 12px 0 0; color: #dbe7ff; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.gen-wait { margin-top: 8px; }
+.gen-wait .helper { margin: 0; }
+.gen-wait .gen-notify { margin-top: 8px; color: var(--accent); }
+.gen-wait .gen-notify-status { margin-top: 6px; }
 .help-loading .gen-progress { max-width: none; margin: 12px 0 0; }
 .help-loading.has-progress { align-items: start; }
 .help-loading.has-progress .help-loading-sparkle { margin-top: 2px; }

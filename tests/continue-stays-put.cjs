@@ -11,7 +11,7 @@ function build({open = true, viewedPath = 'original', chapter = 0} = {}) {
     $: id => id === 'reader-edit-panel' ? edit : {open},
     selectedPath: () => ({id: viewedPath}), readerPanel: () => panel,
     renderChapterNavigation() { calls.push('nav'); panel.scrollTop = 0; context.document.activeElement = null; },
-    renderReaderActions() { calls.push('actions'); }, updateReaderNavigation() { calls.push('sticky'); },
+    renderReaderActions() { calls.push('actions'); }, notifyResult() {}, renderEstimates() {}, updateReaderNavigation() { calls.push('sticky'); },
     updateReader() { calls.push('updateReader'); }, renderReaderGeneration() { calls.push('status'); },
     ensureReaderOpen: async s => { calls.push(`open:${s.id}`); }, queueBackgroundContext: (storyId, pathId) => calls.push(`background:${storyId}:${pathId}`), setReaderGeneration(v) { vm.runInContext('readerGeneration = null', context); calls.push(`status:${v}`); }, toast: m => context.toasts.push(m)};
   context.document.activeElement = focused;

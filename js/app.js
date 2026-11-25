@@ -5,7 +5,7 @@ import { markStoryActivity, planLibrary, dateSegments, describeDates } from './l
 import { beginMemoryRebuild, finishMemoryRebuild, createStoryMemory } from './story-memory.js';
 import { createGenerationController } from './generation-controller.js';
 import { createReaderPanels } from './reader-panels.js';
-import { ai, readFile, writeFile, listFiles, speech, translation, selectionMenu, share, save, isNative } from './bridge.js';
+import { ai, readFile, writeFile, listFiles, speech, translation, selectionMenu, share, save, isNative, notify, hasNotificationPermission, requestNotificationPermission } from './bridge.js';
 import { speakSelection, prepareSpeechOptions, speakChapter, chapterSpeechText } from './reader-speech.js';
 import { createSelectionMenuRouter } from './selection-menu.js';
 import { createReaderActivation, glossaryForTrigger, indexGlossaryTriggers, normalizeReaderControls } from './reader-activation.js';
@@ -14,6 +14,7 @@ import { markParagraphGaps } from './paragraph-gaps.js';
 import { SPEECH_RATES, canonicalRange, createReaderPlayer, speechUnits } from './reader-player.js';
 import { createPipeline, pendingRequests, MAX_RUNNING, MAX_BROKEN_RESENDS } from './generation-pipeline.js';
 import { hasStoryContext, progressSummary } from './generation-progress.js';
+import { timingEntry, timingSamples, estimateGeneration, remainingTime, estimateText, remainingText } from './generation-timing.js';
 import { SAFEGUARD_VERSION, parseContent, validateStory } from './learning-validation.js';
 import { failureInfo, recoverySummary, operationLabel, discardFailureMessage, appendFailureDetails } from './generation-errors.js';
 import { createWorkspaceStorage, createSettingsPersistence, optionalStore, SIGNALS_PATH, USAGE_PATH } from './workspace-storage.js';
@@ -60,11 +61,11 @@ function fillScopeOptions(input, selected = 'scene', describe) {
     group.textContent = '';
     Object.entries(SCOPES).forEach(([value, scope]) => {
       const button = document.createElement('button'); button.type = 'button'; button.setAttribute('role', 'radio'); button.dataset.value = value; button.className = 'segment'; button.textContent = scope.label;
-      button.addEventListener('click', () => { if (!button.disabled) setScope(input, value, describe); });
+      button.addEventListener('click', () => { if (!button.disabled) { setScope(input, value, describe); renderEstimates(); } });
       button.addEventListener('keydown', event => {
         const keys = Object.keys(SCOPES), step = ['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : ['ArrowLeft', 'ArrowUp'].includes(event.key) ? -1 : 0;
         if (!step) return; event.preventDefault();
-        const next = keys[(keys.indexOf(input.value) + step + keys.length) % keys.length]; setScope(input, next, describe); group.querySelector(`[data-value="${next}"]`).focus();
+        const next = keys[(keys.indexOf(input.value) + step + keys.length) % keys.length]; setScope(input, next, describe); renderEstimates(); group.querySelector(`[data-value="${next}"]`).focus();
       });
       group.append(button);
     });
@@ -76,7 +77,7 @@ function fillScopeOptions(input, selected = 'scene', describe) {
 // reference text in index.html. PREFERRED_MODEL preselects the story model on first use only.
 const PREFERRED_MODEL = 'gpt-6.2-sol';
 const $ = id => document.getElementById(id);
-const state = { languageOrder: Object.keys(LANGUAGES), standardizedLevels: {}, checkpointBlocked: false, stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', lightModel: '', lightReasoning: '', splitNotes: true, retryBrokenReplies: true, targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, libraryLanguage: 'all', librarySort: 'recent', storyMenu: null, libraryStale: false, libraryPlainHero: false, deleteTrigger: null, deleteStoryIds: new Set(), storySelectionMode: false, selectedStoryIds: new Set(), storySelectionFocusId: '', explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', readerHistoryEntry: false, speechVersionKey: '', playerEnabled: false, player: null, playerUnits: [], speechRate: 1, followAlong: true, following: true, wordNoteTrigger: null, backgroundStoryContext: true, shareVocabularyNotes: false, readerEditBusy: false, activeChapterRequest: null, readerEditDraft: null };
+const state = { languageOrder: Object.keys(LANGUAGES), standardizedLevels: {}, checkpointBlocked: false, stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', lightModel: '', lightReasoning: '', splitNotes: true, retryBrokenReplies: true, notifyWhenReady: false, targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, libraryLanguage: 'all', librarySort: 'recent', storyMenu: null, libraryStale: false, libraryPlainHero: false, deleteTrigger: null, deleteStoryIds: new Set(), storySelectionMode: false, selectedStoryIds: new Set(), storySelectionFocusId: '', explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', readerHistoryEntry: false, speechVersionKey: '', playerEnabled: false, player: null, playerUnits: [], speechRate: 1, followAlong: true, following: true, wordNoteTrigger: null, backgroundStoryContext: true, shareVocabularyNotes: false, readerEditBusy: false, activeChapterRequest: null, readerEditDraft: null };
 
 let readerSpeechRun = 0;
 let readerSpeechKey = '';
@@ -398,13 +399,14 @@ function syncSettingsControls() {
   $('background-context').checked = state.backgroundStoryContext;
   $('split-notes').checked = state.splitNotes;
   $('retry-broken').checked = state.retryBrokenReplies;
+  paintNotificationControls();
   syncModelControls();
 }
 function syncModelControls() {
   if (!state.models?.length) return;
   const select=$('model-select');
   if (state.models.some(model => model.id === state.model)) select.value=state.model; else select.selectedIndex=-1;
-  buildReasoningOptions(); buildLightModelOptions();
+  buildReasoningOptions(); buildLightModelOptions(); renderEstimates();
 }
 // Rebuilds the options only when the model changed, so a focused Reasoning select keeps focus.
 function buildReasoningOptions(force = false) {
@@ -755,12 +757,16 @@ function createProgressView() {
   const bar = document.createElement('div'); bar.className = 'gen-bar'; bar.setAttribute('aria-hidden', 'true');
   const list = document.createElement('ol'); list.className = 'gen-steps';
   const status = document.createElement('p'); status.className = 'sr-only'; status.setAttribute('role', 'status');
-  root.append(bar, list, status); return root;
+  // Time left and the waiting note are not live regions: they change too often to announce.
+  const eta = document.createElement('p'); eta.className = 'gen-eta'; eta.hidden = true;
+  root.append(bar, list, status, eta, createWaitNote()); return root;
 }
 // A chapter card painted before its operation exists keeps the clock id it started with, so the story-context
 // step keeps its time once the real operation takes over.
 function paintProgress(root, op) {
   const summary = progressSummary(op), now = Date.now(), clockId = root.clockId || op.id;
+  // One estimate per run, made when it starts; a chapter card brings its own (it knows the story-context step).
+  if (root.estimateFor !== clockId) { root.estimateFor = clockId; root.estimate = root.presetEstimate !== undefined ? root.presetEstimate : op.config ? estimateFor(operationPlan(op)) : null; }
   for (const step of summary.steps) {
     const key = `${clockId}:${step.key}`, clock = stepClock.get(key) || {};
     if (step.state !== 'pending' && !clock.start) clock.start = now;
@@ -795,11 +801,98 @@ function tickProgress() {
     const clock = stepClock.get(item.dataset.clock), time = item.querySelector('.gen-time');
     time.textContent = clock?.start && item.dataset.state !== 'pending' ? elapsedText((clock.end || now) - clock.start) : '';
   }
+  for (const root of document.querySelectorAll('.gen-progress')) paintTimeLeft(root, now);
+}
+// "About 2 minutes left" from the run's estimate and each step's elapsed time on this page.
+function paintTimeLeft(root, now = Date.now()) {
+  const eta = root.querySelector('.gen-eta'), items = [...root.querySelectorAll('.gen-steps li[data-clock]')];
+  const steps = items.map(item => ({ key: item.dataset.clock.slice(item.dataset.clock.lastIndexOf(':') + 1), state: item.dataset.state }));
+  const elapsed = Object.fromEntries(items.map((item, index) => { const clock = stepClock.get(item.dataset.clock); return [steps[index].key, clock?.start ? (clock.end || now) - clock.start : 0]; }));
+  const message = root.estimate && steps.length ? remainingText(remainingTime(root.estimate, steps, elapsed)) : '';
+  if (eta && eta.textContent !== message) eta.textContent = message;
+  if (eta) eta.hidden = !message;
+  const note = root.querySelector('.gen-wait');
+  // The notification offer is for waits worth leaving for: unknown, or about a minute or more.
+  if (note) note.hidden = !generationLive() || Boolean(root.estimate && root.estimate.total < 60000);
+}
+
+// Estimates (js/generation-timing.js): the sum of each step's median over similar earlier chapters on
+// this device, with the reasoning effort each flow actually sends.
+function estimateFor(plan) { return estimateGeneration(plan, timingSamples(state.stories)); }
+function operationPlan(op, contextRequests = 0) {
+  const memory = lightTaskConfig(state);
+  return { kind: op.kind, language: op.language, scope: op.input?.scope, notesParts: op.config?.notesParts, model: op.config?.model, reasoning: op.config?.reasoning, light: op.config?.light, contextRequests, context: { model: memory.model, reasoning: memory.reasoning } };
+}
+function draftPlan(kind, language, scope, contextRequests = 0) {
+  const model = state.models.find(item => item.id === state.model);
+  const reasoning = kind === 'create' ? (model?.reasoningLevels?.includes(state.reasoning) ? state.reasoning : '') : state.reasoning;
+  return operationPlan({ kind, language, input: { scope }, config: { model: state.model, reasoning, light: lightModelChoice(state), notesParts: noteParts() } }, contextRequests);
+}
+function readerDraftPlan() {
+  const story = readerStory(), mode = $('reader-edit-panel').dataset.mode;
+  if (!story || !['continue', 'rewrite'].includes(mode)) return null;
+  const entries = selectedPath(story).entries, memoryEntries = mode === 'continue' ? entries : entries.slice(0, state.readerChapter);
+  return draftPlan(mode, story.language, $('reader-scope').value, pendingSummaryCount(story, memoryEntries));
+}
+// "Usually 1–2 minutes" beside Generate, Continue and Rewrite; empty until there are enough similar runs.
+function renderEstimates() {
+  const create = $('generate-estimate');
+  if (create) { create.textContent = estimateText(estimateFor(draftPlan('create', $('language').value, $('reading-scope').value))); create.hidden = !create.textContent; }
+  const reader = $('reader-edit-estimate');
+  // While a chapter runs, its card shows the time left instead.
+  if (reader) { const plan = !$('reader-edit-panel').hidden && !state.readerEditBusy && readerDraftPlan(); reader.textContent = plan ? estimateText(estimateFor(plan)) : ''; reader.hidden = !reader.textContent; }
+}
+
+// Ready notifications are opt-in: the waiting card offers them, Settings can turn them off. They are sent
+// only while LingoMage is in the background and Android allows notifications.
+function createWaitNote() {
+  const note = document.createElement('div'); note.className = 'gen-wait'; note.hidden = true;
+  const copy = document.createElement('p'); copy.className = 'helper'; copy.textContent = 'You can keep reading or switch apps while you wait. Reopen LingoMage if it pauses.';
+  const offer = document.createElement('button'); offer.type = 'button'; offer.className = 'small-btn gen-notify'; offer.textContent = 'Notify me when it’s ready';
+  const status = document.createElement('p'); status.className = 'helper gen-notify-status';
+  offer.addEventListener('click', () => { setReadyNotifications(true); });
+  note.append(copy, offer, status); paintWaitNote(note); return note;
+}
+function notificationStatusText() {
+  if (!state.notifyWhenReady) return '';
+  if (hasNotificationPermission()) return 'You’ll get a notification when it’s ready.';
+  return notificationAsked ? 'Notifications are off for LingoMage, so you won’t be told. Allow them in App²: LingoMage menu → Permissions.' : 'Allow notifications to be told when it’s ready.';
+}
+function paintWaitNote(note) {
+  note.querySelector('.gen-notify').hidden = state.notifyWhenReady;
+  const status = note.querySelector('.gen-notify-status'), text = notificationStatusText();
+  status.textContent = text; status.hidden = !text;
+}
+function paintNotificationControls() {
+  document.querySelectorAll('.gen-wait').forEach(paintWaitNote);
+  $('notify-ready').checked = state.notifyWhenReady;
+  const hint = $('notify-ready-status'), text = state.notifyWhenReady && !hasNotificationPermission() ? notificationStatusText() : '';
+  hint.textContent = text; hint.hidden = !text;
+}
+let notificationAsked = false;
+function setReadyNotifications(on) {
+  state.notifyWhenReady = on;
+  if (!trySaveSettings()) { state.notifyWhenReady = !on; paintNotificationControls(); return; }
+  if (on && !hasNotificationPermission()) requestNotificationPermission();
+  paintNotificationControls();
+}
+// The host reports the real outcome of its permission dialogs here.
+window.addEventListener('app2:notifperm', () => { notificationAsked = true; paintNotificationControls(); });
+function notifyWhileAway(title, message) {
+  if (!state.notifyWhenReady || document.visibilityState !== 'hidden' || !hasNotificationPermission()) return;
+  try { notify(title, message); } catch { /* A notification is a convenience; the result is saved either way. */ }
+}
+function notifyResult(op, story) {
+  if (!['create', 'continue', 'rewrite'].includes(op.kind)) return;
+  notifyWhileAway(op.kind === 'create' ? 'Your story is ready' : op.kind === 'continue' ? `Chapter ${op.target.entries.length + 1} is ready` : 'Your rewritten chapter is ready', story?.title || 'Open LingoMage to read it.');
+}
+function notifyStopped(kind) {
+  if (['create', 'continue', 'rewrite'].includes(kind)) notifyWhileAway('Generation stopped', 'Open LingoMage to see what happened. Finished steps are kept.');
 }
 let createProgress = null, resumedCreateCard = false;
 function paintChapterProgress(request, op) {
   const loading = request.loading;
-  if (!loading.progress) { loading.progress = createProgressView(); loading.progress.clockId = request.clockId; loading.querySelector('.help-loading-copy').append(loading.progress); loading.classList.add('has-progress'); }
+  if (!loading.progress) { loading.progress = createProgressView(); loading.progress.clockId = request.clockId; loading.progress.presetEstimate = request.estimate; loading.querySelector('.help-loading-copy').append(loading.progress); loading.classList.add('has-progress'); }
   paintProgress(loading.progress, op);
 }
 function createProgressRoot() { if (!createProgress) { createProgress = createProgressView(); $('generation-status').after(createProgress); } return createProgress; }
@@ -909,6 +1002,7 @@ async function resumeCheckpoint(op) {
     await aiSession.run(() => pipeline.run(op)); showOperationResult(op);
   } catch (error) {
     if (error.code === 'generation_cancelled') { setReaderGeneration(null); toast('Generation cancelled'); return; }
+    notifyStopped(op.kind);
     op.error=failureInfo(error,op.stage).message; if (op.failure?.message !== failureInfo(error,op.stage).message) op.failure = failureInfo(error, op.stage);
     if (readerGeneration && (readerGeneration.storyId ?? null) === (op.target?.storyId ?? null)) setReaderGeneration({...readerGeneration,phase:'error',message:op.discardRequested ? discardFailureMessage(op) : 'Generation stopped.'});
     renderCheckpointRecovery(); revealRecovery(op);
@@ -938,6 +1032,7 @@ const { operationProvenance, applyContentOperation } = createGenerationControlle
 function showOperationResult(op) {
   const story=state.stories.find(s=>op.kind === 'create' ? s.operationId === op.id : s.id === op.target.storyId);
   if (!story) return;
+  notifyResult(op, story); renderEstimates();
   if (op.kind !== 'examples') queueBackgroundContext(story.id, op.kind === 'continue' ? op.target.pathId : op.kind === 'rewrite' ? `path-${op.id}` : null);
   if (op.kind === 'create') { setReaderGeneration(null); ensureReaderOpen(story).catch(error => toast(error.message)); return; }
   if (readerGeneration && readerGeneration.storyId === story.id) {
@@ -1220,6 +1315,7 @@ async function generate(event) {
     showOperationResult(op);
   } catch (error) {
     if (error.code === 'generation_cancelled') { setReaderGeneration(null); toast('Generation cancelled'); return; }
+    notifyStopped('create');
     if (state.requestId && !state.pendingGeneration && !pipeline?.records.length) {
       try { await ai.acknowledge(state.requestId); state.requestId = null; state.pendingStoryRequestId = null; }
       catch (releaseError) { error.message = `${error.message} The AI result still needs release: ${releaseError.message}`; }
@@ -1645,7 +1741,7 @@ function pathForkDescription(story, path) {
   return `Different version from Chapter ${path.forkChapter}.${parent ? ` Later chapters remain on ${pathLabel(story, parent)}.` : ''}`;
 }
 const { normalizeChapters, ensureStoryPaths, initializePathCounter, selectedPath, pathChapters, activeChapter, activeVersion } = createStoryModel({state, readerStory});
-const { memoryChunks, recentProse, decodeMemory, prepareStoryMemory, storyContextReady } = createStoryMemory({state, normalizeChapters, readerAi:(...args)=>readerAi(...args), savePendingReaderResult:(...args)=>savePendingReaderResult(...args), discardResponse:()=>releaseInvalidReaderResponse()});
+const { memoryChunks, recentProse, decodeMemory, prepareStoryMemory, storyContextReady, pendingSummaryCount } = createStoryMemory({state, normalizeChapters, readerAi:(...args)=>readerAi(...args), savePendingReaderResult:(...args)=>savePendingReaderResult(...args), discardResponse:()=>releaseInvalidReaderResponse()});
 function readerStory() { return state.stories.find(item => item.id === state.readerId) || (state.current?.id === state.readerId ? state.current : null); }
 function profileSnapshot(story) {
   const version = state.readerId === story.id ? activeVersion(activeChapter(), story) : null;
@@ -2722,7 +2818,7 @@ async function readerAi(kind, input, instructions, requestPanel, config = { prov
   if (config.providerId && provider.id !== config.providerId) throw new Error('The available AI provider changed. Choose a model in Settings first.');
   const providerId = provider.id;
   state.requestId = 'starting';
-  let id;
+  let id; const startedAt = Date.now();
   try { id = await aiSession.start({ providerId, model: model.id, instructions, input: JSON.stringify({ kind, ...input }), reasoningEffort: model.reasoningLevels?.includes(config.reasoning) ? config.reasoning : undefined, ...aiNotification(kind) }); }
   catch (error) { state.requestId = null; throw error; }
   state.requestId = id;
@@ -2734,7 +2830,12 @@ async function readerAi(kind, input, instructions, requestPanel, config = { prov
   panel.append(cancel);
   if (config.signal?.cancelledByUser) cancel.click();
   renderReaderGeneration();
-  try { const result = await ai.wait(id); if (cancelled) throw new Error('Request cancelled.'); state.pendingReaderRequestId = id; return result; }
+  try {
+    const result = await ai.wait(id); if (cancelled) throw new Error('Request cancelled.'); state.pendingReaderRequestId = id;
+    // Story-context summaries before Continue or Rewrite are the operation's first step; their times go with it.
+    if (Array.isArray(config.signal?.timings) && ['summary','memory-compact'].includes(kind)) config.signal.timings.push(timingEntry({ stage: 'context', part: kind, model: model.id, reasoning: config.reasoning, startedAt, completedAt: Date.now(), outcome: 'ok' }));
+    return result;
+  }
   catch (error) {
     state.pendingReaderRequestId = id;
     try { await releaseInvalidReaderResponse(); } catch (releaseError) { error.releaseFailure = releaseError.message; }
@@ -3273,6 +3374,7 @@ function showEditPanel(mode) {
   $('reader-prompt-label').textContent = mode === 'continue' ? 'What should happen next? (optional)' : 'How should this chapter change? (optional)';
   $('reader-prompt').placeholder = 'Add ideas in any language, or leave blank.';
   $('reader-edit-submit').textContent = mode === 'continue' ? 'Continue' : 'Rewrite';
+  renderEstimates();
   $('reader-edit-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); $('reader-prompt').focus();
 }
 $('continue-story').addEventListener('click', () => showEditPanel('continue'));
@@ -3296,16 +3398,18 @@ $('reader-edit-submit').addEventListener('click', async () => {
   const instructions = chapterInstructions(LANGUAGES[story.language], difficulty, guideFor(story.language, difficulty), mode);
   state.readerEditBusy = true; state.readerEditDraft = null; $('path-select').disabled = true;
   const loading = createChapterLoading(mode);
-  const request = state.activeChapterRequest = { storyId: story.id, loading, stopped:false, cancelledByUser:false, clockId: `chapter-request-${Date.now()}` };
-  config.signal=request; memoryConfig.signal=request;
   // Earlier chapters are summarized before the operation exists; the checklist shows that as its first step.
   const memoryEntries = mode === 'continue' ? entries : entries.slice(0, rewriteIndex);
+  // The estimate is made now, while it can still count the story-context summaries this run will make.
+  const estimate = estimateFor(operationPlan({ kind: mode, language: story.language, input: { scope }, config }, pendingSummaryCount(story, memoryEntries)));
+  const request = state.activeChapterRequest = { storyId: story.id, loading, stopped:false, cancelledByUser:false, clockId: `chapter-request-${Date.now()}`, timings: [], estimate };
+  config.signal=request; memoryConfig.signal=request;
   const provisional = { id: request.clockId, kind: mode, language: story.language, stage: storyContextReady(story, memoryEntries) && !backgroundRun ? 'plan' : 'context', target: { index: rewriteIndex } };
   if (hasStoryContext(provisional)) { loading.querySelector('strong').textContent = 'Preparing story context…'; paintChapterProgress(request, provisional); }
   renderChapterRequest();
   setReaderGeneration({ storyId: story.id, phase: 'working', message: hasStoryContext(provisional) ? progressSummary(provisional).text : mode === 'continue' ? 'Preparing next chapter…' : 'Preparing rewrite…' });
   $('reader-edit-cancel').disabled = true; $('reader-prompt').disabled = true; $('reader-level').disabled = true; setScopeDisabled($('reader-scope'), true);
-  const button = $('reader-edit-submit'); button.disabled = true; button.textContent = 'Working…'; $('reader-edit-error').textContent = '';
+  const button = $('reader-edit-submit'); button.disabled = true; button.textContent = 'Working…'; $('reader-edit-error').textContent = ''; renderEstimates();
   try {
     await settleBackgroundContext(story.id, memoryEntries);
     persistReaderStory(story);
@@ -3320,7 +3424,7 @@ $('reader-edit-submit').addEventListener('click', async () => {
       if (mode === 'rewrite') input.currentChapter = { title: sourceVersion.title, story: sourceVersion.story };
       if (readerGeneration) { readerGeneration.message = mode === 'continue' ? 'Writing the next chapter…' : 'Rewriting this chapter…'; renderReaderGeneration(); }
       loading.querySelector('strong').textContent = mode === 'continue' ? 'Writing the next chapter…' : 'Rewriting this chapter…';
-      return runContentOperation({kind:mode,language:story.language,input,instructions,config,target:{storyId:story.id,pathId:path.id,entries,chapterId:chapter.id,sourceVersionId:sourceVersion.id,index:rewriteIndex}});
+      return runContentOperation({kind:mode,language:story.language,input,instructions,config,timings:request.timings,target:{storyId:story.id,pathId:path.id,entries,chapterId:chapter.id,sourceVersionId:sourceVersion.id,index:rewriteIndex}});
     });
     showOperationResult(op);
   } catch (error) {
@@ -3328,6 +3432,7 @@ $('reader-edit-submit').addEventListener('click', async () => {
     // A deliberate cancel clears the status instead of reporting a failure.
     if (readerGeneration?.storyId === story.id) setReaderGeneration(error.code === 'generation_cancelled' || request.cancelledByUser ? null : { ...readerGeneration, phase: 'error', message: pipeline?.records[0]?.discardRequested ? discardFailureMessage(pipeline.records[0]) : 'Generation stopped.' });
     if ((error.code === 'generation_cancelled' || request.cancelledByUser) && !pipeline?.records.length) toast('Generation cancelled');
+    else if (error.code !== 'generation_cancelled' && !request.cancelledByUser) notifyStopped(mode);
     const message = error.code === 'generation_cancelled' || request.cancelledByUser ? '' : pipeline?.records.length ? '' : `${failureInfo(error, 'context').message} Submit again to retry.`;
     state.readerEditDraft = { storyId: story.id, pathId: path.id, chapterId: chapter.id, mode, prompt, difficulty, scope, error: message };
     if (state.readerId === story.id) {
@@ -3336,7 +3441,7 @@ $('reader-edit-submit').addEventListener('click', async () => {
       $('reader-edit-error').textContent = message; renderPendingReaderResult();
     }
   }
-  finally { $('path-select').disabled = false; loading.remove(); state.activeChapterRequest = null; renderChapterRequest(); state.readerEditBusy = false; $('reader-edit-cancel').disabled = false; $('reader-prompt').disabled = false; $('reader-level').disabled = false; setScopeDisabled($('reader-scope'), false); button.disabled = false; button.textContent = mode === 'continue' ? 'Continue' : 'Rewrite'; renderCheckpointRecovery(); }
+  finally { $('path-select').disabled = false; loading.remove(); state.activeChapterRequest = null; renderChapterRequest(); state.readerEditBusy = false; renderEstimates(); $('reader-edit-cancel').disabled = false; $('reader-prompt').disabled = false; $('reader-level').disabled = false; setScopeDisabled($('reader-scope'), false); button.disabled = false; button.textContent = mode === 'continue' ? 'Continue' : 'Rewrite'; renderCheckpointRecovery(); }
 
 });
 $('reader-dialog').addEventListener('click', event => { if (event.target === $('reader-dialog')) $('reader-dialog').close(); });
@@ -3401,6 +3506,11 @@ $('light-model-select').addEventListener('change', () => {
   buildLightModelOptions(); trySaveSettings();
 });
 $('retry-broken').addEventListener('change', () => { state.retryBrokenReplies = $('retry-broken').checked; trySaveSettings(); });
+$('notify-ready').addEventListener('change', () => setReadyNotifications($('notify-ready').checked));
+// Estimates follow the form and the model settings they depend on.
+$('story-form').addEventListener('change', renderEstimates);
+$('reader-edit-panel').addEventListener('change', renderEstimates);
+for (const id of ['model-select', 'reasoning-select', 'light-model-select', 'light-reasoning-select', 'split-notes']) $(id).addEventListener('change', renderEstimates);
 $('split-notes').addEventListener('change', () => { state.splitNotes = $('split-notes').checked; trySaveSettings(); });
 $('light-reasoning-select').addEventListener('change', () => { state.lightReasoning = $('light-reasoning-select').value; trySaveSettings(); });
 window.addEventListener('app2:ai:connection', refreshModels);
@@ -3409,7 +3519,7 @@ window.addEventListener('pageshow', () => { if (document.visibilityState === 'vi
 document.documentElement.style.colorScheme = 'dark';
 state.stories = JSON.parse(JSON.stringify(workspaceStorage.load('data/stories.json').value));
 loadReaderPositions();
-const settings = workspaceStorage.load('data/settings.json').value; state.providerId = settings.providerId || ''; state.model = settings.model || PREFERRED_MODEL; state.reasoning = settings.reasoning || ''; state.lightModel = settings.lightModel || ''; state.lightReasoning = settings.lightReasoning || ''; state.splitNotes = settings.splitNotes !== false; state.retryBrokenReplies = settings.retryBrokenReplies !== false;
+const settings = workspaceStorage.load('data/settings.json').value; state.providerId = settings.providerId || ''; state.model = settings.model || PREFERRED_MODEL; state.reasoning = settings.reasoning || ''; state.lightModel = settings.lightModel || ''; state.lightReasoning = settings.lightReasoning || ''; state.splitNotes = settings.splitNotes !== false; state.retryBrokenReplies = settings.retryBrokenReplies !== false; state.notifyWhenReady = settings.notifyWhenReady === true;
 state.furigana = settings.readingPreferences?.furigana !== false;
 state.readerFontSize = Math.max(15, Math.min(30, Number(settings.readingPreferences?.fontSize) || 19));
 state.speechRate = SPEECH_RATES.includes(Number(settings.readingPreferences?.speechRate)) ? Number(settings.readingPreferences.speechRate) : 1;
@@ -3417,6 +3527,7 @@ state.followAlong = settings.readingPreferences?.followAlong !== false;
 state.backgroundStoryContext = settings.backgroundStoryContext !== false;
 state.shareVocabularyNotes = settings.shareVocabularyNotes === true;
 $('retry-broken').checked = state.retryBrokenReplies;
+$('notify-ready').checked = state.notifyWhenReady;
 $('split-notes').checked = state.splitNotes;
 $('background-context').checked = state.backgroundStoryContext;
 state.languageSetupDismissed = settings.languageSetupDismissed === true;
@@ -3449,6 +3560,7 @@ window.visualViewport?.addEventListener('resize',scheduleRecoveryVisibility);
 initializePipeline();
 showStorageErrors();
 refreshModels();
+renderEstimates(); paintNotificationControls();
 
 // A recreated page keeps the current tab and reader entry, rather than returning to Create.
 const restoredNavigation = history.state;

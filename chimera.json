@@ -13,7 +13,7 @@
   },
   "capabilities": {
     "ai": true,
-    "notifications": false,
+    "notifications": true,
     "network": false
   },
   "ai": {

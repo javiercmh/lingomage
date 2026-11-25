@@ -421,6 +421,23 @@ export function createStoryMemory({state, normalizeChapters, readerAi, savePendi
     try { return !needsCompaction(decodeMemory(record.memory)) || cache.has(compactKey(ids, index)); } catch { return true; }
   }
 
+  // How many summary requests prepareStoryMemory would make for this lineage (used for time estimates).
+  // Condensing is not counted: whether it runs depends on answers not yet received.
+  function pendingSummaryCount(story, entries) {
+    if (!entries.length || storyContextReady(story, entries)) return 0;
+    const chapters = normalizeChapters(story);
+    const cache = new Map((story.memories || []).map(item => [item.key, item]));
+    const prefix = [];
+    let count = 0;
+    for (const entry of entries) {
+      const version = chapters.find(chapter => chapter.id === entry.chapterId)?.versions.find(v => v.id === entry.versionId);
+      if (!version) return count;
+      prefix.push(entry.versionId);
+      memoryChunks(version.story).forEach((chunk, index) => { if (!cache.has(compactKey(prefix, index)) && !cache.has(summaryKey(prefix, index))) count++; });
+    }
+    return count;
+  }
+
   // `requestPanel` receives each request's cancel control; it defaults to the loading card itself.
   async function prepareStoryMemory(story, entries, loading, config = { providerId: state.providerId, model: state.model, reasoning: state.reasoning }, requestPanel = loading) {
     let memory = emptyMemory(), compactionFailed = false;
@@ -472,5 +489,5 @@ export function createStoryMemory({state, normalizeChapters, readerAi, savePendi
     return memory;
   }
 
-  return {memoryChunks, recentProse, decodeMemory, prepareStoryMemory, storyContextReady, applyUpdate, compactionCandidates, applyCompaction, connections};
+  return {memoryChunks, recentProse, decodeMemory, prepareStoryMemory, storyContextReady, pendingSummaryCount, applyUpdate, compactionCandidates, applyCompaction, connections};
 }

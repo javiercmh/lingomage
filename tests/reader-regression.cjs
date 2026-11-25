@@ -670,6 +670,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   gen.$('reader-edit-submit').addEventListener=(_,fn)=>submit=fn;
   gen.$('reader-prompt').value='Next';gen.$('reader-edit-panel').dataset.mode='continue';
   bindStory(gen);
+  Object.assign(gen,{estimateFor:()=>null,operationPlan:()=>({}),pendingSummaryCount:()=>0,notifyStopped:()=>{},renderEstimates:()=>{}}); // estimates and notifications are tested in generation-timing.mjs
   vm.runInContext(section('function storyInstructions(', 'function storyInput(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section("$('reader-edit-submit').addEventListener", "$('reader-dialog').addEventListener"),gen);
   await submit();
   assert.ok(requested.storyMemory.events.some(item=>item.event==='Text three'));assert.equal(requested.recentProse,'Text three');assert.equal(requested.priorActiveChapters,undefined);assert.equal(requested.precedingChapters,undefined);

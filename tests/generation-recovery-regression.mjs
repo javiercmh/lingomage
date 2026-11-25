@@ -40,7 +40,7 @@ const source=fs.readFileSync('js/app.js','utf8');
 const op={kind:'create',stage:'prose',promptVersion:'test',safeguardVersion:'test',error:'service'};
 let runs=0,results=0,resolve;
 const aiSession=createAiSession({ai:{}});
-const context={backgroundRun:null,aiSession,pendingRequests,state:{readerEditDraft:null},PROMPT_VERSION:'test',SAFEGUARD_VERSION:'test',pipeline:{records:[op],busy:false,async run(){runs++;this.busy=true;await new Promise(r=>resolve=r);this.records=[];this.busy=false;}},readerGeneration:null,setReaderGeneration(value){context.readerGeneration=value;},showOperationResult(){results++;},toast(){},renderCheckpointRecovery(){},revealRecovery(){},failureInfo};
+const context={backgroundRun:null,aiSession,pendingRequests,notifyStopped:()=>{},state:{readerEditDraft:null},PROMPT_VERSION:'test',SAFEGUARD_VERSION:'test',pipeline:{records:[op],busy:false,async run(){runs++;this.busy=true;await new Promise(r=>resolve=r);this.records=[];this.busy=false;}},readerGeneration:null,setReaderGeneration(value){context.readerGeneration=value;},showOperationResult(){results++;},toast(){},renderCheckpointRecovery(){},revealRecovery(){},failureInfo};
 vm.createContext(context);vm.runInContext(source.slice(source.indexOf('async function resumeCheckpoint('),source.indexOf('function revealRecovery(')),context);
 const retry=context.resumeCheckpoint(op);assert.equal(runs,1);await context.resumeCheckpoint(op);assert.equal(runs,1);resolve();await retry;assert.equal(results,1);await context.resumeCheckpoint(op);assert.equal(runs,1);
 assert.match(recoverySummary({kind:'create',stage:'notes',prose,error:'service',failure:failureInfo(Object.assign(Error('Service failed'),{code:'service'}),'notes')}),/vocabulary notes.*Completed prose is preserved/);
@@ -51,7 +51,7 @@ assert.ok(!failureInfo(Error('session_id=secret sessionId: secret'),'prose').mes
 // Resume obeys the same status rules: only explicit in-app cancellation clears it; external interruptions point to recovery, Create has no story id.
 for (const [message, kind, expected] of [['Request cancelled. Resume to explicitly retry, or discard this attempt.','continue','error'],['Service failed','continue','error'],['Request cancelled.','create','error'],['Service failed','create','error'],['Generation cancelled.','create',null]]) {
   const failing={kind,stage:'prose',promptVersion:'test',safeguardVersion:'test',error:'',target:kind==='create'?undefined:{storyId:'story'}};
-  const ctx={backgroundRun:null,aiSession,pendingRequests,state:{readerEditDraft:null},PROMPT_VERSION:'test',SAFEGUARD_VERSION:'test',pipeline:{records:[failing],busy:false,async run(){throw Object.assign(new Error(message),message==='Generation cancelled.'?{code:'generation_cancelled'}:{});}},readerGeneration:null,setReaderGeneration(value){ctx.readerGeneration=value;},showOperationResult(){},toast(){},renderCheckpointRecovery(){},revealRecovery(){},failureInfo};
+  const ctx={backgroundRun:null,aiSession,pendingRequests,notifyStopped:()=>{},state:{readerEditDraft:null},PROMPT_VERSION:'test',SAFEGUARD_VERSION:'test',pipeline:{records:[failing],busy:false,async run(){throw Object.assign(new Error(message),message==='Generation cancelled.'?{code:'generation_cancelled'}:{});}},readerGeneration:null,setReaderGeneration(value){ctx.readerGeneration=value;},showOperationResult(){},toast(){},renderCheckpointRecovery(){},revealRecovery(){},failureInfo};
   vm.createContext(ctx);vm.runInContext(source.slice(source.indexOf('async function resumeCheckpoint('),source.indexOf('function revealRecovery(')),ctx);
   await ctx.resumeCheckpoint(failing);
   assert.equal(ctx.readerGeneration?.phase ?? null,expected,`${kind} resume failure "${message}"`);
@@ -88,7 +88,7 @@ for (const [message, kind, expected] of [['Request cancelled. Resume to explicit
   // resumeCheckpoint adopts the newly selected Settings model if an older checkpoint had a blank model.
   const blankOp = { kind: 'continue', stage: 'plan', config: { providerId: 'chatgpt', model: '', reasoning: '' }, promptVersion: 'test', safeguardVersion: 'test', error: 'Invalid request.' };
   let resumedModel = '';
-  const resumeCtx = { backgroundRun: null, aiSession, pendingRequests, state: { readerEditDraft: null, providerId: 'chatgpt', model: 'gpt-5', reasoning: 'medium' }, PROMPT_VERSION: 'test', SAFEGUARD_VERSION: 'test', pipeline: { records: [blankOp], busy: false, async run(o) { resumedModel = o.config.model; this.records = []; } }, readerGeneration: null, setReaderGeneration() {}, showOperationResult() {}, toast() {}, renderCheckpointRecovery() {}, revealRecovery() {}, failureInfo };
+  const resumeCtx = { backgroundRun: null, aiSession, pendingRequests, notifyStopped: () => {}, state: { readerEditDraft: null, providerId: 'chatgpt', model: 'gpt-5', reasoning: 'medium' }, PROMPT_VERSION: 'test', SAFEGUARD_VERSION: 'test', pipeline: { records: [blankOp], busy: false, async run(o) { resumedModel = o.config.model; this.records = []; } }, readerGeneration: null, setReaderGeneration() {}, showOperationResult() {}, toast() {}, renderCheckpointRecovery() {}, revealRecovery() {}, failureInfo };
   vm.createContext(resumeCtx);
   vm.runInContext(source.slice(source.indexOf('async function resumeCheckpoint('), source.indexOf('function revealRecovery(')), resumeCtx);
   await resumeCtx.resumeCheckpoint(blankOp);
