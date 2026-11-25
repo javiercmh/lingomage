@@ -53,6 +53,7 @@
     "js/reading-exposure.js",
     "data/learning-signals.json",
     "js/story-share.js",
+    "js/light-model.js",
     "LICENSE"
   ],
   "app2Update": {
@@ -103,6 +104,7 @@
       "js/consultation-signals.js",
       "js/reading-exposure.js",
       "js/story-share.js",
+      "js/light-model.js",
       "LICENSE"
     ],
     "seedFiles": [

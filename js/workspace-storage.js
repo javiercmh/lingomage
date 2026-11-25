@@ -62,7 +62,7 @@ export function validStories(value) {
 }
 export function validSettings(value) {
   if (!object(value)) return false;
-  const strings = ['providerId','model','reasoning','theme'];
+  const strings = ['providerId','model','reasoning','lightModel','lightReasoning','theme'];
   if (strings.some(key => value[key] !== undefined && typeof value[key] !== 'string')) return false;
   if (value.languageOrder !== undefined && !list(value.languageOrder, item => typeof item === 'string')) return false;
   if (value.languageSetupDismissed !== undefined && typeof value.languageSetupDismissed !== 'boolean') return false;
@@ -192,12 +192,12 @@ export function createWorkspaceStorage({read, write, exists}) {
 }
 
 const SETTINGS_PATH = 'data/settings.json';
-const SCALARS = ['providerId','model','reasoning','languageSetupDismissed','backgroundStoryContext','shareVocabularyNotes','theme'];
+const SCALARS = ['providerId','model','reasoning','lightModel','lightReasoning','languageSetupDismissed','backgroundStoryContext','shareVocabularyNotes','theme'];
 const MAPS = ['targetLanguages','standardizedLevels','learnerProfiles','languageExpectations'];
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 export function settingsSnapshot(state) {
-  return clone({providerId:state.providerId,model:state.model,reasoning:state.reasoning,targetLanguages:state.targetLanguages,languageOrder:state.languageOrder,learnerProfiles:state.learnerProfiles,languageExpectations:state.languageExpectations,languageSetupDismissed:state.languageSetupDismissed,backgroundStoryContext:state.backgroundStoryContext !== false,shareVocabularyNotes:state.shareVocabularyNotes === true,standardizedLevels:state.standardizedLevels,readingPreferences:{furigana:state.furigana,fontSize:state.readerFontSize,speechRate:state.speechRate,followAlong:state.followAlong},theme:'dark'});
+  return clone({providerId:state.providerId,model:state.model,reasoning:state.reasoning,lightModel:state.lightModel || '',lightReasoning:state.lightReasoning || '',targetLanguages:state.targetLanguages,languageOrder:state.languageOrder,learnerProfiles:state.learnerProfiles,languageExpectations:state.languageExpectations,languageSetupDismissed:state.languageSetupDismissed,backgroundStoryContext:state.backgroundStoryContext !== false,shareVocabularyNotes:state.shareVocabularyNotes === true,standardizedLevels:state.standardizedLevels,readingPreferences:{furigana:state.furigana,fontSize:state.readerFontSize,speechRate:state.speechRate,followAlong:state.followAlong},theme:'dark'});
 }
 export function restoreSettingsSnapshot(state, value) {
   const {readingPreferences, theme, ...fields} = clone(value);

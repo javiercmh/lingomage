@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { lightTaskConfig } from '../js/light-model.js';
 import { beginMemoryRebuild, finishMemoryRebuild, createStoryMemory } from '../js/story-memory.js';
 import { failureInfo } from '../js/generation-errors.js';
 
@@ -36,7 +37,7 @@ function harness(story = fixture()) {
     close() { this.open = false; }, showModal() { this.open = true; }, focus() {}, remove() {} });
   const calls = [], state = { stories: [story], readerId: story.id, providerId: 'mock', model: 'mock', models: [{ id: 'mock' }] };
   let disk = json(story), summaries = 0;
-  const ctx = { state, beginMemoryRebuild, finishMemoryRebuild, document: { createElement: node },
+  const ctx = { state, lightTaskConfig, beginMemoryRebuild, finishMemoryRebuild, document: { createElement: node },
     $: id => { if (!elements.has(id)) elements.set(id, node()); return elements.get(id); },
     readerStory: () => story, selectedPath: s => s.paths[0], pendingDeletionBlocked: () => Boolean(state.readerEditBusy || state.pendingReaderResult || state.pendingReaderRequestId),
     closeReaderActions() {}, renderChapterRequest() {}, renderReaderActions() {}, renderReaderGeneration() {},

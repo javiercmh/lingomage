@@ -1,5 +1,6 @@
 import { chapterShareText, storyShareText, storyExportFile, shareTargets, downloadStoryFile, shareStoryFile, shareText, copyText, importStoryFile, STORY_IMPORT_MAX_BYTES } from './story-share.js';
 import { createStoryModel, pathLabel } from './story-model.js';
+import { lightModelChoice, lightTaskConfig } from './light-model.js';
 import { markStoryActivity, planLibrary, dateSegments, describeDates } from './library-activity.js';
 import { beginMemoryRebuild, finishMemoryRebuild, createStoryMemory } from './story-memory.js';
 import { createGenerationController } from './generation-controller.js';
@@ -73,7 +74,7 @@ function fillScopeOptions(input, selected = 'scene', describe) {
 
 const PREFERRED_MODEL = 'gpt-6-luna';
 const $ = id => document.getElementById(id);
-const state = { languageOrder: Object.keys(LANGUAGES), standardizedLevels: {}, checkpointBlocked: false, stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, libraryLanguage: 'all', librarySort: 'recent', storyMenu: null, libraryStale: false, libraryPlainHero: false, deleteTrigger: null, deleteStoryIds: new Set(), storySelectionMode: false, selectedStoryIds: new Set(), storySelectionFocusId: '', explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', readerHistoryEntry: false, speechVersionKey: '', playerEnabled: false, player: null, playerUnits: [], speechRate: 1, followAlong: true, following: true, wordNoteTrigger: null, backgroundStoryContext: true, shareVocabularyNotes: false, readerEditBusy: false, activeChapterRequest: null, readerEditDraft: null };
+const state = { languageOrder: Object.keys(LANGUAGES), standardizedLevels: {}, checkpointBlocked: false, stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', lightModel: '', lightReasoning: '', targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, libraryLanguage: 'all', librarySort: 'recent', storyMenu: null, libraryStale: false, libraryPlainHero: false, deleteTrigger: null, deleteStoryIds: new Set(), storySelectionMode: false, selectedStoryIds: new Set(), storySelectionFocusId: '', explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', readerHistoryEntry: false, speechVersionKey: '', playerEnabled: false, player: null, playerUnits: [], speechRate: 1, followAlong: true, following: true, wordNoteTrigger: null, backgroundStoryContext: true, shareVocabularyNotes: false, readerEditBusy: false, activeChapterRequest: null, readerEditDraft: null };
 
 let readerSpeechRun = 0;
 let readerSpeechKey = '';
@@ -194,7 +195,7 @@ function maybeStartBackgroundContext() {
   const status = { storyId: story.id, phase: 'working', message: 'Preparing story context in the background…' };
   setReaderGeneration(status);
   run.promise = (async () => {
-    try { await prepareStoryMemory(story, entries, loading, { providerId: state.providerId, model: state.model, reasoning: state.reasoning, signal: run }, run.host); }
+    try { await prepareStoryMemory(story, entries, loading, { ...lightTaskConfig(state), signal: run }, run.host); }
     catch (error) {
       // Stopping, cancelling or a hidden page is not a failure; Continue prepares whatever is missing.
       if (!run.stopped && !run.cancelledByUser && error.message !== 'Request cancelled.' && error.code !== 'background_paused') toast(`Story context was not prepared in the background: ${failureInfo(error, 'context', 'request').message} Continue will prepare it.`);
@@ -399,7 +400,7 @@ function syncModelControls() {
   if (!state.models?.length) return;
   const select=$('model-select');
   if (state.models.some(model => model.id === state.model)) select.value=state.model; else select.selectedIndex=-1;
-  buildReasoningOptions();
+  buildReasoningOptions(); buildLightModelOptions();
 }
 // Rebuilds the options only when the model changed, so a focused Reasoning select keeps focus.
 function buildReasoningOptions(force = false) {
@@ -411,6 +412,22 @@ function buildReasoningOptions(force = false) {
   }
   $('reasoning-label').hidden=!model; select.hidden=!model; select.disabled=!(model?.reasoningLevels || []).length;
   select.value=model?.reasoningLevels?.includes(state.reasoning) ? state.reasoning : '';
+}
+function buildLightModelOptions() {
+  const select = $('light-model-select'), effort = $('light-reasoning-select');
+  select.textContent = '';
+  const same = document.createElement('option'); same.value = ''; same.textContent = 'Same as story model'; select.append(same);
+  state.models.forEach(model => { const option = document.createElement('option'); option.value = model.id; option.textContent = model.name; select.append(option); });
+  select.disabled = !state.models.length;
+  select.value = lightModelChoice(state) ? state.lightModel : '';
+  const model = state.models.find(item => item.id === select.value);
+  if (effort.dataset.model !== String(select.value)) {
+    effort.dataset.model = String(select.value); effort.textContent = '';
+    const defaultOption = document.createElement('option'); defaultOption.value = ''; defaultOption.textContent = 'Provider default'; effort.append(defaultOption);
+    (model?.reasoningLevels || []).forEach(level => { const option = document.createElement('option'); option.value = level; option.textContent = level[0].toUpperCase() + level.slice(1); effort.append(option); });
+  }
+  $('light-reasoning-label').hidden = !model; effort.hidden = !model; effort.disabled = !(model?.reasoningLevels || []).length;
+  effort.value = model?.reasoningLevels?.includes(state.lightReasoning) ? state.lightReasoning : '';
 }
 function persistStories() { workspaceStorage.save('data/stories.json', state.stories); }
 function persistReaderStory(story) {
@@ -1185,7 +1202,7 @@ async function generate(event) {
     $('story-form').hidden = true; $('loading-card').hidden = false; { const root = createProgressRoot(); root.hidden = true; delete root.dataset.signature; }
     creatingStory = true; setReaderGeneration({storyId:null,phase:'working',message:'Writing your story…'});
     $('generation-status').textContent = ai.developmentMock ? 'Using the offline development response.' : 'Weaving your ideas into a story.';
-    const op = await runContentOperation({kind:'create', language:languageCode, input:requestProfile, profileVersion:PROFILE_DEFINITIONS.version, instructions:storyInstructions(LANGUAGES[languageCode],difficulty,guideFor(languageCode,difficulty)), config:{providerId:provider.id,model:model.id,reasoning:chosenEffort}});
+    const op = await runContentOperation({kind:'create', language:languageCode, input:requestProfile, profileVersion:PROFILE_DEFINITIONS.version, instructions:storyInstructions(LANGUAGES[languageCode],difficulty,guideFor(languageCode,difficulty)), config:{providerId:provider.id,model:model.id,reasoning:chosenEffort,light:lightModelChoice(state)}});
     showOperationResult(op);
   } catch (error) {
     if (error.code === 'generation_cancelled') { setReaderGeneration(null); toast('Generation cancelled'); return; }
@@ -2845,7 +2862,7 @@ async function explainSelection(kind = 'explain', action = 'initial', followUp =
       const previousExplanation = existingHelp ? JSON.stringify({ explanation: existingHelp.text, followUps: promptHistory.map(entry => ({ action: entry.action || 'detail', question: entry.followUp || '', text: entry.text || '', examples: entry.examples })) }) : '';
       const helpInput={ action, language:LANGUAGES[story.language], languageCode:story.language, difficulty:story.difficulty, sourceText:version.story, start:passage.start, end:passage.end, passage:passage.text, ...context, profile:passage.profile, followUp, previousExplanation };
       if (action === 'examples') {
-        const op=await runContentOperation({kind:'examples',language:story.language,input:helpInput,instructions:helpInstructions(action),config:{providerId,model,reasoning},target:{storyId:story.id,chapterId:chapter.id,versionId:version.id,helpId:existingHelp.id,start:passage.start,end:passage.end,passage:passage.text}});
+        const op=await runContentOperation({kind:'examples',language:story.language,input:helpInput,instructions:helpInstructions(action),config:{providerId,model,reasoning,light:lightModelChoice(state)},target:{storyId:story.id,chapterId:chapter.id,versionId:version.id,helpId:existingHelp.id,start:passage.start,end:passage.end,passage:passage.text}});
         clearLoading(); recordSelectionLookup(passage, 'examples'); showOperationResult(op); return;
       }
       const result = decodeHelp(await readerAi(kind, helpInput, helpInstructions(action), helpRequest.loading, {
@@ -3140,7 +3157,7 @@ $('reader-rebuild-memory').addEventListener('click', () => {
   closeReaderActions();
   const rebuild = memoryRebuildStory.memoryRebuild;
   $('memory-rebuild-title').textContent = rebuild ? 'Resume story memory rebuild?' : 'Rebuild story memory?';
-  $('memory-rebuild-description').textContent = `Story: ${memoryRebuildStory.title}. Storyline: ${rebuildPathLabel(memoryRebuildStory, rebuild)}. All chapters on this storyline will be summarized with ${state.model}.`;
+  $('memory-rebuild-description').textContent = `Story: ${memoryRebuildStory.title}. Storyline: ${rebuildPathLabel(memoryRebuildStory, rebuild)}. All chapters on this storyline will be summarized with ${lightTaskConfig(state).model}.`;
   $('memory-rebuild-effect').textContent = rebuild
     ? 'This uses AI to finish rebuilding story context. Completed summaries will be reused. Your chapters, storylines, vocabulary notes and explanations stay as they are.'
     : 'This uses AI to recreate summaries, characters, events and story context from saved chapters. Your chapters, storylines, vocabulary notes and explanations stay as they are. Saved summaries for this story will be cleared; other storylines prepare their context when needed.';
@@ -3158,7 +3175,7 @@ async function runMemoryRebuild(story) {
   const loading = createHelpLoading('continue');
   loading.querySelector('strong').textContent = 'Rebuilding story memory…';
   const request = state.activeChapterRequest = { storyId: story.id, loading, stopped: false, cancelledByUser: false };
-  const config = { providerId: state.providerId, model: state.model, reasoning: state.reasoning, signal: request };
+  const config = { ...lightTaskConfig(state), signal: request };
   try {
     await stopBackgroundContext();
     await releaseSavedInference();
@@ -3255,7 +3272,7 @@ $('reader-edit-submit').addEventListener('click', async () => {
   const story = readerStory(), chapters = pathChapters(story), chapter = chapters[state.readerChapter], version = activeVersion(chapter), mode = $('reader-edit-panel').dataset.mode;
   const path = selectedPath(story), entries = path.entries.map(entry => ({ ...entry })), rewriteIndex = state.readerChapter;
   const sourceVersion = mode === 'continue' ? activeVersion(chapters[chapters.length - 1]) : version;
-  const providerId = state.providerId, model = state.model, config = { providerId, model, reasoning: state.reasoning };
+  const providerId = state.providerId, model = state.model, config = { providerId, model, reasoning: state.reasoning, light: lightModelChoice(state) }, memoryConfig = lightTaskConfig(state);
   const difficulty = $('reader-level').value, scope = $('reader-scope').value;
   if (!levelDefinition(story.language,difficulty)) { $('reader-edit-error').textContent='Choose a reading level for this generation.'; return; }
   if (ai.available === false || (Array.isArray(state.models) && !state.models.length && $('ai-setup')?.hidden === false)) { $('reader-edit-error').textContent='Open App² → Settings → AI and connect a provider, then return here.'; return; }
@@ -3266,7 +3283,7 @@ $('reader-edit-submit').addEventListener('click', async () => {
   state.readerEditBusy = true; state.readerEditDraft = null; $('path-select').disabled = true;
   const loading = createChapterLoading(mode);
   const request = state.activeChapterRequest = { storyId: story.id, loading, stopped:false, cancelledByUser:false, clockId: `chapter-request-${Date.now()}` };
-  config.signal=request;
+  config.signal=request; memoryConfig.signal=request;
   // Earlier chapters are summarized before the operation exists; the checklist shows that as its first step.
   const memoryEntries = mode === 'continue' ? entries : entries.slice(0, rewriteIndex);
   const provisional = { id: request.clockId, kind: mode, language: story.language, stage: storyContextReady(story, memoryEntries) && !backgroundRun ? 'plan' : 'context', target: { index: rewriteIndex } };
@@ -3281,7 +3298,7 @@ $('reader-edit-submit').addEventListener('click', async () => {
     await releaseSavedInference();
     // Summary preparation and every generation stage share one session; readerAi joins it and never ends it.
     const op = await aiSession.run(async () => {
-      input.storyMemory = await prepareStoryMemory(story, memoryEntries, loading, config, loading.requestHost);
+      input.storyMemory = await prepareStoryMemory(story, memoryEntries, loading, memoryConfig, loading.requestHost);
       if (request.cancelledByUser) throw Object.assign(new Error('Generation cancelled.'), {code:'generation_cancelled'});
       const priorEntry = mode === 'continue' ? entries[entries.length - 1] : entries[rewriteIndex - 1];
       const priorVersion = priorEntry ? normalizeChapters(story).find(c => c.id === priorEntry.chapterId).versions.find(v => v.id === priorEntry.versionId) : null;
@@ -3332,12 +3349,13 @@ async function refreshModels() {
     }
     const hadModel = !!state.model;
     const providerChanged = !!state.providerId && state.providerId !== provider.id;
-    if (providerChanged) { state.model = ''; state.reasoning = ''; state.models = []; }
+    if (providerChanged) { state.model = ''; state.reasoning = ''; state.lightModel = ''; state.lightReasoning = ''; state.models = []; }
     state.providerId = provider.id; $('ai-setup').hidden = true; $('model-controls').hidden = false;
     const response = await ai.models(provider.id);
     if (refreshVersion !== modelRefreshVersion) return;
     state.models = response.models || [];
     if (!state.models.some(model => model.id === state.model)) { state.model = ''; state.reasoning = ''; }
+    if (state.lightModel && !state.models.some(model => model.id === state.lightModel)) { state.lightModel = ''; state.lightReasoning = ''; }
     trySaveSettings(); // A write failure is reported by the settings notice; it does not mean the provider is unavailable.
     select.textContent = '';
     state.models.forEach(model => { const option = document.createElement('option'); option.value = model.id; option.textContent = model.name; select.append(option); });
@@ -3349,6 +3367,7 @@ async function refreshModels() {
       else { state.model = ''; select.selectedIndex = -1; }
     } else { state.model = ''; state.reasoning = ''; select.disabled = true; select.innerHTML = '<option>No models available</option>'; }
     if (!state.model) { $('reasoning-select').value = ''; $('reasoning-select').hidden = true; $('reasoning-label').hidden = true; }
+    buildLightModelOptions();
   } catch { if (refreshVersion !== modelRefreshVersion) return; $('ai-setup').hidden = false; $('model-controls').hidden = true; }
 }
 $('language-settings-open').addEventListener('click', () => { setView('profile'); $('my-languages').scrollIntoView({ block: 'start' }); });
@@ -3363,13 +3382,18 @@ $('model-select').addEventListener('change', () => {
   trySaveSettings();
 });
 $('reasoning-select').addEventListener('change', () => { state.reasoning = $('reasoning-select').value; trySaveSettings(); });
+$('light-model-select').addEventListener('change', () => {
+  state.lightModel = $('light-model-select').value; state.lightReasoning = '';
+  buildLightModelOptions(); trySaveSettings();
+});
+$('light-reasoning-select').addEventListener('change', () => { state.lightReasoning = $('light-reasoning-select').value; trySaveSettings(); });
 window.addEventListener('app2:ai:connection', refreshModels);
 window.addEventListener('pageshow', () => { if (document.visibilityState === 'visible') refreshModels(); });
 
 document.documentElement.style.colorScheme = 'dark';
 state.stories = JSON.parse(JSON.stringify(workspaceStorage.load('data/stories.json').value));
 loadReaderPositions();
-const settings = workspaceStorage.load('data/settings.json').value; state.providerId = settings.providerId || ''; state.model = settings.model || PREFERRED_MODEL; state.reasoning = settings.reasoning || '';
+const settings = workspaceStorage.load('data/settings.json').value; state.providerId = settings.providerId || ''; state.model = settings.model || PREFERRED_MODEL; state.reasoning = settings.reasoning || ''; state.lightModel = settings.lightModel || ''; state.lightReasoning = settings.lightReasoning || '';
 state.furigana = settings.readingPreferences?.furigana !== false;
 state.readerFontSize = Math.max(15, Math.min(30, Number(settings.readingPreferences?.fontSize) || 19));
 state.speechRate = SPEECH_RATES.includes(Number(settings.readingPreferences?.speechRate)) ? Number(settings.readingPreferences.speechRate) : 1;

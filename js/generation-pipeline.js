@@ -13,6 +13,13 @@ export const pendingRequests = op => requestHolders(op).map(holder => holder.req
 // parallel: run Japanese notes and readings together. The app enables it. Older App² hosts hold one
 // request per app and answer request_in_progress; the part then starts after the other finishes.
 // The sequential default keeps offline evaluation request budgets and ordering predictable.
+// Study notes and Japanese readings may use the lighter model saved in op.config.light; the plan and
+// the prose always use the main model. A saved operation without `light` uses the main model throughout.
+export const LIGHT_STAGES = new Set(['notes','readings']);
+export function stageModel(op, stage) {
+  const light = LIGHT_STAGES.has(stage) && String(op.config.light?.model || '').trim() ? op.config.light : null;
+  return {providerId:op.config.providerId, model:light ? light.model : op.config.model, reasoningEffort:(light ? light.reasoning : op.config.reasoning) || undefined};
+}
 export function createPipeline({ records, persist, ai, apply, changed = () => {}, parallel = false }) {
   let busy = false;
   let phase = '';
@@ -74,7 +81,7 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
     if (name === 'readings' && !plan.spans.length) { part.content = attachReadings(canonical, plan, {readings:[]}, op.kind); part.done = true; save(); return; }
     if (!part.request) {
       const input = name === 'notes' ? {...op.input,kind:'notes',languagePlan:op.plan,chapter:canonical} : {kind:'readings',languageCode:'ja',spans:plan.spans};
-      const id = await ai.start({providerId:op.config.providerId,model:op.config.model,reasoningEffort:op.config.reasoning || undefined,instructions:name === 'notes' ? NOTES_INSTRUCTIONS : READING_INSTRUCTIONS,input:JSON.stringify(input),...aiNotification(op.kind,name)});
+      const id = await ai.start({...stageModel(op,name),instructions:name === 'notes' ? NOTES_INSTRUCTIONS : READING_INSTRUCTIONS,input:JSON.stringify(input),...aiNotification(op.kind,name)});
       part.request={id,stage:name,completed:false}; save();
     }
     await checkCancelled(op, part);
@@ -141,7 +148,7 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
           const instructions = stage === 'plan' ? PLAN_INSTRUCTIONS : stage === 'prose' ? op.instructions : stage === 'notes' ? NOTES_INSTRUCTIONS : READING_INSTRUCTIONS;
           if (!op.request) {
             mark('start');
-            const id = await ai.start({providerId:op.config.providerId,model:op.config.model,reasoningEffort:op.config.reasoning || undefined,instructions,input:JSON.stringify(input),...aiNotification(op.kind,stage)});
+            const id = await ai.start({...stageModel(op,stage),instructions,input:JSON.stringify(input),...aiNotification(op.kind,stage)});
             op.request={id,stage,completed:false}; save();
           }
           await checkCancelled(op);

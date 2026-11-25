@@ -16,6 +16,7 @@ function harness({ ready = false, enabled = true } = {}) {
   const ctx = { state: { backgroundStoryContext: enabled, stories: [story], model: 'mock', providerId: 'p', reasoning: '' }, ai: { available: true }, pipeline: { records: [] },
     readerGeneration: null, calls, toasts, story, console, failureInfo,
     document: { createElement: element, body: element() },
+    lightTaskConfig: () => ({ providerId: 'p', model: 'light-mock', reasoning: 'low' }),
     generationLive: () => false, selectedPath: s => s.paths[0], storyContextReady: () => ready, toast: message => toasts.push(message),
     renderReaderGeneration() {},
     setReaderGeneration(value) { ctx.readerGeneration = value; ctx.maybeStartBackgroundContext(); },
@@ -40,6 +41,8 @@ function harness({ ready = false, enabled = true } = {}) {
   assert.equal(h.calls.length, 1); assert.equal(JSON.stringify(h.calls[0].entries), JSON.stringify([{ chapterId: 'c1', versionId: 'v2' }]), 'the queued path is prepared');
   assert.equal(h.readerGeneration.message, 'Preparing story context in the background…');
   assert.equal(h.calls[0].config.signal, h.run(), 'requests carry the run so a stop is honoured between requests');
+  assert.equal(h.calls[0].config.model, 'light-mock', 'story context summaries use the light tasks model');
+  assert.equal(h.calls[0].config.reasoning, 'low');
   h.pending.resolve({});
   await h.run().promise;
   assert.equal(h.run(), null); assert.equal(h.readerGeneration, null); assert.deepEqual(h.toasts, []);
