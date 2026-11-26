@@ -3,7 +3,7 @@ import { timingEntry } from './generation-timing.js';
 import { aiNotification } from './ai-notification.js';
 import { decodePlan } from './story-generation.js';
 import { PLAN_INSTRUCTIONS, notesInstructions, READING_INSTRUCTIONS } from './prompts.js';
-import { parseContent, validateContentSize, validateProse, validateNotes, validateStory, validateExamples, readingPlan, attachReadings, attachReadingMap, validateReadings, readingSpansFor, READING_PART_TARGET_UNITS, MAX_READING_PARTS, notesParts, noteMinUnits, noteTargetUnits, mergeNoteParts, SAFEGUARD_VERSION } from './learning-validation.js';
+import { parseContent, validateContentSize, validateProse, validateNotes, validateStory, validateExamples, readingPlan, attachReadings, attachReadingMap, validateReadings, readingSpansFor, notesParts, noteMinUnits, noteTargetUnits, mergeNoteParts, SAFEGUARD_VERSION } from './learning-validation.js';
 
 // A saved operation can hold several requests: the main one and, for Japanese notes plus readings,
 // one per parallel part. Every cancel, release and recovery path walks all of them.
@@ -25,13 +25,17 @@ export const MAX_PARALLEL = 6;
 // Operations saved before the setting existed captured no parallelLimit and keep their old three at a time.
 const LEGACY_PARALLEL = 3;
 export const parallelLimitFor = allowConcurrent => allowConcurrent === false ? 1 : MAX_PARALLEL;
-// Broken replies (code invalid_json: the reply is not JSON at all) are resent automatically, up to
-// MAX_BROKEN_RESENDS times per stage or part, when the operation captured config.retryBroken (Settings →
-// Advanced → Retry broken replies automatically, on by default). Never silent: every resend calls
-// onResend so the app tells the learner, progress shows "retry N of 3", and op.retried counts them.
-// After the limit, or for any other validation failure, the operation stops for explicit recovery.
+// Failed steps are resent automatically, up to MAX_BROKEN_RESENDS times per stage or part, when the operation
+// captured config.retryBroken (Settings → Advanced → Retry failed steps automatically, on by default): unreadable
+// or invalid replies, provider and network errors, timeouts and failed starts. Never after a rate limit
+// (usage_limit), and never for errors a resend cannot fix or the learner chose (cancellation, permission, sign-in,
+// background or session limits, model or request configuration). Never silent: every resend calls onResend so the
+// app tells the learner, progress shows "retry N of 3", and op.retried counts them. After the limit the operation
+// stops for explicit recovery. (The names keep "broken" from when only non-JSON replies were resent.)
 export const MAX_BROKEN_RESENDS = 3;
-export const canResendBroken = (op, key, error) => error?.code === 'invalid_json' && op.config.retryBroken === true && (op.retried?.[key] || 0) < MAX_BROKEN_RESENDS;
+const NO_RESEND = new Set(['usage_limit','generation_cancelled','permission','authentication','background_paused','background_service','request_in_progress','session_ended','session_cancelled','session_idle','session_timeout','models','invalid_request']);
+export const resendable = error => !NO_RESEND.has(error?.code);
+export const canResendBroken = (op, key, error) => resendable(error) && !op.cancelRequested && !op.discardRequested && op.config.retryBroken === true && (op.retried?.[key] || 0) < MAX_BROKEN_RESENDS;
 const markResent = (op, key) => { op.retried = { ...(op.retried || {}), [key]: (op.retried?.[key] || 0) + 1 }; return op.retried[key]; };
 const START_REFUSALS = new Set(['request_in_progress', 'usage_limit']);
 const isNotesPart = name => name === 'notes' || name.startsWith('notes-');
@@ -42,18 +46,18 @@ const readingRanges = op => readingNames(op).filter(name => name !== 'readings')
 // Parts for a finished prose stage: legacy single "notes" or "notes-1".."notes-N" with canonical offsets.
 // A notes rebuild (kind "notes") keeps the version's saved readings, so it has no readings part.
 // A progressive operation gets a short lead part (the opening paragraph) so the chapter can open once it has
-// notes. Japanese readings are split the same way (same lead paragraph, larger blocks after it) into
-// readings-1..M, and readings-1 comes right after notes-1, so it also runs early when parts go one at a time.
+// notes. Japanese readings use the same blocks as the notes (readings-1..N beside notes-1..N), ordered notes-1,
+// readings-1, notes-2, readings-2…, so each block's notes and furigana arrive together, also one at a time.
 const PROGRESSIVE_KINDS = new Set(['create','continue','rewrite']);
 const wantsProgressive = op => op.config.progressive === true && PROGRESSIVE_KINDS.has(op.kind);
 export function enrichmentParts(op) {
   const parts = {}, split = notesParts(op.prose.story, Number(op.config.notesParts) || 1, noteMinUnits(op.language), noteTargetUnits(op.language), {lead:wantsProgressive(op)});
   const readings = op.language === 'ja' && op.kind !== 'notes';
-  const readingSplit = readings && split.length && wantsProgressive(op) ? notesParts(op.prose.story, MAX_READING_PARTS, noteMinUnits(op.language), READING_PART_TARGET_UNITS, {lead:true}) : [];
+  const readingSplit = readings && split.length && wantsProgressive(op) ? split : []; // the same blocks as the notes
   const addReadings = () => { if (readingSplit.length) readingSplit.forEach((part, index) => { parts[`readings-${index + 1}`] = {request:null, done:false, start:part.start, end:part.end}; }); else parts.readings = {request:null, done:false}; };
   if (split.length) split.forEach((part, index) => { parts[`notes-${index + 1}`] = {request:null, done:false, start:part.start, end:part.end}; if (index === 0 && readings) addReadings(); });
   else { parts.notes = {request:null, done:false}; if (readings) addReadings(); }
-  // Order: notes-1, readings-1, then the rest by position so each block's notes and readings arrive together.
+  // Order by position, notes before readings for the same block.
   if (readingSplit.length > 1) {
     const ordered = {}, rest = Object.keys(parts).filter(name => !['notes-1','readings-1'].includes(name));
     rest.sort((a, b) => parts[a].start - parts[b].start || (isReadingsPart(a) ? 1 : -1));
@@ -181,7 +185,11 @@ export function createPipeline({ records, persist, ai, apply, applyPartial = nul
       partPhase='start';
       let id; const startedAt = now();
       try { id = await ai.start({...stageModel(op,notes ? 'notes' : 'readings'),instructions:notes ? notesInstructions(op.config.noteDensity) : READING_INSTRUCTIONS,input:JSON.stringify(input),...aiNotification(op.kind,notes ? 'notes' : 'readings')}); }
-      catch (error) { if (START_REFUSALS.has(error?.code)) error.startRefused = true; throw fail(error); }
+      catch (error) {
+        if (START_REFUSALS.has(error?.code)) error.startRefused = true;
+        else if (!op.discardRequested && canResendBroken(op, name, error)) { const count = markResent(op, name); save(); onResend(op, name, count, error); changed(); return runPart(op, name); }
+        throw fail(error);
+      }
       part.request={id,stage:notes ? 'notes' : 'readings',completed:false,startedAt}; startedHere.add(part.request); save();
     }
     await checkCancelled(op, part);
@@ -193,7 +201,7 @@ export function createPipeline({ records, persist, ai, apply, applyPartial = nul
       if (error?.code !== 'generation_cancelled') track(op, part.request, stage, name, canResendBroken(op, name, error) ? 'resent' : 'failed');
       if (error?.code === 'usage_limit') { op.partsOneAtATime = true; save(); } // a provider limit: Resume goes one part at a time
       fail(error); await invalidate();
-      if (canResendBroken(op, name, error)) { const count = markResent(op, name); save(); onResend(op, name, count); changed(); return runPart(op, name); }
+      if (canResendBroken(op, name, error)) { const count = markResent(op, name); save(); onResend(op, name, count, error); changed(); return runPart(op, name); }
       throw error;
     }
     try {
@@ -201,7 +209,12 @@ export function createPipeline({ records, persist, ai, apply, applyPartial = nul
       part.content = notes ? validateNotes(response, op.prose, op.language, {requireNotes:!Number.isInteger(part.start)})
         : ranges ? {readings:[...validateReadings(plan, response, spans)].map(([id, reading]) => ({id, reading}))} : attachReadings(canonical, plan, response, op.kind);
       validateContentSize(part.content);
-    } catch (error) { track(op, part.request, stage, name, 'invalid'); fail(error); await invalidate(); throw error; }
+    } catch (error) {
+      const resend = !op.discardRequested && canResendBroken(op, name, error);
+      track(op, part.request, stage, name, resend ? 'resent' : 'invalid'); fail(error); await invalidate();
+      if (resend) { const count = markResent(op, name); save(); onResend(op, name, count, error); changed(); return runPart(op, name); }
+      throw error;
+    }
     track(op, part.request, stage, name, 'ok');
     part.request.completed=true; part.done=true; save();
     await release(op, part);
@@ -276,7 +289,12 @@ export function createPipeline({ records, persist, ai, apply, applyPartial = nul
           if (!op.request) {
             mark('start');
             const startedAt = now();
-            const id = await ai.start({...stageModel(op,stage),instructions,input:JSON.stringify(input),...aiNotification(op.kind,stage)});
+            let id;
+            try { id = await ai.start({...stageModel(op,stage),instructions,input:JSON.stringify(input),...aiNotification(op.kind,stage)}); }
+            catch (error) {
+              if (!op.discardRequested && canResendBroken(op, stage, error)) { const count = markResent(op, stage); save(); onResend(op, stage, count, error); changed(); continue; }
+              throw error;
+            }
             op.request={id,stage,completed:false,startedAt}; startedHere.add(op.request); save();
           }
           await checkCancelled(op);
@@ -287,7 +305,7 @@ export function createPipeline({ records, persist, ai, apply, applyPartial = nul
             if (error?.code !== 'generation_cancelled') track(op, op.request, stage, stage, canResendBroken(op, stage, error) ? 'resent' : 'failed');
             const failure=failureInfo(error,stage,phase);
             if (op.request) { op.request.completed=true; op.request.invalid=true; save(); await release(op); }
-            if (canResendBroken(op, stage, error)) { const count = markResent(op, stage); save(); onResend(op, stage, count); changed(); continue; }
+            if (canResendBroken(op, stage, error)) { const count = markResent(op, stage); save(); onResend(op, stage, count, error); changed(); continue; }
             error.generationFailure=failure; throw error;
           }
           let content;
@@ -297,9 +315,11 @@ export function createPipeline({ records, persist, ai, apply, applyPartial = nul
             validateContentSize(content);
           } catch (error) {
             if (op.discardRequested) throw error;
-            track(op, op.request, stage, stage, 'invalid');
+            const resend = canResendBroken(op, stage, error);
+            track(op, op.request, stage, stage, resend ? 'resent' : 'invalid');
             const failure=failureInfo(error,stage,phase);
             if (op.request) { op.request.completed=true; op.request.invalid=true; save(); await release(op); }
+            if (resend) { const count = markResent(op, stage); save(); onResend(op, stage, count, error); changed(); continue; }
             error.generationFailure=failure; throw error;
           }
           track(op, op.request, stage, stage, 'ok');

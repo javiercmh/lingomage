@@ -1,5 +1,6 @@
-// Broken replies (not JSON) are resent automatically, up to three times per stage or part, and every resend is
-// announced. After the limit, any other validation failure, or without retryBroken, recovery is explicit.
+// Failed steps (unreadable or invalid replies, provider errors, failed starts) are resent automatically, up to three
+// times per stage or part, and every resend is announced. Rate limits, cancellation and errors a resend cannot fix are
+// never resent; after the limit or without retryBroken, recovery is explicit.
 import assert from 'node:assert/strict';
 import { createPipeline, MAX_BROKEN_RESENDS } from '../js/generation-pipeline.js';
 import { progressSteps } from '../js/generation-progress.js';
@@ -13,13 +14,14 @@ const story = WORDS.map(word => `Der ${word} läuft schnell durch den Garten. `.
 const prose = { title: 'Tiere', story };
 
 // broken: {label: n} answers the first n requests for that label with text that is not JSON.
-function harness({ retryBroken = true, notesParts = 1, broken = {}, unmatched = false } = {}) {
+function harness({ retryBroken = true, notesParts = 1, broken = {}, unmatched = false, failures = {}, startFailures = {} } = {}) {
   let n = 0; const starts = [], kinds = new Map(), announced = [];
   const ai = {
-    async start(args) { const input = JSON.parse(args.input), label = input.kind === 'notes' && input.focus ? `notes-${input.focus.part}` : input.kind; const id = `r${++n}`; kinds.set(id, { label, input }); starts.push(label); return id; },
+    async start(args) { const input = JSON.parse(args.input), label = input.kind === 'notes' && input.focus ? `notes-${input.focus.part}` : input.kind; starts.push(`start ${label}`); if (startFailures[label]?.length) throw Object.assign(new Error('Network failed.'), { code: startFailures[label].shift() }); starts.pop(); const id = `r${++n}`; kinds.set(id, { label, input }); starts.push(label); return id; },
     async wait(id) {
       const { label, input } = kinds.get(id);
       if (broken[label] > 0) { broken[label]--; return 'Sorry, here are the notes: {glossary: [unfinished'; }
+      if (failures[label]?.length) throw Object.assign(new Error('The AI service failed.'), { code: failures[label].shift() });
       if (input.kind === 'language-plan') return JSON.stringify({ vocabulary: [], grammar: [], guidance: '' });
       if (input.kind === 'create') return JSON.stringify(prose);
       if (unmatched) return JSON.stringify({ glossary: [{ word: 'Elefant', meaning: 'elephant', forms: ['Elefant'] }] });
@@ -75,10 +77,33 @@ function harness({ retryBroken = true, notesParts = 1, broken = {}, unmatched = 
   }
 }
 
-{ // Valid JSON that fails validation (no note matches the chapter) is never resent.
+{ // Valid JSON that fails validation (no note matches the chapter) is resent too, then stops after three resends.
   const h = harness({ unmatched: true });
   await assert.rejects(h.pipeline.run(h.op), /None of the AI vocabulary notes matched/);
-  assert.equal(h.starts.filter(label => label === 'notes').length, 1);
+  assert.equal(h.starts.filter(label => label === 'notes').length, 4);
+  assert.deepEqual(h.announced, ['notes 1', 'notes 2', 'notes 3']);
+  assert.match(recoverySummary(h.op), /already retried this step automatically 3 times\./);
+}
+
+{ // Provider and network errors during a request, and failed starts, are resent; in a split part only that part.
+  const h = harness({ failures: { create: ['provider'] } });
+  await h.pipeline.run(h.op);
+  assert.deepEqual(h.starts.filter(label => label === 'create').length, 2); assert.deepEqual(h.announced, ['prose 1']);
+  const part = harness({ notesParts: 3, failures: { 'notes-3': ['network', 'timeout'] } });
+  await part.pipeline.run(part.op);
+  assert.equal(part.starts.filter(label => label === 'notes-3').length, 3); assert.deepEqual(part.announced, ['notes-3 1', 'notes-3 2']);
+  const start = harness({ startFailures: { 'language-plan': ['network'] } });
+  await start.pipeline.run(start.op);
+  assert.deepEqual(start.announced, ['plan 1']); assert.equal(start.pipeline.records.length, 0);
+}
+
+{ // Never resent: a rate limit, cancellation, or errors a resend cannot fix.
+  for (const code of ['usage_limit', 'generation_cancelled', 'permission', 'authentication', 'models']) {
+    const h = harness({ failures: { notes: [code] } });
+    await assert.rejects(h.pipeline.run(h.op));
+    assert.equal(h.starts.filter(label => label === 'notes').length, 1, code); assert.deepEqual(h.announced, [], code);
+    assert.doesNotMatch(recoverySummary(h.op), /already retried/);
+  }
 }
 
 { // Split notes: only the broken part is resent; progress shows the retry on the notes step.
@@ -99,4 +124,4 @@ function harness({ retryBroken = true, notesParts = 1, broken = {}, unmatched = 
   assert.equal(settingsSnapshot({ readerFontSize: 19, retryBrokenReplies: false }).retryBrokenReplies, false);
 }
 
-console.log('PASS broken replies: up to three announced automatic resends per stage or part, setting and legacy operations respected, validation failures never resent');
+console.log('PASS automatic resends: up to three announced resends per stage or part for broken or invalid replies, provider errors and failed starts; never after a rate limit, cancellation or unfixable errors; setting and legacy operations respected');

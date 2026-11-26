@@ -80,20 +80,20 @@ function harness({ progressive = true, language = 'de', text = prose, records = 
   assert.ok(partials.every(call => call.segments), 'every early save carries the readings');
 }
 
-{ // Japanese readings split like notes: readings-1 asks only for the title and opening paragraph, the rest in
-  // larger blocks; the chapter opens with the opening's furigana, and the final save has every reading.
+{ // Japanese readings use the same blocks as the notes: readings-1 asks only for the title and opening paragraph;
+  // the chapter opens with the opening's furigana, and the final save has every reading.
   const ja = { title: '駅', story: Array.from({ length: 12 }, (_, i) => `今日は${i + 1}番目の駅で友だちと会って、電車の時間を確認しました。`.repeat(3)).join('\n') };
   const h = harness({ language: 'ja', text: ja });
   await h.pipeline.run(h.op);
   const readings = [...h.inputs.values()].filter(item => item.label === 'readings');
-  assert.ok(readings.length >= 2 && readings.length <= 4, `readings are split into a few blocks (got ${readings.length})`);
+  const noteParts = [...h.inputs.values()].filter(item => item.label.startsWith('notes-'));
+  assert.ok(readings.length >= 2); assert.equal(readings.length, noteParts.length, 'one readings block per notes part');
   const all = readings.flatMap(item => item.input.spans.map(span => span.id));
   assert.equal(new Set(all).size, all.length, 'no kanji is asked twice');
   const first = readings[0].input.spans;
   assert.ok(first.some(span => span.section === 'title'), 'the title is in the first readings part');
   const leadEnd = ja.story.indexOf('\n', ja.story.indexOf('\n') + 1);
   assert.ok(first.filter(span => span.section === 'story').every(span => span.start < leadEnd + 1), 'the first part covers only the opening');
-  assert.ok(readings.slice(1).every(item => item.input.spans.length > first.length), 'later blocks are larger');
   assert.ok(h.op.result.storySegments.filter(seg => /\p{Script=Han}/u.test(seg.text)).every(seg => seg.reading), 'the final save has every reading');
 }
 
@@ -171,4 +171,4 @@ function harness({ progressive = true, language = 'de', text = prose, records = 
   assert.equal(stories[0].chapters[1].versions[0].glossary.length, 1);
 }
 
-console.log('PASS progressive notes: chapter opens after its first paragraph has notes (and Japanese readings, split the same way in larger blocks), growing notes per part, final completion, Define notes kept and preferred, failure and discard, resume, controller updates');
+console.log('PASS progressive notes: chapter opens after its first paragraph has notes (and Japanese readings, in the same blocks), growing notes per part, final completion, Define notes kept and preferred, failure and discard, resume, controller updates');

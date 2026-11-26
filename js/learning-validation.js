@@ -124,10 +124,6 @@ export const MAX_NOTE_PARTS = 8;
 export const MIN_NOTE_PART_UNITS_JA = 250;
 export const noteMinUnits = language => language === 'ja' ? MIN_NOTE_PART_UNITS_JA : MIN_NOTE_PART_UNITS;
 export const noteTargetUnits = language => language === 'ja' ? NOTE_PART_TARGET_UNITS_JA : NOTE_PART_TARGET_UNITS;
-// Japanese readings split the same way when a chapter opens early (same lead paragraph), in larger blocks: a
-// readings request is quicker than a notes request, so fewer parts are needed for the rest of the chapter.
-export const READING_PART_TARGET_UNITS = 1200;
-export const MAX_READING_PARTS = 4;
 // lead: the first part is only the opening paragraph (joined with the next ones while under half of minUnits), so
 // the reader can open the chapter once that short part has its notes; the rest is split as usual.
 export function notesParts(story, maxParts = 1, minUnits = MIN_NOTE_PART_UNITS, targetUnits = 0, { lead = false } = {}) {

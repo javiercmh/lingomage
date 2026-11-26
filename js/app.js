@@ -770,8 +770,9 @@ function resendStepName(key) {
   if (key.startsWith('readings-')) return `kanji readings (part ${key.slice(9)})`;
   return {plan:'language plan',prose:'story text',notes:'vocabulary notes',readings:'kanji readings'}[key] || 'AI';
 }
-function announceResend(op, key, count) {
-  toast(`The ${resendStepName(key)} reply was unreadable. Retrying automatically (${count} of ${MAX_BROKEN_RESENDS}).`);
+function announceResend(op, key, count, error) {
+  const what = error?.code === 'invalid_json' ? 'reply was unreadable' : failureInfo(error, key).category === 'validation' ? 'reply did not pass the checks' : 'request failed';
+  toast(`The ${resendStepName(key)} ${what}. Retrying automatically (${count} of ${MAX_BROKEN_RESENDS}).`);
 }
 function initializePipeline() {
   const entry=workspaceStorage.load('data/generation-checkpoints.json');
