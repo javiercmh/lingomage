@@ -40,7 +40,7 @@ Every doc, what it contains, and when to read or update it. Update the matching 
 
 - Interface and glossary text are English. Targets: German, Japanese, Russian, Spanish; learners request regional varieties in language preferences.
 - Label product assumptions and evidence limits. Never claim certified CEFR alignment or proven learning effectiveness.
-- When prompts or learning behavior change: update the PED and language docs, increment `PROMPT_VERSION` in `js/app.js`, and preserve saved-story provenance.
+- When prompts or learning behavior change: update the PED and language docs, increment `PROMPT_VERSION` in `js/prompts.js` (where all prompts except story memory live), and preserve saved-story provenance.
 - Japanese canonical text stays separate from furigana; copy and speech omit readings. Russian uses Cyrillic without transliteration.
 
 ## Code rules

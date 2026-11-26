@@ -1,6 +1,7 @@
 // Explicit supplemental stage evaluation; preserves original failures and canonical prose.
 import fs from 'node:fs';
-import {parseContent,validateStory,readingPlan,attachReadings,READING_INSTRUCTIONS} from '../js/learning-validation.js';
+import {parseContent,validateStory,readingPlan,attachReadings} from '../js/learning-validation.js';
+import {READING_INSTRUCTIONS} from '../js/prompts.js';
 const [filename,endpoint]=process.argv.slice(2);
 if(!filename||!/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(endpoint||''))throw Error('Record and local bridge required.');
 const record=JSON.parse(fs.readFileSync(filename,'utf8'));

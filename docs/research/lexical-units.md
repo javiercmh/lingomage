@@ -90,7 +90,7 @@ the reviewed L2 vocabulary-learning sources.
 
 These describe what the code does today. They are not claims about linguistic
 correctness or learning effect. Prompt text is `NOTES_INSTRUCTIONS` in
-`js/learning-validation.js`.
+`js/prompts.js`.
 
 | Concept | Operational definition (as implemented) | Limitation, not settled |
 | --- | --- | --- |

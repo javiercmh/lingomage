@@ -5,8 +5,9 @@ import path from 'node:path';
 import vm from 'node:vm';
 import {fileURLToPath} from 'node:url';
 import {createPipeline} from '../js/generation-pipeline.js';
-import {PLAN_INSTRUCTIONS,decodePlan} from '../js/story-generation.js';
-import {parseContent,validateStory,readingPlan,attachReadings,READING_INSTRUCTIONS,SAFEGUARD_VERSION} from '../js/learning-validation.js';
+import {decodePlan} from '../js/story-generation.js';
+import {PROMPT_VERSION as promptVersion,PLAN_INSTRUCTIONS,READING_INSTRUCTIONS,storyInstructions,chapterInstructions} from '../js/prompts.js';
+import {parseContent,validateStory,readingPlan,attachReadings,SAFEGUARD_VERSION} from '../js/learning-validation.js';
 import {findGlossaryMatches} from '../js/reader-text.js';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const args=process.argv.slice(2);const option=(key,fallback)=>{const i=args.indexOf(key);return i<0?fallback:args[i+1];};
@@ -21,9 +22,8 @@ if(!['models','pilot','followups','prose'].includes(suite))throw Error('Expected
 if(!/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(endpoint))throw Error('Use the local development bridge only.');
 fs.mkdirSync(output,{recursive:true});
 const read=p=>JSON.parse(fs.readFileSync(p,'utf8'));const write=(p,value)=>{fs.writeFileSync(p+'.tmp',JSON.stringify(value,null,2)+'\n');fs.renameSync(p+'.tmp',p);};
-const app=fs.readFileSync(path.join(root,'js/app.js'),'utf8');const promptVersion=/const PROMPT_VERSION = '([^']+)'/.exec(app)[1];
 function loadPrompt(source){const context={};vm.createContext(context);vm.runInContext(source,context);return context;}
-const revisedPrompts=loadPrompt(app.slice(app.indexOf('function storyInstructions('),app.indexOf('function storyInput(')));
+const revisedPrompts={storyInstructions,chapterInstructions};
 const baseline=read(path.join(root,'docs/evaluation/generation-tests/baseline.json'));
 const original=loadPrompt(baseline.storyInstructionsSource).storyInstructions;
 const revised=revisedPrompts.storyInstructions;
@@ -71,7 +71,7 @@ if(beginnerPilot) {
 for(const item of cases){if(args.includes('--mock')){item.model='development-mock';item.effort='';}const found=available.find(m=>m.id===item.model);if(!found||item.effort&&!found.reasoningLevels.includes(item.effort))throw Error(`Unavailable evaluation setting: ${item.model} ${item.effort}`);}
 if(languageFilter)cases=cases.filter(item=>item.input.languageCode===languageFilter);
 const suiteFile=path.join(output,languageFilter?'suite-'+languageFilter+'.json':'suite.json');
-const suiteRecord={suite,live:!!info.liveAi,promptVersion,safeguardVersion:SAFEGUARD_VERSION,profileVersion:profiles.version,selectedNotes,cases,experimentalPrompts:suite==='prose'?{plan:PLAN_INSTRUCTIONS,planAddition:PLAN_LOAD_CHECK,writerSource:app.slice(app.indexOf('function storyInstructions('),app.indexOf('function storyInput(')),writerAddition:WRITER_CHECK}:null};
+const suiteRecord={suite,live:!!info.liveAi,promptVersion,safeguardVersion:SAFEGUARD_VERSION,profileVersion:profiles.version,selectedNotes,cases,experimentalPrompts:suite==='prose'?{plan:PLAN_INSTRUCTIONS,planAddition:PLAN_LOAD_CHECK,writerSource:`${storyInstructions}\n${chapterInstructions}`,writerAddition:WRITER_CHECK}:null};
 if(suite==='prose'&&fs.existsSync(suiteFile)&&JSON.stringify(read(suiteFile))!==JSON.stringify(suiteRecord))throw Error('Experimental definition changed; use a new output directory.');
 write(suiteFile,suiteRecord);
 let count=0;

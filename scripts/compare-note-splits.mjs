@@ -6,7 +6,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { NOTES_INSTRUCTIONS, notesParts, noteMinUnits, mergeNoteParts, validateNotes, parseContent } from '../js/learning-validation.js';
+import { NOTES_INSTRUCTIONS } from '../js/prompts.js';
+import { notesParts, noteMinUnits, mergeNoteParts, validateNotes, parseContent } from '../js/learning-validation.js';
 
 const args = process.argv.slice(2), option = (key, fallback) => args.includes(key) ? args[args.indexOf(key) + 1] : fallback;
 const CORPUS = 'docs/evaluation/generation-tests/notes-prompt-experiment/corpus.json';

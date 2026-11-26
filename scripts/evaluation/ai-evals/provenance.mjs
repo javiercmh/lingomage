@@ -2,9 +2,8 @@
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import vm from 'node:vm';
-import {PLAN_INSTRUCTIONS} from '../../../js/story-generation.js';
-import {NOTES_INSTRUCTIONS, READING_INSTRUCTIONS, SAFEGUARD_VERSION} from '../../../js/learning-validation.js';
+import {PROMPT_VERSION, storyInstructions, chapterInstructions, PLAN_INSTRUCTIONS, NOTES_INSTRUCTIONS, READING_INSTRUCTIONS} from '../../../js/prompts.js';
+import {SAFEGUARD_VERSION} from '../../../js/learning-validation.js';
 import {RUBRIC_HASH_SOURCE, RUBRIC_VERSION} from './rubric.mjs';
 import {ROOT} from './store.mjs';
 
@@ -17,24 +16,16 @@ export function canonicalJson(value) {
 export const hashOf = value => sha256(canonicalJson(value));
 
 // Production code that determines generation or validation, plus the evaluator itself.
-const PRODUCTION_CODE = ['js/generation-pipeline.js', 'js/learning-validation.js', 'js/story-generation.js', 'js/generation-errors.js', 'js/reader-text.js'];
+const PRODUCTION_CODE = ['js/prompts.js', 'js/generation-pipeline.js', 'js/learning-validation.js', 'js/story-generation.js', 'js/generation-errors.js', 'js/reader-text.js'];
 
-// The writer prompts live inside js/app.js. They are executed from the shipped source, never copied.
-export function loadWriterPrompts(root = ROOT) {
-  const app = fs.readFileSync(path.join(root, 'js/app.js'), 'utf8');
-  const promptVersion = /const PROMPT_VERSION = '([^']+)'/.exec(app)?.[1];
-  const start = app.indexOf('function storyInstructions('), end = app.indexOf('function storyInput(');
-  if (!promptVersion || start < 0 || end < start) throw new Error('Could not locate the production prompt functions in js/app.js.');
-  const source = app.slice(start, end);
-  const context = {};
-  vm.createContext(context);
-  vm.runInContext(source, context);
-  if (typeof context.storyInstructions !== 'function' || typeof context.chapterInstructions !== 'function') throw new Error('Production prompt functions are missing.');
-  return {promptVersion, source, storyInstructions: context.storyInstructions, chapterInstructions: context.chapterInstructions};
+// The writer prompts are imported from the shipped js/prompts.js, never copied.
+export function loadWriterPrompts() {
+  const source = `${storyInstructions}\n${chapterInstructions}`;
+  return {promptVersion: PROMPT_VERSION, source, storyInstructions, chapterInstructions};
 }
 
 export function computeProvenance(root = ROOT) {
-  const writer = loadWriterPrompts(root);
+  const writer = loadWriterPrompts();
   const read = rel => fs.readFileSync(path.join(root, rel), 'utf8');
   const profiles = read('data/learning-profiles.json');
   const safeguards = read('data/language-safeguards.json');

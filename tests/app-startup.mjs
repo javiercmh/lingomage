@@ -94,8 +94,7 @@ assert.equal(settingsFile(app).targetLanguages.ru, 'enabled', 'Retry repeats the
 // Host failures render through the real app: accurate wording, the code in Technical details, and an explicit Retry (nothing resumes by itself).
 {
   const {failureInfo} = await import('../js/generation-errors.js'), {SAFEGUARD_VERSION} = await import('../js/learning-validation.js');
-  const {readFileSync} = await import('node:fs');
-  const promptVersion = /const PROMPT_VERSION = '([^']+)'/.exec(readFileSync('js/app.js', 'utf8'))[1];
+  const {PROMPT_VERSION: promptVersion} = await import('../js/prompts.js');
   const cases = {
     background_service: ['Android could not start background work (ForegroundServiceStartNotAllowedException).', /Android could not keep background work running\. Steps that finished earlier are saved\./],
     session_idle: ['The background session was released after a period without a running request.', /after a pause without a running step/],

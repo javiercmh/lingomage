@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { createPipeline, pendingRequests, MAX_RUNNING } from '../js/generation-pipeline.js';
 import { progressSummary } from '../js/generation-progress.js';
 import { recoverySummary } from '../js/generation-errors.js';
-import { notesParts, noteMinUnits, mergeNoteParts, validateNotes, NOTES_INSTRUCTIONS } from '../js/learning-validation.js';
+import { notesParts, noteMinUnits, mergeNoteParts, validateNotes } from '../js/learning-validation.js';
+import { NOTES_INSTRUCTIONS } from '../js/prompts.js';
 
 const WORDS = ['Hund', 'Katze', 'Vogel', 'Fisch', 'Pferd', 'Maus'];
 const paragraph = word => `Der ${word} läuft schnell durch den Garten. `.repeat(12).trim();

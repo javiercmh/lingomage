@@ -14,7 +14,7 @@ if(args.includes('--freeze')){
  }
  const prompts=read(path.join(base,'prompts.json'));
  const validatorFiles=['js/learning-validation.js','js/reader-text.js'];
- write(manifestFile,{promptVersions:{current:/const PROMPT_VERSION = '([^']+)'/.exec(fs.readFileSync('js/app.js','utf8'))[1],candidate:'contextual-notes-candidate-1'},createdAt:new Date().toISOString(),cases,prompts,model:'gpt-6.1-sol',effort:'low',validatorSources:Object.fromEntries(validatorFiles.map(f=>[f,fs.readFileSync(f,'utf8')])),focused:read(path.join(base,'focused.json'))});
+ write(manifestFile,{promptVersions:{current:/const PROMPT_VERSION = '([^']+)'/.exec(fs.readFileSync('js/prompts.js','utf8'))[1],candidate:'contextual-notes-candidate-1'},createdAt:new Date().toISOString(),cases,prompts,model:'gpt-6.1-sol',effort:'low',validatorSources:Object.fromEntries(validatorFiles.map(f=>[f,fs.readFileSync(f,'utf8')])),focused:read(path.join(base,'focused.json'))});
 }
 const manifest=read(manifestFile),cases=[...manifest.cases,...manifest.focused];
 if(args.includes('--run')){

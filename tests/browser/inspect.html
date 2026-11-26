@@ -60,7 +60,7 @@ const recoveryMessages={
 };
 async function seedRecovery(code){
  const {failureInfo}=await import('/js/generation-errors.js'),{SAFEGUARD_VERSION}=await import('/js/learning-validation.js');
- const promptVersion=/const PROMPT_VERSION = '([^']+)'/.exec(await fetch('/js/app.js').then(response=>response.text()))[1];
+ const promptVersion=/const PROMPT_VERSION = '([^']+)'/.exec(await fetch('/js/prompts.js').then(response=>response.text()))[1];
  const failure=failureInfo(Object.assign(new Error(recoveryMessages[code]),{code}),'plan','wait');
  const op={id:'fixture-recovery',kind:'continue',language:'de',stage:'plan',createdAt:'2026-01-01T00:00:00.000Z',promptVersion,safeguardVersion:SAFEGUARD_VERSION,profileVersion:'',config:{providerId:'chatgpt',model:'development-mock'},input:{},instructions:'fixture',request:null,
   target:{storyId:'held-story',pathId:'alt',entries:twoPathStory.paths[1].entries,chapterId:'c3',sourceVersionId:'v3',index:1},error:failure.message,failure};

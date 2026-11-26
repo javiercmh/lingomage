@@ -34,7 +34,7 @@ Source records: [level-guided generation review](../research/level-guided-genera
 
 ## Implementation
 
-- Definitions: `data/learning-profiles.json`. Orchestration: `js/story-generation.js`, `js/generation-pipeline.js`, `js/learning-validation.js`, `js/app.js`.
+- Definitions: `data/learning-profiles.json`. Prompts: `js/prompts.js`. Orchestration: `js/story-generation.js`, `js/generation-pipeline.js`, `js/learning-validation.js`, `js/app.js`.
 - Settings keep old enablement and self-assessment values and add standardized selections. Each generated version keeps plan, level and framework, scope, exact learner context and provider, model, prompt and profile provenance.
 - Active safeguards LANG-002–009 and GEN-001–004 ([register](../architecture/safeguards.md)); Russian stress allowed when requested.
 - Tests: `tests/story-generation-regression.cjs`, `tests/learning-safeguards.mjs`.

@@ -6,7 +6,8 @@ What the app is made of: platform, modules, version constants and tests. Archite
 
 - Dependency-free HTML/CSS/JavaScript App² subapp at the repository root; no build step, framework, native code or production server. Historical Kotlin is in Git; the [safeguard audit](safeguards.md) records what was adopted.
 - `dev_server.py` (Python 3.12+) serves the workspace for browser testing with deterministic `--mock-ai`, or development-only `--chatgpt` through the Codex CLI login.
-- Versions: prompt `PROMPT_VERSION` in `js/app.js`, safeguards `SAFEGUARD_VERSION` in `js/learning-validation.js`, memory `MEMORY_VERSION` and memory prompts `SUMMARY_PROMPT_VERSION`/`COMPACTION_PROMPT_VERSION` in `js/story-memory.js`, app `version` in `manifest.json`.
+- Prompts: every AI prompt and `PROMPT_VERSION` live in `js/prompts.js` (story and chapter prose, Explain/More detail/examples, language plan, vocabulary notes, Japanese readings). Only the story-memory prompts stay in `js/story-memory.js` with their own versions.
+- Versions: prompt `PROMPT_VERSION` in `js/prompts.js`, safeguards `SAFEGUARD_VERSION` in `js/learning-validation.js`, memory `MEMORY_VERSION` and memory prompts `SUMMARY_PROMPT_VERSION`/`COMPACTION_PROMPT_VERSION` in `js/story-memory.js`, app `version` in `manifest.json`.
 
 ## Modules
 

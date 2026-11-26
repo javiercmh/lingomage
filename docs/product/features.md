@@ -33,7 +33,7 @@ Stories can be shared from the reader or Library: canonical chapter or selected-
 
 - Scope Scene (default) or Chapter; no numeric length quotas.
 - Language plan of up to five vocabulary candidates and two grammar focuses, possibly none.
-- Notes for most meaningful words and expressions, no density cap.
+- Notes only for words and fixed expressions likely to be difficult for a learner just starting the selected level, noting doubtful words (never free word combinations), no density cap.
 - Reasoning choices only where the provider advertises them, plus provider default; higher reasoning may add latency and usage. Model and reasoning are stored in `data/settings.json`, not per account.
 - Settings → Story writer shows suggested ChatGPT models as reference: GPT-6.2 Sol at low effort for stories (preselected on first use when offered) and GPT-6 Luna at low effort for light tasks. Specific AI options sit in a collapsed Advanced section.
 - Retry broken replies automatically (Advanced, on by default): an unreadable (non-JSON) reply is resent automatically, at most three times per step or notes part, with a notice each time; after that, Retry is explicit.

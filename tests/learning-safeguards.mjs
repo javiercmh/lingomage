@@ -1,4 +1,5 @@
-import { PLAN_INSTRUCTIONS } from '../js/story-generation.js';
+import * as prompts from '../js/prompts.js';
+const { PLAN_INSTRUCTIONS, NOTES_INSTRUCTIONS } = prompts;
 import { bindGeneration } from './support/controllers.mjs';
 import { failureInfo, recoverySummary, operationLabel, discardFailureMessage } from '../js/generation-errors.js';
 import { progressSummary } from '../js/generation-progress.js';
@@ -7,7 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { execFileSync } from 'node:child_process';
-import { validateProse, validateNotes, NOTES_INSTRUCTIONS, validateStory, validateExamples, validateScript, wordCount, sentenceCount, readingPlan, attachReadings, SAFEGUARD_VERSION } from '../js/learning-validation.js';
+import { validateProse, validateNotes, validateStory, validateExamples, validateScript, wordCount, sentenceCount, readingPlan, attachReadings, SAFEGUARD_VERSION } from '../js/learning-validation.js';
 import { createPipeline } from '../js/generation-pipeline.js';
 import { annotatedText, getCanonicalSelection, japaneseSegments } from '../js/reader-text.js';
 import {MEMORY_VERSION} from '../js/story-memory.js';
@@ -61,8 +62,6 @@ assert.throws(()=>validateExamples({examples:Array(3).fill({...example,sentence:
 assert.deepEqual(japaneseSegments('行きます',[{text:'行きます',reading:'いきます'}]),[{text:'行',reading:'い'},{text:'きます'}]);
 const legacy=[{text:'食べ物',reading:'たべべもの'}];assert.deepEqual(japaneseSegments('食べ物',legacy),legacy);assert.equal(legacy[0].text,'食べ物');tested('LANG-007');
 const source=fs.readFileSync(new URL('../js/app.js',import.meta.url),'utf8');
-const promptSection=source.slice(source.indexOf('function storyInstructions('),source.indexOf('function storyInput('));
-const prompts={};vm.createContext(prompts);vm.runInContext(promptSection,prompts);
 for (const language of ['German','Japanese','Russian','Spanish']) {
   const prompt=prompts.storyInstructions(language,'advanced','Nuanced usage.','long');
   for (const text of ['languagePlan','languageExpectations','no numerical length quota','not a claim of certified CEFR, JLPT or TORFL alignment','Do not impose a fixed beginner curriculum','unless explicitly requested','German preserves noun capitalization','Spanish preserves accents']) assert.ok(prompt.includes(text),text);
@@ -84,7 +83,7 @@ for (const language of ['German','Japanese','Russian','Spanish']) {
   assert.ok(NOTES_INSTRUCTIONS.includes('For Russian only, put a combining acute'));
   assert.ok(NOTES_INSTRUCTIONS.includes('in the dictionary headword and in each listed form'));
 }
-for (const text of ['Define most meaningful vocabulary','including common words','fixed canonical chapter','Every form must be copied exactly','English explanations only','At least one useful note','do not pad a quota']) assert.ok(NOTES_INSTRUCTIONS.includes(text),text);
+for (const text of ['Note only words and expressions likely to be difficult','single word or a fixed multi-word expression','fixed canonical chapter','Every form must be copied exactly','English explanations only','At least one useful note','do not pad a quota']) assert.ok(NOTES_INSTRUCTIONS.includes(text),text);
 assert.ok(prompts.storyInstructions('Russian','A1','test').includes('canonical title and story'));
 for (const text of ['everyday terms and expressions', 'Use guidance to flag', 'nearby clue in simpler language', 'especially at beginner levels', 'fewer or none are allowed']) {
   assert.ok(PLAN_INSTRUCTIONS.includes(text), text);

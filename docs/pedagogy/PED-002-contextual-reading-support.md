@@ -1,6 +1,6 @@
 # PED-002: Contextual help for selected text and vocabulary notes
 
-- Date: 2026-10-11; current state at prompt version `2026-10-14.21`
+- Date: 2026-10-11; current state at prompt version `2026-11-26.1`
 - Status: implemented; learner usefulness and language quality unvalidated; qualified language review pending
 - Scope: reading support in German, Japanese, Russian and Spanish stories
 - Evidence basis: product requirements and evidence-informed extrapolation; no direct evaluation of this feature
@@ -25,7 +25,7 @@ Interaction details are in [`DESIGN.md`](../../DESIGN.md); pipeline and storage 
 ### Vocabulary notes
 
 - Every chapter has a nonempty set of English notes; at least one structurally valid note is required, with no pedagogical quota or cap (the former 100-note cap was removed at the learner's request). Underlines keep help learner-controlled.
-- Notes come from a separate request after canonical prose is validated and checkpointed. It asks for most meaningful words and useful expressions (common words, contextual inflections, idioms, constructions, pronouns, possessives, determiners, useful function words), skipping routine proper names and duplicate meanings. The level guides explanation complexity; it is not a presumption that words are known.
+- Notes come from a separate request after canonical prose is validated and checkpointed. It asks only for words and expressions likely to be difficult at the selected reading target (less frequent or topic-specific vocabulary, unusual senses, irregular or opaque forms, idioms, set phrases, collocations and constructions not clear from their parts), assuming the learner may have just started that target (vocabulary of the target itself may still be unknown) and skipping only basic words almost certainly met at the level below, routine proper names and duplicate meanings. When in doubt whether a word is difficult, the model notes it. Each form is one word or a fixed multi-word expression; free combinations of ordinary words (a verb with its regular object or prepositional phrase, such as German *kommt von der Tür*, a noun with its article, a clause) are not noted, only the difficult word inside them. Which words count as difficult is the model's estimate from the self-selected level, not a claim that any word is known; any other text stays selectable for Explain.
 - Schema: English meaning, headword (`word`, a schema name, not a claim of one orthographic word) and exact `forms`. Forms are resolved tolerantly to attested chapter text; unattested forms are dropped, and a note with none is discarded rather than failing the chapter. Forms only in the title or plan do not count.
 - Grouped forms need compatible explanations. The prompt distinguishes referents, person and number, association versus ownership, prefers disambiguating attested phrases, and explains discontinuous constructions without assigning their meaning to an isolated particle.
 - Display: each note appears once, at its first eligible occurrence in the displayed version (identity = headword + meaning, NFC, trimmed and collapsed whitespace, case and punctuation preserved; longest overlaps first); later occurrences stay selectable for Explain. Recomputed on render without changing stored data.
@@ -44,13 +44,13 @@ Interaction details are in [`DESIGN.md`](../../DESIGN.md); pipeline and storage 
 - **Glossed reading** has support with heterogeneous, partial outcomes ([reading and glossing review](../research/reading-and-glossing.md)). `yanagisawaWebbUchihara2020Glossing` ([DOI](https://doi.org/10.1017/S0272263119000688)) supports offering contextual help as an option; it does not test first-occurrence display, these languages or AI explanations, and does not fix an optimal frequency.
 - **Reading-first practice** has small-to-medium, possibly overestimated support, mostly for sustained classroom reading, not one-off AI chapters: `sangersEtAl2025ExtensiveReading` ([DOI](https://doi.org/10.1007/s10648-025-10068-6)); `hamada2020ExtensiveReadingBias` ([DOI](https://doi.org/10.3389/fpsyg.2020.00617)) lowered one estimate after correcting selection bias.
 - **Repeated encounters** correlate with incidental learning without a required count (`uchiharaEtAl2019Repetition`, [DOI](https://doi.org/10.1111/lang.12343)), so natural reuse remains a product assumption.
-- **Product assumptions** (no direct evidence): focused and silently adapted help, three examples, first-occurrence display, broad note coverage, no density cap, Listen and Translate, sentence playback controls, story-led creation, multilingual input, open-ended endings, and all presentation choices.
+- **Product assumptions** (no direct evidence): focused and silently adapted help, three examples, first-occurrence display, selective notes for likely difficult words and fixed expressions, no density cap, Listen and Translate, sentence playback controls, story-led creation, multilingual input, open-ended endings, and all presentation choices.
 - Structural validation cannot establish semantic accuracy, useful coverage, level suitability or pedagogical value; language review is separate. The cause of reported Android failures with prose-prefixed detail responses was never confirmed from a captured response.
 - Retrieval, review and instruction are not implemented; they are research candidates in the [future directions](../product/future-directions.md).
 
 ## Implementation
 
-- Code: `js/app.js` (reader, help requests), `js/reader-text.js` (canonical text, glossary display), `js/learning-validation.js` (validation, notes prompt `NOTES_INSTRUCTIONS`).
+- Code: `js/app.js` (reader, help requests), `js/reader-text.js` (canonical text, glossary display), `js/learning-validation.js` (validation), `js/prompts.js` (notes prompt `NOTES_INSTRUCTIONS`, help prompts `helpInstructions`).
 - Provenance: saved help records passage offsets, source version, profile snapshot, model and prompt version; follow-ups add question, response and their own provenance; legacy JSON detail objects remain readable. Prompt or learning-behavior changes increment `PROMPT_VERSION`; copy and presentation changes do not; saved records never relabel.
 - Lookups of notes, explanations, follow-ups, examples and translations are recorded under [PED-005](PED-005-consultation-signals.md); recording changes no help content or prompt.
 
@@ -72,3 +72,4 @@ A controlled contextual-accuracy comparison of notes prompts is designed but not
 - 2026-11-08: lookups recorded under PED-005.
 - 2026-11-22: Russian note stress moved from the dictionary headword to the form from the passage (prompt `2026-11-22.1`).
 - 2026-11-25: notes may be split into paragraph parts requested in parallel, each with whole-chapter context (prompt `2026-11-25.1`).
+- 2026-11-26: at the learner's request, notes changed from broad coverage including common words to likely difficult words and fixed expressions only; free word combinations such as *kommt von der Tür* are no longer noted. Notes assume the learner may have just started the selected level and note doubtful words (prompt `2026-11-26.1`). This keeps the intent of the 2026-10 broad-coverage preference (when in doubt, note it) while dropping notes on clearly basic words and arbitrary phrases.

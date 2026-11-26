@@ -1,6 +1,7 @@
 (async()=>{
 const {bindStory, bindGeneration, bindPanels}=await import('./support/controllers.mjs');
 const {markStoryActivity}=await import('../js/library-activity.js');
+const prompts=await import('../js/prompts.js');
 // Dependency-free regression harness; exercises production functions with isolated DOM/AI stubs.
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -21,7 +22,7 @@ function sandbox(extra = {}) {
     append(...nodes){this.childNodes.push(...nodes);},addEventListener(name,fn){this.events[name]=fn;},setAttribute(name,value){this.attributes[name]=value;},focus(){this.focused=true;},scrollIntoView(){},remove(){},querySelector(selector){return this.childNodes.find(node=>node.tagName===selector) || this.childNodes.map(node=>node.querySelector?.(selector)).find(Boolean) || null;},querySelectorAll(){return [];},classList:{add(){},remove(){},toggle(){}}});
   const c = {backgroundRun:null,workspaceStorage:{assertWritable(){}},usage:{setReader(){},checkpoint(){}},settingsFeedback:{sync(){}},pipeline:null,state:{},console,crypto:{randomUUID:(()=>{let id=0;return ()=>`help-test-${++id}`;})()},PROMPT_VERSION:'test',STORY_GUIDES:{de:{beginner:'Simple sentences'}},renderChapterRequest(){},updateReaderNavigation(){},renderCheckpointRecovery(){},LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},SPEECH_LANGUAGES:{de:'de-DE',ja:'ja-JP',ru:'ru-RU','es-CL':'es-CL'},renderGenerationRecovery(){},readerPanel:()=>({classList:{toggle(){}}}),$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{body:element(),createElement:element,createElementNS:(_ns,name)=>element(name),createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},setTimeout:()=>0,clearTimeout(){},...extra};
   c.readerGeneration = null; c.renderReaderGeneration = () => {}; c.setReaderGeneration = value => { c.readerGeneration = value; };
-  vm.createContext(c); c.markStoryActivity = markStoryActivity;
+  vm.createContext(c); c.markStoryActivity = markStoryActivity; for (const name of ['storyInstructions','chapterInstructions','helpInstructions']) if (!(name in c)) c[name] = prompts[name];
   vm.runInContext(notificationSource, c);
   vm.runInContext(fs.readFileSync('js/story-model.js','utf8').replace(/^[\s\S]*?(?=export function pathLabel)/, '').replaceAll('export function ', 'function '), c);
   vm.runInContext(fs.readFileSync('js/generation-errors.js','utf8').replace(/^import .*\n/m, '').replaceAll('export function ', 'function '), c);
@@ -476,7 +477,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
       state:{followUpEdit:draft},pendingDeletionBlocked:()=>false,
       persistReaderStory(){ if (failSave) throw Error('Disk unavailable'); }
     });
-    vm.runInContext(section('function savedFollowUps(', 'function helpInstructions(')+section('function deleteFollowUp(', 'function confirmDeleteFollowUp('),c);
+    vm.runInContext(section('function savedFollowUps(', 'function overlappingHelp(')+section('function deleteFollowUp(', 'function confirmDeleteFollowUp('),c);
     const before = JSON.stringify(story);
     assert.throws(() => c.deleteFollowUp(story,story.help,0), /Disk unavailable/);
     assert.equal(JSON.stringify(story),before);
@@ -509,8 +510,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
 
   const contract=sandbox();
   vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function decodeHelp(', 'async function explainSelection('), contract);
-  const promptContract=sandbox();
-  vm.runInContext(section('function savedFollowUps(', 'function selectedPassage('),promptContract);
+  const promptContract=prompts;
   const detailPrompt=promptContract.helpInstructions('detail');
   assert.ok(detailPrompt.includes('Return only the explanation text'));
   assert.ok(detailPrompt.includes('or JSON'));
@@ -671,7 +671,8 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   gen.$('reader-prompt').value='Next';gen.$('reader-edit-panel').dataset.mode='continue';
   bindStory(gen);
   Object.assign(gen,{estimateFor:()=>null,operationPlan:()=>({}),pendingSummaryCount:()=>0,notifyStopped:()=>{}}); // estimates and notifications are tested in generation-timing.mjs
-  vm.runInContext(section('function storyInstructions(', 'function storyInput(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section("$('reader-edit-submit').addEventListener", "$('reader-dialog').addEventListener"),gen);
+  Object.assign(gen,prompts);
+  vm.runInContext(section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section("$('reader-edit-submit').addEventListener", "$('reader-dialog').addEventListener"),gen);
   await submit();
   assert.ok(requested.storyMemory.events.some(item=>item.event==='Text three'));assert.equal(requested.recentProse,'Text three');assert.equal(requested.priorActiveChapters,undefined);assert.equal(requested.precedingChapters,undefined);
   assert.equal(story3.chapters.length,4);assert.equal(story3.chapters[3].basedOnVersionId,'threev');assert.equal(story3.chapters[1].versions.length,1);

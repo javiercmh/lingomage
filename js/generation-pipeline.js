@@ -1,8 +1,9 @@
 import { failureInfo } from './generation-errors.js';
 import { timingEntry } from './generation-timing.js';
 import { aiNotification } from './ai-notification.js';
-import { PLAN_INSTRUCTIONS, decodePlan } from './story-generation.js';
-import { parseContent, validateContentSize, validateProse, validateNotes, validateStory, validateExamples, readingPlan, attachReadings, notesParts, noteMinUnits, mergeNoteParts, NOTES_INSTRUCTIONS, READING_INSTRUCTIONS, SAFEGUARD_VERSION } from './learning-validation.js';
+import { decodePlan } from './story-generation.js';
+import { PLAN_INSTRUCTIONS, NOTES_INSTRUCTIONS, READING_INSTRUCTIONS } from './prompts.js';
+import { parseContent, validateContentSize, validateProse, validateNotes, validateStory, validateExamples, readingPlan, attachReadings, notesParts, noteMinUnits, mergeNoteParts, SAFEGUARD_VERSION } from './learning-validation.js';
 
 // A saved operation can hold several requests: the main one and, for Japanese notes plus readings,
 // one per parallel part. Every cancel, release and recovery path walks all of them.
