@@ -63,7 +63,7 @@ Every doc, what it contains, and when to read or update it. Update the matching 
 
 ## Development and verification
 
-- Run `python3 dev_server.py --mock-ai` and open `http://localhost:8888` (deterministic, no external requests). Optional live testing: `codex login`, then `python3 dev_server.py --chatgpt` (uses ChatGPT plan allowance; development only).
+- Run `python3 dev_server.py --mock-ai` and open `http://localhost:8888` (deterministic, no external requests). Optional live testing: `codex login`, then `python3 dev_server.py --chatgpt` (uses ChatGPT plan allowance; development only). It runs Codex with a private temporary `CODEX_HOME` that links only `auth.json`, so a global `~/.codex/AGENTS.md` or `config.toml` never reaches LingoMage requests; do not work around the instruction-source check. For live tests that write data, run the server from a throwaway copy of the app (as `scripts/browser_smoke.py` builds), never against an existing `.dev-data/`.
 - The server keeps learner files in the gitignored `.dev-data/`, seeded from `seedDefaults`; committed seeds never change. Delete `.dev-data/` for a fresh install. Never commit learner data.
 - Run `python3 scripts/check.py` (Node 22.12+, Python 3.12+) before completing any change.
 - For interface or copy changes, inspect screenshots at desktop and narrow mobile widths (spacing, wrapping, hierarchy, clipping, touch targets); DOM checks are not enough. Share before and after screenshots with the requester in the conversation, not just a description.

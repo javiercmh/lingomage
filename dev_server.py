@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 import threading
 import shutil
+import signal
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -107,8 +108,44 @@ class CodexAppServer:
         self.notifications = queue.Queue()
         self.reader = None
         self.failure = None
+        self.home = None
+        self.user_auth = None
+
+    def _private_home(self):
+        """A Codex home holding only the user's sign-in, so inference never loads instructions from it.
+
+        Codex adds the user's global AGENTS.md (and config.toml extras such as plugins or instruction files) to
+        every thread, and no thread or config option turns that off. Those instructions are meant for coding
+        agents, not for LingoMage requests, and run_live_request refuses any thread that reports instruction
+        sources. Linking only auth.json keeps the ChatGPT sign-in; close() copies a refreshed sign-in back.
+        """
+        user_home = Path(os.environ.get('CODEX_HOME') or Path.home() / '.codex').expanduser()
+        self.user_auth = user_home / 'auth.json'
+        if not self.user_auth.is_file():
+            raise RuntimeError('Codex is not signed in. Run `codex login`, choose ChatGPT sign-in, then restart this server.')
+        self.home = Path(tempfile.mkdtemp(prefix='lingomage-codex-home-'))
+        (self.home / 'auth.json').symlink_to(self.user_auth.resolve())
+        return self.home
+
+    def _restore_auth(self):
+        """If Codex replaced the linked auth.json with a refreshed copy, keep the user's sign-in current."""
+        if not self.home:
+            return
+        private = self.home / 'auth.json'
+        try:
+            if private.is_file() and not private.is_symlink() and self.user_auth:
+                target = self.user_auth.resolve()
+                staged = target.with_name(f'.{target.name}.lingomage')
+                shutil.copy2(private, staged)
+                os.chmod(staged, 0o600)
+                os.replace(staged, target)
+        except OSError:
+            pass
+        shutil.rmtree(self.home, ignore_errors=True)
+        self.home = None
 
     def start(self):
+        environment = {**os.environ, 'CODEX_HOME': str(self._private_home())}
         try:
             self.process = subprocess.Popen(
                 [
@@ -119,9 +156,10 @@ class CodexAppServer:
                     '-c', 'mcp_servers={}',
                 ],
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL, text=True, encoding='utf-8', bufsize=1,
+                stderr=subprocess.DEVNULL, text=True, encoding='utf-8', bufsize=1, env=environment,
             )
         except FileNotFoundError as error:
+            self._restore_auth()
             raise RuntimeError('Codex CLI was not found. Install Codex and run `codex login` before using --chatgpt.') from error
         self.reader = threading.Thread(target=self._read, name='codex-app-server-reader', daemon=True)
         self.reader.start()
@@ -196,6 +234,7 @@ class CodexAppServer:
 
     def close(self):
         if not self.process:
+            self._restore_auth()
             return
         try:
             self.process.terminate()
@@ -211,6 +250,7 @@ class CodexAppServer:
                     stream.close()
                 except OSError:
                     pass
+        self._restore_auth()
 
 
 def model_record(model):
@@ -701,6 +741,8 @@ if __name__ == '__main__':
         except Exception as error:
             server.server_close()
             parser.error(str(error))
+    # A terminated server (an agent or script stopping it) cleans up like Ctrl+C, so the private Codex home goes too.
+    signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
     with server:
         print(f'LingoMage: http://localhost:{server.server_port}', flush=True)
         print(f'Serving app files from: {server.workspace}', flush=True)
