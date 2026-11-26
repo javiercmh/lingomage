@@ -19,7 +19,9 @@ function updateShownVersion(op, result, pending) {
   if (!version) return false;
   if (!version.notesPending) return true; // already complete: re-applying changes nothing
   const before=JSON.parse(JSON.stringify(story));
-  const fields={glossary:result.glossary || [], ...(result.titleSegments ? {titleSegments:result.titleSegments, storySegments:result.storySegments} : {})};
+  // Notes the learner added with Define while the generated notes were still arriving stay, and win where they overlap.
+  const learnerNotes=(version.glossary || []).filter(note=>note.addedBy === 'learner');
+  const fields={glossary:[...(result.glossary || []), ...learnerNotes], ...(result.titleSegments ? {titleSegments:result.titleSegments, storySegments:result.storySegments} : {})};
   Object.assign(version, fields, pending ? {} : timingField(op));
   if (op.kind === 'create' && story.activeVersionId === version.id) Object.assign(story, fields);
   if (pending) version.notesPending = true; else delete version.notesPending;

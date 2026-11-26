@@ -676,7 +676,10 @@ export function createReaderHelp({
     if (config.signal?.stopped || config.signal?.cancelledByUser) throw new Error('Request cancelled.');
     workspaceStorage.assertWritable();
     if (state.pendingReaderResult) throw new Error('Save the completed response before starting another request.');
-    if (state.requestId) throw new Error('Another AI request is still running. Wait for it to finish before starting another.');
+    // alongsideNotes: Define while a shown chapter's notes are still arriving. The notes operation owns
+    // state.requestId, so this request keeps its own id and never touches that slot.
+    const shared = !config.alongsideNotes;
+    if (shared && state.requestId) throw new Error('Another AI request is still running. Wait for it to finish before starting another.');
     if (!ai.available) throw new Error('Connect an AI provider in App² Settings → AI first.');
     const model = state.models.find(item => item.id === config.model); if (!model) throw new Error(String(config.model || '').trim() ? 'The selected AI model is not available now. Open Settings and choose an available model.' : 'No AI model is selected. Open Settings and choose an AI model first.');
     const { providers } = await ai.providers();
@@ -685,16 +688,17 @@ export function createReaderHelp({
     if (!provider) throw new Error('Connect an AI provider in App² Settings → AI first.');
     if (config.providerId && provider.id !== config.providerId) throw new Error('The available AI provider changed. Choose a model in Settings first.');
     const providerId = provider.id;
-    state.requestId = 'starting';
+    if (shared) state.requestId = 'starting';
     let id; const startedAt = Date.now();
     try { id = await aiSession.start({ providerId, model: model.id, instructions, input: JSON.stringify({ kind, ...input }), reasoningEffort: model.reasoningLevels?.includes(config.reasoning) ? config.reasoning : undefined, ...aiNotification(kind) }); }
-    catch (error) { state.requestId = null; throw error; }
-    state.requestId = id;
+    catch (error) { if (shared) state.requestId = null; throw error; }
+    if (shared) state.requestId = id;
+    let running = true;
     config.onTaskStarted?.();
     const panel = requestPanel || (['continue','rewrite'].includes(kind) ? $('reader-edit-panel') : $('reader-help'));
     const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'small-btn reader-ai-cancel'; cancel.textContent = 'Cancel request';
     let cancelled = false;
-    cancel.addEventListener('click', async () => { if (state.requestId !== id) return; cancel.disabled = true; cancelled = true; if (config.signal) config.signal.cancelledByUser=true; try { await ai.cancel(id); } catch (error) { cancelled = false; cancel.disabled = false; toast(`Could not cancel: ${error.message}`); } });
+    cancel.addEventListener('click', async () => { if (shared ? state.requestId !== id : !running) return; cancel.disabled = true; cancelled = true; if (config.signal) config.signal.cancelledByUser=true; try { await ai.cancel(id); } catch (error) { cancelled = false; cancel.disabled = false; toast(`Could not cancel: ${error.message}`); } });
     panel.append(cancel);
     if (config.signal?.cancelledByUser) cancel.click();
     renderReaderGeneration();
@@ -710,7 +714,7 @@ export function createReaderHelp({
       if (cancelled && config.signal && !config.signal.stopped) config.signal.cancelledByUser = true;
       throw cancelled ? new Error('Request cancelled.') : error;
     }
-    finally { if (state.requestId === id) state.requestId = null; cancel.remove(); }
+    finally { running = false; if (shared && state.requestId === id) state.requestId = null; cancel.remove(); }
   }
   async function acknowledgeReaderResult() {
     if (!state.pendingReaderRequestId) return;
@@ -752,7 +756,7 @@ export function createReaderHelp({
         },
         acknowledge: acknowledgeReaderResult
       });
-      if (currentReaderGeneration()?.storyId === pending.story.id && !(state.readerEditBusy && pending.story.memoryRebuild)) { currentReaderGeneration().phase = 'ready'; currentReaderGeneration().message = 'Ready'; }
+      if (!pending.alongsideNotes && currentReaderGeneration()?.storyId === pending.story.id && !(state.readerEditBusy && pending.story.memoryRebuild)) { currentReaderGeneration().phase = 'ready'; currentReaderGeneration().message = 'Ready'; }
     } catch (error) { pending.failure=failureInfo(error,'saving',pending.saved ? 'release' : 'save'); throw error; }
     finally { pending.saving = false; renderReaderGeneration(); }
   }
@@ -1009,9 +1013,14 @@ export function createReaderHelp({
     if (story.id !== passage.storyId || !version) return;
     if (openNoteForSelection(passage)) { $('selection-toolbar').hidden = true; return; }
     if (currentBackgroundRun()) await stopBackgroundContext();
-    if (state.checkpointBlocked || currentPipeline()?.records.length || state.readerHelpBusy || state.readerEditBusy || state.requestId) { toast('Another AI request is still running. Wait for it to finish.'); return; }
+    // Define also works while a shown chapter's vocabulary notes are still arriving (any chapter of any story):
+    // the running operation has already saved its chapter, and the learner's note is kept and prevails.
+    const notesOp = currentPipeline()?.busy ? currentPipeline().records.find(op => op.earlyApplied) : null, alongside = Boolean(notesOp);
+    if (state.checkpointBlocked || (currentPipeline()?.records.length && !alongside) || state.readerHelpBusy || state.readerEditBusy || (state.requestId && !alongside)) { toast('Another AI request is still running. Wait for it to finish.'); return; }
     if (!validTextRange(version.story, passage.start, passage.end) || version.story.slice(passage.start, passage.end) !== passage.text) { toast('Select the word again to define it.'); return; }
-    const config = lightTaskConfig(state, 'notes');
+    const config = { ...lightTaskConfig(state, 'notes'), ...(alongside ? { alongsideNotes: true } : {}) };
+    // The status bar keeps showing the notes' progress; the note popover shows this request.
+    const setStatus = value => { if (!alongside) setReaderGeneration(value); };
     state.readerHelpBusy = true;
     try {
       try { persistReaderStory(story); await releaseSavedInference(); }
@@ -1029,7 +1038,7 @@ export function createReaderHelp({
         heading.append(cancel); item.append(status, ...lines);
       });
       markDefinePending(passage);
-      setReaderGeneration({ storyId: story.id, pathId: story.activePathId, chapterId: chapter.id, versionId: version.id, kind: 'define', phase: 'working', message: 'Writing a vocabulary note…' });
+      setStatus({ storyId: story.id, pathId: story.activePathId, chapterId: chapter.id, versionId: version.id, kind: 'define', phase: 'working', message: 'Writing a vocabulary note…' });
       const sameView = () => state.readerId === story.id && activeChapter().id === chapter.id && activeVersion().id === version.id;
       try {
         const input = { language: LANGUAGES[story.language], languageCode: story.language, difficulty: story.difficulty, chapter: { title: version.title || story.title, story: version.story }, start: passage.start, end: passage.end, passage: passage.text, sentence: passage.sentence || '', profile: passage.profile };
@@ -1038,7 +1047,7 @@ export function createReaderHelp({
         try { value = JSON.parse(String(raw || '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')); }
         catch { throw new Error('The AI response was not valid JSON.'); }
         const note = { ...validateDefinedNote(value, { title: version.title || story.title, story: version.story }, story.language, passage), createdAt: new Date().toISOString(), providerId: config.providerId, model: config.model, promptVersion: PROMPT_VERSION };
-        state.pendingReaderResult = { story, saved: false, preview: `${note.word} — ${note.meaning}`, readerLocation: { chapterId: chapter.id, versionId: version.id, helpId: '' }, apply() {
+        state.pendingReaderResult = { story, saved: false, alongsideNotes: alongside, preview: `${note.word} — ${note.meaning}`, readerLocation: { chapterId: chapter.id, versionId: version.id, helpId: '' }, apply() {
           const undoActivity = markStoryActivity(story);
           const before = version.glossary;
           version.glossary = [...(before || []), note];
@@ -1052,20 +1061,20 @@ export function createReaderHelp({
         const panel = readerPanel(), current = panel.scrollTop;
         updateReader(true); panel.scrollTop = current;
         // The opened note is the result, so the reader status bar's Ready / View result is not needed.
-        if (openNoteForSelection(passage) && currentReaderGeneration()?.storyId === story.id) setReaderGeneration(null);
+        if (openNoteForSelection(passage) && !alongside && currentReaderGeneration()?.storyId === story.id) setReaderGeneration(null);
       } catch (error) {
         const cancelled = error.message === 'Request cancelled.' || error.code === 'generation_cancelled';
         try { await releaseInvalidReaderResponse(); } catch {}
-        if (currentReaderGeneration()?.storyId === story.id) {
+        if (!alongside && currentReaderGeneration()?.storyId === story.id) {
           setReaderGeneration(cancelled
             ? (state.pendingReaderRequestId ? { ...currentReaderGeneration(), phase: 'cleanup', message: 'Could not finish cancelled request.' } : null)
             : { ...currentReaderGeneration(), phase: 'error', message: 'Request stopped.' });
         }
         if (cancelled) { if (defineInProgress()) closeWordNote(); if (!state.pendingReaderRequestId) toast('Request cancelled'); return; }
         // The note popover (or a toast after leaving the chapter) carries the failure and Retry, not the status bar.
-        if (!state.pendingReaderRequestId && currentReaderGeneration()?.storyId === story.id && !currentPipeline()?.records.length) setReaderGeneration(null);
+        if (!alongside && !state.pendingReaderRequestId && currentReaderGeneration()?.storyId === story.id && !currentPipeline()?.records.length) setReaderGeneration(null);
         if (!sameView()) { toast(`Could not define: ${error.message}`); return; }
-        if (currentPipeline()?.records.length) { closeWordNote(); renderCheckpointRecovery(); return; }
+        if (currentPipeline()?.records.length && !alongside) { closeWordNote(); renderCheckpointRecovery(); return; }
         const retrySelection = JSON.parse(JSON.stringify(passage));
         showDefinePopover(passage, (item, popover) => {
           const note = document.createElement('span'); note.setAttribute('role', 'alert');

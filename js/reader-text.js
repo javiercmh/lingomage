@@ -124,10 +124,20 @@ export function findGlossaryMatches(canonical, glossary = [], { nested = false }
     if (!range || occupied.subarray(range.start, range.end).some(value => value)) continue;
     chosen.push({ ...range, notes: [note], anchored: true }); occupied.fill(1, range.start, range.end);
   }
+  // The learner's note prevails: a generated note whose first occurrence is where the learner defined a word (for
+  // example notes that arrived after Define, or a rebuild) is not shown, rather than moving to a later occurrence
+  // it was not written for.
+  const suppressed = new Set();
+  if (chosen.length) for (const note of glossary) {
+    if (note?.at || !Array.isArray(note?.forms)) continue;
+    let first = null;
+    for (const form of note.forms) { if (typeof form !== 'string' || !form.length) continue; const range = glossaryRanges(canonical, form, true)[0]; if (range && (!first || range.start < first.start)) first = range; }
+    if (first && occupied.subarray(first.start, first.end).some(value => value)) suppressed.add(note);
+  }
   // Group repeated forms before scanning. Process one length at a time so a
   // larger glossary does not allocate every candidate across every length.
   const forms=new Map();
-  for (const note of glossary) for (const form of Array.isArray(note?.forms) && !note.at ? note.forms : []) {
+  for (const note of glossary) for (const form of Array.isArray(note?.forms) && !note.at && !suppressed.has(note) ? note.forms : []) {
     if (typeof form !== 'string' || !form.length || !note?.meaning) continue;
     if(!forms.has(form))forms.set(form,{form,notes:[],identities:new Map()});
     const group=forms.get(form);

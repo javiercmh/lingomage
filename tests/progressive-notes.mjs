@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import { createPipeline } from '../js/generation-pipeline.js';
 import { createGenerationController } from '../js/generation-controller.js';
+import { firstGlossaryMatches } from '../js/reader-text.js';
 import { MAX_NOTE_PARTS, readingPlan, attachReadingMap, readingSpansFor, validateReadings } from '../js/learning-validation.js';
 
 const WORDS = ['Hund', 'Katze', 'Vogel', 'Fisch', 'Pferd', 'Maus'];
@@ -140,6 +141,24 @@ function harness({ progressive = true, language = 'de', text = prose, records = 
   const before = saves;
   applyContentOperation({ ...op, result: { ...prose, glossary: [] } });
   assert.equal(saves, before, 're-applying a completed version changes nothing'); assert.equal(version().glossary.length, 2);
+  // A note the learner added with Define while notes were arriving survives the later saves and the final one.
+  const own = { id: 'op3', kind: 'create', language: 'de', input: { difficulty: 'A2' }, config: { providerId: 'p', model: 'main' }, createdAt: 'then', promptVersion: 'pv' };
+  const text = { title: 'Tiere', story: 'Der Hund bellt. Der Hund schläft.' };
+  applyContentOperation(own, { content: { ...text, glossary: [] } });
+  const shown = stories.find(item => item.operationId === 'op3').chapters[0].versions[0];
+  const learner = { word: 'Hund', meaning: 'my dog note', forms: ['Hund'], addedBy: 'learner', at: { start: 4, end: 8 } };
+  shown.glossary = [...shown.glossary, learner];
+  const generated = { word: 'Hund', meaning: 'dog', forms: ['Hund'] };
+  applyContentOperation(own, { content: { ...text, glossary: [generated] } });
+  assert.deepEqual(shown.glossary, [generated, learner]);
+  applyContentOperation({ ...own, result: { ...text, glossary: [generated] } });
+  assert.deepEqual(shown.glossary, [generated, learner]); assert.equal(shown.notesPending, undefined);
+  // The learner's note prevails where the generated one was written for (its first occurrence); it does not move on.
+  const matches = firstGlossaryMatches(text.story, shown.glossary);
+  assert.deepEqual(matches.map(match => [match.start, match.notes[0].meaning]), [[4, 'my dog note']]);
+  // A generated note that first occurs elsewhere still shows there.
+  const earlier = { word: 'Hund', meaning: 'dog', forms: ['Hund'] }, later = { ...learner, at: { start: 20, end: 24 } };
+  assert.deepEqual(firstGlossaryMatches(text.story, [earlier, later]).map(match => [match.start, match.notes[0].meaning]), [[4, 'dog'], [20, 'my dog note']]);
   // A continue shown early adds one chapter and later fills it.
   const cont = { id: 'op2', kind: 'continue', language: 'de', input: { prompt: '' }, config: { providerId: 'p', model: 'main' }, createdAt: 'then', target: { storyId: stories[0].id, pathId: 'main', entries: [{ chapterId: stories[0].chapters[0].id, versionId: version().id }], sourceVersionId: version().id } };
   stories[0].paths = [{ id: 'main', entries: cont.target.entries.map(entry => ({ ...entry })) }];
@@ -152,4 +171,4 @@ function harness({ progressive = true, language = 'de', text = prose, records = 
   assert.equal(stories[0].chapters[1].versions[0].glossary.length, 1);
 }
 
-console.log('PASS progressive notes: chapter opens after its first paragraph has notes (and Japanese readings, split the same way in larger blocks), growing notes per part, final completion, failure and discard, resume, controller updates');
+console.log('PASS progressive notes: chapter opens after its first paragraph has notes (and Japanese readings, split the same way in larger blocks), growing notes per part, final completion, Define notes kept and preferred, failure and discard, resume, controller updates');
