@@ -1,5 +1,5 @@
-// Light tasks may use a second model chosen in Settings → Advanced. Empty or no longer offered by the
-// provider means the story model and its effort. Settings → Advanced → "Use the light model for" picks the
+// Light tasks may use a second model chosen in Settings → AI models → Light model. Empty or no longer offered by the
+// provider means the story model and its effort. Settings → AI models → Light model → "Use it for" picks the
 // tasks; story planning and writing always use the story model.
 // notes: vocabulary notes, including Define. readings: Japanese kanji readings. memory: story context
 // summaries and condensing. explanations: Explain and More detail. examples: Generate examples.

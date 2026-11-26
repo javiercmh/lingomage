@@ -449,8 +449,11 @@ function buildLightModelOptions() {
   }
   $('light-reasoning-label').hidden = !model; effort.hidden = !model; effort.disabled = !(model?.reasoningLevels || []).length;
   effort.value = model?.reasoningLevels?.includes(state.lightReasoning) ? state.lightReasoning : '';
-  // Settings → Advanced → Use the light model for: shown only once a separate light model is chosen.
+  // Settings → AI models → Light model: the collapsed row shows the current choice; its tasks show only once a
+  // separate light model is chosen.
   $('light-tasks').hidden = !model;
+  const effortName = model?.reasoningLevels?.includes(state.lightReasoning) ? ` · ${state.lightReasoning[0].toUpperCase()}${state.lightReasoning.slice(1)}` : '';
+  $('light-summary').textContent = model ? `${model.name}${effortName}` : 'Same as story model';
   const ticked = lightTasks(state);
   document.querySelectorAll('[data-light-task]').forEach(box => { box.checked = ticked.includes(box.dataset.lightTask); });
 }
@@ -942,7 +945,6 @@ $('memory-rebuild-submit').addEventListener('click', () => runMemoryRebuild(memo
 // other saved generation.
 const DENSITY_NAMES = { fewer: 'Fewer', standard: 'Standard', more: 'More' };
 let notesRebuildTarget = null;
-const notesModelName = () => { const id = lightTaskConfig(state, 'notes').model; return state.models?.find(item => item.id === id)?.name || id || 'the selected model'; };
 $('reader-rebuild-notes').addEventListener('click', () => {
   if (pendingDeletionBlocked() || state.storageBlocked) return;
   const story = readerStory(), chapter = story && pathChapters(story)[state.readerChapter], version = chapter && activeVersion(chapter);
@@ -950,8 +952,7 @@ $('reader-rebuild-notes').addEventListener('click', () => {
   closeReaderActions();
   notesRebuildTarget = { storyId: story.id, chapterId: chapter.id, versionId: version.id, index: state.readerChapter };
   const kept = (version.glossary || []).filter(note => note.addedBy === 'learner').length;
-  $('notes-rebuild-description').textContent = `Chapter ${state.readerChapter + 1} of “${story.title || 'Untitled story'}”. Notes will be written again with the ${DENSITY_NAMES[state.noteDensity] || 'Standard'} amount from Settings → Vocabulary notes, using ${notesModelName()}.`;
-  $('notes-rebuild-effect').textContent = `This uses AI. The chapter’s current vocabulary notes are replaced${kept ? `; the ${kept === 1 ? 'note' : `${kept} notes`} you added with Define stay` : ''}. The text, readings and explanations stay as they are.`;
+  $('notes-rebuild-description').textContent = `Chapter ${state.readerChapter + 1} gets new notes (${DENSITY_NAMES[state.noteDensity] || 'Standard'}).${kept ? ' Your Define notes stay.' : ''}`;
   $('notes-rebuild-error').textContent = '';
   $('notes-rebuild-dialog').showModal(); $('notes-rebuild-cancel').focus();
 });
@@ -1216,7 +1217,7 @@ $('notify-ready').addEventListener('change', () => setReadyNotifications($('noti
 $('split-notes').addEventListener('change', () => { state.splitNotes = $('split-notes').checked; trySaveSettings(); });
 // Settings → Vocabulary notes: picks the notes prompt for chapters started from now on (PED-002).
 $('note-density').addEventListener('change', () => { state.noteDensity = $('note-density').value; trySaveSettings(); });
-$('light-reasoning-select').addEventListener('change', () => { state.lightReasoning = $('light-reasoning-select').value; trySaveSettings(); });
+$('light-reasoning-select').addEventListener('change', () => { state.lightReasoning = $('light-reasoning-select').value; buildLightModelOptions(); trySaveSettings(); });
 document.querySelectorAll('[data-light-task]').forEach(box => box.addEventListener('change', () => {
   state.lightTasks = LIGHT_TASKS.filter(task => document.querySelector(`[data-light-task="${task}"]`).checked); trySaveSettings();
 }));

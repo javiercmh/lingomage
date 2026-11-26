@@ -41,7 +41,7 @@ export function enrichmentParts(op) {
   return parts;
 }
 // Vocabulary notes, Japanese readings and example sentences may use the lighter model saved in op.config.light
-// when its `tasks` (Settings → Advanced → Use the light model for) include them; the plan and story prose always
+// when its `tasks` (Settings → AI models → Light model → Use it for) include them; the plan and story prose always
 // use the main model. A saved light choice without `tasks` (older operations) covers notes and readings. A saved
 // operation without `light` uses the main model throughout.
 const LEGACY_LIGHT_TASKS = ['notes','readings'];
