@@ -2,10 +2,10 @@
 // part) has notes and, for Japanese, its readings are ready; each finished notes part adds its notes to the same
 // version, and the final apply completes it.
 import assert from 'node:assert/strict';
-import { createPipeline } from '../js/generation-pipeline.js';
+import { createPipeline, readingBlocks } from '../js/generation-pipeline.js';
 import { createGenerationController } from '../js/generation-controller.js';
 import { firstGlossaryMatches } from '../js/reader-text.js';
-import { MAX_NOTE_PARTS, readingPlan, attachReadingMap, readingSpansFor, validateReadings } from '../js/learning-validation.js';
+import { MAX_NOTE_PARTS, notesParts, noteMinUnits, noteTargetUnits, readingPlan, attachReadingMap, readingSpansFor, validateReadings } from '../js/learning-validation.js';
 
 const WORDS = ['Hund', 'Katze', 'Vogel', 'Fisch', 'Pferd', 'Maus'];
 const story = WORDS.map(word => `Der ${word} läuft schnell durch den Garten. `.repeat(30).trim()).join('\n\n');
@@ -80,21 +80,36 @@ function harness({ progressive = true, language = 'de', text = prose, records = 
   assert.ok(partials.every(call => call.segments), 'every early save carries the readings');
 }
 
-{ // Japanese readings use the same blocks as the notes: readings-1 asks only for the title and opening paragraph;
-  // the chapter opens with the opening's furigana, and the final save has every reading.
+{ // Japanese furigana: readings-1 asks for exactly the title and the notes-1 range; the rest comes in smaller blocks
+  // than the notes; together the blocks ask for every kanji once, and the final save has every reading.
   const ja = { title: '駅', story: Array.from({ length: 12 }, (_, i) => `今日は${i + 1}番目の駅で友だちと会って、電車の時間を確認しました。`.repeat(3)).join('\n') };
   const h = harness({ language: 'ja', text: ja });
   await h.pipeline.run(h.op);
   const readings = [...h.inputs.values()].filter(item => item.label === 'readings');
   const noteParts = [...h.inputs.values()].filter(item => item.label.startsWith('notes-'));
-  assert.ok(readings.length >= 2); assert.equal(readings.length, noteParts.length, 'one readings block per notes part');
+  assert.ok(readings.length > noteParts.length, `furigana blocks are smaller than notes parts (${readings.length} vs ${noteParts.length})`);
+  const plan = readingPlan(ja), lead = noteParts.find(item => item.label === 'notes-1').input.focus.text, leadEnd = ja.story.indexOf(lead) + lead.length;
   const all = readings.flatMap(item => item.input.spans.map(span => span.id));
-  assert.equal(new Set(all).size, all.length, 'no kanji is asked twice');
+  assert.equal(new Set(all).size, all.length, 'no kanji is asked twice'); assert.equal(all.length, plan.spans.length, 'every kanji is asked');
   const first = readings[0].input.spans;
   assert.ok(first.some(span => span.section === 'title'), 'the title is in the first readings part');
-  const leadEnd = ja.story.indexOf('\n', ja.story.indexOf('\n') + 1);
-  assert.ok(first.filter(span => span.section === 'story').every(span => span.start < leadEnd + 1), 'the first part covers only the opening');
+  assert.deepEqual(first.map(span => span.id), plan.spans.filter(span => span.section === 'title' || span.start < leadEnd).map(span => span.id), 'readings-1 is exactly the title and notes-1');
   assert.ok(h.op.result.storySegments.filter(seg => /\p{Script=Han}/u.test(seg.text)).every(seg => seg.reading), 'the final save has every reading');
+}
+
+{ // readingBlocks: readings-1 equals notes-1, the rest is contiguous to the end in blocks about half a notes part
+  // (at most MAX_NOTE_PARTS in all); with concurrent requests off they are the notes parts.
+  const long = Array.from({ length: 30 }, (_, i) => `${i + 1}番目の駅で友だちと会って、電車の時間を確認しました。`.repeat(3)).join('\n');
+  const op = { language: 'ja', prose: { title: '駅', story: long }, config: { parallelLimit: 6 } };
+  const split = notesParts(long, MAX_NOTE_PARTS, noteMinUnits('ja'), noteTargetUnits('ja'), { lead: true }), blocks = readingBlocks(op, split);
+  assert.deepEqual([blocks[0].start, blocks[0].end], [split[0].start, split[0].end]);
+  assert.ok(blocks.length > split.length - 1 && blocks.length <= MAX_NOTE_PARTS, `${blocks.length} blocks for ${split.length} notes parts`);
+  for (let i = 1; i < blocks.length; i++) assert.ok(blocks[i].start > blocks[i - 1].end - 1 && !/\S/.test(long.slice(blocks[i - 1].end, blocks[i].start)), 'contiguous');
+  assert.equal(blocks.at(-1).end, long.length);
+  assert.deepEqual(readingBlocks({ ...op, config: { parallelLimit: 1 } }, split), split, 'one at a time: the notes parts');
+  const short = '駅で会いました。\n電車に乗りました。';
+  const two = [{ start: 0, end: 8 }, { start: 9, end: short.length }];
+  assert.deepEqual(readingBlocks({ language: 'ja', prose: { title: '駅', story: short }, config: {} }, two).map(block => [block.start, block.end]), [[0, 8], [9, short.length]]);
 }
 
 { // Readings of one part: only its kanji are accepted; kanji of parts still running stay plain text.
@@ -171,4 +186,4 @@ function harness({ progressive = true, language = 'de', text = prose, records = 
   assert.equal(stories[0].chapters[1].versions[0].glossary.length, 1);
 }
 
-console.log('PASS progressive notes: chapter opens after its first paragraph has notes (and Japanese readings, in the same blocks), growing notes per part, final completion, Define notes kept and preferred, failure and discard, resume, controller updates');
+console.log('PASS progressive notes: chapter opens after its first paragraph has notes (and Japanese furigana, in smaller blocks after the opening), growing notes per part, final completion, Define notes kept and preferred, failure and discard, resume, controller updates');

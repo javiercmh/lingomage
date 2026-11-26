@@ -3,7 +3,7 @@ import { timingEntry } from './generation-timing.js';
 import { aiNotification } from './ai-notification.js';
 import { decodePlan } from './story-generation.js';
 import { PLAN_INSTRUCTIONS, notesInstructions, READING_INSTRUCTIONS } from './prompts.js';
-import { parseContent, validateContentSize, validateProse, validateNotes, validateStory, validateExamples, readingPlan, attachReadings, attachReadingMap, validateReadings, readingSpansFor, notesParts, noteMinUnits, noteTargetUnits, mergeNoteParts, SAFEGUARD_VERSION } from './learning-validation.js';
+import { parseContent, validateContentSize, validateProse, validateNotes, validateStory, validateExamples, readingPlan, attachReadings, attachReadingMap, validateReadings, readingSpansFor, MAX_NOTE_PARTS, notesParts, noteMinUnits, noteTargetUnits, mergeNoteParts, SAFEGUARD_VERSION } from './learning-validation.js';
 
 // A saved operation can hold several requests: the main one and, for Japanese notes plus readings,
 // one per parallel part. Every cancel, release and recovery path walks all of them.
@@ -42,18 +42,30 @@ const isNotesPart = name => name === 'notes' || name.startsWith('notes-');
 export const isReadingsPart = name => name === 'readings' || name.startsWith('readings-');
 const readingNames = op => Object.keys(op.parallel || {}).filter(isReadingsPart);
 // Split readings parts in chapter order, rebuilt from their saved offsets.
-const readingRanges = op => readingNames(op).filter(name => name !== 'readings').map(name => op.parallel[name]);
+const readingRanges = op => readingNames(op).filter(name => name !== 'readings').sort((a, b) => Number(a.slice(9)) - Number(b.slice(9))).map(name => op.parallel[name]);
 // Parts for a finished prose stage: legacy single "notes" or "notes-1".."notes-N" with canonical offsets.
 // A notes rebuild (kind "notes") keeps the version's saved readings, so it has no readings part.
 // A progressive operation gets a short lead part (the opening paragraph) so the chapter can open once it has
-// notes. Japanese readings use the same blocks as the notes (readings-1..N beside notes-1..N), ordered notes-1,
-// readings-1, notes-2, readings-2…, so each block's notes and furigana arrive together, also one at a time.
+// notes. Japanese readings get blocks of their own (readingBlocks): readings-1 matches notes-1, the rest are smaller.
+// All parts are ordered by chapter position (notes first on a tie), so nearby notes and furigana arrive together.
 const PROGRESSIVE_KINDS = new Set(['create','continue','rewrite']);
 const wantsProgressive = op => op.config.progressive === true && PROGRESSIVE_KINDS.has(op.kind);
+// Furigana blocks: readings-1 is exactly notes-1 (the chapter opens with the opening's furigana); the rest is split
+// into blocks about half a notes part, because a readings request for the same paragraphs took longer than its notes
+// (47 s versus 32 s, live Japanese run 2026-11-26), at most MAX_NOTE_PARTS blocks in all. With concurrent requests
+// off, smaller blocks would only add requests, so the readings blocks are the notes parts.
+export function readingBlocks(op, split) {
+  if (Number(op.config.parallelLimit) === 1) return split;
+  const story = op.prose.story, lead = split[0], minUnits = noteMinUnits(op.language) / 2;
+  const rest = notesParts(story.slice(lead.end), MAX_NOTE_PARTS - 1, minUnits, noteTargetUnits(op.language) / 2)
+    .map(part => ({start:part.start + lead.end, end:part.end + lead.end}));
+  if (!rest.length) { const first = story.slice(lead.end).search(/\S/); return first < 0 ? [lead] : [lead, {start:lead.end + first, end:story.length}]; }
+  return [lead, ...rest];
+}
 export function enrichmentParts(op) {
   const parts = {}, split = notesParts(op.prose.story, Number(op.config.notesParts) || 1, noteMinUnits(op.language), noteTargetUnits(op.language), {lead:wantsProgressive(op)});
   const readings = op.language === 'ja' && op.kind !== 'notes';
-  const readingSplit = readings && split.length && wantsProgressive(op) ? split : []; // the same blocks as the notes
+  const readingSplit = readings && split.length && wantsProgressive(op) ? readingBlocks(op, split) : [];
   const addReadings = () => { if (readingSplit.length) readingSplit.forEach((part, index) => { parts[`readings-${index + 1}`] = {request:null, done:false, start:part.start, end:part.end}; }); else parts.readings = {request:null, done:false}; };
   if (split.length) split.forEach((part, index) => { parts[`notes-${index + 1}`] = {request:null, done:false, start:part.start, end:part.end}; if (index === 0 && readings) addReadings(); });
   else { parts.notes = {request:null, done:false}; if (readings) addReadings(); }
