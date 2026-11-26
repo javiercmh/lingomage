@@ -15,7 +15,7 @@ What LingoMage does now, its confirmed requirements and its defaults. Interactio
 | Library | Local stories, latest-activity hero, sort, language filter, bulk delete | `DESIGN.md` (navigation only) |
 | Profile | Time in LingoMage, Most looked up with detail sheet, language list and levels | [PED-005](../pedagogy/PED-005-consultation-signals.md) |
 | Recovery | Checkpointed generation with explicit Resume, Retry, Discard | [runtime](../architecture/generation-pipeline.md#generation) |
-| Waiting | Time estimates from earlier chapters on this device, time left while running, opt-in ready notification | [runtime](../architecture/generation-pipeline.md#timing-and-estimates) |
+| Waiting | Time left while running, estimated from earlier chapters on this device; opt-in ready notification | [runtime](../architecture/generation-pipeline.md#timing-and-estimates) |
 
 Stories can be shared from the reader or Library: canonical chapter or selected-path whole-story text, with optional vocabulary notes, or a complete JSON story file. The Share sheet offers each action directly: Share or Save backup of the story file, and Copy or Share chapter or whole-story text. A story file is never copied. Library → Import story… adds a shared story file back as a new story, never replacing an existing one.
 

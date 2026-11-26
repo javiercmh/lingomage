@@ -79,7 +79,7 @@ function quantile(sorted, q) {
   const position = (sorted.length - 1) * q, low = Math.floor(position), high = Math.ceil(position);
   return sorted[low] + (sorted[high] - sorted[low]) * (position - low);
 }
-// Median and quartiles of the most similar past runs: first the same model, reasoning effort, language,
+// Median of the most similar past runs: first the same model, reasoning effort, language,
 // scope (and number of note parts), then the same model and effort, then the same model only.
 export function stepStats(samples, step) {
   const own = samples.filter(sample => sample.step === step.key && sample.model === step.model);
@@ -92,7 +92,7 @@ export function stepStats(samples, step) {
     const found = own.filter(match);
     if (found.length < MIN_SAMPLES) continue;
     const values = found.slice(-RECENT_SAMPLES).map(sample => sample.ms).sort((a, b) => a - b);
-    return {median: quantile(values, 0.5), low: quantile(values, 0.25), high: quantile(values, 0.75), samples: values.length};
+    return {median: quantile(values, 0.5), samples: values.length};
   }
   return null;
 }
@@ -122,10 +122,10 @@ export function estimateGeneration(plan, samples) {
     const stats = stepStats(samples, step);
     if (!stats) return null;
     const times = step.requests || 1;
-    steps[step.key] = {median: stats.median * times, low: stats.low * times, high: stats.high * times};
+    steps[step.key] = {median: stats.median * times};
   }
-  const sum = field => Object.entries(steps).reduce((total, [key, value]) => key === 'readings' && steps.notes ? total : total + (key === 'notes' && steps.readings ? Math.max(value[field], steps.readings[field]) : value[field]), 0);
-  return {steps, total: sum('median'), low: sum('low'), high: sum('high')};
+  const total = Object.entries(steps).reduce((sum, [key, value]) => key === 'readings' && steps.notes ? sum : sum + (key === 'notes' && steps.readings ? Math.max(value.median, steps.readings.median) : value.median), 0);
+  return {steps, total};
 }
 
 // Time left while running: done steps count nothing, waiting steps their median, the running step what is
@@ -146,15 +146,7 @@ export function remainingTime(estimate, steps, elapsed = {}) {
 }
 
 const minutes = count => `${count} minute${count === 1 ? '' : 's'}`;
-// Before starting: a range of typical runs, never a precise countdown.
-export function estimateText(estimate) {
-  if (!estimate) return '';
-  const high = Math.round(estimate.high / 60000);
-  if (high < 1) return 'Usually less than a minute';
-  const low = Math.min(high, Math.max(1, Math.round(estimate.low / 60000)));
-  return low === high ? `Usually about ${minutes(low)}` : `Usually ${low}–${high} minutes`;
-}
-// While running: one rounded figure.
+// Shown only while running, as one rounded figure; never a precise countdown.
 export function remainingText(remaining) {
   if (!remaining) return '';
   if (remaining.over) return 'Taking longer than usual';

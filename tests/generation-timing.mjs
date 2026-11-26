@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createPipeline } from '../js/generation-pipeline.js';
 import { createGenerationController } from '../js/generation-controller.js';
 import { progressSteps } from '../js/generation-progress.js';
-import { busyTime, summarizeTimings, timingSamples, estimateGeneration, remainingTime, estimateText, remainingText, plannedSteps, MIN_SAMPLES } from '../js/generation-timing.js';
+import { busyTime, summarizeTimings, timingSamples, estimateGeneration, remainingTime, remainingText, plannedSteps, MIN_SAMPLES } from '../js/generation-timing.js';
 import { validSettings, settingsSnapshot } from '../js/workspace-storage.js';
 
 const WORDS = ['Hund', 'Katze', 'Vogel', 'Fisch', 'Pferd', 'Maus'];
@@ -111,7 +111,6 @@ const plan = (extra = {}) => ({ kind: 'create', language: 'de', scope: 'scene', 
   const runs = [10, 20, 30].map(base => ({ steps: { plan: base * 100, prose: base * 1000, notes: base * 500 } }));
   const estimate = estimateGeneration(plan(), timingSamples(storiesWith(runs)));
   assert.equal(estimate.total, 2000 + 20000 + 10000);
-  assert.ok(estimate.low < estimate.total && estimate.total < estimate.high);
   assert.equal(estimateGeneration(plan(), timingSamples(storiesWith(runs.slice(0, MIN_SAMPLES - 1)))), null);
   // Another model has no history yet: no estimate rather than a guess.
   assert.equal(estimateGeneration(plan({ model: 'other' }), timingSamples(storiesWith(runs))), null);
@@ -170,14 +169,6 @@ const plan = (extra = {}) => ({ kind: 'create', language: 'de', scope: 'scene', 
   // Japanese notes and readings left at the same time count as the longer one.
   const ja = { steps: { plan: { median: 1 }, prose: { median: 1 }, notes: { median: 90000 }, readings: { median: 30000 } } };
   assert.equal(remainingTime(ja, progressSteps({ kind: 'create', language: 'ja', stage: 'enrich', parallel: { notes: {}, readings: {} } }), {}).ms, 90000);
-}
-
-{ // Before starting: a range of typical runs, rounded to whole minutes.
-  assert.equal(estimateText({ low: 50000, high: 110000 }), 'Usually 1–2 minutes');
-  assert.equal(estimateText({ low: 70000, high: 85000 }), 'Usually about 1 minute');
-  assert.equal(estimateText({ low: 10000, high: 25000 }), 'Usually less than a minute');
-  assert.equal(estimateText({ low: 10000, high: 200000 }), 'Usually 1–3 minutes');
-  assert.equal(estimateText(null), '');
 }
 
 { // The ready-notification preference is an optional boolean in settings, off unless chosen.

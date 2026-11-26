@@ -14,7 +14,7 @@ import { markParagraphGaps } from './paragraph-gaps.js';
 import { SPEECH_RATES, canonicalRange, createReaderPlayer, speechUnits } from './reader-player.js';
 import { createPipeline, pendingRequests, MAX_RUNNING, MAX_BROKEN_RESENDS } from './generation-pipeline.js';
 import { hasStoryContext, progressSummary } from './generation-progress.js';
-import { timingEntry, timingSamples, estimateGeneration, remainingTime, estimateText, remainingText } from './generation-timing.js';
+import { timingEntry, timingSamples, estimateGeneration, remainingTime, remainingText } from './generation-timing.js';
 import { SAFEGUARD_VERSION, parseContent, validateStory } from './learning-validation.js';
 import { failureInfo, recoverySummary, operationLabel, discardFailureMessage, appendFailureDetails } from './generation-errors.js';
 import { createWorkspaceStorage, createSettingsPersistence, optionalStore, SIGNALS_PATH, USAGE_PATH } from './workspace-storage.js';
@@ -61,11 +61,11 @@ function fillScopeOptions(input, selected = 'scene', describe) {
     group.textContent = '';
     Object.entries(SCOPES).forEach(([value, scope]) => {
       const button = document.createElement('button'); button.type = 'button'; button.setAttribute('role', 'radio'); button.dataset.value = value; button.className = 'segment'; button.textContent = scope.label;
-      button.addEventListener('click', () => { if (!button.disabled) { setScope(input, value, describe); renderEstimates(); } });
+      button.addEventListener('click', () => { if (!button.disabled) setScope(input, value, describe); });
       button.addEventListener('keydown', event => {
         const keys = Object.keys(SCOPES), step = ['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : ['ArrowLeft', 'ArrowUp'].includes(event.key) ? -1 : 0;
         if (!step) return; event.preventDefault();
-        const next = keys[(keys.indexOf(input.value) + step + keys.length) % keys.length]; setScope(input, next, describe); renderEstimates(); group.querySelector(`[data-value="${next}"]`).focus();
+        const next = keys[(keys.indexOf(input.value) + step + keys.length) % keys.length]; setScope(input, next, describe); group.querySelector(`[data-value="${next}"]`).focus();
       });
       group.append(button);
     });
@@ -406,7 +406,7 @@ function syncModelControls() {
   if (!state.models?.length) return;
   const select=$('model-select');
   if (state.models.some(model => model.id === state.model)) select.value=state.model; else select.selectedIndex=-1;
-  buildReasoningOptions(); buildLightModelOptions(); renderEstimates();
+  buildReasoningOptions(); buildLightModelOptions();
 }
 // Rebuilds the options only when the model changed, so a focused Reasoning select keeps focus.
 function buildReasoningOptions(force = false) {
@@ -823,31 +823,11 @@ function operationPlan(op, contextRequests = 0) {
   const memory = lightTaskConfig(state);
   return { kind: op.kind, language: op.language, scope: op.input?.scope, notesParts: op.config?.notesParts, model: op.config?.model, reasoning: op.config?.reasoning, light: op.config?.light, contextRequests, context: { model: memory.model, reasoning: memory.reasoning } };
 }
-function draftPlan(kind, language, scope, contextRequests = 0) {
-  const model = state.models.find(item => item.id === state.model);
-  const reasoning = kind === 'create' ? (model?.reasoningLevels?.includes(state.reasoning) ? state.reasoning : '') : state.reasoning;
-  return operationPlan({ kind, language, input: { scope }, config: { model: state.model, reasoning, light: lightModelChoice(state), notesParts: noteParts() } }, contextRequests);
-}
-function readerDraftPlan() {
-  const story = readerStory(), mode = $('reader-edit-panel').dataset.mode;
-  if (!story || !['continue', 'rewrite'].includes(mode)) return null;
-  const entries = selectedPath(story).entries, memoryEntries = mode === 'continue' ? entries : entries.slice(0, state.readerChapter);
-  return draftPlan(mode, story.language, $('reader-scope').value, pendingSummaryCount(story, memoryEntries));
-}
-// "Usually 1–2 minutes" beside Generate, Continue and Rewrite; empty until there are enough similar runs.
-function renderEstimates() {
-  const create = $('generate-estimate');
-  if (create) { create.textContent = estimateText(estimateFor(draftPlan('create', $('language').value, $('reading-scope').value))); create.hidden = !create.textContent; }
-  const reader = $('reader-edit-estimate');
-  // While a chapter runs, its card shows the time left instead.
-  if (reader) { const plan = !$('reader-edit-panel').hidden && !state.readerEditBusy && readerDraftPlan(); reader.textContent = plan ? estimateText(estimateFor(plan)) : ''; reader.hidden = !reader.textContent; }
-}
-
 // Ready notifications are opt-in: the waiting card offers them, Settings can turn them off. They are sent
 // only while LingoMage is in the background and Android allows notifications.
 function createWaitNote() {
   const note = document.createElement('div'); note.className = 'gen-wait'; note.hidden = true;
-  const copy = document.createElement('p'); copy.className = 'helper'; copy.textContent = 'You can keep reading or switch apps while you wait. Reopen LingoMage if it pauses.';
+  const copy = document.createElement('p'); copy.className = 'helper'; copy.textContent = 'You can keep reading or switch apps while you wait.';
   const offer = document.createElement('button'); offer.type = 'button'; offer.className = 'small-btn gen-notify'; offer.textContent = 'Notify me when it’s ready';
   const status = document.createElement('p'); status.className = 'helper gen-notify-status';
   offer.addEventListener('click', () => { setReadyNotifications(true); });
@@ -1032,7 +1012,7 @@ const { operationProvenance, applyContentOperation } = createGenerationControlle
 function showOperationResult(op) {
   const story=state.stories.find(s=>op.kind === 'create' ? s.operationId === op.id : s.id === op.target.storyId);
   if (!story) return;
-  notifyResult(op, story); renderEstimates();
+  notifyResult(op, story);
   if (op.kind !== 'examples') queueBackgroundContext(story.id, op.kind === 'continue' ? op.target.pathId : op.kind === 'rewrite' ? `path-${op.id}` : null);
   if (op.kind === 'create') { setReaderGeneration(null); ensureReaderOpen(story).catch(error => toast(error.message)); return; }
   if (readerGeneration && readerGeneration.storyId === story.id) {
@@ -3374,7 +3354,6 @@ function showEditPanel(mode) {
   $('reader-prompt-label').textContent = mode === 'continue' ? 'What should happen next? (optional)' : 'How should this chapter change? (optional)';
   $('reader-prompt').placeholder = 'Add ideas in any language, or leave blank.';
   $('reader-edit-submit').textContent = mode === 'continue' ? 'Continue' : 'Rewrite';
-  renderEstimates();
   $('reader-edit-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); $('reader-prompt').focus();
 }
 $('continue-story').addEventListener('click', () => showEditPanel('continue'));
@@ -3409,7 +3388,7 @@ $('reader-edit-submit').addEventListener('click', async () => {
   renderChapterRequest();
   setReaderGeneration({ storyId: story.id, phase: 'working', message: hasStoryContext(provisional) ? progressSummary(provisional).text : mode === 'continue' ? 'Preparing next chapter…' : 'Preparing rewrite…' });
   $('reader-edit-cancel').disabled = true; $('reader-prompt').disabled = true; $('reader-level').disabled = true; setScopeDisabled($('reader-scope'), true);
-  const button = $('reader-edit-submit'); button.disabled = true; button.textContent = 'Working…'; $('reader-edit-error').textContent = ''; renderEstimates();
+  const button = $('reader-edit-submit'); button.disabled = true; button.textContent = 'Working…'; $('reader-edit-error').textContent = '';
   try {
     await settleBackgroundContext(story.id, memoryEntries);
     persistReaderStory(story);
@@ -3441,7 +3420,7 @@ $('reader-edit-submit').addEventListener('click', async () => {
       $('reader-edit-error').textContent = message; renderPendingReaderResult();
     }
   }
-  finally { $('path-select').disabled = false; loading.remove(); state.activeChapterRequest = null; renderChapterRequest(); state.readerEditBusy = false; renderEstimates(); $('reader-edit-cancel').disabled = false; $('reader-prompt').disabled = false; $('reader-level').disabled = false; setScopeDisabled($('reader-scope'), false); button.disabled = false; button.textContent = mode === 'continue' ? 'Continue' : 'Rewrite'; renderCheckpointRecovery(); }
+  finally { $('path-select').disabled = false; loading.remove(); state.activeChapterRequest = null; renderChapterRequest(); state.readerEditBusy = false; $('reader-edit-cancel').disabled = false; $('reader-prompt').disabled = false; $('reader-level').disabled = false; setScopeDisabled($('reader-scope'), false); button.disabled = false; button.textContent = mode === 'continue' ? 'Continue' : 'Rewrite'; renderCheckpointRecovery(); }
 
 });
 $('reader-dialog').addEventListener('click', event => { if (event.target === $('reader-dialog')) $('reader-dialog').close(); });
@@ -3508,9 +3487,6 @@ $('light-model-select').addEventListener('change', () => {
 $('retry-broken').addEventListener('change', () => { state.retryBrokenReplies = $('retry-broken').checked; trySaveSettings(); });
 $('notify-ready').addEventListener('change', () => setReadyNotifications($('notify-ready').checked));
 // Estimates follow the form and the model settings they depend on.
-$('story-form').addEventListener('change', renderEstimates);
-$('reader-edit-panel').addEventListener('change', renderEstimates);
-for (const id of ['model-select', 'reasoning-select', 'light-model-select', 'light-reasoning-select', 'split-notes']) $(id).addEventListener('change', renderEstimates);
 $('split-notes').addEventListener('change', () => { state.splitNotes = $('split-notes').checked; trySaveSettings(); });
 $('light-reasoning-select').addEventListener('change', () => { state.lightReasoning = $('light-reasoning-select').value; trySaveSettings(); });
 window.addEventListener('app2:ai:connection', refreshModels);
@@ -3560,7 +3536,7 @@ window.visualViewport?.addEventListener('resize',scheduleRecoveryVisibility);
 initializePipeline();
 showStorageErrors();
 refreshModels();
-renderEstimates(); paintNotificationControls();
+paintNotificationControls();
 
 // A recreated page keeps the current tab and reader entry, rather than returning to Create.
 const restoredNavigation = history.state;
