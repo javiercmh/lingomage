@@ -57,7 +57,8 @@ class DevServer(HTTPServer):
         self.ai_mode = ai_mode
         self.requests = {}
         self.request_lock = threading.Lock()
-        self.ai_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='lingomage-ai')
+        # Up to six live requests run at once, like LingoMage's parallel note parts on App² (MAX_PARALLEL).
+        self.ai_executor = ThreadPoolExecutor(max_workers=6, thread_name_prefix='lingomage-ai')
         self.app_server = None
         self.models = []
         self.codex = codex
@@ -106,6 +107,9 @@ class CodexAppServer:
         self.pending_lock = threading.Lock()
         self.pending = {}
         self.notifications = queue.Queue()
+        # Notifications for one inference thread go to that thread's queue, so concurrent requests never
+        # consume each other's turn/completed.
+        self.thread_queues = {}
         self.reader = None
         self.failure = None
         self.home = None
@@ -186,7 +190,10 @@ class CodexAppServer:
                     if 'id' in message:
                         self._respond(message['id'], {'decision': 'decline'})
                     else:
-                        self.notifications.put(message)
+                        thread_id = (message.get('params') or {}).get('threadId')
+                        with self.pending_lock:
+                            target = self.thread_queues.get(thread_id)
+                        (target or self.notifications).put(message)
         except (OSError, ValueError):
             pass
         self.failure = RuntimeError('Codex app-server stopped unexpectedly. Restart it and try again.')
@@ -194,6 +201,9 @@ class CodexAppServer:
             for waiter in self.pending.values():
                 waiter['event'].set()
         self.notifications.put({'method': '__closed__'})
+        with self.pending_lock:
+            for target in self.thread_queues.values():
+                target.put({'method': '__closed__'})
 
     def _write(self, value):
         if not self.process or self.process.poll() is not None:
@@ -207,6 +217,14 @@ class CodexAppServer:
             self._write({'jsonrpc': '2.0', 'id': request_id, 'result': result})
         except Exception:
             pass
+
+    def subscribe(self, thread_id):
+        with self.pending_lock:
+            return self.thread_queues.setdefault(thread_id, queue.Queue())
+
+    def unsubscribe(self, thread_id):
+        with self.pending_lock:
+            self.thread_queues.pop(thread_id, None)
 
     def notify(self, method, params):
         self._write({'jsonrpc': '2.0', 'method': method, 'params': params})
@@ -546,6 +564,7 @@ class Handler(SimpleHTTPRequestHandler):
             if thread.get('instructionSources'):
                 raise RuntimeError('Codex loaded project instructions into the isolated inference thread.')
             request['threadId'] = thread_id
+            notifications = app_server.subscribe(thread_id)
             if request.get('cancelled'):
                 return
             turn = app_server.call('turn/start', {
@@ -570,7 +589,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             while not request.get('cancelled'):
                 try:
-                    message = app_server.notifications.get(timeout=0.5)
+                    message = notifications.get(timeout=0.5)
                 except queue.Empty:
                     if app_server.failure:
                         raise app_server.failure
@@ -588,6 +607,8 @@ class Handler(SimpleHTTPRequestHandler):
             if not request.get('cancelled'):
                 request['error'] = {'code': 'provider', 'message': str(error)}
         finally:
+            if request.get('threadId'):
+                app_server.unsubscribe(request['threadId'])
             if request.get('cancelled'):
                 self.cleanup_live_request(request)
 
