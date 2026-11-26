@@ -10,7 +10,7 @@ assert.deepEqual(validateNotes({glossary:[{...glossary[0],forms:['kauft','kaufen
 assert.throws(()=>validateNotes({glossary:[{...glossary[0],forms:['kaufen']},{word:'Zug',meaning:'train',forms:['Zug']}]},prose,'de'),/None of the AI vocabulary notes/);
 assert.throws(()=>validateNotes({glossary:[]},prose,'de'),/at least one/);
 assert.throws(()=>validateNotes({glossary:[{word:'дом',meaning:'home',forms:['Latin']}]},{title:'Дом',story:'Дом'},'ru'),/target script/);
-for(const term of ['likely to be difficult for a learner','may have just started the selected reading target','When in doubt whether a word is difficult, note it','Never note a free combination of ordinary words','Skip routine proper names','Group alternate forms','not a list of dictionary senses','not a claim that any word is known'])assert.ok(NOTES_INSTRUCTIONS.includes(term));
+for(const term of ['likely to be difficult for a learner','may have just started the selected reading target','When in doubt whether a word is difficult, note it','Never note a free combination of ordinary words','When such a verb is split in the sentence, note the attested verb form','Skip routine proper names','Group alternate forms','not a list of dictionary senses','not a claim that any word is known'])assert.ok(NOTES_INSTRUCTIONS.includes(term));
 function harness(fail='') {
   const events=[];let durable=[],pipeline,currentKind,invalid=fail==='invalid',stop=fail==='cancel',ackFail=fail==='ack',saveFail=fail==='save';
   const io={records:[],persist(records){if(saveFail&&records[0]?.stage==='ready'){saveFail=false;throw Error('notes disk');}durable=structuredClone(records);},ai:{
