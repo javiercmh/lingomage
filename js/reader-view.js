@@ -296,13 +296,11 @@ export function createReaderView({
     });
     return listen;
   }
-  // `at` ({ rect, start, end }) opens the note at another occurrence of the word than its underlined first one,
-  // and records the lookup there; `trigger` may then be null.
-  function showWordNote(trigger, notes, surface = '', helpId = '', at = null) {
+  function showWordNote(trigger, notes, surface = '', helpId = '') {
     const popover = $('word-note-popover');
-    if (!at && !popover.hidden && trigger.getAttribute('aria-expanded') === 'true') { closeWordNote(); return; }
+    if (!popover.hidden && trigger.getAttribute('aria-expanded') === 'true') { closeWordNote(); return; }
     closeWordNote(); popover.textContent = '';
-    const lookupInfo = at || glossaryForTrigger(trigger);
+    const lookupInfo = glossaryForTrigger(trigger);
     recordNoteLookup(notes, lookupInfo, 'note');
     for (const note of notes) {
       const item = document.createElement('p'); item.className = 'word-note-entry';
@@ -337,9 +335,8 @@ export function createReaderView({
       view.addEventListener('click', () => { closeWordNote(); showExplanationForHelp(helpId); });
       popover.append(view);
     }
-    if (!at) { trigger.setAttribute('aria-expanded', 'true'); trigger.setAttribute('aria-controls', 'word-note-popover'); state.wordNoteTrigger = trigger; }
-    popover.hidden = false; popover.focus();
-    const rect = at?.rect || trigger.getBoundingClientRect();
+    trigger.setAttribute('aria-expanded', 'true'); trigger.setAttribute('aria-controls', 'word-note-popover'); state.wordNoteTrigger = trigger; popover.hidden = false; popover.focus();
+    const rect = trigger.getBoundingClientRect();
     const left = Math.max(12, Math.min(window.innerWidth - 292, rect.left));
     popover.style.left = `${left}px`;
     popover.style.top = `${Math.min(window.innerHeight - 20, rect.bottom + 8)}px`;

@@ -26,7 +26,7 @@ User files are seeded only when absent, preserved by updates and never packaged 
 
 ## Library activity
 
-Glossary entries the learner added with Define carry `addedBy: 'learner'` plus `createdAt`, `providerId`, `model` and `promptVersion`; generated notes have no `addedBy`. Readers that ignore these keys still display the note.
+Glossary entries the learner added with Define carry `addedBy: 'learner'`, `at: {start, end}` (the canonical range of the occurrence the note was written for; the note attaches only there, and an anchor that no longer spans one of its forms hides the note) plus `createdAt`, `providerId`, `model` and `promptVersion`; generated notes have no `addedBy` or `at` and attach at their forms' first occurrences. Readers that ignore these keys still display the note.
 
 Russian glossary entries store an unstressed `word` and optional zero-based `stress` character positions. `forms` still records exact text from the chapter; optional `formStress` maps each form to its stress positions. Lookup history folds Russian combining acute marks out of item keys and saved words while retaining ё and й. Older notes can omit the annotation.
 

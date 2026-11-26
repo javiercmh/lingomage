@@ -108,11 +108,26 @@ export function resolveGlossaryForms(canonical, form) {
   const resolved = parts.map(part => hasGlossaryForm(canonical, part) ? part : (() => { const range = tolerantRange(canonical, part); return range ? canonical.slice(range.start, range.end) : null; })());
   return resolved.every(Boolean) ? [...new Set(resolved)] : [];
 }
+// A note written by Define for one occurrence carries `at` ({start, end}); it attaches only there, so another
+// occurrence of the same form, possibly with another meaning, never shows it.
+export function anchoredRange(canonical, note) {
+  const at = note?.at;
+  if (!at || !Number.isInteger(at.start) || !Number.isInteger(at.end) || at.start < 0 || at.end <= at.start || at.end > canonical.length) return null;
+  const text = canonical.slice(at.start, at.end);
+  return Array.isArray(note.forms) && note.forms.includes(text) && note.meaning ? { start: at.start, end: at.end, form: text } : null;
+}
+
 export function findGlossaryMatches(canonical, glossary = [], { nested = false } = {}) {
+  const occupied=new Uint8Array(canonical.length),chosen=[],leftover=[];
+  for (const note of glossary) {
+    const range = anchoredRange(canonical, note);
+    if (!range || occupied.subarray(range.start, range.end).some(value => value)) continue;
+    chosen.push({ ...range, notes: [note], anchored: true }); occupied.fill(1, range.start, range.end);
+  }
   // Group repeated forms before scanning. Process one length at a time so a
   // larger glossary does not allocate every candidate across every length.
   const forms=new Map();
-  for (const note of glossary) for (const form of Array.isArray(note?.forms) ? note.forms : []) {
+  for (const note of glossary) for (const form of Array.isArray(note?.forms) && !note.at ? note.forms : []) {
     if (typeof form !== 'string' || !form.length || !note?.meaning) continue;
     if(!forms.has(form))forms.set(form,{form,notes:[],identities:new Map()});
     const group=forms.get(form);
@@ -125,7 +140,6 @@ export function findGlossaryMatches(canonical, glossary = [], { nested = false }
     if(!lengths.has(group.form.length))lengths.set(group.form.length,[]);
     lengths.get(group.form.length).push(group);
   }
-  const occupied=new Uint8Array(canonical.length),chosen=[],leftover=[];
   for(const length of [...lengths.keys()].sort((a,b)=>b-a)) {
     const candidates=[];
     for(const group of lengths.get(length))for(const range of glossaryRanges(canonical,group.form))candidates.push({...range,form:group.form,notes:group.notes});
@@ -158,6 +172,7 @@ export function firstGlossaryMatches(canonical, glossary = [], options = {}) {
     if (seenGroups.has(match.notes)) return [];
     seenGroups.add(match.notes);
     const notes = match.notes.filter(note => {
+      if (match.anchored) return true;
       const key = JSON.stringify([normalize(note.word || note.forms?.[0]), normalize(note.meaning)]);
       if (seen.has(key)) return false;
       seen.add(key); return true;

@@ -99,10 +99,16 @@ export function validateNotes(value, prose, language, { requireNotes = true } = 
 // underline lands where the learner selected. Saved with addedBy: 'learner' beside the chapter notes.
 export function validateDefinedNote(value, prose, language, selection) {
   const { glossary } = validateNotes(value, prose, language, { requireNotes: false });
-  const covers = note => note.forms.some(form => glossaryRanges(prose.story, form).some(range => range.start < selection.end && selection.start < range.end));
-  const note = glossary.find(covers);
-  if (!note) invalid('The vocabulary note did not match the selected text in the chapter.');
-  return { ...note, addedBy: 'learner' };
+  // The anchor is the form occurrence at the selection: the smallest range covering it, else one overlapping it.
+  let best = null;
+  for (const note of glossary) for (const form of note.forms) for (const range of glossaryRanges(prose.story, form)) {
+    if (!(range.start < selection.end && selection.start < range.end)) continue;
+    const covering = range.start <= selection.start && range.end >= selection.end;
+    const better = !best || covering && !best.covering || covering === best.covering && range.end - range.start < best.end - best.start;
+    if (better) best = { note, start: range.start, end: range.end, covering };
+  }
+  if (!best) invalid('The vocabulary note did not match the selected text in the chapter.');
+  return { ...best.note, addedBy: 'learner', at: { start: best.start, end: best.end } };
 }
 // Splitting notes into parts (PED-002): consecutive paragraphs are grouped into at most maxParts parts of
 // at least MIN_NOTE_PART_UNITS UTF-16 units, so a short chapter stays one request. Offsets are canonical.
