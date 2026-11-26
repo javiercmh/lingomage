@@ -100,10 +100,13 @@ function setReaderGeneration(value) {
 function currentReaderGeneration() { return readerGeneration; }
 // "Working" is displayed only while a request is actually live, so a cancelled, failed or abandoned request never leaves a stale status.
 function generationLive() { return Boolean(creatingStory || backgroundRun || pipeline?.busy || state.readerEditBusy || state.readerHelpBusy || state.requestId); }
+function definePopoverOpen() { const popover = $('word-note-popover'); return Boolean(popover && !popover.hidden && popover.dataset.define === 'true'); }
 function generationView(status) {
   if (!status) return null;
   const pending = state.pendingReaderResult;
   if (pending && pending.story.id === status.storyId) return { message: pending.saved ? 'Response saved. Finish request.' : 'Response needs saving.', action: pending.saved ? 'Finish request' : 'Save response', dismiss: false };
+  // Define shows its progress and Cancel in the note popover at the word, so the bar stays hidden while that is open.
+  if (status.phase === 'working' && status.kind === 'define' && definePopoverOpen()) return null;
   if (status.phase === 'working') return generationLive() ? { message: status.message, action: 'Cancel request', dismiss: false, working: true } : null;
   return { message: status.message, action: { cleanup: 'Finish request', error: 'Review', ready: 'View result' }[status.phase] || '', dismiss: true };
 }

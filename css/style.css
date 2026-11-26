@@ -320,6 +320,20 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 .word-note-entry { display: grid; gap: 3px; margin: 0; }
 .word-note-entry + .word-note-entry { margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--line); }
 .word-note-entry strong { color: #c8d8ff; }
+/* Define (PED-002): note skeleton while the AI writes, and the selection's underline drawing itself in. */
+.word-note-skeleton .skeleton-line { display: block; height: 10px; margin-top: 7px; border-radius: 6px; background: linear-gradient(90deg, rgba(255,255,255,.07) 0%, rgba(169,197,255,.24) 50%, rgba(255,255,255,.07) 100%); background-size: 200% 100%; animation: skeleton-shimmer 1.3s linear infinite; }
+.word-note-skeleton .skeleton-line:last-child { margin-bottom: 4px; }
+.define-cancel { flex-shrink: 0; color: var(--muted); }
+.define-cancel svg { stroke-width: 2.2; }
+@keyframes skeleton-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+#reader-story { position: relative; }
+.define-pending-layer { position: absolute; inset: 0; pointer-events: none; }
+.define-pending { position: absolute; border-radius: 3px; background: rgba(122,167,255,.14); animation: define-glow 1.4s ease-in-out infinite; }
+.define-pending::after { content: ""; position: absolute; left: 0; right: 0; bottom: -3px; height: 2px; background: repeating-linear-gradient(90deg, var(--accent) 0 3px, transparent 3px 6px); transform-origin: left; animation: define-draw 4s cubic-bezier(.2,.7,.3,1) forwards; }
+.define-pending-layer.complete .define-pending::after { animation: define-finish .18s ease-out forwards; }
+@keyframes define-glow { 50% { background: rgba(122,167,255,.28); } }
+@keyframes define-draw { from { transform: scaleX(0); } to { transform: scaleX(.88); } }
+@keyframes define-finish { from { transform: scaleX(.88); } to { transform: scaleX(1); } }
 .word-note-form { opacity: 0.75; font-size: 0.85em; }
 .recovery-panel { margin: 12px 0; padding: 14px 16px; border: 1px solid rgba(250,204,21,.32); border-radius: 14px; background: rgba(120,80,10,.18); }
 .recovery-panel.recovery-neutral { border-color: var(--line); background: var(--card); }

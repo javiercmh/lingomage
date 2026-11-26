@@ -222,12 +222,15 @@ export function createReaderView({
   }
   function closeWordNote(restoreFocus = false) {
     const popover = $('word-note-popover');
+    // While Define's popover is open it carries the progress, so the status bar returns when it closes.
+    const wasDefine = popover.dataset.define === 'true';
     delete popover.dataset.define;
-    if (popover.hidden) return;
+    if (popover.hidden) { if (wasDefine) renderReaderGeneration(); return; }
     popover.hidden = true;
     if (restoreFocus) state.wordNoteTrigger?.focus();
     state.wordNoteTrigger = null;
     document.querySelectorAll('.gloss-note-trigger[aria-expanded="true"]').forEach(button => { button.removeAttribute('aria-expanded'); button.removeAttribute('aria-controls'); });
+    if (wasDefine) renderReaderGeneration();
   }
   let inlineSpeechRun = 0;
   let inlineSpeechButton = null;

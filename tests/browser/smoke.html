@@ -61,7 +61,7 @@ document.querySelector('#run').addEventListener('click',async event=>{
   const wordRange=doc().createRange();wordRange.setStart(word.node,word.start);wordRange.setEnd(word.node,word.start+word.text.length);
   selection.removeAllRanges();selection.addRange(wordRange);doc().dispatchEvent(new Event('selectionchange'));
   await until(()=>!field('selection-toolbar').hidden && !field('selection-define').hidden,'Define is not offered for a story selection');field('selection-define').click();
-  await until(()=>!field('word-note-popover').hidden && field('word-note-popover').textContent.includes('Writing a vocabulary note'),'Define showed no progress');
+  await until(()=>!field('word-note-popover').hidden && field('word-note-popover').textContent.includes('Writing a vocabulary note') && doc().querySelector('.word-note-skeleton .skeleton-line') && doc().querySelector('.define-pending') && field('reader-generation-bar').hidden,'Define showed no note skeleton and drawing underline at the word');
   await until(()=>doc().querySelectorAll('.gloss-note-trigger').length>notesBefore && !field('word-note-popover').hidden && field('word-note-popover').textContent.includes(word.text) && !doc().querySelector('.reader-ai-cancel'),'Define did not save and open the note');
   const definedNote=JSON.parse(await read('data/stories.json')).flatMap(story=>story.chapters.flatMap(chapter=>chapter.versions.flatMap(version=>version.glossary||[]))).find(note=>note.addedBy==='learner');
   assert(definedNote && definedNote.forms.includes(word.text),'Define note was not saved with the chapter notes');

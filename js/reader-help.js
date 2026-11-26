@@ -5,6 +5,7 @@
 // read through accessors (currentPipeline(), currentReaderGeneration(), currentBackgroundRun(), setPlaybackContext()).
 // app.js calls createReaderHelp where the section used to be.
 import { getCanonicalSelection, japaneseSegments, applyExplainedMarks } from './reader-text.js';
+import { canonicalRange } from './reader-player.js';
 import { speech, translation, ai, save, share, isNative } from './bridge.js';
 import { chapterSpeechText, speakChapter, speakSelection } from './reader-speech.js';
 import { normalizeReaderControls, createReaderActivation, glossaryForTrigger } from './reader-activation.js';
@@ -952,8 +953,9 @@ export function createReaderHelp({
     const popover = $('word-note-popover');
     closeWordNote(); popover.textContent = '';
     const item = document.createElement('div'); item.className = 'word-note-entry';
+    const heading = document.createElement('span'); heading.className = 'word-note-heading';
     const word = document.createElement('strong'); word.textContent = passage.text;
-    item.append(word); build(item, popover); popover.prepend(item);
+    heading.append(word); item.append(heading); build(item, popover, heading); popover.prepend(item);
     popover.dataset.define = 'true'; popover.hidden = false; popover.focus();
     const rect = passage.rect || { left: 12, bottom: 12, top: 12 };
     popover.style.left = `${Math.max(12, Math.min(window.innerWidth - 292, rect.left))}px`;
@@ -962,6 +964,32 @@ export function createReaderHelp({
       const box = popover.getBoundingClientRect();
       if (box.bottom > window.innerHeight - 12) popover.style.top = `${Math.max(12, rect.top - box.height - 8)}px`;
     });
+  }
+  // While the note is written, the selected words glow and their dotted underline draws itself in; the layer
+  // sits over the story text, has no text of its own, and disappears with the next story render.
+  function markDefinePending(passage) {
+    clearDefinePending();
+    const root = $('reader-story'), range = canonicalRange(root, passage.start, passage.end);
+    if (!range) return;
+    const origin = root.getBoundingClientRect(), layer = document.createElement('div'), seen = new Set();
+    layer.className = 'define-pending-layer'; layer.setAttribute('aria-hidden', 'true');
+    for (const rect of range.getClientRects()) {
+      const key = [rect.left, rect.top, rect.width, rect.height].map(Math.round).join();
+      if (!rect.width || seen.has(key)) continue;
+      seen.add(key);
+      const mark = document.createElement('span'); mark.className = 'define-pending';
+      Object.assign(mark.style, { left: `${rect.left - origin.left}px`, top: `${rect.top - origin.top}px`, width: `${rect.width}px`, height: `${rect.height}px` });
+      layer.append(mark);
+    }
+    root.append(layer);
+  }
+  function clearDefinePending() { document.querySelectorAll('.define-pending-layer').forEach(layer => layer.remove()); }
+  // The underline finishes drawing before the saved note replaces it.
+  function completeDefinePending() {
+    const layer = document.querySelector('.define-pending-layer');
+    if (!layer || matchMedia('(prefers-reduced-motion: reduce)').matches) return Promise.resolve();
+    layer.classList.add('complete');
+    return new Promise(resolve => setTimeout(resolve, 200));
   }
   function defineInProgress() { const popover = $('word-note-popover'); return !popover.hidden && popover.dataset.define === 'true'; }
   async function defineSelection(selected = state.readerSelection) {
@@ -982,13 +1010,18 @@ export function createReaderHelp({
       catch (error) { toast(error.message); renderPendingReaderResult(); return; }
       $('selection-toolbar').hidden = true;
       if (!defineRequestHost) { defineRequestHost = document.createElement('span'); defineRequestHost.hidden = true; readerPanel().append(defineRequestHost); }
-      showDefinePopover(passage, (item, popover) => {
-        const status = document.createElement('span'); status.setAttribute('role', 'status'); status.textContent = 'Writing a vocabulary note…';
-        const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'word-note-view'; cancel.textContent = 'Cancel';
+      // A skeleton of the note: the same heading, with shimmering lines where the meaning will appear.
+      showDefinePopover(passage, (item, popover, heading) => {
+        item.classList.add('word-note-skeleton');
+        const status = document.createElement('span'); status.className = 'sr-only'; status.setAttribute('role', 'status'); status.textContent = 'Writing a vocabulary note…';
+        const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'icon-btn define-cancel'; cancel.setAttribute('aria-label', 'Cancel vocabulary note'); cancel.title = 'Cancel';
+        cancel.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
         cancel.addEventListener('click', () => { defineRequestHost.querySelector('.reader-ai-cancel')?.click(); });
-        item.append(status); popover.append(cancel);
+        const lines = ['92%', '64%'].map(width => { const line = document.createElement('span'); line.className = 'skeleton-line'; line.style.width = width; return line; });
+        heading.append(cancel); item.append(status, ...lines);
       });
-      setReaderGeneration({ storyId: story.id, pathId: story.activePathId, chapterId: chapter.id, versionId: version.id, phase: 'working', message: 'Writing a vocabulary note…' });
+      markDefinePending(passage);
+      setReaderGeneration({ storyId: story.id, pathId: story.activePathId, chapterId: chapter.id, versionId: version.id, kind: 'define', phase: 'working', message: 'Writing a vocabulary note…' });
       const sameView = () => state.readerId === story.id && activeChapter().id === chapter.id && activeVersion().id === version.id;
       try {
         const input = { language: LANGUAGES[story.language], languageCode: story.language, difficulty: story.difficulty, chapter: { title: version.title || story.title, story: version.story }, start: passage.start, end: passage.end, passage: passage.text, sentence: passage.sentence || '', profile: passage.profile };
@@ -1005,6 +1038,8 @@ export function createReaderHelp({
         } };
         try { await savePendingReaderResult(); }
         catch { if (state.readerId === story.id) { closeWordNote(); renderPendingReaderResult(); } return; }
+        if (!sameView()) return;
+        await completeDefinePending();
         if (!sameView()) return;
         const panel = readerPanel(), current = panel.scrollTop;
         updateReader(true); panel.scrollTop = current;
@@ -1033,7 +1068,7 @@ export function createReaderHelp({
           item.append(note); popover.append(retry);
         });
       }
-    } finally { state.readerHelpBusy = false; renderReaderGeneration(); }
+    } finally { clearDefinePending(); state.readerHelpBusy = false; renderReaderGeneration(); }
   }
   function runSelectionAction(button, action) {
     if (button.getAttribute('aria-busy') === 'true') return Promise.resolve();
