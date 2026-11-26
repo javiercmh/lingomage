@@ -28,6 +28,7 @@ export function createGenerationStatusUi({
   // step keeps its time once the real operation takes over.
   function paintProgress(root, op) {
     const summary = progressSummary(op), now = Date.now(), clockId = root.clockId || op.id;
+    root.opened = Boolean(op.earlyApplied); // the chapter is readable; an estimate to opening has nothing left to say
     // One estimate per run, made when it starts; a chapter card brings its own (it knows the story-context step).
     if (root.estimateFor !== clockId) { root.estimateFor = clockId; root.estimate = root.presetEstimate !== undefined ? root.presetEstimate : op.config ? estimateFor(operationPlan(op)) : null; }
     for (const step of summary.steps) {
@@ -71,7 +72,7 @@ export function createGenerationStatusUi({
     const eta = root.querySelector('.gen-eta'), items = [...root.querySelectorAll('.gen-steps li[data-clock]')];
     const steps = items.map(item => ({ key: item.dataset.clock.slice(item.dataset.clock.lastIndexOf(':') + 1), state: item.dataset.state }));
     const elapsed = Object.fromEntries(items.map((item, index) => { const clock = stepClock.get(item.dataset.clock); return [steps[index].key, clock?.start ? (clock.end || now) - clock.start : 0]; }));
-    const message = root.estimate && steps.length ? remainingText(remainingTime(root.estimate, steps, elapsed), { opens: Boolean(root.estimate.opens) }) : '';
+    const message = root.estimate && steps.length && !(root.estimate.opens && root.opened) ? remainingText(remainingTime(root.estimate, steps, elapsed), { opens: Boolean(root.estimate.opens) }) : '';
     if (eta && eta.textContent !== message) eta.textContent = message;
     if (eta) eta.hidden = !message;
     const note = root.querySelector('.gen-wait');
