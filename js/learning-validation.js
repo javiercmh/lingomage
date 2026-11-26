@@ -118,25 +118,35 @@ export const MIN_NOTE_PART_UNITS = 600;
 // rounded down so a part stays well above the ~300-unit parts that added errors on 2026-11-25.
 export const NOTE_PART_TARGET_UNITS = 1000;
 export const NOTE_PART_TARGET_UNITS_JA = 400;
-// Requests per chapter at most; the pipeline still runs only MAX_RUNNING of them at once.
+// Requests per chapter at most; the pipeline runs at most config.parallelLimit of them at once.
 export const MAX_NOTE_PARTS = 8;
 // Japanese packs far more text per UTF-16 unit; at 600 most Japanese chapters never split (2026-11-25 comparison).
 export const MIN_NOTE_PART_UNITS_JA = 250;
 export const noteMinUnits = language => language === 'ja' ? MIN_NOTE_PART_UNITS_JA : MIN_NOTE_PART_UNITS;
 export const noteTargetUnits = language => language === 'ja' ? NOTE_PART_TARGET_UNITS_JA : NOTE_PART_TARGET_UNITS;
-export function notesParts(story, maxParts = 1, minUnits = MIN_NOTE_PART_UNITS, targetUnits = 0) {
+// lead: the first part is only the opening paragraph (joined with the next ones while under half of minUnits), so
+// the reader can open the chapter once that short part has its notes; the rest is split as usual.
+export function notesParts(story, maxParts = 1, minUnits = MIN_NOTE_PART_UNITS, targetUnits = 0, { lead = false } = {}) {
   const text = String(story || ''), paragraphs = [];
   for (const match of text.matchAll(/[^\n]*\S[^\n]*/g)) paragraphs.push({ start: match.index, end: match.index + match[0].length });
   const limit = Math.max(1, Math.floor(maxParts) || 1);
-  // Without a target size (older callers), parts are the text divided evenly by maxParts.
-  const target = Math.max(minUnits, targetUnits || 0, Math.ceil(text.length / limit));
   const parts = [];
+  if (lead && limit > 1 && paragraphs.length > 1) {
+    const first = { ...paragraphs[0] };
+    while (paragraphs.length > 1 && first.end - first.start < minUnits / 2) first.end = paragraphs.splice(1, 1)[0].end;
+    paragraphs.shift();
+    if (paragraphs.length) parts.push(first); else paragraphs.push(first);
+  }
+  // Without a target size (older callers), parts are the text divided evenly by maxParts.
+  const rest = parts.length ? text.length - parts[0].end : text.length, restLimit = limit - parts.length;
+  const target = Math.max(minUnits, targetUnits || 0, Math.ceil(rest / restLimit));
+  const leadCount = parts.length;
   for (const paragraph of paragraphs) {
-    const last = parts.at(-1);
+    const last = parts.length > leadCount ? parts.at(-1) : null;
     if (last && (last.end - last.start < target || parts.length >= limit)) last.end = paragraph.end;
     else parts.push({ ...paragraph });
   }
-  // A short tail joins the previous part instead of becoming a request of its own.
+  // A short tail joins the previous part (the lead too) instead of becoming a request of its own.
   if (parts.length > 1 && parts.at(-1).end - parts.at(-1).start < minUnits / 2) { const tail = parts.pop(); parts.at(-1).end = tail.end; }
   return parts.length > 1 ? parts.map(part => ({ ...part, text: text.slice(part.start, part.end) })) : [];
 }

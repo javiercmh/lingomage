@@ -1,5 +1,6 @@
-// Reading while vocabulary notes are written: the chapter is saved as soon as its prose (and Japanese readings) is
-// ready, each finished notes part adds its notes to the same version, and the final apply completes it.
+// Reading while vocabulary notes are written: the chapter is saved once its opening paragraph (a short lead notes
+// part) has notes and, for Japanese, its readings are ready; each finished notes part adds its notes to the same
+// version, and the final apply completes it.
 import assert from 'node:assert/strict';
 import { createPipeline } from '../js/generation-pipeline.js';
 import { createGenerationController } from '../js/generation-controller.js';
@@ -9,14 +10,14 @@ const WORDS = ['Hund', 'Katze', 'Vogel', 'Fisch', 'Pferd', 'Maus'];
 const story = WORDS.map(word => `Der ${word} läuft schnell durch den Garten. `.repeat(30).trim()).join('\n\n');
 const prose = { title: 'Tiere', story };
 
-function harness({ progressive = true, language = 'de', text = prose, records = [], applyPartial = true, failNotes = '' } = {}) {
+function harness({ progressive = true, language = 'de', text = prose, records = [], applyPartial = true, failNotes = '', slowLead = false } = {}) {
   const calls = [], started = [];
   let n = 0; const kinds = new Map();
   const ai = {
     async start(args) { const input = JSON.parse(args.input); const label = input.kind === 'notes' && input.focus ? `notes-${input.focus.part}` : input.kind; const id = `r${++n}`; kinds.set(id, { label, input }); started.push(label); return id; },
     async wait(id) {
       const { label, input } = kinds.get(id);
-      await new Promise(resolve => setTimeout(resolve, label === 'readings' ? 2 : label.startsWith('notes') ? 4 + Number(label.slice(6) || 0) * 3 : 1));
+      await new Promise(resolve => setTimeout(resolve, label === 'readings' ? 2 : label.startsWith('notes') ? (slowLead && label === 'notes-1' ? 40 : 4 + Number(label.slice(6) || 0) * 3) : 1));
       if (label === failNotes) throw Object.assign(new Error('Model failed.'), { code: 'provider' });
       if (input.kind === 'language-plan') return JSON.stringify({ vocabulary: [], grammar: [], guidance: '' });
       if (input.kind === 'create') return JSON.stringify(text);
@@ -32,19 +33,35 @@ function harness({ progressive = true, language = 'de', text = prose, records = 
     ...(applyPartial ? { applyPartial: async (op, content, { first }) => { calls.push({ type: 'partial', first, notes: content.glossary.length, segments: Boolean(content.storySegments) }); } } : {}),
     discarded: op => calls.push({ type: 'discarded', id: op.id }) });
   const op = records[0] || pipeline.create({ kind: 'create', language, planned: true, input: { difficulty: 'A2' }, instructions: 'Write.', config: { providerId: 'p', model: 'main', notesParts: MAX_NOTE_PARTS, progressive } });
-  return { pipeline, op, calls, started };
+  return { pipeline, op, calls, started, inputs: kinds };
 }
 
-{ // German: the chapter is shown right after the prose, then notes arrive part by part, then the final apply.
+{ // German: the lead part is the first paragraph; the chapter opens with its notes, then the rest arrive, then the final apply.
   const h = harness();
   await h.pipeline.run(h.op);
+  const lead = [...h.inputs.values()].find(item => item.label === 'notes-1').input.focus.text;
+  assert.equal(lead, story.split('\n\n')[0], 'the lead part is the opening paragraph');
   const partials = h.calls.filter(call => call.type === 'partial');
-  assert.equal(partials[0].first, true); assert.equal(partials[0].notes, 0, 'the chapter is shown before any notes');
+  assert.equal(partials[0].first, true); assert.ok(partials[0].notes >= 1, 'the chapter opens with the first paragraph\'s notes');
   assert.ok(partials.slice(1).every(call => call.first === false));
   assert.ok(partials.length >= 3, 'each finished part updates the chapter');
   for (let i = 1; i < partials.length; i++) assert.ok(partials[i].notes >= partials[i - 1].notes, 'notes only grow');
   assert.equal(h.calls.at(-1).type, 'final'); assert.equal(h.calls.at(-1).notes, WORDS.length);
   assert.equal(h.op.earlyApplied, true);
+}
+
+{ // Parts that finish before the lead do not open the chapter; it opens when the lead is done.
+  const h = harness({ slowLead: true });
+  await h.pipeline.run(h.op);
+  const partials = h.calls.filter(call => call.type === 'partial');
+  assert.ok(partials[0].notes > 1, 'opened only after the lead, with the parts already finished');
+  assert.ok(partials[0].first);
+}
+
+{ // A failed lead part shows nothing early.
+  const h = harness({ failNotes: 'notes-1' });
+  await assert.rejects(h.pipeline.run(h.op), /Model failed/);
+  assert.equal(h.op.earlyApplied, undefined); assert.ok(!h.calls.some(call => call.type === 'partial'));
 }
 
 { // Without progressive (saved operations, examples) nothing is shown early.
@@ -71,7 +88,7 @@ function harness({ progressive = true, language = 'de', text = prose, records = 
   assert.deepEqual(h.calls.filter(call => call.type === 'discarded').map(call => call.id), [h.op.id]);
 }
 
-{ // Resumed after the prose without an early save: the chapter is shown before the remaining notes.
+{ // Resumed after the prose without an early save: the chapter opens once the lead part is done.
   const first = harness({ failNotes: 'notes-1', applyPartial: false });
   await assert.rejects(first.pipeline.run(first.op));
   const records = first.pipeline.records; assert.equal(records[0].earlyApplied, undefined);
@@ -109,4 +126,4 @@ function harness({ progressive = true, language = 'de', text = prose, records = 
   assert.equal(stories[0].chapters[1].versions[0].glossary.length, 1);
 }
 
-console.log('PASS progressive notes: early chapter after prose or Japanese readings, growing notes per part, final completion, failure and discard, resume, controller updates');
+console.log('PASS progressive notes: chapter opens after its first paragraph has notes (and Japanese readings), growing notes per part, final completion, failure and discard, resume, controller updates');

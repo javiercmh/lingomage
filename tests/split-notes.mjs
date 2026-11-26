@@ -1,7 +1,8 @@
 // Split vocabulary notes: paragraph parts, merging, the parallel scheduler, and both rate-limit paths
-// (App²'s start limit before inference, the provider's limit during a request). No silent retries.
+// (a start refused before inference, the provider's limit during a request). No silent retries.
 import assert from 'node:assert/strict';
-import { createPipeline, pendingRequests, MAX_RUNNING, MAX_PARALLEL, parallelLimitFor } from '../js/generation-pipeline.js';
+import { createPipeline, pendingRequests, MAX_PARALLEL, parallelLimitFor } from '../js/generation-pipeline.js';
+const LEGACY_RUNNING = 3; // operations saved without config.parallelLimit
 import { progressSummary } from '../js/generation-progress.js';
 import { recoverySummary } from '../js/generation-errors.js';
 import { notesParts, noteMinUnits, noteTargetUnits, mergeNoteParts, validateNotes, MAX_NOTE_PARTS } from '../js/learning-validation.js';
@@ -18,6 +19,12 @@ const prose = { title: 'Tiere', story };
   const parts = notesParts(story, 3);
   assert.equal(parts.length, 3);
   assert.equal(parts[0].start, 0); assert.equal(parts.at(-1).end, story.length);
+  // lead: the opening paragraph is a part of its own; a very short opening line is joined with the next paragraph.
+  const led = notesParts(story, MAX_NOTE_PARTS, noteMinUnits('de'), noteTargetUnits('de'), { lead: true });
+  assert.equal(led[0].text, paragraph('Hund')); assert.equal(led.at(-1).end, story.length);
+  const titled = `Kapitel eins.\n\n${story}`;
+  assert.equal(notesParts(titled, MAX_NOTE_PARTS, 600, 1000, { lead: true })[0].text, `Kapitel eins.\n\n${paragraph('Hund')}`);
+  assert.deepEqual(notesParts('Kurz.\n\nNoch kurz.', MAX_NOTE_PARTS, 600, 1000, { lead: true }), [], 'a short chapter stays one request');
   for (const part of parts) { assert.equal(story.slice(part.start, part.end), part.text); assert.ok(!/^\s|\s$/.test(part.text)); }
   for (let i = 1; i < parts.length; i++) assert.ok(parts[i].start > parts[i - 1].end && !story.slice(parts[i - 1].end, parts[i].start).trim(), 'parts only skip the blank lines between them');
   assert.ok(notesParts(story, 10).length <= WORDS.length, 'never more parts than paragraphs');
@@ -93,21 +100,23 @@ function harness({ notesParts: parts = 3, parallelLimit, startRefusals = {}, wai
   assert.equal(new Set(h.applied.glossary.map(note => note.word)).size, h.applied.glossary.length, 'identical notes from several parts are joined');
   assert.ok(WORDS.every(word => h.applied.glossary.some(note => note.word === word)));
   assert.equal(h.pipeline.records.length, 0);
-  assert.ok(MAX_RUNNING >= 3);
 }
 
-{ // Up to MAX_NOTE_PARTS parts of similar size, never more than MAX_RUNNING at once.
+{ // Up to MAX_NOTE_PARTS parts of similar size; an operation saved without parallelLimit keeps three at once.
   const h = harness({ notesParts: MAX_NOTE_PARTS });
   await h.pipeline.run(h.op);
   const notes = h.started.filter(item => item.input.kind === 'notes');
-  assert.ok(notes.length > MAX_RUNNING, `a long chapter gets more than ${MAX_RUNNING} parts (got ${notes.length})`);
-  assert.equal(h.peak, MAX_RUNNING, 'parts beyond the running limit wait for a free slot');
+  assert.ok(notes.length > LEGACY_RUNNING, `a long chapter gets more than ${LEGACY_RUNNING} parts (got ${notes.length})`);
+  assert.equal(h.peak, LEGACY_RUNNING, 'parts beyond the running limit wait for a free slot');
   assert.ok(notes.every(item => item.input.focus.of === notes.length));
   assert.ok(WORDS.every(word => h.applied.glossary.some(note => note.word === word)));
 }
 
-{ // App²'s start limit decides how many parts run at once: 6 at 12+ per minute or no limit, else 3.
-  assert.deepEqual([null, undefined, 6, 12, 30, 0].map(parallelLimitFor), [MAX_RUNNING, MAX_RUNNING, MAX_RUNNING, MAX_PARALLEL, MAX_PARALLEL, MAX_PARALLEL]);
+{ // Settings → Allow concurrent requests: up to six parts at once, or one at a time when off.
+  assert.deepEqual([true, undefined, false].map(parallelLimitFor), [MAX_PARALLEL, MAX_PARALLEL, 1]);
+  const single = harness({ notesParts: MAX_NOTE_PARTS, parallelLimit: parallelLimitFor(false) });
+  await single.pipeline.run(single.op);
+  assert.equal(single.peak, 1, 'without concurrent requests parts run one at a time');
   const h = harness({ notesParts: MAX_NOTE_PARTS, parallelLimit: MAX_PARALLEL });
   await h.pipeline.run(h.op);
   const notes = h.started.filter(item => item.input.kind === 'notes');
@@ -124,7 +133,7 @@ function harness({ notesParts: parts = 3, parallelLimit, startRefusals = {}, wai
   assert.equal(notes.length, 1); assert.equal(notes[0].input.focus, undefined);
 }
 
-{ // App² refuses a start while other parts run: the part starts again after one of them finishes.
+{ // A start is refused while other parts run: the part starts again after one of them finishes.
   const h = harness({ startRefusals: { 'notes-3': ['usage_limit'] } });
   await h.pipeline.run(h.op);
   const refused = h.events.indexOf('refused notes-3'), restarted = h.events.lastIndexOf('start notes-3');
@@ -133,7 +142,7 @@ function harness({ notesParts: parts = 3, parallelLimit, startRefusals = {}, wai
   assert.equal(h.events.filter(event => event === 'start notes-3').length, 1, 'refused starts made no request');
 }
 
-{ // Refused again with nothing left running: stop, keep finished parts, explain App²'s limit.
+{ // Refused again with nothing left running: stop, keep finished parts, explain the rate limit.
   const h = harness({ startRefusals: { 'notes-3': ['usage_limit', 'usage_limit', 'usage_limit'] } });
   await assert.rejects(h.pipeline.run(h.op), /too many AI requests/);
   assert.equal(h.op.stage, 'enrich');
@@ -141,7 +150,7 @@ function harness({ notesParts: parts = 3, parallelLimit, startRefusals = {}, wai
   assert.equal(h.op.failure.code, 'usage_limit'); assert.equal(h.op.failure.phase, 'start');
   assert.deepEqual(pendingRequests(h.op), []);
   const summary = recoverySummary(h.op);
-  assert.match(summary, /App² limits how many AI requests LingoMage can start per minute/);
+  assert.match(summary, /reported a rate limit, so the next step did not start/);
   assert.match(summary, /2 of 3 note parts are saved/); assert.match(summary, /during vocabulary notes\./);
   assert.match(progressSummary(h.op).text, /Vocabulary notes · 2 of 3 parts/);
   // Resume starts only the missing part.
@@ -166,4 +175,4 @@ function harness({ notesParts: parts = 3, parallelLimit, startRefusals = {}, wai
   assert.equal(resumed.pipeline.records.length, 0);
 }
 
-console.log('PASS split vocabulary notes: paragraph parts, merge, parallel limit, App² start refusals and provider rate limits');
+console.log('PASS split vocabulary notes: paragraph parts, merge, parallel limit, concurrency setting, start refusals and provider rate limits');

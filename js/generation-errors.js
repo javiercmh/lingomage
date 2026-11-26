@@ -54,12 +54,12 @@ export function discardFailureMessage(op) {
   return 'The AI request or saved progress still needs to be cleared. Try again.';
 }
 
-// Rate limits (code usage_limit). Refused at start: App²'s per-app start limit, before any inference.
+// Rate limits (code usage_limit). Refused at start, before any inference, or during a request.
 // During a request: the provider's rate limit or quota; for ChatGPT plans the two look the same.
 function usageLimitReason(op, failure) {
   const parts = Object.entries(op.parallel || {}).filter(([name]) => name === 'notes' || name.startsWith('notes-'));
   const saved = parts.length > 1 ? ` ${parts.filter(([, part]) => part.done).length} of ${parts.length} note parts are saved.` : SAVED;
-  if (failure.phase === 'start') return `App² limits how many AI requests LingoMage can start per minute, so the next step did not start.${saved} Wait a minute, then tap Resume, or raise the limit in App² → Settings → AI → Request limit per app.`;
+  if (failure.phase === 'start') return `The AI service reported a rate limit, so the next step did not start.${saved} Wait a minute, then tap Resume. If it keeps happening, turn off Settings → Advanced → Allow concurrent requests.`;
   const message = failureInfo(new Error(failure.message), op.stage).message;
   return `The AI provider reported a rate limit or usage limit: ${message}${saved} Resume ${parts.length > 1 ? 'runs the missing parts one at a time' : 'runs the unfinished step again'}; if the limit is your plan's quota, it fails again until the quota resets.`;
 }

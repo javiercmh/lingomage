@@ -132,8 +132,7 @@ export const ai = {
   available: !!AI || !!DEV?.mockAi || !!DEV?.liveAi,
   developmentMock: !AI && !!DEV?.mockAi,
   developmentLive: !AI && !!DEV?.liveAi,
-  // -> {providers:[{id,name,connected}], startLimit} without account identifiers; startLimit is App²'s generation
-  // starts per minute for this app (0 = no limit, absent on older hosts).
+  // -> {providers:[{id,name,connected}]} without account identifiers.
   providers: () => aiCall('providers'),
   // -> {models:[{id,name,reasoningLevels}]} in account-specific server order.
   models: (providerId = 'chatgpt') => aiCall('models', { providerId }),

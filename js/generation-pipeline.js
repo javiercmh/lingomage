@@ -14,18 +14,17 @@ export const pendingRequests = op => requestHolders(op).map(holder => holder.req
 // the final application is idempotent via operationId on saved records.
 // parallel: run Japanese notes and readings together, and split notes into paragraph parts when
 // op.config.noteDensity (Settings → Vocabulary notes: fewer, standard or more; absent means standard) picks the
-// notes prompt. op.config.notesParts > 1 (Settings → Split vocabulary notes). The app enables it. At most MAX_RUNNING parts
-// run at once. A start the host refuses before any inference (request_in_progress, or App²'s per-app
-// start limit as usage_limit) waits for a running part to finish and starts once more; with nothing
-// running, the operation stops with saved parts. A provider usage_limit during a request stops new parts
-// and sets op.partsOneAtATime, so Resume runs the missing parts one at a time. Nothing retries silently.
+// notes prompt. op.config.notesParts > 1 (Settings → Split vocabulary notes). The app enables it. At most
+// op.config.parallelLimit parts run at once (Settings → Allow concurrent requests: MAX_PARALLEL, or 1 when off).
+// App² sets no request limit of its own. A start refused before any inference (request_in_progress or
+// usage_limit) waits for a running part to finish and starts once more; with nothing running, the operation
+// stops with saved parts. A provider usage_limit during a request stops new parts and sets
+// op.partsOneAtATime, so Resume runs the missing parts one at a time. Nothing retries silently.
 // The sequential default keeps offline evaluation request budgets and ordering predictable.
-export const MAX_RUNNING = 3;
-// With App²'s start limit at 12 or more per minute, or no limit (startLimit 0, reported by ai.providers()),
-// up to MAX_PARALLEL parts run at once: one long chapter's starts (plan, prose, readings, up to 8 note parts)
-// then fit in a minute. Unknown (older hosts, browser) or lower limits keep MAX_RUNNING.
 export const MAX_PARALLEL = 6;
-export const parallelLimitFor = startLimit => Number.isInteger(startLimit) && (startLimit === 0 || startLimit >= 12) ? MAX_PARALLEL : MAX_RUNNING;
+// Operations saved before the setting existed captured no parallelLimit and keep their old three at a time.
+const LEGACY_PARALLEL = 3;
+export const parallelLimitFor = allowConcurrent => allowConcurrent === false ? 1 : MAX_PARALLEL;
 // Broken replies (code invalid_json: the reply is not JSON at all) are resent automatically, up to
 // MAX_BROKEN_RESENDS times per stage or part, when the operation captured config.retryBroken (Settings →
 // Advanced → Retry broken replies automatically, on by default). Never silent: every resend calls
@@ -38,11 +37,15 @@ const START_REFUSALS = new Set(['request_in_progress', 'usage_limit']);
 const isNotesPart = name => name === 'notes' || name.startsWith('notes-');
 // Parts for a finished prose stage: legacy single "notes" or "notes-1".."notes-N" with canonical offsets.
 // A notes rebuild (kind "notes") keeps the version's saved readings, so it has no readings part.
+// A progressive operation gets a short lead part (the opening paragraph) so the chapter can open once it has
+// notes; Japanese readings come right after it, so they also run early when parts go one at a time.
+const PROGRESSIVE_KINDS = new Set(['create','continue','rewrite']);
+const wantsProgressive = op => op.config.progressive === true && PROGRESSIVE_KINDS.has(op.kind);
 export function enrichmentParts(op) {
-  const parts = {}, split = notesParts(op.prose.story, Number(op.config.notesParts) || 1, noteMinUnits(op.language), noteTargetUnits(op.language));
-  if (split.length) split.forEach((part, index) => { parts[`notes-${index + 1}`] = {request:null, done:false, start:part.start, end:part.end}; });
-  else parts.notes = {request:null, done:false};
-  if (op.language === 'ja' && op.kind !== 'notes') parts.readings = {request:null, done:false};
+  const parts = {}, split = notesParts(op.prose.story, Number(op.config.notesParts) || 1, noteMinUnits(op.language), noteTargetUnits(op.language), {lead:wantsProgressive(op)});
+  const readings = op.language === 'ja' && op.kind !== 'notes';
+  if (split.length) split.forEach((part, index) => { parts[`notes-${index + 1}`] = {request:null, done:false, start:part.start, end:part.end}; if (index === 0 && readings) parts.readings = {request:null, done:false}; });
+  else { parts.notes = {request:null, done:false}; if (readings) parts.readings = {request:null, done:false}; }
   return parts;
 }
 // Vocabulary notes, Japanese readings and example sentences may use the lighter model saved in op.config.light
@@ -56,11 +59,11 @@ export function stageModel(op, stage) {
   const light = task && tasks.includes(task) && String(op.config.light?.model || '').trim() ? op.config.light : null;
   return {providerId:op.config.providerId, model:light ? light.model : op.config.model, reasoningEffort:(light ? light.reasoning : op.config.reasoning) || undefined};
 }
-// Reading while notes are written (config.progressive, create/continue/rewrite): once the prose is validated (and,
-// for Japanese, its readings), applyPartial(op, content, {first}) saves the chapter with the notes finished so far
-// and op.earlyApplied is checkpointed; each later notes part calls it again with more notes; the final apply(op)
-// completes the same version. A discarded operation that already showed its chapter calls discarded(op).
-const PROGRESSIVE_KINDS = new Set(['create','continue','rewrite']);
+// Reading while notes are written (config.progressive, create/continue/rewrite, split notes): once the lead notes
+// part (the opening paragraph) is done (and, for Japanese, the readings), applyPartial(op, content, {first}) saves
+// the chapter with the notes finished so far and op.earlyApplied is checkpointed; each later notes part calls it
+// again with more notes; the final apply(op) completes the same version. A chapter whose notes are one request
+// opens only at the final apply. A discarded operation that already showed its chapter calls discarded(op).
 export function createPipeline({ records, persist, ai, apply, applyPartial = null, discarded = () => {}, changed = () => {}, onResend = () => {}, parallel = false, now = () => Date.now() }) {
   let busy = false;
   // Requests started by this page. A saved request from an earlier page completes when this page notices,
@@ -116,14 +119,15 @@ export function createPipeline({ records, persist, ai, apply, applyPartial = nul
     try { save(); } catch (error) { records.splice(index,0,op); throw error; }
     if (op.earlyApplied) { try { discarded(op); } catch { /* the chapter stays readable; its notes stay as saved */ } }
   }
-  const progressive = op => Boolean(applyPartial) && op.config.progressive === true && PROGRESSIVE_KINDS.has(op.kind);
+  const progressive = op => Boolean(applyPartial) && wantsProgressive(op);
   // Notes saved so far: validated finished parts merged in chapter order (possibly none yet).
   function notesSoFar(op) {
     const done = Object.entries(op.parallel || {}).filter(([name, part]) => isNotesPart(name) && part.done).map(([, part]) => part.content);
     return done.length ? validateNotes({glossary:mergeNoteParts(done)}, op.prose, op.language, {requireNotes:false}).glossary : [];
   }
   async function applyEarly(op) {
-    const readings = op.parallel?.readings;
+    const parts = op.parallel || {}, readings = parts.readings, lead = parts['notes-1'] || parts.notes;
+    if (!lead?.done) return; // the opening paragraph has its notes before the chapter opens
     if (op.language === 'ja' && !readings?.done) return; // Japanese is shown only with its readings
     const content = {...validateProse(op.prose, op.language), glossary:notesSoFar(op), ...(readings?.done ? {titleSegments:readings.content.titleSegments, storySegments:readings.content.storySegments} : {})};
     const first = !op.earlyApplied;
@@ -174,14 +178,14 @@ export function createPipeline({ records, persist, ai, apply, applyPartial = nul
     part.request.completed=true; part.done=true; save();
     await release(op, part);
   }
-  // Runs unfinished parts, at most MAX_RUNNING at once (one after a provider usage_limit). After any
+  // Runs unfinished parts, at most config.parallelLimit at once (one after a provider usage_limit). After any
   // failure no new part starts; running parts finish and stay saved, and the first failure is reported.
   async function runParallel(op) {
-    const limit = op.partsOneAtATime ? 1 : Math.max(1, Math.min(MAX_PARALLEL, Number(op.config.parallelLimit) || MAX_RUNNING));
+    const limit = op.partsOneAtATime ? 1 : Math.max(1, Math.min(MAX_PARALLEL, Number(op.config.parallelLimit) || LEGACY_PARALLEL));
     const queue = Object.keys(op.parallel).filter(name => !op.parallel[name].done), running = new Map();
     let failure = null, held = false;
     const launch = name => {
-      const task = runPart(op, name).then(() => progressive(op) && (name === 'readings' || op.earlyApplied) ? applyEarly(op) : null).then(() => null, error => error).then(error => {
+      const task = runPart(op, name).then(() => progressive(op) ? applyEarly(op) : null).then(() => null, error => error).then(error => {
         running.delete(name);
         // Refused before any inference: start again only after a running part has finished.
         if (error?.startRefused && !op.parallel[name].request && running.size) { queue.unshift(name); held = true; return; }
@@ -226,7 +230,7 @@ export function createPipeline({ records, persist, ai, apply, applyPartial = nul
         if (op.discardRequested) throw cancelled();
         for (const holder of requestHolders(op)) if (holder.request?.completed) await release(op, holder);
         while (['plan','prose','notes','readings','enrich'].includes(op.stage)) {
-          // Resumed after the prose: show the chapter again before waiting for the remaining notes.
+          // Resumed with the lead part done: show the chapter again before waiting for the remaining notes.
           if ((op.stage === 'notes' || op.stage === 'enrich') && progressive(op) && !op.earlyApplied) await applyEarly(op);
           if (op.stage === 'enrich') { await runParallel(op); continue; } // each part checks for cancellation itself
           await checkCancelled(op);
@@ -283,7 +287,6 @@ export function createPipeline({ records, persist, ai, apply, applyPartial = nul
           op.request.completed=true;
           save(); // A failed write retains content in memory for explicit Save/Resume.
           await release(op);
-          if (stage === 'prose' && progressive(op) && op.language !== 'ja') await applyEarly(op);
         }
         await checkCancelled(op);
         if (op.stage === 'ready') {
