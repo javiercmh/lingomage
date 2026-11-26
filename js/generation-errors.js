@@ -65,7 +65,7 @@ function usageLimitReason(op, failure) {
 }
 export function recoverySummary(op) {
   const names={create:'Story generation',continue:'Story continuation',rewrite:'Chapter rewrite',examples:'Example generation',notes:'Vocabulary notes rebuild',explain:'Explanation',initial:'Explanation',detail:'More detail',define:'Vocabulary note'};
-  const stages={plan:'language planning',prose:'writing',notes:'vocabulary notes',readings:'Japanese readings',enrich:op.parallel && !op.parallel.readings ? 'vocabulary notes' : 'vocabulary notes and readings',ready:'saving',applied:'finishing the request',setup:'setup',detail:'more detail',initial:'explanation'};
+  const stages={plan:'language planning',prose:'writing',notes:'vocabulary notes',readings:'Japanese readings',enrich:op.parallel && !Object.keys(op.parallel).some(name => name === 'readings' || name.startsWith('readings-')) ? 'vocabulary notes' : 'vocabulary notes and readings',ready:'saving',applied:'finishing the request',setup:'setup',detail:'more detail',initial:'explanation'};
   if (op.discardRequested) return discardFailureMessage(op);
   if (!op.error) return 'An unfinished request has saved progress. Resume it or discard this attempt.';
   const failure=op.failure || failureInfo(new Error(op.error),op.stage);

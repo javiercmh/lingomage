@@ -767,6 +767,7 @@ function showOperationResult(op) {
 // Automatic resends of unreadable replies are announced, never silent (Settings → Advanced).
 function resendStepName(key) {
   if (key.startsWith('notes-')) return `vocabulary notes (part ${key.slice(6)})`;
+  if (key.startsWith('readings-')) return `kanji readings (part ${key.slice(9)})`;
   return {plan:'language plan',prose:'story text',notes:'vocabulary notes',readings:'kanji readings'}[key] || 'AI';
 }
 function announceResend(op, key, count) {

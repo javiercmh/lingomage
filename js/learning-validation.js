@@ -124,6 +124,10 @@ export const MAX_NOTE_PARTS = 8;
 export const MIN_NOTE_PART_UNITS_JA = 250;
 export const noteMinUnits = language => language === 'ja' ? MIN_NOTE_PART_UNITS_JA : MIN_NOTE_PART_UNITS;
 export const noteTargetUnits = language => language === 'ja' ? NOTE_PART_TARGET_UNITS_JA : NOTE_PART_TARGET_UNITS;
+// Japanese readings split the same way when a chapter opens early (same lead paragraph), in larger blocks: a
+// readings request is quicker than a notes request, so fewer parts are needed for the rest of the chapter.
+export const READING_PART_TARGET_UNITS = 1200;
+export const MAX_READING_PARTS = 4;
 // lead: the first part is only the opening paragraph (joined with the next ones while under half of minUnits), so
 // the reader can open the chapter once that short part has its notes; the rest is split as usual.
 export function notesParts(story, maxParts = 1, minUnits = MIN_NOTE_PART_UNITS, targetUnits = 0, { lead = false } = {}) {
@@ -187,21 +191,36 @@ export function readingPlan(content, kind = 'story') {
   }
   return {sections, spans};
 }
-export function attachReadings(content, plan, response, kind = 'story') {
-  if (!response || Object.keys(response).some(key => key !== 'readings') || !Array.isArray(response.readings) || response.readings.length !== plan.spans.length) invalid('Readings must cover exactly the requested kanji IDs without rewriting text.');
-  const readings = new Map();
+// Validates a readings reply that must cover exactly `spans` (all of the plan, or one part's). Returns id → kana.
+export function validateReadings(plan, response, spans = plan.spans) {
+  if (!response || Object.keys(response).some(key => key !== 'readings') || !Array.isArray(response.readings) || response.readings.length !== spans.length) invalid('Readings must cover exactly the requested kanji IDs without rewriting text.');
+  const allowed = new Set(spans.map(span => span.id)), readings = new Map();
   for (const item of response.readings) {
-    if (!item || Object.keys(item).some(key => !['id','reading'].includes(key)) || !Number.isInteger(item.id) || !plan.spans[item.id] || readings.has(item.id)) invalid('A reading ID is missing, duplicated or unknown.');
+    if (!item || Object.keys(item).some(key => !['id','reading'].includes(key)) || !Number.isInteger(item.id) || !allowed.has(item.id) || !plan.spans[item.id] || readings.has(item.id)) invalid('A reading ID is missing, duplicated or unknown.');
     const reading = typeof item.reading === 'string' ? item.reading.trim().normalize('NFC') : '';
     if (!reading || reading.length > 600 || !/^[\p{Script=Hiragana}\p{Script=Katakana}\u3099\u309Aー]+$/u.test(reading)) invalid('A kanji reading must contain kana only.');
     readings.set(item.id, reading);
   }
+  return readings;
+}
+// Kanji spans one readings part covers: the title's in the first part, and the story's that start in its range
+// (up to the next part's start, so nothing between parts is lost).
+export function readingSpansFor(plan, parts, index) {
+  const start = index === 0 ? 0 : parts[index].start, end = index + 1 < parts.length ? parts[index + 1].start : Infinity;
+  return plan.spans.filter(span => span.section === 'title' ? index === 0 : span.start >= start && span.start < end);
+}
+export function attachReadings(content, plan, response, kind = 'story') {
+  return attachReadingMap(content, plan, validateReadings(plan, response), kind);
+}
+// Segments from validated readings. Spans without a reading yet (parts still running) stay plain text.
+export function attachReadingMap(content, plan, readings, kind = 'story') {
   const result = JSON.parse(JSON.stringify(content));
   for (const source of plan.sections) {
     const segments = []; let cursor = 0;
     for (const span of plan.spans.filter(s => s.section === source.section)) {
       if (span.start > cursor) segments.push({text:source.text.slice(cursor,span.start)});
-      segments.push({text:source.text.slice(span.start,span.end),reading:readings.get(span.id)}); cursor=span.end;
+      const reading = readings.get(span.id);
+      segments.push(reading ? {text:source.text.slice(span.start,span.end),reading} : {text:source.text.slice(span.start,span.end)}); cursor=span.end;
     }
     if (cursor < source.text.length) segments.push({text:source.text.slice(cursor)});
     if (segments.map(p=>p.text).join('') !== source.text) invalid('Reading boundaries do not match canonical text.');

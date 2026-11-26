@@ -3,7 +3,7 @@ import { timingEntry } from './generation-timing.js';
 import { aiNotification } from './ai-notification.js';
 import { decodePlan } from './story-generation.js';
 import { PLAN_INSTRUCTIONS, notesInstructions, READING_INSTRUCTIONS } from './prompts.js';
-import { parseContent, validateContentSize, validateProse, validateNotes, validateStory, validateExamples, readingPlan, attachReadings, notesParts, noteMinUnits, noteTargetUnits, mergeNoteParts, SAFEGUARD_VERSION } from './learning-validation.js';
+import { parseContent, validateContentSize, validateProse, validateNotes, validateStory, validateExamples, readingPlan, attachReadings, attachReadingMap, validateReadings, readingSpansFor, READING_PART_TARGET_UNITS, MAX_READING_PARTS, notesParts, noteMinUnits, noteTargetUnits, mergeNoteParts, SAFEGUARD_VERSION } from './learning-validation.js';
 
 // A saved operation can hold several requests: the main one and, for Japanese notes plus readings,
 // one per parallel part. Every cancel, release and recovery path walks all of them.
@@ -35,17 +35,31 @@ export const canResendBroken = (op, key, error) => error?.code === 'invalid_json
 const markResent = (op, key) => { op.retried = { ...(op.retried || {}), [key]: (op.retried?.[key] || 0) + 1 }; return op.retried[key]; };
 const START_REFUSALS = new Set(['request_in_progress', 'usage_limit']);
 const isNotesPart = name => name === 'notes' || name.startsWith('notes-');
+export const isReadingsPart = name => name === 'readings' || name.startsWith('readings-');
+const readingNames = op => Object.keys(op.parallel || {}).filter(isReadingsPart);
+// Split readings parts in chapter order, rebuilt from their saved offsets.
+const readingRanges = op => readingNames(op).filter(name => name !== 'readings').map(name => op.parallel[name]);
 // Parts for a finished prose stage: legacy single "notes" or "notes-1".."notes-N" with canonical offsets.
 // A notes rebuild (kind "notes") keeps the version's saved readings, so it has no readings part.
 // A progressive operation gets a short lead part (the opening paragraph) so the chapter can open once it has
-// notes; Japanese readings come right after it, so they also run early when parts go one at a time.
+// notes. Japanese readings are split the same way (same lead paragraph, larger blocks after it) into
+// readings-1..M, and readings-1 comes right after notes-1, so it also runs early when parts go one at a time.
 const PROGRESSIVE_KINDS = new Set(['create','continue','rewrite']);
 const wantsProgressive = op => op.config.progressive === true && PROGRESSIVE_KINDS.has(op.kind);
 export function enrichmentParts(op) {
   const parts = {}, split = notesParts(op.prose.story, Number(op.config.notesParts) || 1, noteMinUnits(op.language), noteTargetUnits(op.language), {lead:wantsProgressive(op)});
   const readings = op.language === 'ja' && op.kind !== 'notes';
-  if (split.length) split.forEach((part, index) => { parts[`notes-${index + 1}`] = {request:null, done:false, start:part.start, end:part.end}; if (index === 0 && readings) parts.readings = {request:null, done:false}; });
-  else { parts.notes = {request:null, done:false}; if (readings) parts.readings = {request:null, done:false}; }
+  const readingSplit = readings && split.length && wantsProgressive(op) ? notesParts(op.prose.story, MAX_READING_PARTS, noteMinUnits(op.language), READING_PART_TARGET_UNITS, {lead:true}) : [];
+  const addReadings = () => { if (readingSplit.length) readingSplit.forEach((part, index) => { parts[`readings-${index + 1}`] = {request:null, done:false, start:part.start, end:part.end}; }); else parts.readings = {request:null, done:false}; };
+  if (split.length) split.forEach((part, index) => { parts[`notes-${index + 1}`] = {request:null, done:false, start:part.start, end:part.end}; if (index === 0 && readings) addReadings(); });
+  else { parts.notes = {request:null, done:false}; if (readings) addReadings(); }
+  // Order: notes-1, readings-1, then the rest by position so each block's notes and readings arrive together.
+  if (readingSplit.length > 1) {
+    const ordered = {}, rest = Object.keys(parts).filter(name => !['notes-1','readings-1'].includes(name));
+    rest.sort((a, b) => parts[a].start - parts[b].start || (isReadingsPart(a) ? 1 : -1));
+    for (const name of ['notes-1','readings-1',...rest]) ordered[name] = parts[name];
+    return ordered;
+  }
   return parts;
 }
 // Vocabulary notes, Japanese readings and example sentences may use the lighter model saved in op.config.light
@@ -125,11 +139,21 @@ export function createPipeline({ records, persist, ai, apply, applyPartial = nul
     const done = Object.entries(op.parallel || {}).filter(([name, part]) => isNotesPart(name) && part.done).map(([, part]) => part.content);
     return done.length ? validateNotes({glossary:mergeNoteParts(done)}, op.prose, op.language, {requireNotes:false}).glossary : [];
   }
+  // Readings saved so far as segments: the legacy single part's, or the finished split parts' (other kanji plain).
+  function readingsSoFar(op) {
+    const parts = op.parallel || {};
+    if (parts.readings) return parts.readings.done ? parts.readings.content : null;
+    const done = readingNames(op).filter(name => parts[name].done);
+    if (!done.length) return null;
+    const map = new Map(done.flatMap(name => parts[name].content.readings.map(item => [item.id, item.reading])));
+    return attachReadingMap(validateProse(op.prose, op.language), readingPlan(validateProse(op.prose, op.language), op.kind), map, op.kind);
+  }
   async function applyEarly(op) {
-    const parts = op.parallel || {}, readings = parts.readings, lead = parts['notes-1'] || parts.notes;
+    const parts = op.parallel || {}, lead = parts['notes-1'] || parts.notes, readingLead = parts['readings-1'] || parts.readings;
     if (!lead?.done) return; // the opening paragraph has its notes before the chapter opens
-    if (op.language === 'ja' && !readings?.done) return; // Japanese is shown only with its readings
-    const content = {...validateProse(op.prose, op.language), glossary:notesSoFar(op), ...(readings?.done ? {titleSegments:readings.content.titleSegments, storySegments:readings.content.storySegments} : {})};
+    if (op.language === 'ja' && !readingLead?.done) return; // Japanese opens with the opening paragraph's readings
+    const segments = readingsSoFar(op);
+    const content = {...validateProse(op.prose, op.language), glossary:notesSoFar(op), ...(segments ? {titleSegments:segments.titleSegments, storySegments:segments.storySegments} : {})};
     const first = !op.earlyApplied;
     mark('apply'); await applyPartial(op, content, {first});
     if (first) { op.earlyApplied = true; save(); }
@@ -147,19 +171,22 @@ export function createPipeline({ records, persist, ai, apply, applyPartial = nul
     const invalidate = async () => { if (part.request) { part.request.completed=true; part.request.invalid=true; save(); await release(op, part); } };
     await checkCancelled(op, part);
     const canonical = validateProse(op.prose, op.language), plan = readingPlan(canonical, op.kind), notes = isNotesPart(name);
+    // A split readings part asks only for the kanji in its range; it saves {readings:[{id, reading}]}.
+    const ranges = name.startsWith('readings-') ? readingRanges(op) : null, spans = ranges ? readingSpansFor(plan, ranges, Number(name.slice(9)) - 1) : plan.spans;
     if (name === 'readings' && !plan.spans.length) { part.content = attachReadings(canonical, plan, {readings:[]}, op.kind); part.done = true; save(); return; }
+    if (ranges && !spans.length) { part.content = {readings:[]}; part.done = true; save(); return; }
     if (!part.request) {
       const focus = notes && Number.isInteger(part.start) ? {part:Number(name.slice(6)), of:Object.keys(op.parallel).filter(isNotesPart).length, text:canonical.story.slice(part.start, part.end)} : null;
-      const input = notes ? {...op.input,kind:'notes',languagePlan:op.plan,chapter:canonical,...(focus ? {focus} : {})} : {kind:'readings',languageCode:'ja',spans:plan.spans};
+      const input = notes ? {...op.input,kind:'notes',languagePlan:op.plan,chapter:canonical,...(focus ? {focus} : {})} : {kind:'readings',languageCode:'ja',spans};
       partPhase='start';
       let id; const startedAt = now();
-      try { id = await ai.start({...stageModel(op,notes ? 'notes' : name),instructions:notes ? notesInstructions(op.config.noteDensity) : READING_INSTRUCTIONS,input:JSON.stringify(input),...aiNotification(op.kind,notes ? 'notes' : name)}); }
+      try { id = await ai.start({...stageModel(op,notes ? 'notes' : 'readings'),instructions:notes ? notesInstructions(op.config.noteDensity) : READING_INSTRUCTIONS,input:JSON.stringify(input),...aiNotification(op.kind,notes ? 'notes' : 'readings')}); }
       catch (error) { if (START_REFUSALS.has(error?.code)) error.startRefused = true; throw fail(error); }
-      part.request={id,stage:notes ? 'notes' : name,completed:false,startedAt}; startedHere.add(part.request); save();
+      part.request={id,stage:notes ? 'notes' : 'readings',completed:false,startedAt}; startedHere.add(part.request); save();
     }
     await checkCancelled(op, part);
     let response;
-    const stage = notes ? 'notes' : name;
+    const stage = notes ? 'notes' : 'readings';
     try { partPhase='wait'; const raw = await wait(part.request.id); part.request.completedAt = now(); await checkCancelled(op, part); response = parseContent(raw); }
     catch (error) {
       if (op.discardRequested) throw error;
@@ -171,7 +198,8 @@ export function createPipeline({ records, persist, ai, apply, applyPartial = nul
     }
     try {
       partPhase='validation';
-      part.content = notes ? validateNotes(response, op.prose, op.language, {requireNotes:!Number.isInteger(part.start)}) : attachReadings(canonical, plan, response, op.kind);
+      part.content = notes ? validateNotes(response, op.prose, op.language, {requireNotes:!Number.isInteger(part.start)})
+        : ranges ? {readings:[...validateReadings(plan, response, spans)].map(([id, reading]) => ({id, reading}))} : attachReadings(canonical, plan, response, op.kind);
       validateContentSize(part.content);
     } catch (error) { track(op, part.request, stage, name, 'invalid'); fail(error); await invalidate(); throw error; }
     track(op, part.request, stage, name, 'ok');
@@ -203,7 +231,12 @@ export function createPipeline({ records, persist, ai, apply, applyPartial = nul
     const parts = op.parallel, names = Object.keys(parts), noteNames = names.filter(isNotesPart);
     const notes = noteNames.length === 1 && parts.notes ? parts.notes.content
       : validateNotes({glossary:mergeNoteParts(noteNames.map(name => parts[name].content))}, op.prose, op.language);
-    const result = parts.readings ? {...notes, titleSegments:parts.readings.content.titleSegments, storySegments:parts.readings.content.storySegments} : notes;
+    let segments = parts.readings ? parts.readings.content : null;
+    if (!segments && readingNames(op).length) { // split readings: every kanji must have its reading now
+      const canonical = validateProse(op.prose, op.language), plan = readingPlan(canonical, op.kind);
+      segments = attachReadings(canonical, plan, {readings:readingNames(op).flatMap(name => parts[name].content.readings).sort((a, b) => a.id - b.id)}, op.kind);
+    }
+    const result = segments ? {...notes, titleSegments:segments.titleSegments, storySegments:segments.storySegments} : notes;
     validateContentSize(result);
     op.prose = notes; op.result = result;
     op.stage='ready'; op.parallel=null; delete op.partsOneAtATime; save();

@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { createPipeline } from '../js/generation-pipeline.js';
 import { createGenerationController } from '../js/generation-controller.js';
-import { MAX_NOTE_PARTS } from '../js/learning-validation.js';
+import { MAX_NOTE_PARTS, readingPlan, attachReadingMap, readingSpansFor, validateReadings } from '../js/learning-validation.js';
 
 const WORDS = ['Hund', 'Katze', 'Vogel', 'Fisch', 'Pferd', 'Maus'];
 const story = WORDS.map(word => `Der ${word} läuft schnell durch den Garten. `.repeat(30).trim()).join('\n\n');
@@ -79,6 +79,32 @@ function harness({ progressive = true, language = 'de', text = prose, records = 
   assert.ok(partials.every(call => call.segments), 'every early save carries the readings');
 }
 
+{ // Japanese readings split like notes: readings-1 asks only for the title and opening paragraph, the rest in
+  // larger blocks; the chapter opens with the opening's furigana, and the final save has every reading.
+  const ja = { title: '駅', story: Array.from({ length: 12 }, (_, i) => `今日は${i + 1}番目の駅で友だちと会って、電車の時間を確認しました。`.repeat(3)).join('\n') };
+  const h = harness({ language: 'ja', text: ja });
+  await h.pipeline.run(h.op);
+  const readings = [...h.inputs.values()].filter(item => item.label === 'readings');
+  assert.ok(readings.length >= 2 && readings.length <= 4, `readings are split into a few blocks (got ${readings.length})`);
+  const all = readings.flatMap(item => item.input.spans.map(span => span.id));
+  assert.equal(new Set(all).size, all.length, 'no kanji is asked twice');
+  const first = readings[0].input.spans;
+  assert.ok(first.some(span => span.section === 'title'), 'the title is in the first readings part');
+  const leadEnd = ja.story.indexOf('\n', ja.story.indexOf('\n') + 1);
+  assert.ok(first.filter(span => span.section === 'story').every(span => span.start < leadEnd + 1), 'the first part covers only the opening');
+  assert.ok(readings.slice(1).every(item => item.input.spans.length > first.length), 'later blocks are larger');
+  assert.ok(h.op.result.storySegments.filter(seg => /\p{Script=Han}/u.test(seg.text)).every(seg => seg.reading), 'the final save has every reading');
+}
+
+{ // Readings of one part: only its kanji are accepted; kanji of parts still running stay plain text.
+  const c = { title: '駅', story: '電車に乗る。\n学校へ行く。' }, plan = readingPlan(c), ranges = [{ start: 0, end: 6 }, { start: 7, end: 13 }];
+  const first = readingSpansFor(plan, ranges, 0), second = readingSpansFor(plan, ranges, 1);
+  assert.deepEqual(first.map(span => span.text), ['駅', '電車', '乗']); assert.deepEqual(second.map(span => span.text), ['学校', '行']);
+  assert.throws(() => validateReadings(plan, { readings: second.map(span => ({ id: span.id, reading: 'か' })) }, first));
+  const shown = attachReadingMap(c, plan, validateReadings(plan, { readings: first.map(span => ({ id: span.id, reading: 'か' })) }, first));
+  assert.deepEqual(shown.storySegments.slice(4), [{ text: '学校' }, { text: 'へ' }, { text: '行' }, { text: 'く。' }]);
+}
+
 { // A failed part stops the run but the chapter stays shown; discarding then clears the pending mark.
   const h = harness({ failNotes: 'notes-2' });
   await assert.rejects(h.pipeline.run(h.op), /Model failed/);
@@ -126,4 +152,4 @@ function harness({ progressive = true, language = 'de', text = prose, records = 
   assert.equal(stories[0].chapters[1].versions[0].glossary.length, 1);
 }
 
-console.log('PASS progressive notes: chapter opens after its first paragraph has notes (and Japanese readings), growing notes per part, final completion, failure and discard, resume, controller updates');
+console.log('PASS progressive notes: chapter opens after its first paragraph has notes (and Japanese readings, split the same way in larger blocks), growing notes per part, final completion, failure and discard, resume, controller updates');

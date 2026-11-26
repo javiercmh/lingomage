@@ -25,7 +25,8 @@ export function progressSteps(op) {
   else if (op.stage === 'enrich') {
     ['context', 'plan', 'prose'].forEach(key => done.add(key));
     const parts = Object.entries(op.parallel || {}), noteParts = parts.filter(([name]) => name === 'notes' || name.startsWith('notes-'));
-    for (const [name, part] of parts) if (part.done && name === 'readings') done.add(name);
+    const readingParts = parts.filter(([name]) => name === 'readings' || name.startsWith('readings-'));
+    if (readingParts.length && readingParts.every(([, part]) => part.done)) done.add('readings');
     if (noteParts.length && noteParts.every(([, part]) => part.done)) done.add('notes');
     // Split notes show how many parts are saved: "Vocabulary notes · 1 of 3 parts".
     if (noteParts.length > 1) { const step = steps.find(item => item.key === 'notes'); if (step) step.label += ` · ${noteParts.filter(([, part]) => part.done).length} of ${noteParts.length} parts`; }
@@ -37,11 +38,11 @@ export function progressSteps(op) {
   // sequential checkpoints run notes before readings, against display order), else the first unfinished step.
   let activeAssigned = op.stage !== 'enrich' && steps.some(step => step.key === op.stage && !done.has(step.key));
   // A broken reply resent automatically shows on its unfinished step until that step finishes.
-  const resends = key => Math.max(0, ...Object.entries(op.retried || {}).filter(([name]) => name === key || (key === 'notes' && name.startsWith('notes-'))).map(([, count]) => Number(count) || 0));
+  const resends = key => Math.max(0, ...Object.entries(op.retried || {}).filter(([name]) => name === key || name.startsWith(`${key}-`)).map(([, count]) => Number(count) || 0));
   return steps.map(step => {
     if (done.has(step.key)) return { ...step, state: 'done' };
     if (resends(step.key)) step = { ...step, label: `${step.label} · retry ${resends(step.key)} of ${MAX_RESENDS}` };
-    const parallelPart = op.stage === 'enrich' && (step.key === 'notes' || (step.key === 'readings' && op.parallel?.readings));
+    const parallelPart = op.stage === 'enrich' && (step.key === 'notes' || (step.key === 'readings' && Object.keys(op.parallel || {}).some(name => name === 'readings' || name.startsWith('readings-'))));
     if (parallelPart || step.key === op.stage || !activeAssigned) { activeAssigned = true; return { ...step, state: 'active' }; }
     return { ...step, state: 'pending' };
   });

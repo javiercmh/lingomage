@@ -10,7 +10,7 @@ const TIMED_STEPS = ['context', 'plan', 'prose', 'notes', 'readings'];
 
 const finite = value => typeof value === 'number' && Number.isFinite(value);
 const text = value => typeof value === 'string' ? value : '';
-export const stepOf = name => String(name).startsWith('notes') ? 'notes' : String(name);
+export const stepOf = name => String(name).startsWith('notes') ? 'notes' : String(name).startsWith('readings') ? 'readings' : String(name);
 
 // One finished request attempt, appended to op.timings by the pipeline (and, for story context, by the app).
 export function timingEntry({stage, part, model, reasoning, startedAt, completedAt, outcome, approximate}) {
