@@ -16,7 +16,7 @@ import { createPipeline, pendingRequests, MAX_RUNNING, MAX_BROKEN_RESENDS } from
 import { hasStoryContext, progressSummary } from './generation-progress.js';
 import { timingEntry, timingSamples, estimateGeneration, remainingTime, remainingText } from './generation-timing.js';
 import { SAFEGUARD_VERSION, parseContent, validateStory, MAX_NOTE_PARTS } from './learning-validation.js';
-import { PROMPT_VERSION, storyInstructions, chapterInstructions, helpInstructions, NOTE_DENSITIES, DEFAULT_NOTE_DENSITY } from './prompts.js';
+import { PROMPT_VERSION, storyInstructions, chapterInstructions, helpInstructions, NOTE_DENSITIES, DEFAULT_NOTE_DENSITY, scopeGuide } from './prompts.js';
 import { failureInfo, recoverySummary, operationLabel, discardFailureMessage, appendFailureDetails } from './generation-errors.js';
 import { createWorkspaceStorage, createSettingsPersistence, optionalStore, SIGNALS_PATH, USAGE_PATH } from './workspace-storage.js';
 import { createSignalsTracker } from './consultation-signals.js';
@@ -759,7 +759,7 @@ function storyInput() {
   const level = levelDefinition(language, difficulty);
   if (!level) throw new Error('Choose a reading level before generating.');
   const scope = $('reading-scope').value;
-  return JSON.stringify({ language: LANGUAGES[language], languageCode: language, difficulty, framework: LEVELS[language].framework, levelDescription: level.guide, readingStartingPoint: state.standardizedLevels[language] || difficulty, readingSelfReport: level.description, languageExpectations: state.languageExpectations[language] || '', scope, scopeDescription: SCOPES[scope].description, profileVersion: PROFILE_DEFINITIONS.version, topic: $('topic').value.trim(), practice: '' });
+  return JSON.stringify({ language: LANGUAGES[language], languageCode: language, difficulty, framework: LEVELS[language].framework, levelDescription: level.guide, readingStartingPoint: state.standardizedLevels[language] || difficulty, readingSelfReport: level.description, languageExpectations: state.languageExpectations[language] || '', scope, scopeDescription: scopeGuide(scope, language, difficulty), profileVersion: PROFILE_DEFINITIONS.version, topic: $('topic').value.trim(), practice: '' });
 }
 function populateDifficulty(selected = '') {
   const language = $('language').value, select = $('difficulty');
@@ -1100,7 +1100,7 @@ $('reader-edit-submit').addEventListener('click', async () => {
   if (ai.available === false || (Array.isArray(state.models) && !state.models.length && $('ai-setup')?.hidden === false)) { $('reader-edit-error').textContent='Open App² → Settings → AI and connect a provider, then return here.'; return; }
   if (!String(model || '').trim()) { $('reader-edit-error').textContent='No AI model is selected. Open Settings and choose an AI model before generating.'; return; }
   if (Array.isArray(state.models) && !state.models.some(item => item.id === model)) { $('reader-edit-error').textContent='The selected AI model is not available now. Open Settings and choose an available model.'; return; }
-  const input = { topic: story.topic || '', practice: story.practice || (story.words || []).join(', '), language: LANGUAGES[story.language], languageCode: story.language, difficulty, framework: LEVELS[story.language].framework, levelDescription: guideFor(story.language, difficulty), readingSelfReport: readingDescription(story.language, difficulty), languageExpectations: state.languageExpectations[story.language] || '', scope, scopeDescription: SCOPES[scope].description, learnerProfile: { ...profileSnapshot(story), readingStartingPoint: difficulty, readingSelfReport: readingDescription(story.language, difficulty) }, prompt };
+  const input = { topic: story.topic || '', practice: story.practice || (story.words || []).join(', '), language: LANGUAGES[story.language], languageCode: story.language, difficulty, framework: LEVELS[story.language].framework, levelDescription: guideFor(story.language, difficulty), readingSelfReport: readingDescription(story.language, difficulty), languageExpectations: state.languageExpectations[story.language] || '', scope, scopeDescription: scopeGuide(scope, story.language, difficulty), learnerProfile: { ...profileSnapshot(story), readingStartingPoint: difficulty, readingSelfReport: readingDescription(story.language, difficulty) }, prompt };
   const instructions = chapterInstructions(LANGUAGES[story.language], difficulty, guideFor(story.language, difficulty), mode);
   state.readerEditBusy = true; state.readerEditDraft = null; $('path-select').disabled = true;
   const loading = createChapterLoading(mode);

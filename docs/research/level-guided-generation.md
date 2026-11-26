@@ -32,6 +32,15 @@ Consensus follow-up on 2026-11-17. Reviewed the vocabulary-selection paper and t
 - `pulido2007LexicalInferencing` studied 35 adult L2 Spanish learners reading narratives with invented target words. Topic familiarity and knowledge of the surrounding vocabulary were associated with successful inference. [DOI](https://doi.org/10.1093/applin/aml049)
 - `kaivanpanahRahimi2017ContextualClues` studied 67 learners of English. More contextual clues and topic familiarity helped, with about 56% inference accuracy overall. The two reading studies used human-authored texts. Accessible clues in generated prose are an evidence-informed design choice awaiting qualified review across the four languages. [DOI](https://doi.org/10.30827/digibug.53951)
 
+## Text length and scope (2026-11-26)
+
+Consensus search records; abstracts only unless stated.
+
+- More reading of the same story gives more encounters: a book-length treatment produced more incidental word learning and a higher pick-up rate than shorter tasks (`horstCobbMeara1998ClockworkOrange`); number of exposures was the strongest predictor of learning while reading five novel chapters (`godfroidEtAl2017NaturalReading`); words met fewer than eight times in a graded reader were not retained after three months (`waringTakaki2003GradedReader`). Learning across several sessions helped delayed retention (`webbEtAl2023IncidentalMetaAnalysis`), which favours a story continued over chapters.
+- Short texts: one small study of 7th graders and one conference paper on AI-generated texts favour shorter passages; weak evidence.
+- Language models follow vague length instructions poorly and degrade on longer targets (`zhangEtAl2025LIFEBench`, preprint); plain prompts met strict length targets under 30% of the time (`xieLee2025ExactLength`, preprint).
+- No study sets a chapter length for language learners. The app pairs structure with a soft range so Chapter is reliably longer than Scene without a validated quota; the ranges are product choices.
+
 ## Open validation
 
 Qualified review across all four languages and low, middle and high levels; usability evaluation; learner comprehension and retention. Offline fixtures verify engineering behavior, not language suitability.

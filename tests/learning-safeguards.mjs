@@ -20,7 +20,17 @@ const story = (language='de', length='short') => {
   const token=language==='ru' ? 'город' : language==='es-CL' ? 'ciudad' : 'Stadt';
   return {title:token,story:Array(count).fill(token).join(' '),glossary:[{word:token,meaning:'city',forms:[token]}]};
 };
-// PED-004 retires numerical length quotas; technical bounds still apply.
+// Scope guidance (PED-004): structure first plus a soft length range by level band; nothing validates length.
+{
+  const scene = prompts.scopeGuide('scene', 'de', 'A1'), chapter = prompts.scopeGuide('chapter', 'de', 'A1');
+  assert.ok(scene.startsWith('Scene: one place') && scene.includes('120–200 words') && scene.includes('soft guide, not a quota'));
+  assert.ok(chapter.startsWith('Chapter: three to five connected scenes') && chapter.includes('400–700 words'));
+  assert.ok(prompts.scopeGuide('chapter', 'ja', 'N5').includes('900–1,600 characters'), 'Japanese counts characters');
+  assert.ok(prompts.scopeGuide('scene', 'ru', 'C1').includes('400–600 words') && prompts.scopeGuide('chapter', 'es-CL', 'B2').includes('800–1,200 words'));
+  assert.equal(prompts.scopeGuide('longer', 'de', 'A1'), chapter, 'saved Longer passage reads as Chapter');
+  assert.deepEqual(['A1','N4','B1','N2','C2','N1'].map(prompts.levelBand), ['beginner','beginner','intermediate','intermediate','advanced','advanced']);
+}
+// PED-004 retires numerical length quotas as validation; technical bounds still apply.
 for (const language of ['de','ja','ru','es-CL']) {
   const good=story(language);
   assert.ok(validateStory(good,language));
@@ -65,7 +75,7 @@ const legacy=[{text:'食べ物',reading:'たべべもの'}];assert.deepEqual(jap
 const source=appSource();
 for (const language of ['German','Japanese','Russian','Spanish']) {
   const prompt=prompts.storyInstructions(language,'advanced','Nuanced usage.','long');
-  for (const text of ['languagePlan','languageExpectations','no numerical length quota','not a claim of certified CEFR, JLPT or TORFL alignment','Do not impose a fixed beginner curriculum','unless explicitly requested','German preserves noun capitalization','Spanish preserves accents']) assert.ok(prompt.includes(text),text);
+  for (const text of ['languagePlan','languageExpectations','no numerical length is enforced','not a claim of certified CEFR, JLPT or TORFL alignment','Do not impose a fixed beginner curriculum','unless explicitly requested','German preserves noun capitalization','Spanish preserves accents']) assert.ok(prompt.includes(text),text);
   assert.ok(!prompt.includes('return an empty array'));
 }
 {

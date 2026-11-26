@@ -19,6 +19,19 @@ Question: is one notes request, three paragraph parts or about six smaller parts
 
 Times are medians over all six chapters, including the run with an unparseable reply; notes, accuracy and errors cover completed runs only. Interpretation, with limits: six chapters, one uncalibrated judge reply per chapter from the same model family, and wall times that vary with provider load. Splitting shortened time to all notes, most for Russian and Japanese, where single replies are long. Parts also produced more notes (smaller focus means denser coverage; the judge's coverage scores rose and missing-support counts fell), so total output grew and German B1 was not faster. Three parts kept accuracy at the single-request level; about six parts added clearly more major errors (case and aspect explanations) and more headwords with several notes, and would exceed App²'s default six starts per minute alone. Medium effort was neither consistently more accurate nor faster than low. Japanese chapters mostly stay one request at the 600-unit minimum; these Japanese results used a 250-unit minimum, which production adopted for Japanese. Two of 61 generation replies were invalid JSON; with split notes only that part needs a retry. No learning effect or certified accuracy is claimed.
 
+## Scope length comparison (2026-11-26)
+
+Question: do structural scope descriptions (A) or structure plus soft level-band length ranges (C) make Chapter clearly longer than Scene? Four corpus briefs (de-A1-0, ja-N5-0, ru-C1-1, es-CL-C1-0), production story prompt `2026-11-26.4` with only scopeDescription varied, GPT-6.2 Sol low, one sample per cell: 16 requests plus 4 earlier Chapter samples with the old description. Lengths in UTF-16 units (Japanese characters); Scene → Chapter.
+
+| Brief | Old descriptions | A: structure | C: structure + range |
+| --- | --- | --- | --- |
+| German A1 | 943 → 1,052 (1.1×) | 650 → 1,289 (2.0×) | 878 → 2,466 (2.8×) |
+| Japanese N5 | 335 → 576 (1.7×) | 319 → 528 (1.7×) | 309 → 893 (2.9×) |
+| Russian C1 | 3,199 → 3,766 (1.2×) | 2,881 → 4,109 (1.4×) | 2,800 → 7,562 (2.7×) |
+| Spanish C1 | 3,594 → 3,805 (1.1×) | 2,965 → 3,643 (1.2×) | 3,113 → 7,651 (2.5×) |
+
+Under C, scenes fell inside their ranges (for example 149 German words against 120–200, 565 Spanish words against 400–600); two chapters were just under the minimum (Japanese 893 against 900–1,600 characters, Russian 1,189 against 1,200–2,000 words). C chapters had 29–58 paragraphs against 13–33 under A. C was adopted (prompt `2026-11-26.5`). Limits: one sample per cell, one model, scenes in the old column are corpus texts from an earlier prompt; length only, no quality or learning judgement.
+
 ## Note density comparison (2026-11-26)
 
 Question: how do three notes selection rules (Fewer = production prompt `2026-11-26.2`; Standard; More, both with a shared closed-class skip list) and two models compare in note count, underlined share, coverage and accuracy? `scripts/compare-note-density.mjs` ran each rule with GPT-6 Luna and GPT-6.2 Sol, both low effort, with production splitting (3 parts), validation and merging, on eight frozen corpus chapters in two runs: beginners (de-A1-0, ja-N5-0, ru-A1-0, es-CL-A1-0; 44 requests) and advanced (de-C1-0, ja-N1-1, ru-C1-1, es-CL-C1-0; 80 requests). Judge: one anonymous GPT-6.2 Sol low review per model per chapter, comparing that model's three glossaries for errors, missing support for a learner who has just started the level, and redundant notes. "Underlined" is the share of `Intl.Segmenter` word tokens inside a displayed note under the reader's first-occurrence rule (`firstGlossaryMatches`); Japanese segmentation splits particles and endings, so compare its figures only within Japanese. Raw runs stay in the ignored `ai-evals/runs/`.

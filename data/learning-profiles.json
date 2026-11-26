@@ -234,11 +234,11 @@
   "scopes": {
     "scene": {
       "label": "Scene",
-      "description": "One focused event with a natural stopping point."
+      "description": "One focused event in one place, with a natural stopping point."
     },
     "chapter": {
       "label": "Chapter",
-      "description": "Several connected events with room for development."
+      "description": "3–5 linked scenes, about three times a scene."
     }
   },
   "sources": {

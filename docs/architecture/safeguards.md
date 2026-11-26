@@ -45,7 +45,7 @@ Structural validity cannot establish whether a concept is new, whether a reading
 
 ## Integration decision — 2026-10-13
 
-LANG-001 is explicitly retired by the learner-requested [PED-004](../pedagogy/PED-004-level-guided-generation.md) decision to remove numerical length quotas. Short and longer valid content are now accepted within LANG-004 technical maxima. Other registered safeguards remain active and tested. Generation adds a durable language-planning stage before prose; Japanese reading extraction and exact occurrence-ID coverage remain app-owned. Inline notes display once per explanation per chapter version, while validation still checks every form. This integration adds no certification or effectiveness claim.
+LANG-001 is explicitly retired by the learner-requested [PED-004](../pedagogy/PED-004-level-guided-generation.md) decision to remove numerical length quotas. Since 2026-11-26 the writer gets soft length ranges with the Scene and Chapter structure; they are prompt guidance only and LANG-001 remains retired. Short and longer valid content are now accepted within LANG-004 technical maxima. Other registered safeguards remain active and tested. Generation adds a durable language-planning stage before prose; Japanese reading extraction and exact occurrence-ID coverage remain app-owned. Inline notes display once per explanation per chapter version, while validation still checks every form. This integration adds no certification or effectiveness claim.
 
 
 ## Separate notes — 2026-10-13
