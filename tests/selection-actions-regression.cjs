@@ -26,8 +26,8 @@ function button() {
   };
 }
 
-const buttons = Object.fromEntries(['selection-toolbar', 'selection-translate', 'selection-speak', 'selection-explain', 'selection-copy'].map(id => [id, button()]));
-const pending = { translate: deferred(), speak: deferred(), copy: deferred(), generation: deferred() };
+const buttons = Object.fromEntries(['selection-toolbar', 'selection-define', 'selection-translate', 'selection-speak', 'selection-explain', 'selection-copy'].map(id => [id, button()]));
+const pending = { define: deferred(), translate: deferred(), speak: deferred(), copy: deferred(), generation: deferred() };
 const toasts = [];
 const context = {
   state: { readerSelection: { kind: 'body', text: 'Hallo', languageTag: 'de-DE' } },
@@ -36,6 +36,11 @@ const context = {
   window: { getSelection: () => ({removeAllRanges() { context.selectionCleared = true; }}) },
   clearTimeout() {}, selectionTimer: null,
   navigator: { clipboard: { writeText: () => pending.copy.promise } },
+  defineButton: buttons['selection-define'],
+  dictionaryCheckId: 0,
+  positionSelectionToolbar() {},
+  selectedPassage: () => context.state.readerSelection,
+  dictionary: { open: ({text}) => { assert.equal(text, 'Hallo'); return pending.define.promise; } },
   translationLaunching: false,
   translationAvailability: 'available',
   renderTranslationButton() {},
@@ -74,8 +79,17 @@ async function clickAndCheck(id, operation) {
   assert.equal(toasts.length, 0, 'successful copy relies on Android clipboard feedback without an app toast');
   context.state.readerSelection = {kind:'body',text:'Hallo',languageTag:'de-DE'};
   buttons['selection-toolbar'].hidden = false;
+  await clickAndCheck('selection-define', pending.define);
   await clickAndCheck('selection-translate', pending.translate);
   await clickAndCheck('selection-speak', pending.speak);
+
+  context.dictionary.open = async () => { throw Object.assign(new Error('Dictionary removed'), {code:'unavailable'}); };
+  buttons['selection-define'].listeners.click();
+  await flush();
+  assert.equal(buttons['selection-define'].hidden, true, 'an unavailable handler hides Define');
+  assert.equal(buttons['selection-toolbar'].hidden, false, 'failed lookup retains the toolbar');
+  assert.equal(context.state.readerSelection.text, 'Hallo', 'failed lookup retains the selection');
+  assert.equal(toasts.at(-1), 'Could not open dictionary: Dictionary removed');
 
   buttons['selection-explain'].listeners.click();
   await flush();

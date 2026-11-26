@@ -9,7 +9,7 @@ What LingoMage does now, its confirmed requirements and its defaults. Interactio
 | Create | Story from one optional idea-and-topics brief (any language mix), level and scope | [PED-002](../pedagogy/PED-002-contextual-reading-support.md), [PED-004](../pedagogy/PED-004-level-guided-generation.md) |
 | Levels | One self-selected standardized reading level per language, per-story override | [PED-004](../pedagogy/PED-004-level-guided-generation.md) |
 | Reader | Canonical text, furigana (Japanese), text size, vocabulary notes at first occurrence | [PED-002](../pedagogy/PED-002-contextual-reading-support.md) |
-| Help | Explain a selection, More detail, edit and delete saved follow-up questions, examples, device Translate, Speak | [PED-002](../pedagogy/PED-002-contextual-reading-support.md) |
+| Help | Explain a selection, More detail, edit and delete saved follow-up questions, examples, device Translate, device Define (where supported), Speak | [PED-002](../pedagogy/PED-002-contextual-reading-support.md) |
 | Listening | Chapter listening with a sentence player | [PED-002](../pedagogy/PED-002-contextual-reading-support.md) |
 | Story growth | Continue, Rewrite as alternate paths, remove chapters or paths, rebuild derived story memory from saved chapters | [PED-003](../pedagogy/PED-003-story-memory-and-paths.md) |
 | Library | Local stories, latest-activity hero, sort, language filter, bulk delete | `DESIGN.md` (navigation only) |

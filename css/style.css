@@ -280,8 +280,8 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 .reader-prompt { height: 110px; padding: 12px; resize: vertical; }
 .reader-edit-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 /* Floating selection popover, anchored to the selected text. */
-.selection-toolbar { --pop-bg: #1e293b; --pop-ink: #f1f5f9; --pop-line: rgba(203,213,225,.16); --pop-hover: rgba(255,255,255,.09); position: fixed; z-index: 10; top: 0; left: 0; display: flex; flex-wrap: nowrap; align-items: center; gap: 2px; max-width: calc(100vw - 16px); padding: 4px; border: 1px solid var(--pop-line); border-radius: 14px; background: var(--pop-bg); color: var(--pop-ink); box-shadow: 0 4px 6px rgba(0,0,0,.18), 0 10px 28px rgba(0,0,0,.35); animation: selection-pop .12s ease-out; }
-.selection-toolbar[hidden] { display: none; }
+.selection-toolbar { --pop-bg: #1e293b; --pop-ink: #f1f5f9; --pop-line: rgba(203,213,225,.16); --pop-hover: rgba(255,255,255,.09); position: fixed; z-index: 10; top: 0; left: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px; max-width: calc(100vw - 16px); padding: 4px; border: 1px solid var(--pop-line); border-radius: 14px; background: var(--pop-bg); color: var(--pop-ink); box-shadow: 0 4px 6px rgba(0,0,0,.18), 0 10px 28px rgba(0,0,0,.35); animation: selection-pop .12s ease-out; }
+.selection-toolbar[hidden], .selection-toolbar button[hidden] { display: none; }
 @keyframes selection-pop { from { opacity: 0; transform: translateY(4px) scale(.97); } }
 @media (prefers-reduced-motion: reduce) { .selection-toolbar { animation: none; } }
 .selection-toolbar .small-btn, .selection-toolbar .icon-btn { min-height: 44px; border: 0; border-radius: 10px; background: transparent; color: inherit; }

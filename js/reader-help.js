@@ -1,11 +1,11 @@
-// Reader: text selection and its toolbar (Explain, Translate, Listen, Copy), chapter and selection listening,
+// Reader: text selection and its toolbar (Explain, Translate, Define, Listen, Copy), chapter and selection listening,
 // vocabulary-note activation, explanations with follow-ups and examples, saved help cards, the chapter status
 // card and the share dialog's opening. PED-002.
 // The code is the former app.js section, moved verbatim except that bindings other app.js code reassigns are
 // read through accessors (currentPipeline(), currentReaderGeneration(), currentBackgroundRun(), setPlaybackContext()).
 // app.js calls createReaderHelp where the section used to be.
 import { getCanonicalSelection, japaneseSegments, applyExplainedMarks } from './reader-text.js';
-import { speech, translation, ai, save, share, isNative } from './bridge.js';
+import { speech, translation, dictionary, ai, save, share, isNative } from './bridge.js';
 import { chapterSpeechText, speakChapter, speakSelection } from './reader-speech.js';
 import { normalizeReaderControls, createReaderActivation, glossaryForTrigger } from './reader-activation.js';
 import { aiNotification } from './ai-notification.js';
@@ -110,11 +110,14 @@ export function createReaderHelp({
   function showSelectionToolbar() {
     const passage = selectedPassage(); const toolbar = $('selection-toolbar');
     if (!passage) { toolbar.hidden = true; state.readerSelection = null; return; }
-    const translationSelectionChanged = toolbar.hidden || !state.readerSelection ||
-      ['storyId', 'chapterId', 'versionId', 'start', 'end', 'text'].some(key => passage[key] !== state.readerSelection[key]);
+    const selectionChanged = toolbar.hidden || !state.readerSelection ||
+      ['storyId', 'chapterId', 'versionId', 'kind', 'start', 'end', 'text'].some(key => passage[key] !== state.readerSelection[key]);
     if (!state.readerSelection || passage.text !== state.readerSelection.text) closeWordNote();
     state.readerSelection = passage; toolbar.hidden = false;
-    if (translationSelectionChanged) refreshTranslationAvailability();
+    if (selectionChanged) {
+      refreshTranslationAvailability();
+      if (dictionary.supported) refreshDictionaryAvailability();
+    }
     $('selection-speak').disabled = !speech.available;
     $('selection-speak').title = speech.available ? 'Speak selected text' : 'Speech is available in App².';
     positionSelectionToolbar(passage.rect);
@@ -150,11 +153,26 @@ export function createReaderHelp({
       }
     }
   }
+  const defineButton = $('selection-define');
+  let dictionaryCheckId = 0;
+  async function refreshDictionaryAvailability() {
+    if (document.hidden) return;
+    const checkId = ++dictionaryCheckId;
+    let available = false;
+    try { ({ available } = await dictionary.availability()); }
+    catch { /* An unavailable host should leave Define hidden. */ }
+    if (checkId !== dictionaryCheckId || document.hidden || $('selection-toolbar').hidden) return;
+    defineButton.hidden = !available;
+    positionSelectionToolbar();
+  }
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       translationCheckId++;
       translationCheckPending = false;
       renderTranslationButton();
+      dictionaryCheckId++;
+    } else if (dictionary.supported && !$('selection-toolbar').hidden) {
+      refreshDictionaryAvailability();
     }
   });
   window.addEventListener('resize', () => { if (!$('selection-toolbar').hidden) showSelectionToolbar(); });
@@ -986,6 +1004,21 @@ export function createReaderHelp({
         $('selection-toolbar').hidden = true;
       }
       catch { toast('Could not copy the selection.'); }
+    });
+  });
+  defineButton.addEventListener('click', () => {
+    void runSelectionAction(defineButton, async () => {
+      const passage = selectedPassage();
+      if (!passage || defineButton.hidden) return;
+      try { await dictionary.open({ text: passage.text }); }
+      catch (error) {
+        if (error.code === 'unavailable') {
+          dictionaryCheckId++;
+          defineButton.hidden = true;
+          positionSelectionToolbar();
+        }
+        toast(`Could not open dictionary: ${error.message}`);
+      }
     });
   });
   function openShareDialog(story, {chapterIndex = null, trigger}) {
