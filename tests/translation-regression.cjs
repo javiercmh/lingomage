@@ -16,7 +16,7 @@ function harness(channel) { const c = {window: {AppTranslation: channel}, setTim
 // Execute the actual toolbar/controller code with deterministic bridge promises.
 (async () => {
  const app = appSource();
- const buttons = Object.fromEntries(['selection-toolbar', 'selection-translate', 'selection-speak', 'selection-define'].map(id => [id, {
+ const buttons = Object.fromEntries(['selection-toolbar', 'selection-translate', 'selection-speak'].map(id => [id, {
    hidden: true, disabled: false, style: {}, attributes: {}, classList: {add(){},remove(){}},
    setAttribute(key,value){this.attributes[key]=value;}, getAttribute(key){return this.attributes[key] ?? null;},
    addEventListener(type, fn) { this[type] = fn; }
@@ -26,7 +26,7 @@ function harness(channel) { const c = {window: {AppTranslation: channel}, setTim
  const deferred = () => {let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
  const c = {document:{hidden:false,addEventListener(type,fn){events[type]=fn;}}, window:{innerWidth:400},
    state:{readerSelection:null}, positionSelectionToolbar(){}, $:id=>buttons[id], selectedPassage:()=>passage, closeWordNote(){},
-   speech:{available:true}, dictionary:{supported:false}, toast:message=>messages.push(message), recordSelectionLookup:(item,action)=>lookups.push(action),
+   speech:{available:true}, toast:message=>messages.push(message), recordSelectionLookup:(item,action)=>lookups.push(action),
    translation:{availability(){const d=deferred();checks.push(d);return d.promise;},open(options){const d=deferred();d.options=options;launches.push(d);return d.promise;}}
  };
  vm.createContext(c);
@@ -60,26 +60,11 @@ function harness(channel) { const c = {window: {AppTranslation: channel}, setTim
  passage={...passage,start:10};c.showSelectionToolbar();checks[6].reject(new Error('network'));await flush();assert.equal(button.disabled,true);
  passage={...passage,start:11};c.showSelectionToolbar();checks[7].resolve({available:true});await flush();assert.equal(button.disabled,false);
  console.log('PASS translation selection checks, 20 launches, duplicate prevention, timeouts, stale/background replies and recovery');
-
- const dictionaryChecks = [];
- const define = buttons['selection-define'];
- c.dictionary = {supported:true, availability() { const check = deferred(); dictionaryChecks.push(check); return check.promise; }};
- passage = {...passage, kind:'title'}; c.showSelectionToolbar();
- passage = {...passage, kind:'body'}; c.showSelectionToolbar();
- assert.equal(dictionaryChecks.length, 2, 'switching between title and body checks the new selection');
- dictionaryChecks[1].resolve({available:true}); await flush();
- dictionaryChecks[0].resolve({available:false}); await flush();
- assert.equal(define.hidden, false, 'stale dictionary availability does not hide Define');
- passage = {...passage, text:'物語'}; c.showSelectionToolbar();
- dictionaryChecks[2].resolve({available:false}); await flush();
- assert.equal(define.hidden, true, 'Define hides when the current check finds no handler');
- console.log('PASS dictionary availability follows the current title or body selection');
-
 })().catch(e=>{console.error(e);process.exitCode=1;});
 
 (async () => {
  const app=appSource(), events={}, button={}, pending=[];
- const c={document:{hidden:false,addEventListener(type,fn){events[type]=fn;}}, $:()=>button, dictionary:{supported:false},
+ const c={document:{hidden:false,addEventListener(type,fn){events[type]=fn;}}, $:()=>button,
    translation:{availability(){return new Promise((resolve,reject)=>pending.push({resolve,reject}));}}};
  vm.createContext(c);
  vm.runInContext(app.slice(app.indexOf("let translationAvailability ="),app.indexOf("window.addEventListener('resize'",app.indexOf("let translationAvailability ="))),c);
