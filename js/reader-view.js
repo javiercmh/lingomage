@@ -222,6 +222,7 @@ export function createReaderView({
   }
   function closeWordNote(restoreFocus = false) {
     const popover = $('word-note-popover');
+    delete popover.dataset.define;
     if (popover.hidden) return;
     popover.hidden = true;
     if (restoreFocus) state.wordNoteTrigger?.focus();

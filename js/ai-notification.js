@@ -16,6 +16,7 @@ const PROSE = {
 };
 const OTHER = {
   explain: 'Explaining your selection',
+  define: 'Writing a vocabulary note',
   summary: 'Preparing story context',
   'memory-compact': 'Condensing story memory'
 };

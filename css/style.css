@@ -287,6 +287,7 @@ select.field { padding-right: 48px; appearance: none; -webkit-appearance: none; 
 .selection-toolbar .small-btn, .selection-toolbar .icon-btn { min-height: 44px; border: 0; border-radius: 10px; background: transparent; color: inherit; }
 .selection-toolbar .small-btn { min-width: 0; padding: 0 12px; font-size: 13px; white-space: nowrap; }
 .selection-toolbar .icon-btn { width: 44px; height: 44px; }
+@media (max-width: 360px) { .selection-toolbar .small-btn { padding: 0 8px; } }
 .selection-toolbar .icon-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .selection-toolbar button:focus-visible { outline: 2px solid #93c5fd; outline-offset: 1px; }
 .selection-toolbar button.selection-action-active, .selection-toolbar button.selection-action-pressed, .selection-toolbar button:active:not(:disabled) { background: rgba(96,165,250,.2); }
@@ -500,7 +501,7 @@ body.has-app-generation-status .toast { bottom: calc(var(--tabbar-h) + 88px + va
 .reader-actions-menu .menu-icon { width: 16px; height: 16px; vertical-align: -3px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 @media (max-width: 480px) { .reader-panel .reader-title { font-size: 22px; } }
 @media (max-width: 360px) { .reader-title-section { padding: 10px 10px 0; } .reader-title-controls { padding: 10px; gap: 6px; } }
-.selection-toolbar.title-selection #selection-explain { display: none; }
+.selection-toolbar.title-selection #selection-explain, .selection-toolbar.title-selection #selection-define { display: none; }
 
 /* Passages that have a saved explanation: solid underline, distinct from dotted glossary links. */
 .explained-expression { background: rgba(122,167,255,.18); color: inherit; border-bottom: 2px solid rgba(122,167,255,.75); border-radius: 3px; cursor: pointer; -webkit-tap-highlight-color: transparent; }

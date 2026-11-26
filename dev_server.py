@@ -444,6 +444,8 @@ class Handler(SimpleHTTPRequestHandler):
                 response_text = self.mock_readings(request_data)
             elif request_data.get('kind') == 'notes':
                 response_text = self.mock_notes(request_data)
+            elif request_data.get('kind') == 'define':
+                response_text = self.mock_define(request_data)
             elif request_data.get('kind') in {'explain', 'translate', 'examples'}:
                 response_text = self.mock_help(request_data)
             else:
@@ -656,6 +658,18 @@ class Handler(SimpleHTTPRequestHandler):
     @staticmethod
     def mock_words(text, limit):
         return text if len(text) <= limit else text[:limit].rsplit(' ', 1)[0]
+
+    @staticmethod
+    def mock_define(data):
+        """One offline note on the whole word or words around the selection."""
+        text = data.get('chapter', {}).get('story', '')
+        start, end = data.get('start', 0), data.get('end', 0)
+        while start > 0 and text[start - 1].isalnum():
+            start -= 1
+        while end < len(text) and text[end].isalnum():
+            end += 1
+        form = text[start:end].strip() or data.get('passage', '')
+        return json.dumps({'glossary': [{'word': form, 'meaning': f'Offline fixture: the meaning of "{form}" in this sentence.', 'forms': [form]}]}, ensure_ascii=False)
 
     @staticmethod
     def mock_notes(data):

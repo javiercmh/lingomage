@@ -26,8 +26,8 @@ function button() {
   };
 }
 
-const buttons = Object.fromEntries(['selection-toolbar', 'selection-translate', 'selection-speak', 'selection-explain', 'selection-copy'].map(id => [id, button()]));
-const pending = { translate: deferred(), speak: deferred(), copy: deferred(), generation: deferred() };
+const buttons = Object.fromEntries(['selection-toolbar', 'selection-translate', 'selection-define', 'selection-speak', 'selection-explain', 'selection-copy'].map(id => [id, button()]));
+const pending = { define: deferred(), translate: deferred(), speak: deferred(), copy: deferred(), generation: deferred() };
 const toasts = [];
 const context = {
   state: { readerSelection: { kind: 'body', text: 'Hallo', languageTag: 'de-DE' } },
@@ -42,6 +42,7 @@ const context = {
   translation: { open: () => pending.translate.promise },
   speech: { available: true },
   speakSelection: () => pending.speak.promise,
+  defineSelection: selection => { assert.equal(selection.text, 'Hallo', 'Define receives the current selection'); return pending.define.promise; },
   explainSelection(_kind, _action, _followUp, _selection, onTaskStarted) {
     assert.equal(buttons['selection-explain'].attributes['aria-busy'], 'true', 'Explain stays active while the AI task is being created');
     assert.equal(buttons['selection-toolbar'].hidden, false, 'Explain toolbar stays visible until handoff');
@@ -76,6 +77,7 @@ async function clickAndCheck(id, operation) {
   buttons['selection-toolbar'].hidden = false;
   await clickAndCheck('selection-translate', pending.translate);
   await clickAndCheck('selection-speak', pending.speak);
+  await clickAndCheck('selection-define', pending.define);
 
   buttons['selection-explain'].listeners.click();
   await flush();

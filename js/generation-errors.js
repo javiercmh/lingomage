@@ -25,7 +25,7 @@ export function failureInfo(error, stage, phase = '') {
   else if (code === 'not_found') category='unavailable';
   else if (HOST_REASON_CODES.has(code)) category='service';
   else if (/provider|model|connect|Choose a reading level|older app definition|destination|source explanation changed/i.test(message)) category='configuration';
-  else if (/AI response|JSON|glossary|reading|kanji|invalid.*output/i.test(message)) category='validation';
+  else if (/AI response|JSON|glossary|vocabulary note|reading|kanji|invalid.*output/i.test(message)) category='validation';
   else if (code || /service|network|timeout|fetch/i.test(message)) category='service';
   return {category,stage,phase,code,message};
 }
@@ -64,7 +64,7 @@ function usageLimitReason(op, failure) {
   return `The AI provider reported a rate limit or usage limit: ${message}${saved} Resume ${parts.length > 1 ? 'runs the missing parts one at a time' : 'runs the unfinished step again'}; if the limit is your plan's quota, it fails again until the quota resets.`;
 }
 export function recoverySummary(op) {
-  const names={create:'Story generation',continue:'Story continuation',rewrite:'Chapter rewrite',examples:'Example generation',explain:'Explanation',initial:'Explanation',detail:'More detail'};
+  const names={create:'Story generation',continue:'Story continuation',rewrite:'Chapter rewrite',examples:'Example generation',explain:'Explanation',initial:'Explanation',detail:'More detail',define:'Vocabulary note'};
   const stages={plan:'language planning',prose:'writing',notes:'vocabulary notes',readings:'Japanese readings',enrich:op.parallel && !op.parallel.readings ? 'vocabulary notes' : 'vocabulary notes and readings',ready:'saving',applied:'finishing the request',setup:'setup',detail:'more detail',initial:'explanation'};
   if (op.discardRequested) return discardFailureMessage(op);
   if (!op.error) return 'An unfinished request has saved progress. Resume it or discard this attempt.';

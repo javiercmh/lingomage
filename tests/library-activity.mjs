@@ -218,7 +218,7 @@ for (const kind of ['cont', 'rewrite', 'examples']) {
 // Source contract: stamping happens only in the two content-saving paths, never in opens, positions or pre-request saves.
 {
   const app = appSource();
-  assert.equal(app.match(/markStoryActivity\(/g).length, 2, 'app.js stamps only the saved explanation/detail result and an imported story (the controller stamps the other content)');
+  assert.equal(app.match(/markStoryActivity\(/g).length, 3, 'app.js stamps only the saved explanation/detail result, a saved Define note and an imported story (the controller stamps the other content)');
   const body = name => app.slice(app.indexOf(`function ${name}(`), app.indexOf('\n}\n', app.indexOf(`function ${name}(`)));
   assert.match(body('importStoryFromFile'), /markStoryActivity\(story, new Date\(\), 'updated'\);/);
   for (const name of ['persistReaderStory', 'openReader', 'rememberReaderPosition', 'persistReaderPosition']) assert.ok(!/markStoryActivity/.test(body(name)), `${name} does not stamp`);

@@ -1,4 +1,4 @@
-import { resolveGlossaryForms, stripRussianStress, withRussianStress } from './reader-text.js';
+import { glossaryRanges, resolveGlossaryForms, stripRussianStress, withRussianStress } from './reader-text.js';
 
 export const SAFEGUARD_VERSION = '2026-10-14.1';
 // A generous transport/storage bound, independent of note count and reading level.
@@ -93,6 +93,16 @@ export function validateNotes(value, prose, language, { requireNotes = true } = 
   if (!glossary.length && requireNotes) invalid('None of the AI vocabulary notes matched words or phrases that appear in the chapter. The completed prose is preserved; the chapter is not ready yet.');
   // Model annotations are ignored: the app owns Japanese boundaries.
   return { ...canonical, glossary };
+}
+// Define (PED-002): one vocabulary note the learner asked for, on the selected text. It passes the same
+// repair as chapter notes, and at least one of its forms must cover part of the selection, so the new
+// underline lands where the learner selected. Saved with addedBy: 'learner' beside the chapter notes.
+export function validateDefinedNote(value, prose, language, selection) {
+  const { glossary } = validateNotes(value, prose, language, { requireNotes: false });
+  const covers = note => note.forms.some(form => glossaryRanges(prose.story, form).some(range => range.start < selection.end && selection.start < range.end));
+  const note = glossary.find(covers);
+  if (!note) invalid('The vocabulary note did not match the selected text in the chapter.');
+  return { ...note, addedBy: 'learner' };
 }
 // Splitting notes into parts (PED-002): consecutive paragraphs are grouped into at most maxParts parts of
 // at least MIN_NOTE_PART_UNITS UTF-16 units, so a short chapter stays one request. Offsets are canonical.

@@ -42,7 +42,7 @@ export function japaneseSegments(canonical, segments, strict = false) {
   });
 }
 
-function glossaryRanges(canonical, form, firstOnly = false) {
+export function glossaryRanges(canonical, form, firstOnly = false) {
   const ranges=[];
   const wordCharacter = value => Boolean(value && /[\p{L}\p{N}\p{M}_]/u.test(value));
   const usesJapaneseScript = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(form);

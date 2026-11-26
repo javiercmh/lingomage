@@ -26,6 +26,8 @@ User files are seeded only when absent, preserved by updates and never packaged 
 
 ## Library activity
 
+Glossary entries the learner added with Define carry `addedBy: 'learner'` plus `createdAt`, `providerId`, `model` and `promptVersion`; generated notes have no `addedBy`. Readers that ignore these keys still display the note.
+
 Russian glossary entries store an unstressed `word` and optional zero-based `stress` character positions. `forms` still records exact text from the chapter; optional `formStress` maps each form to its stress positions. Lookup history folds Russian combining acute marks out of item keys and saved words while retaining ё and й. Older notes can omit the annotation.
 
 A saved follow-up edit replaces its question and answer and drops the later entries in the same explanation's ordered history, including examples. The story write updates legacy latest-detail fields in the same operation and rolls back the whole edit if the write fails. Deleting one follow-up preserves other entries and updates or clears the legacy latest-detail fields in the same write.

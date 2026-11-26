@@ -49,8 +49,8 @@ function section(start, end) { const at = source.indexOf(start); assert(at >= 0,
   vm.createContext(titleContext); vm.runInContext(section('function selectedTitle(', 'function selectedPassage('), titleContext);
   const passage = titleContext.selectedTitle();
   assert.equal(passage.kind, 'title'); assert.equal(passage.languageTag, 'de-DE'); assert.equal(passage.text, 'Titel');
-  assert(/\.selection-toolbar\.title-selection #selection-explain \{ display: none/.test(fs.readFileSync(path.join(__dirname, '../css/style.css'), 'utf8')), 'Explain is hidden for title selections');
-  console.log('PASS title section structure and title selection uses the custom toolbar without Explain');
+  assert(/\.selection-toolbar\.title-selection #selection-explain, \.selection-toolbar\.title-selection #selection-define \{ display: none/.test(fs.readFileSync(path.join(__dirname, '../css/style.css'), 'utf8')), 'Explain and Define are hidden for title selections');
+  console.log('PASS title section structure and title selection uses the custom toolbar without Explain or Define');
 }
 
 // Explained expressions: newest range owns overlaps; overlapping explanations are detected for replacement.

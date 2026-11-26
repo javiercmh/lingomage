@@ -53,6 +53,19 @@ document.querySelector('#run').addEventListener('click',async event=>{
   await until(()=>!field('selection-toolbar').hidden,'Selection toolbar did not open');field('selection-explain').click();
   await until(()=>field('reader-help').querySelector('.help-card') && !field('reader-help').querySelector('.reader-ai-cancel'),'Explanation did not save');
   selection.removeAllRanges();pass('Canonical selection creates a saved contextual explanation');
+  // Define: a plain word becomes a saved vocabulary note, underlined like the chapter notes and opened in place.
+  const plain=doc().createTreeWalker(field('reader-story'),4);let word=null;
+  while((node=plain.nextNode())){if(node.parentElement.closest('rt,.gloss-note-trigger'))continue;const found=/\p{L}{4,}/u.exec(node.textContent);if(found){word={node,start:found.index,text:found[0]};break;}}
+  assert(word,'No plain word to define');
+  const notesBefore=doc().querySelectorAll('.gloss-note-trigger').length;
+  const wordRange=doc().createRange();wordRange.setStart(word.node,word.start);wordRange.setEnd(word.node,word.start+word.text.length);
+  selection.removeAllRanges();selection.addRange(wordRange);doc().dispatchEvent(new Event('selectionchange'));
+  await until(()=>!field('selection-toolbar').hidden && !field('selection-define').hidden,'Define is not offered for a story selection');field('selection-define').click();
+  await until(()=>!field('word-note-popover').hidden && field('word-note-popover').textContent.includes('Writing a vocabulary note'),'Define showed no progress');
+  await until(()=>doc().querySelectorAll('.gloss-note-trigger').length>notesBefore && !field('word-note-popover').hidden && field('word-note-popover').textContent.includes(word.text) && !doc().querySelector('.reader-ai-cancel'),'Define did not save and open the note');
+  const definedNote=JSON.parse(await read('data/stories.json')).flatMap(story=>story.chapters.flatMap(chapter=>chapter.versions.flatMap(version=>version.glossary||[]))).find(note=>note.addedBy==='learner');
+  assert(definedNote && definedNote.forms.includes(word.text),'Define note was not saved with the chapter notes');
+  selection.removeAllRanges();pass('Define saves a learner vocabulary note and opens it on the word');
   for(const [button,mode] of [['continue-story','continue'],['rewrite-chapter','rewrite']]){
    field(button).click();assert(field('reader-edit-panel').dataset.mode===mode,'Wrong edit mode');field('reader-edit-submit').click();
    await until(()=>field('reader-edit-panel').hidden && !field('reader-edit-submit').disabled,'Chapter edit did not finish');

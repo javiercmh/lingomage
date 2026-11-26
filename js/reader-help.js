@@ -1,4 +1,4 @@
-// Reader: text selection and its toolbar (Explain, Translate, Listen, Copy), chapter and selection listening,
+// Reader: text selection and its toolbar (Explain, Translate, Define, Listen, Copy), chapter and selection listening,
 // vocabulary-note activation, explanations with follow-ups and examples, saved help cards, the chapter status
 // card and the share dialog's opening. PED-002.
 // The code is the former app.js section, moved verbatim except that bindings other app.js code reassigns are
@@ -12,8 +12,9 @@ import { aiNotification } from './ai-notification.js';
 import { timingEntry } from './generation-timing.js';
 import { saveBeforeAcknowledge } from './request-lifecycle.js';
 import { failureInfo, appendFailureDetails, recoverySummary } from './generation-errors.js';
-import { helpInstructions, PROMPT_VERSION } from './prompts.js';
-import { lightModelChoice } from './light-model.js';
+import { helpInstructions, DEFINE_INSTRUCTIONS, PROMPT_VERSION } from './prompts.js';
+import { lightModelChoice, lightTaskConfig } from './light-model.js';
+import { validateDefinedNote } from './learning-validation.js';
 import { markStoryActivity } from './library-activity.js';
 import { shareTargets } from './story-share.js';
 import { pathLabel } from './story-model.js';
@@ -935,6 +936,105 @@ export function createReaderHelp({
       } finally { clearLoading(); }
     } finally { state.readerHelpBusy = false; renderReaderGeneration(); }
   }
+  // Define (PED-002): an on-demand vocabulary note for the selection, saved with the chapter's notes and
+  // underlined like them. A selection inside an existing note opens that note without an AI request.
+  function noteCoveringSelection(passage) {
+    let best = null;
+    for (const fragment of $('reader-story').querySelectorAll('.gloss-note-trigger')) {
+      const info = glossaryForTrigger(fragment);
+      if (!info || info.start > passage.start || info.end < passage.end) continue;
+      if (!best || info.end - info.start < best.end - best.start) best = info;
+    }
+    return best;
+  }
+  let defineRequestHost = null;
+  function showDefinePopover(passage, build) {
+    const popover = $('word-note-popover');
+    closeWordNote(); popover.textContent = '';
+    const item = document.createElement('div'); item.className = 'word-note-entry';
+    const word = document.createElement('strong'); word.textContent = passage.text;
+    item.append(word); build(item, popover); popover.prepend(item);
+    popover.dataset.define = 'true'; popover.hidden = false; popover.focus();
+    const rect = passage.rect || { left: 12, bottom: 12, top: 12 };
+    popover.style.left = `${Math.max(12, Math.min(window.innerWidth - 292, rect.left))}px`;
+    popover.style.top = `${Math.min(window.innerHeight - 20, rect.bottom + 8)}px`;
+    requestAnimationFrame(() => {
+      const box = popover.getBoundingClientRect();
+      if (box.bottom > window.innerHeight - 12) popover.style.top = `${Math.max(12, rect.top - box.height - 8)}px`;
+    });
+  }
+  function defineInProgress() { const popover = $('word-note-popover'); return !popover.hidden && popover.dataset.define === 'true'; }
+  async function defineSelection(selected = state.readerSelection) {
+    const passage = selected; if (!passage || passage.kind === 'title') return;
+    const existing = noteCoveringSelection(passage);
+    if (existing && existing.trigger) { $('selection-toolbar').hidden = true; showWordNote(existing.trigger, existing.notes, existing.surface); return; }
+    if (currentBackgroundRun()) await stopBackgroundContext();
+    if (state.checkpointBlocked || currentPipeline()?.records.length || state.readerHelpBusy || state.readerEditBusy || state.requestId) { toast('Another AI request is still running. Wait for it to finish.'); return; }
+    const story = readerStory();
+    const chapter = normalizeChapters(story).find(item => item.id === passage.chapterId);
+    const version = chapter?.versions.find(item => item.id === passage.versionId);
+    if (story.id !== passage.storyId || !version) return;
+    if (!validTextRange(version.story, passage.start, passage.end) || version.story.slice(passage.start, passage.end) !== passage.text) { toast('Select the word again to define it.'); return; }
+    const config = lightTaskConfig(state);
+    state.readerHelpBusy = true;
+    try {
+      try { persistReaderStory(story); await releaseSavedInference(); }
+      catch (error) { toast(error.message); renderPendingReaderResult(); return; }
+      $('selection-toolbar').hidden = true;
+      if (!defineRequestHost) { defineRequestHost = document.createElement('span'); defineRequestHost.hidden = true; readerPanel().append(defineRequestHost); }
+      showDefinePopover(passage, (item, popover) => {
+        const status = document.createElement('span'); status.setAttribute('role', 'status'); status.textContent = 'Writing a vocabulary note…';
+        const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'word-note-view'; cancel.textContent = 'Cancel';
+        cancel.addEventListener('click', () => { defineRequestHost.querySelector('.reader-ai-cancel')?.click(); });
+        item.append(status); popover.append(cancel);
+      });
+      setReaderGeneration({ storyId: story.id, pathId: story.activePathId, chapterId: chapter.id, versionId: version.id, phase: 'working', message: 'Writing a vocabulary note…' });
+      const sameView = () => state.readerId === story.id && activeChapter().id === chapter.id && activeVersion().id === version.id;
+      try {
+        const input = { language: LANGUAGES[story.language], languageCode: story.language, difficulty: story.difficulty, chapter: { title: version.title || story.title, story: version.story }, start: passage.start, end: passage.end, passage: passage.text, sentence: passage.sentence || '', profile: passage.profile };
+        const raw = await readerAi('define', input, DEFINE_INSTRUCTIONS, defineRequestHost, config);
+        let value;
+        try { value = JSON.parse(String(raw || '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')); }
+        catch { throw new Error('The AI response was not valid JSON.'); }
+        const note = { ...validateDefinedNote(value, { title: version.title || story.title, story: version.story }, story.language, passage), createdAt: new Date().toISOString(), providerId: config.providerId, model: config.model, promptVersion: PROMPT_VERSION };
+        state.pendingReaderResult = { story, saved: false, preview: `${note.word} — ${note.meaning}`, readerLocation: { chapterId: chapter.id, versionId: version.id, helpId: '' }, apply() {
+          const undoActivity = markStoryActivity(story);
+          const before = version.glossary;
+          version.glossary = [...(before || []), note];
+          return () => { if (before === undefined) delete version.glossary; else version.glossary = before; undoActivity(); };
+        } };
+        try { await savePendingReaderResult(); }
+        catch { if (state.readerId === story.id) { closeWordNote(); renderPendingReaderResult(); } return; }
+        if (!sameView()) return;
+        const panel = readerPanel(), current = panel.scrollTop;
+        updateReader(true); panel.scrollTop = current;
+        const added = noteCoveringSelection(passage) || [...$('reader-story').querySelectorAll('.gloss-note-trigger')].map(glossaryForTrigger).find(info => info?.notes.includes(note));
+        // The opened note is the result, so the reader status bar's Ready / View result is not needed.
+        if (added?.trigger) { showWordNote(added.trigger, added.notes, added.surface); if (currentReaderGeneration()?.storyId === story.id) setReaderGeneration(null); }
+      } catch (error) {
+        const cancelled = error.message === 'Request cancelled.' || error.code === 'generation_cancelled';
+        try { await releaseInvalidReaderResponse(); } catch {}
+        if (currentReaderGeneration()?.storyId === story.id) {
+          setReaderGeneration(cancelled
+            ? (state.pendingReaderRequestId ? { ...currentReaderGeneration(), phase: 'cleanup', message: 'Could not finish cancelled request.' } : null)
+            : { ...currentReaderGeneration(), phase: 'error', message: 'Request stopped.' });
+        }
+        if (cancelled) { if (defineInProgress()) closeWordNote(); if (!state.pendingReaderRequestId) toast('Request cancelled'); return; }
+        // The note popover (or a toast after leaving the chapter) carries the failure and Retry, not the status bar.
+        if (!state.pendingReaderRequestId && currentReaderGeneration()?.storyId === story.id && !currentPipeline()?.records.length) setReaderGeneration(null);
+        if (!sameView()) { toast(`Could not define: ${error.message}`); return; }
+        if (currentPipeline()?.records.length) { closeWordNote(); renderCheckpointRecovery(); return; }
+        const retrySelection = JSON.parse(JSON.stringify(passage));
+        showDefinePopover(passage, (item, popover) => {
+          const note = document.createElement('span'); note.setAttribute('role', 'alert');
+          note.textContent = recoverySummary({ kind: 'define', error: error.message, failure: failureInfo(error, 'define') });
+          const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'word-note-view'; retry.textContent = 'Retry';
+          retry.addEventListener('click', () => { closeWordNote(); void defineSelection(retrySelection); });
+          item.append(note); popover.append(retry);
+        });
+      }
+    } finally { state.readerHelpBusy = false; renderReaderGeneration(); }
+  }
   function runSelectionAction(button, action) {
     if (button.getAttribute('aria-busy') === 'true') return Promise.resolve();
     button.classList.add('selection-action-active');
@@ -966,6 +1066,10 @@ export function createReaderHelp({
       try { await speakSelection(speech, passage.text, passage.languageTag); }
       catch (error) { toast(`Could not play audio: ${error.message}`); }
     });
+  });
+  $('selection-define').addEventListener('click', () => {
+    if (state.readerSelection?.kind === 'title') return;
+    void runSelectionAction($('selection-define'), () => defineSelection(state.readerSelection));
   });
   $('selection-explain').addEventListener('click', () => {
     if (state.readerSelection?.kind === 'title') return;
