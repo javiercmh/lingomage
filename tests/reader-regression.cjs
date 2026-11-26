@@ -732,7 +732,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   console.log('PASS story-context failures before a checkpoint show bounded, redacted host reasons with explicit retry');
 
   let cancelAction, rejectWait, cancelCalls=0;
-  const cancelContext=sandbox({state:{models:[{id:'mock'}],model:'mock'},ai:{available:true,providers:async()=>({providers:[{id:'openrouter',connected:true}]}),start:async args=>{assert.equal(args.providerId,'openrouter');assert.deepEqual({title:args.title,body:args.body},{title:'Explaining your selection',body:'Working now. Reopen LingoMage if it pauses between steps.'});return 'cancel-id';},wait:()=>new Promise((_,reject)=>rejectWait=reject),cancel:async()=>{cancelCalls++;rejectWait(Error('cancelled'));},acknowledge:async()=>{}},document:{createElement:()=>({addEventListener:(_,fn)=>cancelAction=fn,remove(){}})}});
+  const cancelContext=sandbox({state:{models:[{id:'mock'}],model:'mock'},ai:{available:true,providers:async()=>({providers:[{id:'openrouter',connected:true}]}),start:async args=>{assert.equal(args.providerId,'openrouter');assert.deepEqual({title:args.title,body:args.body},{title:'Explaining your selection',body:'Working now.'});return 'cancel-id';},wait:()=>new Promise((_,reject)=>rejectWait=reject),cancel:async()=>{cancelCalls++;rejectWait(Error('cancelled'));},acknowledge:async()=>{}},document:{createElement:()=>({addEventListener:(_,fn)=>cancelAction=fn,remove(){}})}});
   cancelContext.aiSession={start:args=>cancelContext.ai.start(args)};
   vm.runInContext(lifecycle + section('async function readerAi(', 'async function acknowledgeReaderResult('),cancelContext);
   const cancellation=cancelContext.readerAi('explain',{},'test');

@@ -14,7 +14,7 @@ for (const [kind, stage, title] of cases) {
   assert.equal(copy.title, title);
   assert.ok(copy.body.length <= 80 && copy.title.length <= 40, 'Notification copy stays concise');
 }
-assert.equal(aiNotification('create').body, 'Working now. Reopen LingoMage if it pauses between steps.');
+assert.equal(aiNotification('create').body, 'Working now.');
 assert.ok(!/keeps going|safe to switch/i.test(aiNotification('create').body), 'No promise that the page keeps orchestrating while suspended');
 assert.equal(aiNotification('unknown').title, 'Working on your story');
 assert.deepEqual(Object.keys(aiNotification('create')), ['title', 'body']);

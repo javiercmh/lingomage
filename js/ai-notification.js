@@ -1,8 +1,8 @@
 // Presentation text for the native "AI request in progress" notification. App² shows it beside the
 // host-derived app name. It never feeds prompts, prompt versions or saved records.
-// Honest about the limits: a running request continues natively, but the web steps between requests
-// run only while Android lets the page run, so a multi-step operation may wait for the learner.
-const BODY = 'Working now. Reopen LingoMage if it pauses between steps.';
+// Kept short: the title names the step. It never promises that the whole operation finishes while
+// LingoMage is in the background (the web steps between requests run only while Android lets the page run).
+const BODY = 'Working now.';
 const STAGES = {
   plan: 'Planning your story',
   notes: 'Writing study notes',
