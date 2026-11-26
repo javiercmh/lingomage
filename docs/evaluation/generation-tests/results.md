@@ -19,6 +19,34 @@ Question: is one notes request, three paragraph parts or about six smaller parts
 
 Times are medians over all six chapters, including the run with an unparseable reply; notes, accuracy and errors cover completed runs only. Interpretation, with limits: six chapters, one uncalibrated judge reply per chapter from the same model family, and wall times that vary with provider load. Splitting shortened time to all notes, most for Russian and Japanese, where single replies are long. Parts also produced more notes (smaller focus means denser coverage; the judge's coverage scores rose and missing-support counts fell), so total output grew and German B1 was not faster. Three parts kept accuracy at the single-request level; about six parts added clearly more major errors (case and aspect explanations) and more headwords with several notes, and would exceed App²'s default six starts per minute alone. Medium effort was neither consistently more accurate nor faster than low. Japanese chapters mostly stay one request at the 600-unit minimum; these Japanese results used a 250-unit minimum, which production adopted for Japanese. Two of 61 generation replies were invalid JSON; with split notes only that part needs a retry. No learning effect or certified accuracy is claimed.
 
+## Note density comparison (2026-11-26)
+
+Question: how do three notes selection rules (Fewer = production prompt `2026-11-26.2`; Standard; More, both with a shared closed-class skip list) and two models compare in note count, underlined share, coverage and accuracy? `scripts/compare-note-density.mjs` ran each rule with GPT-6 Luna and GPT-6.2 Sol, both low effort, with production splitting (3 parts), validation and merging, on eight frozen corpus chapters in two runs: beginners (de-A1-0, ja-N5-0, ru-A1-0, es-CL-A1-0; 44 requests) and advanced (de-C1-0, ja-N1-1, ru-C1-1, es-CL-C1-0; 80 requests). Judge: one anonymous GPT-6.2 Sol low review per model per chapter, comparing that model's three glossaries for errors, missing support for a learner who has just started the level, and redundant notes. "Underlined" is the share of `Intl.Segmenter` word tokens inside a displayed note under the reader's first-occurrence rule (`firstGlossaryMatches`); Japanese segmentation splits particles and endings, so compare its figures only within Japanese. Raw runs stay in the ignored `ai-evals/runs/`.
+
+Beginner chapters (means of four):
+
+| Variant | Notes | Underlined | Judge coverage (1–5) | Missing | Major errors (total) |
+| --- | --- | --- | --- | --- | --- |
+| Luna Fewer | 14 | 14% | 2 | 21 | 0 |
+| Luna Standard | 29 | 23% | 3.75 | 10 | 1 |
+| Luna More | 31 | 25% | 4.25 | 7 | 2 |
+| Sol Fewer | 28 | 21% | 3 | 14 | 0 |
+| Sol Standard | 35 | 26% | 4.25 | 6 | 0 |
+| Sol More | 37 | 26% | 4 | 7 | 0 |
+
+Advanced chapters (means over completed runs):
+
+| Variant | Notes | Underlined | Judge coverage | Missing | Redundant | Major errors (total) | Wall time |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Luna Fewer | 41 | 14% | 3.25 | 20 | 3 | 1 | 11–16 s |
+| Luna Standard (2 of 4 completed) | 80 | 25% | 4 | 12 | 7 | 2 | 14–26 s |
+| Luna More (3 of 4 completed) | 126 | 35% | 4 | 10 | 31 | 2 | 39–52 s |
+| Sol Fewer | 68 | 18% | 4 | 15 | 2 | 1 | 34–50 s |
+| Sol Standard | 112 | 29% | 5 | 3 | 5 | 0 | 63–83 s |
+| Sol More | 239 | 47% | 5 | 2.5 | 71 | 0 | 94–119 s |
+
+Interpretation, with limits: one chapter per language and level, one uncalibrated judge reply per model and chapter from the same model family as one generator, and wall times that vary with provider load. Fewer left beginners without notes on many words the judge considered needed. Standard equalled More at beginner level by design and tapered at C1, where More added many redundant notes. Sol produced about twice as many notes as Luna under Fewer, completed every run and had no major errors under Standard or More, but took two to four times longer; three of Luna's twelve advanced dense-rule runs failed validation (one invalid JSON, two notes without an English explanation). Many "missing" items were free word combinations the prompt deliberately excludes; possessives (*deine Fahrkarte*, *su billete*, *свой билет*) and *У меня есть* were genuine gaps and were added to Standard and More afterwards (prompt `2026-11-26.4`, not re-tested). No learning effect, measured coverage or certified accuracy is claimed.
+
 ## Evaluation interpretation
 
 The corrected model comparison contains 24 matched prose/notes samples: German, Russian, Japanese and Chilean Spanish, three requested levels per language, GPT-6.1 Sol low versus GPT-6 Luna high. The earlier GPT-6 Sol comparison is archived separately and excluded. Original prompt/validator provenance and failed requests are retained.

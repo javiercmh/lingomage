@@ -45,7 +45,7 @@ export function createCreateFlow({
       $('story-form').hidden = true; $('loading-card').hidden = false; { const root = createProgressRoot(); root.hidden = true; delete root.dataset.signature; }
       setCreatingStory(true); setReaderGeneration({storyId:null,phase:'working',message:'Writing your story…'});
       $('generation-status').textContent = ai.developmentMock ? 'Using the offline development response.' : 'Weaving your ideas into a story.';
-      const op = await runContentOperation({kind:'create', language:languageCode, input:requestProfile, profileVersion:PROFILE_DEFINITIONS.version, instructions:storyInstructions(LANGUAGES[languageCode],difficulty,guideFor(languageCode,difficulty)), config:{providerId:provider.id,model:model.id,reasoning:chosenEffort,light:lightModelChoice(state),notesParts:noteParts(),retryBroken:state.retryBrokenReplies !== false}});
+      const op = await runContentOperation({kind:'create', language:languageCode, input:requestProfile, profileVersion:PROFILE_DEFINITIONS.version, instructions:storyInstructions(LANGUAGES[languageCode],difficulty,guideFor(languageCode,difficulty)), config:{providerId:provider.id,model:model.id,reasoning:chosenEffort,light:lightModelChoice(state),notesParts:noteParts(),noteDensity:state.noteDensity,retryBroken:state.retryBrokenReplies !== false}});
       showOperationResult(op);
     } catch (error) {
       if (error.code === 'generation_cancelled') { setReaderGeneration(null); toast('Generation cancelled'); return; }

@@ -29,7 +29,7 @@ function harness({phase,language='ja',kind='create'}={}) {
 }
 const complete=harness();await complete.pipeline.run(complete.op);
 assert.deepEqual(complete.events,['start language-plan','wait language-plan','ack language-plan','start create','wait create','ack create','start notes','wait notes','ack notes','start readings','wait readings','ack readings','apply']);
-assert.deepEqual(complete.titles,['Planning your story','Writing your story','Writing study notes','Adding readings']);
+assert.deepEqual(complete.titles,['Planning your story','Writing your story','Writing vocabulary notes','Adding readings']);
 for(const kind of ['create','continue','rewrite']) for(const phase of ['plan-start','plan-ack','prose-start','notes-start','readings-start']) {
   const h=harness({phase,kind});await assert.rejects(h.pipeline.run(h.op),/cancelled/);
   assert.ok(!h.events.includes('apply'));

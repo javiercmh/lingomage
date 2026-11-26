@@ -1,4 +1,4 @@
-// Light tasks (study notes, Japanese readings, story context summaries) may use a second model chosen
+// Light tasks (vocabulary notes, Japanese readings, story context summaries) may use a second model chosen
 // in Settings. Empty or no longer offered by the provider means the story model and its effort.
 
 // {model, reasoning} for the light tasks of an operation, or null to use the story model.

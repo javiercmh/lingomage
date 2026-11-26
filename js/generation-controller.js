@@ -6,7 +6,7 @@ export function createGenerationController({state, normalizeChapters, ensureStor
   // What each step took (js/generation-timing.js); absent when nothing was measured, as in older records.
   const timingField = op => { const timing = summarizeTimings(op); return timing ? {timing} : {}; };
   function operationProvenance(op) {
-  return {operationId:op.id, promptVersion:op.promptVersion, safeguardVersion:op.safeguardVersion, difficulty:op.input.difficulty,framework:op.input.framework,scope:op.input.scope,languagePlan:op.plan,profileVersion:op.profileVersion,learnerContext:op.input.learnerProfile || {readingStartingPoint:op.input.readingStartingPoint,readingSelfReport:op.input.readingSelfReport,languageExpectations:op.input.languageExpectations}, providerId:op.config.providerId, model:op.config.model, ...(String(op.config.light?.model || '').trim() ? {lightModel:op.config.light.model} : {}), createdAt:op.createdAt, ...timingField(op)};
+  return {operationId:op.id, promptVersion:op.promptVersion, safeguardVersion:op.safeguardVersion, difficulty:op.input.difficulty,framework:op.input.framework,scope:op.input.scope,languagePlan:op.plan,profileVersion:op.profileVersion,learnerContext:op.input.learnerProfile || {readingStartingPoint:op.input.readingStartingPoint,readingSelfReport:op.input.readingSelfReport,languageExpectations:op.input.languageExpectations}, providerId:op.config.providerId, model:op.config.model, ...(op.config.noteDensity ? {noteDensity:op.config.noteDensity} : {}), ...(String(op.config.light?.model || '').trim() ? {lightModel:op.config.light.model} : {}), createdAt:op.createdAt, ...timingField(op)};
 }
 function applyContentOperation(op) {
   const provenance=operationProvenance(op), result=op.result;

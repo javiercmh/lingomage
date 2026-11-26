@@ -2,7 +2,7 @@ import { failureInfo } from './generation-errors.js';
 import { timingEntry } from './generation-timing.js';
 import { aiNotification } from './ai-notification.js';
 import { decodePlan } from './story-generation.js';
-import { PLAN_INSTRUCTIONS, NOTES_INSTRUCTIONS, READING_INSTRUCTIONS } from './prompts.js';
+import { PLAN_INSTRUCTIONS, notesInstructions, READING_INSTRUCTIONS } from './prompts.js';
 import { parseContent, validateContentSize, validateProse, validateNotes, validateStory, validateExamples, readingPlan, attachReadings, notesParts, noteMinUnits, mergeNoteParts, SAFEGUARD_VERSION } from './learning-validation.js';
 
 // A saved operation can hold several requests: the main one and, for Japanese notes plus readings,
@@ -13,7 +13,8 @@ export const pendingRequests = op => requestHolders(op).map(holder => holder.req
 // Checkpoints are user data. Valid stage results are durable before release;
 // the final application is idempotent via operationId on saved records.
 // parallel: run Japanese notes and readings together, and split notes into paragraph parts when
-// op.config.notesParts > 1 (Settings → Split study notes). The app enables it. At most MAX_RUNNING parts
+// op.config.noteDensity (Settings → Vocabulary notes: fewer, standard or more; absent means standard) picks the
+// notes prompt. op.config.notesParts > 1 (Settings → Split vocabulary notes). The app enables it. At most MAX_RUNNING parts
 // run at once. A start the host refuses before any inference (request_in_progress, or App²'s per-app
 // start limit as usage_limit) waits for a running part to finish and starts once more; with nothing
 // running, the operation stops with saved parts. A provider usage_limit during a request stops new parts
@@ -38,7 +39,7 @@ export function enrichmentParts(op) {
   if (op.language === 'ja') parts.readings = {request:null, done:false};
   return parts;
 }
-// Study notes and Japanese readings may use the lighter model saved in op.config.light; the plan and
+// Vocabulary notes and Japanese readings may use the lighter model saved in op.config.light; the plan and
 // the prose always use the main model. A saved operation without `light` uses the main model throughout.
 export const LIGHT_STAGES = new Set(['notes','readings']);
 export function stageModel(op, stage) {
@@ -118,7 +119,7 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
       const input = notes ? {...op.input,kind:'notes',languagePlan:op.plan,chapter:canonical,...(focus ? {focus} : {})} : {kind:'readings',languageCode:'ja',spans:plan.spans};
       partPhase='start';
       let id; const startedAt = now();
-      try { id = await ai.start({...stageModel(op,notes ? 'notes' : name),instructions:notes ? NOTES_INSTRUCTIONS : READING_INSTRUCTIONS,input:JSON.stringify(input),...aiNotification(op.kind,notes ? 'notes' : name)}); }
+      try { id = await ai.start({...stageModel(op,notes ? 'notes' : name),instructions:notes ? notesInstructions(op.config.noteDensity) : READING_INSTRUCTIONS,input:JSON.stringify(input),...aiNotification(op.kind,notes ? 'notes' : name)}); }
       catch (error) { if (START_REFUSALS.has(error?.code)) error.startRefused = true; throw fail(error); }
       part.request={id,stage:notes ? 'notes' : name,completed:false,startedAt}; startedHere.add(part.request); save();
     }
@@ -200,7 +201,7 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
             op.result=attachReadings(validate(op),readingPlan(op.prose,op.kind),{readings:[]},op.kind); op.stage='ready'; save(); break;
           }
           const input = stage === 'plan' ? {...op.input,kind:'language-plan'} : stage === 'prose' ? {...op.input,kind:op.kind,languagePlan:op.plan} : stage === 'notes' ? {...op.input,kind:'notes',languagePlan:op.plan,chapter:validateProse(op.prose,op.language)} : {kind:'readings',languageCode:'ja',spans:readingPlan(op.prose,op.kind).spans};
-          const instructions = stage === 'plan' ? PLAN_INSTRUCTIONS : stage === 'prose' ? op.instructions : stage === 'notes' ? NOTES_INSTRUCTIONS : READING_INSTRUCTIONS;
+          const instructions = stage === 'plan' ? PLAN_INSTRUCTIONS : stage === 'prose' ? op.instructions : stage === 'notes' ? notesInstructions(op.config.noteDensity) : READING_INSTRUCTIONS;
           if (!op.request) {
             mark('start');
             const startedAt = now();

@@ -7,6 +7,7 @@ Shared rules: [languages README](README.md).
 - **Cyrillic only** (confirmed requirement) for story text, notes and headwords, including names; no Latin transliteration anywhere. Target-script validation rejects Latin text. Cyrillic literacy is assumed.
 - **Stress marks** absent by default (product simplification preserving normal spelling) in story prose and generated examples unless the learner requests them. Vocabulary notes show lexical stress on the form as it appears in the text, with ё retained as written; the dictionary form is shown unmarked. Headwords and forms are saved without combining acute marks, with optional stress positions (`stress`, `formStress`) for display.
 - Correct case, number, gender, aspect and agreement; notes link inflected forms to dictionary headwords.
+- Vocabulary notes at Standard and More ([PED-002](../pedagogy/PED-002-contextual-reading-support.md)): personal and demonstrative pronouns, *и/а/но/или*, common prepositions (*в, на, с, к, по, о, у, из*) and *не, да, нет* are not noted on their own; their case government is explained inside the note of the noted word. *Свой* and possession with *у меня есть / у нас* are noted, the construction as one fixed expression.
 
 ## Earlier designs
 

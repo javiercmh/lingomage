@@ -6,6 +6,7 @@ Shared rules: [languages README](README.md).
 
 - Correct noun capitalization, umlauts and ß; correct articles, case, agreement, word order and separable verbs.
 - Glossary notes link inflected story forms to their dictionary headword (the validator checks that declared forms occur in the text, not that they belong to the lemma).
+- Vocabulary notes at Standard and More ([PED-002](../pedagogy/PED-002-contextual-reading-support.md)): articles, personal and demonstrative pronouns, auxiliary *sein/haben/werden* and common prepositions (*in, an, auf, mit, aus, nach*) are not noted on their own; *haben* and *sein* as main verbs are content words. Possessives whose reference may confuse (*ihr* her/their, *sein*) and constructions such as *es gibt* are noted.
 
 ## Earlier designs
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {createPipeline} from '../js/generation-pipeline.js';
 import {validateProse,validateNotes} from '../js/learning-validation.js';
-import {NOTES_INSTRUCTIONS} from '../js/prompts.js';
+import {notesInstructions,NOTE_DENSITIES} from '../js/prompts.js';
 const prose={title:'Am Bahnhof',story:'Mia kauft Brot. Mia geht zum Bahnhof.'};
 const glossary=[{word:'kaufen',meaning:'buy; kauft is singular present',forms:['kauft']},{word:'Brot',meaning:'bread',forms:['Brot']},{word:'Bahnhof',meaning:'railway station',forms:['Bahnhof']}];
 assert.deepEqual(validateProse({...prose,glossary:[{forms:['absent']}]},'de'),prose);
@@ -10,16 +10,17 @@ assert.deepEqual(validateNotes({glossary:[{...glossary[0],forms:['kauft','kaufen
 assert.throws(()=>validateNotes({glossary:[{...glossary[0],forms:['kaufen']},{word:'Zug',meaning:'train',forms:['Zug']}]},prose,'de'),/None of the AI vocabulary notes/);
 assert.throws(()=>validateNotes({glossary:[]},prose,'de'),/at least one/);
 assert.throws(()=>validateNotes({glossary:[{word:'дом',meaning:'home',forms:['Latin']}]},{title:'Дом',story:'Дом'},'ru'),/target script/);
-for(const term of ['likely to be difficult for a learner','may have just started the selected reading target','When in doubt whether a word is difficult, note it','Never note a free combination of ordinary words','When such a verb is split in the sentence, note the attested verb form','Skip routine proper names','Group alternate forms','not a list of dictionary senses','not a claim that any word is known'])assert.ok(NOTES_INSTRUCTIONS.includes(term));
-function harness(fail='') {
-  const events=[];let durable=[],pipeline,currentKind,invalid=fail==='invalid',stop=fail==='cancel',ackFail=fail==='ack',saveFail=fail==='save';
+for(const term of ['likely to be difficult for a learner','may have just started the selected reading target','When in doubt whether a word is difficult, note it'])assert.ok(notesInstructions('fewer').includes(term),term);
+for(const density of NOTE_DENSITIES)for(const term of ['Never note a free combination of ordinary words','When such a verb is split in the sentence, note the attested verb form','Skip routine proper names','Group alternate forms','not a list of dictionary senses','not a claim that any word is known'])assert.ok(notesInstructions(density).includes(term),`${density}: ${term}`);
+function harness(fail='',config={model:'fixture'}) {
+  const events=[];let notesPrompt='',durable=[],pipeline,currentKind,invalid=fail==='invalid',stop=fail==='cancel',ackFail=fail==='ack',saveFail=fail==='save';
   const io={records:[],persist(records){if(saveFail&&records[0]?.stage==='ready'){saveFail=false;throw Error('notes disk');}durable=structuredClone(records);},ai:{
-    async start(args){currentKind=JSON.parse(args.input).kind;events.push(currentKind);if(currentKind==='notes'){assert.deepEqual(JSON.parse(args.input).chapter,prose);if(stop)await pipeline.cancel();}return currentKind;},
+    async start(args){currentKind=JSON.parse(args.input).kind;events.push(currentKind);if(currentKind==='notes')notesPrompt=args.instructions;if(currentKind==='notes'){assert.deepEqual(JSON.parse(args.input).chapter,prose);if(stop)await pipeline.cancel();}return currentKind;},
     async wait(id){if(id==='language-plan')return JSON.stringify({vocabulary:[],grammar:[],guidance:'Natural prose.'});if(id==='notes')return JSON.stringify({glossary:invalid?[{word:'Haus',meaning:'house',forms:['Haus']}]:glossary});return JSON.stringify(prose);},
     async acknowledge(id){const op=durable[0];assert.ok(op.request.completed);if(id==='create')assert.deepEqual(op.prose,prose);if(id==='notes'&&!op.request.invalid){assert.deepEqual(op.prose.story,prose.story);if(ackFail){ackFail=false;throw Error('notes release');}}},async cancel(id){events.push('cancel '+id);}
   },apply(op){assert.equal(op.result.story,prose.story);assert.deepEqual(op.result.glossary,glossary);events.push('apply');}};
-  pipeline=createPipeline(io);const op=pipeline.create({planned:true,kind:'create',language:'de',input:{difficulty:'A1',practice:''},instructions:'prose only',config:{model:'fixture'}});
-  return {pipeline,op,events,io,get durable(){return durable;},repair(){invalid=false;stop=false;}};
+  pipeline=createPipeline(io);const op=pipeline.create({planned:true,kind:'create',language:'de',input:{difficulty:'A1',practice:''},instructions:'prose only',config});
+  return {pipeline,op,events,io,get notesPrompt(){return notesPrompt;},get durable(){return durable;},repair(){invalid=false;stop=false;}};
 }
 let h=harness('invalid');await assert.rejects(h.pipeline.run(h.op),/None of the AI vocabulary notes/);assert.equal(h.op.stage,'notes');assert.deepEqual(h.durable[0].prose,prose);assert.ok(!h.events.includes('apply'));
 h.repair();const records=structuredClone(h.durable);const reloaded=createPipeline({...h.io,records});await reloaded.run(records[0]);assert.deepEqual(h.events,['language-plan','create','notes','notes','apply']);
@@ -30,3 +31,9 @@ let stages=[];const examples={examples:Array(3).fill({sentence:'Brot',translatio
 const pipeline=createPipeline({records:[],persist(){},ai:{start:async args=>{stages.push(JSON.parse(args.input).kind);return 'examples';},wait:async()=>JSON.stringify(examples),acknowledge:async()=>{}},apply(){}});
 await pipeline.run(pipeline.create({kind:'examples',language:'de',input:{},instructions:'examples',config:{}}));assert.deepEqual(stages,['examples']);
 console.log('PASS fixed prose, broad-note prompt, exact forms, note-only reload/retry, cancellation, durable save/release recovery and examples bypass');
+
+// Settings → Vocabulary notes: the density saved in the operation picks the notes prompt; absent means standard.
+for(const [config,density] of [[{model:'fixture'},'standard'],[{model:'fixture',noteDensity:'more'},'more'],[{model:'fixture',noteDensity:'fewer'},'fewer']]){
+  const run=harness('',config);await run.pipeline.run(run.op);assert.equal(run.notesPrompt,notesInstructions(density),density);
+}
+console.log('PASS notes density: saved operation setting selects the notes prompt, standard by default');

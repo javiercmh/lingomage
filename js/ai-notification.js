@@ -5,7 +5,7 @@
 const BODY = 'Working now.';
 const STAGES = {
   plan: 'Planning your story',
-  notes: 'Writing study notes',
+  notes: 'Writing vocabulary notes',
   readings: 'Adding readings'
 };
 const PROSE = {

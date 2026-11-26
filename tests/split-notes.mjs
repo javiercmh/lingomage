@@ -1,4 +1,4 @@
-// Split study notes: paragraph parts, merging, the parallel scheduler, and both rate-limit paths
+// Split vocabulary notes: paragraph parts, merging, the parallel scheduler, and both rate-limit paths
 // (App²'s start limit before inference, the provider's limit during a request). No silent retries.
 import assert from 'node:assert/strict';
 import { createPipeline, pendingRequests, MAX_RUNNING } from '../js/generation-pipeline.js';
@@ -130,4 +130,4 @@ function harness({ notesParts: parts = 3, startRefusals = {}, waitFailures = {},
   assert.equal(resumed.pipeline.records.length, 0);
 }
 
-console.log('PASS split study notes: paragraph parts, merge, parallel limit, App² start refusals and provider rate limits');
+console.log('PASS split vocabulary notes: paragraph parts, merge, parallel limit, App² start refusals and provider rate limits');

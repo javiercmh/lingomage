@@ -218,3 +218,13 @@ console.log('PASS glossary alias migration: term/text normalized once, conflicts
   state.shareVocabularyNotes=false;restoreSettingsSnapshot(state,snapshot);assert.equal(state.shareVocabularyNotes,true,'a rollback restores the saved choice');
   console.log('PASS share vocabulary-notes preference: validation, default off, snapshot and rollback');
 }
+
+{ // Settings → Vocabulary notes: optional fewer/standard/more, absent means standard; rollback restores it.
+  for(const value of ['fewer','standard','more'])assert.equal(validSettings({noteDensity:value}),true,value);
+  for(const value of ['most','',1,null])assert.equal(validSettings({noteDensity:value}),false,String(value));
+  const base={readingPreferences:{},readerFontSize:19};
+  assert.equal(settingsSnapshot(base).noteDensity,'standard');
+  const state={...base,noteDensity:'more'},snapshot=settingsSnapshot(state);assert.equal(snapshot.noteDensity,'more');
+  state.noteDensity='fewer';restoreSettingsSnapshot(state,snapshot);assert.equal(state.noteDensity,'more','a rollback restores the saved choice');
+  console.log('PASS vocabulary-notes density preference: validation, default standard, snapshot and rollback');
+}

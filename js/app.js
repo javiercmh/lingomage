@@ -16,7 +16,7 @@ import { createPipeline, pendingRequests, MAX_RUNNING, MAX_BROKEN_RESENDS } from
 import { hasStoryContext, progressSummary } from './generation-progress.js';
 import { timingEntry, timingSamples, estimateGeneration, remainingTime, remainingText } from './generation-timing.js';
 import { SAFEGUARD_VERSION, parseContent, validateStory } from './learning-validation.js';
-import { PROMPT_VERSION, storyInstructions, chapterInstructions, helpInstructions } from './prompts.js';
+import { PROMPT_VERSION, storyInstructions, chapterInstructions, helpInstructions, NOTE_DENSITIES, DEFAULT_NOTE_DENSITY } from './prompts.js';
 import { failureInfo, recoverySummary, operationLabel, discardFailureMessage, appendFailureDetails } from './generation-errors.js';
 import { createWorkspaceStorage, createSettingsPersistence, optionalStore, SIGNALS_PATH, USAGE_PATH } from './workspace-storage.js';
 import { createSignalsTracker } from './consultation-signals.js';
@@ -86,7 +86,7 @@ function fillScopeOptions(input, selected = 'scene', describe) {
 // reference text in index.html. PREFERRED_MODEL preselects the story model on first use only.
 const PREFERRED_MODEL = 'gpt-6.2-sol';
 const $ = id => document.getElementById(id);
-const state = { languageOrder: Object.keys(LANGUAGES), standardizedLevels: {}, checkpointBlocked: false, stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', lightModel: '', lightReasoning: '', splitNotes: true, retryBrokenReplies: true, notifyWhenReady: false, targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, libraryLanguage: 'all', librarySort: 'recent', storyMenu: null, libraryStale: false, libraryPlainHero: false, deleteTrigger: null, deleteStoryIds: new Set(), storySelectionMode: false, selectedStoryIds: new Set(), storySelectionFocusId: '', explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', readerHistoryEntry: false, speechVersionKey: '', playerEnabled: false, player: null, playerUnits: [], speechRate: 1, followAlong: true, following: true, wordNoteTrigger: null, backgroundStoryContext: true, shareVocabularyNotes: false, readerEditBusy: false, activeChapterRequest: null, readerEditDraft: null };
+const state = { languageOrder: Object.keys(LANGUAGES), standardizedLevels: {}, checkpointBlocked: false, stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', lightModel: '', lightReasoning: '', splitNotes: true, noteDensity: DEFAULT_NOTE_DENSITY, retryBrokenReplies: true, notifyWhenReady: false, targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, libraryLanguage: 'all', librarySort: 'recent', storyMenu: null, libraryStale: false, libraryPlainHero: false, deleteTrigger: null, deleteStoryIds: new Set(), storySelectionMode: false, selectedStoryIds: new Set(), storySelectionFocusId: '', explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', readerHistoryEntry: false, speechVersionKey: '', playerEnabled: false, player: null, playerUnits: [], speechRate: 1, followAlong: true, following: true, wordNoteTrigger: null, backgroundStoryContext: true, shareVocabularyNotes: false, readerEditBusy: false, activeChapterRequest: null, readerEditDraft: null };
 
 // One status record covers Create, continuation, rewrite and explanation requests. It is shown in the reader bar
 // while that story is open and in the page-level bar everywhere else (any tab, reader closed, or another story's reader).
@@ -410,6 +410,7 @@ function syncSettingsControls() {
   if (!state.player) { state.following=state.followAlong; renderPlayerFollow(); }
   $('background-context').checked = state.backgroundStoryContext;
   $('split-notes').checked = state.splitNotes;
+  $('note-density').value = state.noteDensity;
   $('retry-broken').checked = state.retryBrokenReplies;
   paintNotificationControls();
   syncModelControls();
@@ -431,7 +432,7 @@ function buildReasoningOptions(force = false) {
   $('reasoning-label').hidden=!model; select.hidden=!model; select.disabled=!(model?.reasoningLevels || []).length;
   select.value=model?.reasoningLevels?.includes(state.reasoning) ? state.reasoning : '';
 }
-// Settings → Split study notes: up to MAX_RUNNING paragraph parts in parallel, or one request.
+// Settings → Split vocabulary notes: up to MAX_RUNNING paragraph parts in parallel, or one request.
 const noteParts = () => state.splitNotes === false ? 1 : MAX_RUNNING;
 function buildLightModelOptions() {
   const select = $('light-model-select'), effort = $('light-reasoning-select');
@@ -713,8 +714,8 @@ function showOperationResult(op) {
 }
 // Automatic resends of unreadable replies are announced, never silent (Settings → Advanced).
 function resendStepName(key) {
-  if (key.startsWith('notes-')) return `study notes (part ${key.slice(6)})`;
-  return {plan:'language plan',prose:'story text',notes:'study notes',readings:'kanji readings'}[key] || 'AI';
+  if (key.startsWith('notes-')) return `vocabulary notes (part ${key.slice(6)})`;
+  return {plan:'language plan',prose:'story text',notes:'vocabulary notes',readings:'kanji readings'}[key] || 'AI';
 }
 function announceResend(op, key, count) {
   toast(`The ${resendStepName(key)} reply was unreadable. Retrying automatically (${count} of ${MAX_BROKEN_RESENDS}).`);
@@ -1029,7 +1030,7 @@ $('reader-edit-submit').addEventListener('click', async () => {
   const story = readerStory(), chapters = pathChapters(story), chapter = chapters[state.readerChapter], version = activeVersion(chapter), mode = $('reader-edit-panel').dataset.mode;
   const path = selectedPath(story), entries = path.entries.map(entry => ({ ...entry })), rewriteIndex = state.readerChapter;
   const sourceVersion = mode === 'continue' ? activeVersion(chapters[chapters.length - 1]) : version;
-  const providerId = state.providerId, model = state.model, config = { providerId, model, reasoning: state.reasoning, light: lightModelChoice(state), notesParts: noteParts(), retryBroken: state.retryBrokenReplies !== false }, memoryConfig = lightTaskConfig(state);
+  const providerId = state.providerId, model = state.model, config = { providerId, model, reasoning: state.reasoning, light: lightModelChoice(state), notesParts: noteParts(), noteDensity: state.noteDensity, retryBroken: state.retryBrokenReplies !== false }, memoryConfig = lightTaskConfig(state);
   const difficulty = $('reader-level').value, scope = $('reader-scope').value;
   if (!levelDefinition(story.language,difficulty)) { $('reader-edit-error').textContent='Choose a reading level for this generation.'; return; }
   if (ai.available === false || (Array.isArray(state.models) && !state.models.length && $('ai-setup')?.hidden === false)) { $('reader-edit-error').textContent='Open App² → Settings → AI and connect a provider, then return here.'; return; }
@@ -1150,6 +1151,8 @@ $('retry-broken').addEventListener('change', () => { state.retryBrokenReplies = 
 $('notify-ready').addEventListener('change', () => setReadyNotifications($('notify-ready').checked));
 // Estimates follow the form and the model settings they depend on.
 $('split-notes').addEventListener('change', () => { state.splitNotes = $('split-notes').checked; trySaveSettings(); });
+// Settings → Vocabulary notes: picks the notes prompt for chapters started from now on (PED-002).
+$('note-density').addEventListener('change', () => { state.noteDensity = $('note-density').value; trySaveSettings(); });
 $('light-reasoning-select').addEventListener('change', () => { state.lightReasoning = $('light-reasoning-select').value; trySaveSettings(); });
 window.addEventListener('app2:ai:connection', refreshModels);
 window.addEventListener('pageshow', () => { if (document.visibilityState === 'visible') refreshModels(); });
@@ -1157,7 +1160,7 @@ window.addEventListener('pageshow', () => { if (document.visibilityState === 'vi
 document.documentElement.style.colorScheme = 'dark';
 state.stories = JSON.parse(JSON.stringify(workspaceStorage.load('data/stories.json').value));
 loadReaderPositions();
-const settings = workspaceStorage.load('data/settings.json').value; state.providerId = settings.providerId || ''; state.model = settings.model || PREFERRED_MODEL; state.reasoning = settings.reasoning || ''; state.lightModel = settings.lightModel || ''; state.lightReasoning = settings.lightReasoning || ''; state.splitNotes = settings.splitNotes !== false; state.retryBrokenReplies = settings.retryBrokenReplies !== false; state.notifyWhenReady = settings.notifyWhenReady === true;
+const settings = workspaceStorage.load('data/settings.json').value; state.providerId = settings.providerId || ''; state.model = settings.model || PREFERRED_MODEL; state.reasoning = settings.reasoning || ''; state.lightModel = settings.lightModel || ''; state.lightReasoning = settings.lightReasoning || ''; state.splitNotes = settings.splitNotes !== false; state.noteDensity = NOTE_DENSITIES.includes(settings.noteDensity) ? settings.noteDensity : DEFAULT_NOTE_DENSITY; state.retryBrokenReplies = settings.retryBrokenReplies !== false; state.notifyWhenReady = settings.notifyWhenReady === true;
 state.furigana = settings.readingPreferences?.furigana !== false;
 state.readerFontSize = Math.max(15, Math.min(30, Number(settings.readingPreferences?.fontSize) || 19));
 state.speechRate = SPEECH_RATES.includes(Number(settings.readingPreferences?.speechRate)) ? Number(settings.readingPreferences.speechRate) : 1;
@@ -1167,6 +1170,7 @@ state.shareVocabularyNotes = settings.shareVocabularyNotes === true;
 $('retry-broken').checked = state.retryBrokenReplies;
 $('notify-ready').checked = state.notifyWhenReady;
 $('split-notes').checked = state.splitNotes;
+$('note-density').value = state.noteDensity;
 $('background-context').checked = state.backgroundStoryContext;
 state.languageSetupDismissed = settings.languageSetupDismissed === true;
 state.languageOrder = [...new Set([...(Array.isArray(settings.languageOrder) ? settings.languageOrder : []), ...Object.keys(LANGUAGES)])].filter(code => Object.hasOwn(LANGUAGES, code));

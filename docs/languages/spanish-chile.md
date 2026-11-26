@@ -6,6 +6,7 @@ Shared rules: [languages README](README.md). (The file name reflects the earlier
 
 - No fixed regional variety: broadly understandable Spanish by default. Apply a regional variety, register or address form the learner requests in language preferences, and keep learner-supplied wording from their variety.
 - Correct accents, punctuation, agreement and conjugation.
+- Vocabulary notes at Standard and More ([PED-002](../pedagogy/PED-002-contextual-reading-support.md)): articles, personal pronouns (including clitics *me, te, se, lo*), auxiliary *haber*, common prepositions and conjunctions (*a, de, en, con, por, para, y, o, pero, que*) and *no/sí* are not noted on their own; *ser* and *estar* are content verbs and are noted. *Su* (his, her, their, your) is noted with its referent in context.
 
 ## Earlier designs
 

@@ -1,4 +1,4 @@
-// Development-only comparison of split study notes: one request versus paragraph parts requested in parallel.
+// Development-only comparison of split vocabulary notes: one request versus paragraph parts requested in parallel.
 // Uses the production notes prompt, splitting, validation and merging on frozen corpus chapters. Offline it
 // prints the plan; --live runs inference through local `dev_server.py --chatgpt` bridges (one per concurrent
 // request, because one bridge runs one request at a time). Nothing is retried; every raw reply is saved

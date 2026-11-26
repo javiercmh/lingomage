@@ -12,6 +12,7 @@ Shared rules: [languages README](README.md).
 - **Legacy display normalization:** saved annotations (including sentence-wide readings) are normalized for display only when alignment is unique; ambiguous ones keep their original display. Stored data and provenance are unchanged.
 - **Story memory budgets:** chapter pieces for summaries and the recent prose sent to the writer are budgeted in estimated tokens, counting kana, kanji and CJK punctuation as one each, so a Japanese piece holds about 2000 characters (German about 8000) and ends at 「。！？」 without needing a following space ([PED-003](../pedagogy/PED-003-story-memory-and-paths.md)).
 - **Reader:** each annotated segment stays together at line breaks with room for the reading; scalable text must not clip annotations; screen readers must not repeat content. Glossary entries with kanji include the kana reading and a contextual English meaning.
+- **Vocabulary notes at Standard and More** ([PED-002](../pedagogy/PED-002-contextual-reading-support.md)): case and topic particles (は, が, を, に, で, と, も, の, へ, から, まで), the copula だ/です, polite ます endings and the demonstratives これ/それ/この/その are not noted on their own; their role is explained inside the noted word's note (a verb note names its ます form). Content words, including the most basic nouns and verbs at N5, are noted.
 
 ## Rationale and limits
 

@@ -84,7 +84,17 @@ for (const language of ['German','Japanese','Russian','Spanish']) {
   assert.ok(NOTES_INSTRUCTIONS.includes('For Russian only, put a combining acute'));
   assert.ok(NOTES_INSTRUCTIONS.includes('in the dictionary headword and in each listed form'));
 }
-for (const text of ['Note only words and expressions likely to be difficult','single word or a fixed multi-word expression','fixed canonical chapter','Every form must be copied exactly','English explanations only','At least one useful note','do not pad a quota']) assert.ok(NOTES_INSTRUCTIONS.includes(text),text);
+// Settings → Vocabulary notes (PED-002): three selection rules over one shared notes contract; standard is the default.
+assert.deepEqual(prompts.NOTE_DENSITIES, ['fewer','standard','more']);
+assert.equal(prompts.DEFAULT_NOTE_DENSITY, 'standard');
+assert.equal(NOTES_INSTRUCTIONS, prompts.notesInstructions('standard'));
+assert.equal(prompts.notesInstructions('unknown'), prompts.notesInstructions('standard'));
+for (const density of prompts.NOTE_DENSITIES) for (const text of ['single word or a fixed multi-word expression','fixed canonical chapter','Every form must be copied exactly','English explanations only','At least one useful note','do not pad a quota','For Russian only, put a combining acute','When focus is present']) assert.ok(prompts.notesInstructions(density).includes(text), `${density}: ${text}`);
+assert.ok(prompts.notesInstructions('fewer').includes('Note only words and expressions likely to be difficult'));
+assert.ok(!prompts.notesInstructions('fewer').includes('closed-class items'));
+for (const text of ['about 49 of every 50 running words','At the lowest level of a scale (A1, N5), treat only the closed-class items below as known','At higher levels, also skip core vocabulary of lower levels']) assert.ok(prompts.notesInstructions('standard').includes(text), text);
+assert.ok(prompts.notesInstructions('more').includes('Note every content word (noun, verb, adjective, adverb) and every fixed expression'));
+for (const density of ['standard','more']) for (const text of ['Do not note these closed-class items on their own','Japanese case and topic particles','possessive determiners','Russian У меня есть']) assert.ok(prompts.notesInstructions(density).includes(text), `${density}: ${text}`);
 assert.ok(prompts.storyInstructions('Russian','A1','test').includes('canonical title and story'));
 for (const text of ['everyday terms and expressions', 'Use guidance to flag', 'nearby clue in simpler language', 'especially at beginner levels', 'fewer or none are allowed']) {
   assert.ok(PLAN_INSTRUCTIONS.includes(text), text);
