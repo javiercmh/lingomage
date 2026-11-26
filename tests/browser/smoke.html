@@ -66,6 +66,27 @@ document.querySelector('#run').addEventListener('click',async event=>{
   const definedNote=JSON.parse(await read('data/stories.json')).flatMap(story=>story.chapters.flatMap(chapter=>chapter.versions.flatMap(version=>version.glossary||[]))).find(note=>note.addedBy==='learner');
   assert(definedNote && definedNote.forms.includes(word.text),'Define note was not saved with the chapter notes');
   selection.removeAllRanges();pass('Define saves a learner vocabulary note and opens it on the word');
+  // A later, un-underlined occurrence of a noted word (notes underline only the first) opens that note at the word,
+  // with no request or duplicate: define a repeated plain word, then Define its second occurrence.
+  const glossaryCount=()=>read('data/stories.json').then(text=>JSON.parse(text).flatMap(story=>story.chapters.flatMap(chapter=>chapter.versions.flatMap(version=>version.glossary||[]))).length);
+  const plainWords=()=>{const found=[],walk=doc().createTreeWalker(field('reader-story'),4);let text;while((text=walk.nextNode())){if(text.parentElement.closest('rt,.gloss-note-trigger,mark'))continue;for(const match of text.textContent.matchAll(/(?<!\p{L})\p{L}{3,}(?!\p{L})/gu))found.push({node:text,start:match.index,text:match[0]});}return found;};
+  const selectWord=async target=>{const range=doc().createRange();range.setStart(target.node,target.start);range.setEnd(target.node,target.start+target.text.length);selection.removeAllRanges();selection.addRange(range);doc().dispatchEvent(new Event('selectionchange'));await until(()=>!field('selection-toolbar').hidden,'Selection toolbar did not open');};
+  const repeated=plainWords().find((item,index,all)=>all.findIndex(other=>other.text===item.text)!==index);
+  assert(repeated,'No repeated plain word in the fixture story');
+  const first=plainWords().find(item=>item.text===repeated.text);
+  field('word-note-popover').hidden=true;let countBefore=await glossaryCount();
+  await selectWord(first);field('selection-define').click();
+  await until(()=>!doc().querySelector('.reader-ai-cancel') && !field('word-note-popover').hidden && !doc().querySelector('.word-note-skeleton'),'Define did not open the first occurrence note');
+  assert(await glossaryCount()===countBefore+1,'Define did not save the first occurrence');
+  const later=plainWords().find(item=>item.text===repeated.text);
+  assert(later,'The repeated word has no later, un-underlined occurrence');
+  field('word-note-popover').hidden=true;countBefore=await glossaryCount();
+  await selectWord(later);field('selection-define').click();
+  await until(()=>!field('word-note-popover').hidden,'Define did not open the existing note');
+  assert(!doc().querySelector('.word-note-skeleton') && !doc().querySelector('.define-pending'),'Define sent a request for an already noted word');
+  assert(field('word-note-popover').textContent.includes(repeated.text),'The existing note did not open');
+  assert(await glossaryCount()===countBefore,'Define duplicated an existing note');
+  selection.removeAllRanges();pass('Define on a later occurrence of a noted word opens its note without a duplicate');
   for(const [button,mode] of [['continue-story','continue'],['rewrite-chapter','rewrite']]){
    field(button).click();assert(field('reader-edit-panel').dataset.mode===mode,'Wrong edit mode');field('reader-edit-submit').click();
    await until(()=>field('reader-edit-panel').hidden && !field('reader-edit-submit').disabled,'Chapter edit did not finish');

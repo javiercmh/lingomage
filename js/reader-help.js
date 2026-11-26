@@ -4,7 +4,7 @@
 // The code is the former app.js section, moved verbatim except that bindings other app.js code reassigns are
 // read through accessors (currentPipeline(), currentReaderGeneration(), currentBackgroundRun(), setPlaybackContext()).
 // app.js calls createReaderHelp where the section used to be.
-import { getCanonicalSelection, japaneseSegments, applyExplainedMarks } from './reader-text.js';
+import { findGlossaryMatches, getCanonicalSelection, japaneseSegments, applyExplainedMarks } from './reader-text.js';
 import { canonicalRange } from './reader-player.js';
 import { speech, translation, ai, save, share, isNative } from './bridge.js';
 import { chapterSpeechText, speakChapter, speakSelection } from './reader-speech.js';
@@ -948,6 +948,25 @@ export function createReaderHelp({
     }
     return best;
   }
+  // Notes are underlined only at a form's first occurrence, so a later, plain occurrence of a noted word is
+  // found in the glossary itself; its note opens at the selection instead of a duplicate being written.
+  function glossaryCoveringSelection(passage, version) {
+    let best = null;
+    for (const match of findGlossaryMatches(version.story, version.glossary || [], { nested: true })) {
+      if (match.start > passage.start || match.end < passage.end) continue;
+      if (!best || match.end - match.start < best.end - best.start) best = match;
+    }
+    return best;
+  }
+  function openNoteForSelection(passage, version) {
+    const shown = noteCoveringSelection(passage);
+    if (shown?.trigger) { showWordNote(shown.trigger, shown.notes, shown.surface); return true; }
+    const match = glossaryCoveringSelection(passage, version);
+    if (!match) return false;
+    const rect = canonicalRange($('reader-story'), match.start, match.end)?.getBoundingClientRect() || passage.rect;
+    showWordNote(null, match.notes, version.story.slice(match.start, match.end), '', { rect, start: match.start, end: match.end });
+    return true;
+  }
   let defineRequestHost = null;
   function showDefinePopover(passage, build) {
     const popover = $('word-note-popover');
@@ -994,14 +1013,13 @@ export function createReaderHelp({
   function defineInProgress() { const popover = $('word-note-popover'); return !popover.hidden && popover.dataset.define === 'true'; }
   async function defineSelection(selected = state.readerSelection) {
     const passage = selected; if (!passage || passage.kind === 'title') return;
-    const existing = noteCoveringSelection(passage);
-    if (existing && existing.trigger) { $('selection-toolbar').hidden = true; showWordNote(existing.trigger, existing.notes, existing.surface); return; }
-    if (currentBackgroundRun()) await stopBackgroundContext();
-    if (state.checkpointBlocked || currentPipeline()?.records.length || state.readerHelpBusy || state.readerEditBusy || state.requestId) { toast('Another AI request is still running. Wait for it to finish.'); return; }
     const story = readerStory();
     const chapter = normalizeChapters(story).find(item => item.id === passage.chapterId);
     const version = chapter?.versions.find(item => item.id === passage.versionId);
     if (story.id !== passage.storyId || !version) return;
+    if (validTextRange(version.story, passage.start, passage.end) && openNoteForSelection(passage, version)) { $('selection-toolbar').hidden = true; return; }
+    if (currentBackgroundRun()) await stopBackgroundContext();
+    if (state.checkpointBlocked || currentPipeline()?.records.length || state.readerHelpBusy || state.readerEditBusy || state.requestId) { toast('Another AI request is still running. Wait for it to finish.'); return; }
     if (!validTextRange(version.story, passage.start, passage.end) || version.story.slice(passage.start, passage.end) !== passage.text) { toast('Select the word again to define it.'); return; }
     const config = lightTaskConfig(state);
     state.readerHelpBusy = true;
@@ -1043,9 +1061,8 @@ export function createReaderHelp({
         if (!sameView()) return;
         const panel = readerPanel(), current = panel.scrollTop;
         updateReader(true); panel.scrollTop = current;
-        const added = noteCoveringSelection(passage) || [...$('reader-story').querySelectorAll('.gloss-note-trigger')].map(glossaryForTrigger).find(info => info?.notes.includes(note));
         // The opened note is the result, so the reader status bar's Ready / View result is not needed.
-        if (added?.trigger) { showWordNote(added.trigger, added.notes, added.surface); if (currentReaderGeneration()?.storyId === story.id) setReaderGeneration(null); }
+        if (openNoteForSelection(passage, version) && currentReaderGeneration()?.storyId === story.id) setReaderGeneration(null);
       } catch (error) {
         const cancelled = error.message === 'Request cancelled.' || error.code === 'generation_cancelled';
         try { await releaseInvalidReaderResponse(); } catch {}

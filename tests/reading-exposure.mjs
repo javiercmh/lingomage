@@ -74,8 +74,8 @@ function harness(paragraphs, visible = () => 1) {
 // --- App wiring: lookups recorded after user actions; exposure follows the rendered chapter -----------------
 {
   const app = appSource();
-  assert.match(app, /recordNoteLookup\(notes, glossaryForTrigger\(trigger\), 'note'\)/);
-  assert.match(app, /recordNoteLookup\(\[note\], glossaryForTrigger\(trigger\), 'listen'\)/);
+  assert.match(app, /const lookupInfo = at \|\| glossaryForTrigger\(trigger\);\s*recordNoteLookup\(notes, lookupInfo, 'note'\)/, 'a note records at the occurrence it opened on');
+  assert.match(app, /recordNoteLookup\(\[note\], lookupInfo, 'listen'\)/);
   assert.match(app, /opened = true; \}[\s\S]{0,200}if \(opened\) recordSelectionLookup\(passage, 'translate'\)/, 'translate records only after the translator opened');
   assert.match(app, /catch \{ if \(state\.readerId === story\.id\) renderPendingReaderResult\(\); return; \}[\s\S]{0,300}recordSelectionLookup\(passage, action === 'initial' \? 'explain' : action\);/, 'explain and follow-ups record only after the result is saved');
   assert.doesNotMatch(app, /toast\('Explanation saved'\)/, 'saved explanations appear in place without a notice');
