@@ -27,6 +27,8 @@ export function progressSteps(op) {
     const parts = Object.entries(op.parallel || {}), noteParts = parts.filter(([name]) => name === 'notes' || name.startsWith('notes-'));
     const readingParts = parts.filter(([name]) => name === 'readings' || name.startsWith('readings-'));
     if (readingParts.length && readingParts.every(([, part]) => part.done)) done.add('readings');
+    // Split furigana shows its parts too: "Kanji readings · 1 of 3 parts".
+    if (readingParts.length > 1) { const step = steps.find(item => item.key === 'readings'); if (step) step.label += ` · ${readingParts.filter(([, part]) => part.done).length} of ${readingParts.length} parts`; }
     if (noteParts.length && noteParts.every(([, part]) => part.done)) done.add('notes');
     // Split notes show how many parts are saved: "Vocabulary notes · 1 of 3 parts".
     if (noteParts.length > 1) { const step = steps.find(item => item.key === 'notes'); if (step) step.label += ` · ${noteParts.filter(([, part]) => part.done).length} of ${noteParts.length} parts`; }

@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { createPipeline } from '../js/generation-pipeline.js';
 import { createGenerationController } from '../js/generation-controller.js';
 import { firstGlossaryMatches } from '../js/reader-text.js';
+import { progressSteps } from '../js/generation-progress.js';
 import { MAX_NOTE_PARTS, readingPlan, attachReadingMap, readingSpansFor, validateReadings } from '../js/learning-validation.js';
 
 const WORDS = ['Hund', 'Katze', 'Vogel', 'Fisch', 'Pferd', 'Maus'];
@@ -95,6 +96,12 @@ function harness({ progressive = true, language = 'de', text = prose, records = 
   const leadEnd = ja.story.indexOf('\n', ja.story.indexOf('\n') + 1);
   assert.ok(first.filter(span => span.section === 'story').every(span => span.start < leadEnd + 1), 'the first part covers only the opening');
   assert.ok(h.op.result.storySegments.filter(seg => /\p{Script=Han}/u.test(seg.text)).every(seg => seg.reading), 'the final save has every reading');
+}
+
+{ // Progress counts split furigana parts like notes parts.
+  const steps = progressSteps({ kind: 'create', language: 'ja', stage: 'enrich', parallel: { 'notes-1': { done: true }, 'readings-1': { done: true }, 'notes-2': { done: false }, 'readings-2': { done: false } } });
+  assert.equal(steps.find(step => step.key === 'readings').label, 'Kanji readings · 1 of 2 parts');
+  assert.equal(steps.find(step => step.key === 'notes').label, 'Vocabulary notes · 1 of 2 parts');
 }
 
 { // Readings of one part: only its kanji are accepted; kanji of parts still running stay plain text.
