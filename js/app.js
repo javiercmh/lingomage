@@ -107,7 +107,7 @@ function generationView(status) {
   if (pending && pending.story.id === status.storyId) return { message: pending.saved ? 'Response saved. Finish request.' : 'Response needs saving.', action: pending.saved ? 'Finish request' : 'Save response', dismiss: false };
   // Define shows its progress and Cancel in the note popover at the word, so the bar stays hidden while that is open.
   if (status.phase === 'working' && status.kind === 'define' && definePopoverOpen()) return null;
-  if (status.phase === 'working') return generationLive() ? { message: status.message, action: 'Cancel request', dismiss: false, working: true } : null;
+  if (status.phase === 'working') return generationLive() ? { message: status.message, action: 'Cancel', dismiss: false, working: true } : null;
   return { message: status.message, action: { cleanup: 'Finish request', error: 'Review', ready: 'View result' }[status.phase] || '', dismiss: true };
 }
 function paintGenerationBar(bar, view) {
@@ -119,6 +119,7 @@ function paintGenerationBar(bar, view) {
   $(action).hidden = !view.action; $(action).textContent = view.action;
   $(action).disabled = Boolean(view.working) && !cancelAvailable();
   $(dismiss).hidden = !view.dismiss;
+  bar.classList.toggle('working', Boolean(view.working)); // the compact bar shows a spinner while work runs
 }
 // Cancel is possible only while an operation stage or a memory request is live; the chapter card follows the bar.
 function cancelAvailable() { return !pipeline?.records?.[0]?.discardRequested && Boolean(pipeline?.busy || state.activeChapterRequest && !state.activeChapterRequest.cancelledByUser || document.querySelector('.reader-ai-cancel')); }
@@ -701,7 +702,7 @@ const { operationProvenance, applyContentOperation, clearNotesPending } = create
 // their parts finish. The status bar keeps Cancel and counts saved note parts; the reader keeps its place.
 function notesProgressMessage(op) {
   const parts = Object.entries(op.parallel || {}).filter(([name]) => name === 'notes' || name.startsWith('notes-'));
-  return parts.length > 1 ? `Adding vocabulary notes · ${parts.filter(([, part]) => part.done).length} of ${parts.length}` : 'Adding vocabulary notes…';
+  return parts.length > 1 ? `Notes ${parts.filter(([, part]) => part.done).length} of ${parts.length}` : 'Adding notes…';
 }
 function refreshReaderInPlace(storyId) {
   if (state.readerId !== storyId || !$('reader-dialog').open) return;

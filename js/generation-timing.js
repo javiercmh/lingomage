@@ -50,6 +50,9 @@ export function summarizeTimings(op) {
     if (key === 'notes') step.parts = new Set(own.map(entry => entry.part || entry.stage)).size;
     steps[key] = step;
   }
+  // A chapter shown before its notes finished: how long after the first notes or readings request it opened.
+  const enrich = entries.filter(entry => ['notes', 'readings'].includes(stepOf(entry.stage))).map(entry => entry.startedAt);
+  if (steps.notes && finite(op.openedAt) && enrich.length && op.openedAt >= Math.min(...enrich)) steps.notes.openMs = op.openedAt - Math.min(...enrich);
   if (!Object.keys(steps).length) return null;
   return {version: 1, steps, totalMs: busyTime(intervals), ...(approximate ? {approximate: true} : {})};
 }
@@ -67,7 +70,7 @@ export function timingSamples(stories) {
           if (!step || !finite(step.ms) || step.ms <= 0) continue;
           const requests = key === 'context' ? Number(step.requests) : 1;
           if (!(requests >= 1)) continue;
-          samples.push({step: key, ms: step.ms / requests, model: text(step.model), reasoning: text(step.reasoning), language: text(story.language), scope: text(version.scope) === 'longer' ? 'chapter' : text(version.scope), parts: Number(step.parts) || 1, at: Date.parse(version.createdAt || '') || 0});
+          samples.push({step: key, ms: step.ms / requests, ...(key === 'notes' && finite(step.openMs) && step.openMs > 0 ? {openMs: step.openMs} : {}), model: text(step.model), reasoning: text(step.reasoning), language: text(story.language), scope: text(version.scope) === 'longer' ? 'chapter' : text(version.scope), parts: Number(step.parts) || 1, at: Date.parse(version.createdAt || '') || 0});
         }
       }
     }
@@ -82,7 +85,10 @@ function quantile(sorted, q) {
 // Median of the most similar past runs: first the same model, reasoning effort, language,
 // scope (and, for notes, whether they were split: the part count depends on chapter length, which is unknown
 // before the prose exists), then the same model and effort, then the same model only.
+// step.opens (a chapter that opens before its notes finish): the notes step counts only until it opened (openMs),
+// from runs that recorded it; otherwise the whole step.
 export function stepStats(samples, step) {
+  if (step.opens) { const opened = stepStats(samples.filter(sample => sample.openMs).map(sample => ({...sample, ms: sample.openMs})), {...step, opens: false}); if (opened) return opened; }
   const own = samples.filter(sample => sample.step === step.key && sample.model === step.model);
   const levels = [
     sample => sample.reasoning === step.reasoning && sample.language === step.language && (step.key === 'context' || step.key === 'readings' || sample.scope === step.scope) && (step.key !== 'notes' || (sample.parts > 1) === (step.parts > 1)),
@@ -113,7 +119,8 @@ export function plannedSteps(plan) {
   if (plan.contextRequests > 0) steps.push({key: 'context', ...common, ...(plan.context || modelFor('memory')), requests: plan.contextRequests});
   if (plan.kind !== 'examples' && plan.kind !== 'notes') steps.push({key: 'plan', ...common, ...main});
   if (plan.kind !== 'notes') steps.push({key: 'prose', ...common, ...(plan.kind === 'examples' ? modelFor('examples') : main)});
-  if (plan.kind !== 'examples') steps.push({key: 'notes', ...common, ...light, parts: Math.max(1, Number(plan.notesParts) || 1)});
+  const parts = Math.max(1, Number(plan.notesParts) || 1), opens = plan.progressive === true && parts > 1 && ['create', 'continue', 'rewrite'].includes(plan.kind);
+  if (plan.kind !== 'examples') steps.push({key: 'notes', ...common, ...light, parts, ...(opens ? {opens: true} : {})});
   if (plan.language === 'ja' && plan.kind !== 'notes') steps.push({key: 'readings', ...common, ...modelFor('readings')});
   return steps;
 }
@@ -129,8 +136,11 @@ export function estimateGeneration(plan, samples) {
     const times = step.requests || 1;
     steps[step.key] = {median: stats.median * times};
   }
+  // Opening early waits for the first readings part too; the measured time to open already includes it.
+  const opens = plannedSteps(plan).some(step => step.opens);
+  if (opens && steps.readings && steps.notes) steps.readings = {...steps.notes};
   const total = Object.entries(steps).reduce((sum, [key, value]) => key === 'readings' && steps.notes ? sum : sum + (key === 'notes' && steps.readings ? Math.max(value.median, steps.readings.median) : value.median), 0);
-  return {steps, total};
+  return {steps, total, ...(opens ? {opens: true} : {})};
 }
 
 // Time left while running: done steps count nothing, waiting steps their median, the running step what is
@@ -151,10 +161,12 @@ export function remainingTime(estimate, steps, elapsed = {}) {
 }
 
 const minutes = count => `${count} minute${count === 1 ? '' : 's'}`;
-// Shown only while running, as one rounded figure; never a precise countdown.
-export function remainingText(remaining) {
+// Shown only while running, as one rounded figure; never a precise countdown. opens: the estimate counts to when
+// the chapter can be read (it opens before its notes finish), so it says so.
+export function remainingText(remaining, { opens = false } = {}) {
   if (!remaining) return '';
   if (remaining.over) return 'Taking longer than usual';
-  if (remaining.ms < 45000) return 'Less than a minute left';
-  return `About ${minutes(Math.max(1, Math.round(remaining.ms / 60000)))} left`;
+  if (remaining.ms < 45000) return opens ? 'Ready to read in less than a minute' : 'Less than a minute left';
+  const amount = minutes(Math.max(1, Math.round(remaining.ms / 60000)));
+  return opens ? `Ready to read in about ${amount}` : `About ${amount} left`;
 }

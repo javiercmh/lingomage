@@ -52,7 +52,7 @@ const visible = (t, id) => !t.element(id).hidden;
   t.element('reader-dialog').open = true; context.state.readerId = 'story';
   context.setReaderGeneration({storyId: 'story', phase: 'working', message: 'Writing…'});
   assert.equal(visible(t, 'reader-generation-bar'), true); assert.equal(visible(t, 'generation-status-bar'), false);
-  assert.equal(t.element('reader-generation-action').textContent, 'Cancel request');
+  assert.equal(t.element('reader-generation-action').textContent, 'Cancel'); assert.ok(t.element('reader-generation-bar').classList.contains('working'), 'a spinner shows while work runs');
   assert.equal(t.element('reader-generation-dismiss').hidden, true);
   assert.ok(t.classes.has('reader-panel:has-generation-status'));
   // Rendering unchanged text does not rewrite the live region.

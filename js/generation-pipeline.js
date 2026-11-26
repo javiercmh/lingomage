@@ -160,7 +160,7 @@ export function createPipeline({ records, persist, ai, apply, applyPartial = nul
     const content = {...validateProse(op.prose, op.language), glossary:notesSoFar(op), ...(segments ? {titleSegments:segments.titleSegments, storySegments:segments.storySegments} : {})};
     const first = !op.earlyApplied;
     mark('apply'); await applyPartial(op, content, {first});
-    if (first) { op.earlyApplied = true; save(); }
+    if (first) { op.earlyApplied = true; op.openedAt = now(); save(); } // openedAt: time-to-read estimates (js/generation-timing.js)
   }
   // Japanese notes and readings both need only the saved prose, so they run together. Each part keeps
   // its own request and validated content; a failed part never discards a finished one.

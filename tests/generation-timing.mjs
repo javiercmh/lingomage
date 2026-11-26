@@ -179,6 +179,26 @@ const plan = (extra = {}) => ({ kind: 'create', language: 'de', scope: 'scene', 
   assert.equal(remainingTime(ja, progressSteps({ kind: 'create', language: 'ja', stage: 'enrich', parallel: { notes: {}, readings: {} } }), {}).ms, 90000);
 }
 
+{ // A chapter that opens before its notes finish: the estimate counts to opening, from runs that recorded it.
+  const op = { timings: [
+    { stage: 'prose', model: 'main', reasoning: 'low', startedAt: 0, completedAt: 10000, outcome: 'ok' },
+    { stage: 'notes', part: 'notes-1', model: 'main', reasoning: 'low', startedAt: 10000, completedAt: 14000, outcome: 'ok' },
+    { stage: 'notes', part: 'notes-2', model: 'main', reasoning: 'low', startedAt: 10000, completedAt: 30000, outcome: 'ok' }], openedAt: 14500 };
+  assert.equal(summarizeTimings(op).steps.notes.openMs, 4500);
+  assert.equal(summarizeTimings({ timings: op.timings }).steps.notes.openMs, undefined, 'no openedAt: nothing recorded');
+  const runs = [1, 2, 3].map(() => ({ parts: 3, steps: { plan: 1000, prose: 10000, notes: 20000 } }));
+  const stories = storiesWith(runs);
+  const opening = plan({ progressive: true, notesParts: 8 });
+  // Older runs without openMs: the whole notes step.
+  assert.equal(estimateGeneration(opening, timingSamples(stories)).total, 31000);
+  for (const chapter of stories[0].chapters) chapter.versions[0].timing.steps.notes.openMs = 5000;
+  const estimate = estimateGeneration(opening, timingSamples(stories));
+  assert.equal(estimate.total, 16000); assert.equal(estimate.opens, true);
+  assert.equal(estimateGeneration(plan({ notesParts: 8 }), timingSamples(stories)).total, 31000, 'without progressive: to the last note');
+  assert.equal(remainingText({ ms: 20000, over: false }, { opens: true }), 'Ready to read in less than a minute');
+  assert.equal(remainingText({ ms: 120000, over: false }, { opens: true }), 'Ready to read in about 2 minutes');
+}
+
 { // The ready-notification preference is an optional boolean in settings, off unless chosen.
   assert.equal(validSettings({ notifyWhenReady: true }), true);
   assert.equal(validSettings({ notifyWhenReady: 'yes' }), false);

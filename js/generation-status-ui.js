@@ -66,12 +66,12 @@ export function createGenerationStatusUi({
     }
     for (const root of document.querySelectorAll('.gen-progress')) paintTimeLeft(root, now);
   }
-  // "About 2 minutes left" from the run's estimate and each step's elapsed time on this page.
+  // "Ready to read in about 2 minutes" (or "About 2 minutes left") from the run's estimate and each step's elapsed time on this page.
   function paintTimeLeft(root, now = Date.now()) {
     const eta = root.querySelector('.gen-eta'), items = [...root.querySelectorAll('.gen-steps li[data-clock]')];
     const steps = items.map(item => ({ key: item.dataset.clock.slice(item.dataset.clock.lastIndexOf(':') + 1), state: item.dataset.state }));
     const elapsed = Object.fromEntries(items.map((item, index) => { const clock = stepClock.get(item.dataset.clock); return [steps[index].key, clock?.start ? (clock.end || now) - clock.start : 0]; }));
-    const message = root.estimate && steps.length ? remainingText(remainingTime(root.estimate, steps, elapsed)) : '';
+    const message = root.estimate && steps.length ? remainingText(remainingTime(root.estimate, steps, elapsed), { opens: Boolean(root.estimate.opens) }) : '';
     if (eta && eta.textContent !== message) eta.textContent = message;
     if (eta) eta.hidden = !message;
     const note = root.querySelector('.gen-wait');
@@ -84,7 +84,7 @@ export function createGenerationStatusUi({
   function estimateFor(plan) { return estimateGeneration(plan, timingSamples(state.stories)); }
   function operationPlan(op, contextRequests = 0) {
     const memory = lightTaskConfig(state);
-    return { kind: op.kind, language: op.language, scope: op.input?.scope, notesParts: op.config?.notesParts, model: op.config?.model, reasoning: op.config?.reasoning, light: op.config?.light, contextRequests, context: { model: memory.model, reasoning: memory.reasoning } };
+    return { kind: op.kind, language: op.language, scope: op.input?.scope, notesParts: op.config?.notesParts, progressive: op.config?.progressive === true, model: op.config?.model, reasoning: op.config?.reasoning, light: op.config?.light, contextRequests, context: { model: memory.model, reasoning: memory.reasoning } };
   }
   // Ready notifications are opt-in: the waiting card offers them, Settings can turn them off. They are sent
   // only while LingoMage is in the background and Android allows notifications.
