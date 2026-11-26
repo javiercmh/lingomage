@@ -110,17 +110,26 @@ export function validateDefinedNote(value, prose, language, selection) {
   if (!best) invalid('The vocabulary note did not match the selected text in the chapter.');
   return { ...best.note, addedBy: 'learner', at: { start: best.start, end: best.end } };
 }
-// Splitting notes into parts (PED-002): consecutive paragraphs are grouped into at most maxParts parts of
-// at least MIN_NOTE_PART_UNITS UTF-16 units, so a short chapter stays one request. Offsets are canonical.
+// Splitting notes into parts (PED-002): consecutive paragraphs are grouped into parts of about targetUnits
+// UTF-16 units (never below minUnits), at most maxParts of them, so a short chapter stays one request and a
+// long one gets more parts of similar size instead of three ever-larger ones. Offsets are canonical.
 export const MIN_NOTE_PART_UNITS = 600;
+// Part size that worked in the 2026-11-26 density comparison (C1 scenes in three parts of about 1,200 units),
+// rounded down so a part stays well above the ~300-unit parts that added errors on 2026-11-25.
+export const NOTE_PART_TARGET_UNITS = 1000;
+export const NOTE_PART_TARGET_UNITS_JA = 400;
+// Requests per chapter at most; the pipeline still runs only MAX_RUNNING of them at once.
+export const MAX_NOTE_PARTS = 8;
 // Japanese packs far more text per UTF-16 unit; at 600 most Japanese chapters never split (2026-11-25 comparison).
 export const MIN_NOTE_PART_UNITS_JA = 250;
 export const noteMinUnits = language => language === 'ja' ? MIN_NOTE_PART_UNITS_JA : MIN_NOTE_PART_UNITS;
-export function notesParts(story, maxParts = 1, minUnits = MIN_NOTE_PART_UNITS) {
+export const noteTargetUnits = language => language === 'ja' ? NOTE_PART_TARGET_UNITS_JA : NOTE_PART_TARGET_UNITS;
+export function notesParts(story, maxParts = 1, minUnits = MIN_NOTE_PART_UNITS, targetUnits = 0) {
   const text = String(story || ''), paragraphs = [];
   for (const match of text.matchAll(/[^\n]*\S[^\n]*/g)) paragraphs.push({ start: match.index, end: match.index + match[0].length });
   const limit = Math.max(1, Math.floor(maxParts) || 1);
-  const target = Math.max(minUnits, Math.ceil(text.length / limit));
+  // Without a target size (older callers), parts are the text divided evenly by maxParts.
+  const target = Math.max(minUnits, targetUnits || 0, Math.ceil(text.length / limit));
   const parts = [];
   for (const paragraph of paragraphs) {
     const last = parts.at(-1);

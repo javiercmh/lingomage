@@ -4,11 +4,11 @@ import assert from 'node:assert/strict';
 import { createPipeline, pendingRequests, MAX_RUNNING } from '../js/generation-pipeline.js';
 import { progressSummary } from '../js/generation-progress.js';
 import { recoverySummary } from '../js/generation-errors.js';
-import { notesParts, noteMinUnits, mergeNoteParts, validateNotes } from '../js/learning-validation.js';
+import { notesParts, noteMinUnits, noteTargetUnits, mergeNoteParts, validateNotes, MAX_NOTE_PARTS } from '../js/learning-validation.js';
 import { NOTES_INSTRUCTIONS } from '../js/prompts.js';
 
 const WORDS = ['Hund', 'Katze', 'Vogel', 'Fisch', 'Pferd', 'Maus'];
-const paragraph = word => `Der ${word} läuft schnell durch den Garten. `.repeat(12).trim();
+const paragraph = word => `Der ${word} läuft schnell durch den Garten. `.repeat(30).trim();
 const story = WORDS.map(paragraph).join('\n\n');
 const prose = { title: 'Tiere', story };
 
@@ -26,6 +26,21 @@ const prose = { title: 'Tiere', story };
   assert.equal(noteMinUnits('ja'), 250); assert.equal(noteMinUnits('de'), 600);
   assert.equal(notesParts(ja, 3).length, 0, 'the general minimum would keep it whole');
   assert.ok(notesParts(ja, 3, noteMinUnits('ja')).length > 1, 'the Japanese minimum splits it');
+}
+
+{ // Target part size: longer chapters get more parts of similar size, up to MAX_NOTE_PARTS.
+  assert.equal(noteTargetUnits('de'), 1000); assert.equal(noteTargetUnits('ja'), 400); assert.equal(MAX_NOTE_PARTS, 8);
+  const para = n => `Der Zug fährt heute pünktlich ab, und alle Reisenden steigen ruhig ein. `.repeat(n).trim();
+  const chapterOf = units => { const out = []; let length = 0; while (length < units) { const p = para(4); out.push(p); length += p.length + 2; } return out.join('\n\n'); };
+  const split = units => notesParts(chapterOf(units), MAX_NOTE_PARTS, noteMinUnits('de'), noteTargetUnits('de'));
+  assert.deepEqual(split(900), [], 'a short chapter stays one request');
+  const four = split(4000), seven = split(7000), huge = split(20000);
+  assert.ok(four.length >= 3 && four.length <= 4, `4,000 units -> about 4 parts (got ${four.length})`);
+  assert.ok(seven.length >= 6 && seven.length <= 7, `7,000 units -> about 7 parts (got ${seven.length})`);
+  assert.equal(huge.length, MAX_NOTE_PARTS, 'never more than MAX_NOTE_PARTS');
+  const sizes = seven.map(part => part.end - part.start);
+  assert.ok(Math.max(...sizes.slice(0, -1)) < 1.6 * noteTargetUnits('de'), 'parts stay near the target size');
+  assert.ok(notesParts(chapterOf(7000), 3, noteMinUnits('de')).length === 3, 'without a target the old even split by maxParts still applies');
 }
 
 { // Merging keeps chapter order, joins identical notes and keeps different senses apart.
@@ -79,6 +94,16 @@ function harness({ notesParts: parts = 3, startRefusals = {}, waitFailures = {},
   assert.ok(WORDS.every(word => h.applied.glossary.some(note => note.word === word)));
   assert.equal(h.pipeline.records.length, 0);
   assert.ok(MAX_RUNNING >= 3);
+}
+
+{ // Up to MAX_NOTE_PARTS parts of similar size, never more than MAX_RUNNING at once.
+  const h = harness({ notesParts: MAX_NOTE_PARTS });
+  await h.pipeline.run(h.op);
+  const notes = h.started.filter(item => item.input.kind === 'notes');
+  assert.ok(notes.length > MAX_RUNNING, `a long chapter gets more than ${MAX_RUNNING} parts (got ${notes.length})`);
+  assert.equal(h.peak, MAX_RUNNING, 'parts beyond the running limit wait for a free slot');
+  assert.ok(notes.every(item => item.input.focus.of === notes.length));
+  assert.ok(WORDS.every(word => h.applied.glossary.some(note => note.word === word)));
 }
 
 { // Split notes off: one ordinary notes request, as before.

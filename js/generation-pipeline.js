@@ -3,7 +3,7 @@ import { timingEntry } from './generation-timing.js';
 import { aiNotification } from './ai-notification.js';
 import { decodePlan } from './story-generation.js';
 import { PLAN_INSTRUCTIONS, notesInstructions, READING_INSTRUCTIONS } from './prompts.js';
-import { parseContent, validateContentSize, validateProse, validateNotes, validateStory, validateExamples, readingPlan, attachReadings, notesParts, noteMinUnits, mergeNoteParts, SAFEGUARD_VERSION } from './learning-validation.js';
+import { parseContent, validateContentSize, validateProse, validateNotes, validateStory, validateExamples, readingPlan, attachReadings, notesParts, noteMinUnits, noteTargetUnits, mergeNoteParts, SAFEGUARD_VERSION } from './learning-validation.js';
 
 // A saved operation can hold several requests: the main one and, for Japanese notes plus readings,
 // one per parallel part. Every cancel, release and recovery path walks all of them.
@@ -34,7 +34,7 @@ const isNotesPart = name => name === 'notes' || name.startsWith('notes-');
 // Parts for a finished prose stage: legacy single "notes" or "notes-1".."notes-N" with canonical offsets.
 // A notes rebuild (kind "notes") keeps the version's saved readings, so it has no readings part.
 export function enrichmentParts(op) {
-  const parts = {}, split = notesParts(op.prose.story, Number(op.config.notesParts) || 1, noteMinUnits(op.language));
+  const parts = {}, split = notesParts(op.prose.story, Number(op.config.notesParts) || 1, noteMinUnits(op.language), noteTargetUnits(op.language));
   if (split.length) split.forEach((part, index) => { parts[`notes-${index + 1}`] = {request:null, done:false, start:part.start, end:part.end}; });
   else parts.notes = {request:null, done:false};
   if (op.language === 'ja' && op.kind !== 'notes') parts.readings = {request:null, done:false};

@@ -130,6 +130,14 @@ const plan = (extra = {}) => ({ kind: 'create', language: 'de', scope: 'scene', 
   assert.equal(estimateGeneration(plan({ reasoning: 'high' }), samples).steps.prose.median, 25000);
 }
 
+{ // Notes history matches on split versus single: the configured maximum parts is not the count a chapter gets.
+  const split = [1, 2, 3].map(() => ({ steps: { plan: 1000, prose: 10000, notes: 7000 }, parts: 3 }));
+  const single = [1, 2, 3].map(() => ({ steps: { plan: 1000, prose: 10000, notes: 4000 }, parts: 1 }));
+  const samples = timingSamples(storiesWith([...split, ...single]));
+  assert.equal(estimateGeneration(plan({ notesParts: 8 }), samples).steps.notes.median, 7000);
+  assert.equal(estimateGeneration(plan({ notesParts: 1 }), samples).steps.notes.median, 4000);
+}
+
 { // Story context: the number of summaries still to make × the median time per summary (saved per run).
   const runs = [1, 2, 3].map(() => ({ requests: 2, steps: { context: 8000, plan: 1000, prose: 10000, notes: 5000 } }));
   const samples = timingSamples(storiesWith(runs));

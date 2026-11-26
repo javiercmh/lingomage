@@ -15,7 +15,7 @@ import { SPEECH_RATES, canonicalRange, createReaderPlayer, speechUnits } from '.
 import { createPipeline, pendingRequests, MAX_RUNNING, MAX_BROKEN_RESENDS } from './generation-pipeline.js';
 import { hasStoryContext, progressSummary } from './generation-progress.js';
 import { timingEntry, timingSamples, estimateGeneration, remainingTime, remainingText } from './generation-timing.js';
-import { SAFEGUARD_VERSION, parseContent, validateStory } from './learning-validation.js';
+import { SAFEGUARD_VERSION, parseContent, validateStory, MAX_NOTE_PARTS } from './learning-validation.js';
 import { PROMPT_VERSION, storyInstructions, chapterInstructions, helpInstructions, NOTE_DENSITIES, DEFAULT_NOTE_DENSITY } from './prompts.js';
 import { failureInfo, recoverySummary, operationLabel, discardFailureMessage, appendFailureDetails } from './generation-errors.js';
 import { createWorkspaceStorage, createSettingsPersistence, optionalStore, SIGNALS_PATH, USAGE_PATH } from './workspace-storage.js';
@@ -432,8 +432,8 @@ function buildReasoningOptions(force = false) {
   $('reasoning-label').hidden=!model; select.hidden=!model; select.disabled=!(model?.reasoningLevels || []).length;
   select.value=model?.reasoningLevels?.includes(state.reasoning) ? state.reasoning : '';
 }
-// Settings → Split vocabulary notes: up to MAX_RUNNING paragraph parts in parallel, or one request.
-const noteParts = () => state.splitNotes === false ? 1 : MAX_RUNNING;
+// Settings → Split vocabulary notes: paragraph parts of similar size (up to MAX_NOTE_PARTS, MAX_RUNNING at once), or one request.
+const noteParts = () => state.splitNotes === false ? 1 : MAX_NOTE_PARTS;
 function buildLightModelOptions() {
   const select = $('light-model-select'), effort = $('light-reasoning-select');
   select.textContent = '';

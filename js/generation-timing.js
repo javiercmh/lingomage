@@ -80,11 +80,12 @@ function quantile(sorted, q) {
   return sorted[low] + (sorted[high] - sorted[low]) * (position - low);
 }
 // Median of the most similar past runs: first the same model, reasoning effort, language,
-// scope (and number of note parts), then the same model and effort, then the same model only.
+// scope (and, for notes, whether they were split: the part count depends on chapter length, which is unknown
+// before the prose exists), then the same model and effort, then the same model only.
 export function stepStats(samples, step) {
   const own = samples.filter(sample => sample.step === step.key && sample.model === step.model);
   const levels = [
-    sample => sample.reasoning === step.reasoning && sample.language === step.language && (step.key === 'context' || step.key === 'readings' || sample.scope === step.scope) && (step.key !== 'notes' || sample.parts === step.parts),
+    sample => sample.reasoning === step.reasoning && sample.language === step.language && (step.key === 'context' || step.key === 'readings' || sample.scope === step.scope) && (step.key !== 'notes' || (sample.parts > 1) === (step.parts > 1)),
     sample => sample.reasoning === step.reasoning,
     () => true
   ];
