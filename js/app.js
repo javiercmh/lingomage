@@ -12,7 +12,7 @@ import { createReaderActivation, glossaryForTrigger, indexGlossaryTriggers, norm
 import { annotatedText, applyExplainedMarks, findGlossaryMatches, getCanonicalSelection, japaneseSegments, stripRussianStress, withRussianStress } from './reader-text.js';
 import { markParagraphGaps } from './paragraph-gaps.js';
 import { SPEECH_RATES, canonicalRange, createReaderPlayer, speechUnits } from './reader-player.js';
-import { createPipeline, pendingRequests, MAX_RUNNING, MAX_BROKEN_RESENDS } from './generation-pipeline.js';
+import { createPipeline, pendingRequests, MAX_RUNNING, MAX_BROKEN_RESENDS, parallelLimitFor } from './generation-pipeline.js';
 import { hasStoryContext, progressSummary } from './generation-progress.js';
 import { timingEntry, timingSamples, estimateGeneration, remainingTime, remainingText } from './generation-timing.js';
 import { SAFEGUARD_VERSION, parseContent, validateStory, MAX_NOTE_PARTS } from './learning-validation.js';
@@ -694,11 +694,48 @@ async function runContentOperation(spec) {
   await aiSession.run(() => pipeline.run(op));
   return op;
 }
-const { operationProvenance, applyContentOperation } = createGenerationController({state, normalizeChapters:(...args)=>normalizeChapters(...args), ensureStoryPaths:(...args)=>ensureStoryPaths(...args), persistReaderStory, savedFollowUps: (...args) => savedFollowUps(...args)});
+const { operationProvenance, applyContentOperation, clearNotesPending } = createGenerationController({state, normalizeChapters:(...args)=>normalizeChapters(...args), ensureStoryPaths:(...args)=>ensureStoryPaths(...args), persistReaderStory, savedFollowUps: (...args) => savedFollowUps(...args)});
+// Reading while notes are written: the chapter opens once its text (and Japanese readings) is saved; notes appear as
+// their parts finish. The status bar keeps Cancel and counts saved note parts; the reader keeps its place.
+function notesProgressMessage(op) {
+  const parts = Object.entries(op.parallel || {}).filter(([name]) => name === 'notes' || name.startsWith('notes-'));
+  return parts.length > 1 ? `Adding vocabulary notes · ${parts.filter(([, part]) => part.done).length} of ${parts.length}` : 'Adding vocabulary notes…';
+}
+function refreshReaderInPlace(storyId) {
+  if (state.readerId !== storyId || !$('reader-dialog').open) return;
+  // Never rebuild under an open note or an active selection; the next part or the final save refreshes instead.
+  if (!$('word-note-popover').hidden || !$('selection-toolbar').hidden) return;
+  const scrollTop = readerPanel().scrollTop; updateReader(true); readerPanel().scrollTop = scrollTop;
+}
+function showEarlyResult(op, first) {
+  const story = state.stories.find(s => op.kind === 'create' ? s.operationId === op.id : s.id === op.target.storyId);
+  if (!story) return;
+  if (!first) { refreshReaderInPlace(story.id); setReaderGeneration({ storyId: story.id, phase: 'working', message: notesProgressMessage(op) }); return; }
+  setReaderGeneration({ storyId: story.id, phase: 'working', message: notesProgressMessage(op) });
+  if (op.kind === 'create') { ensureReaderOpen(story).catch(error => toast(error.message)); toast('Your story is ready. Vocabulary notes are on their way.'); return; }
+  if (op.kind === 'continue') {
+    if (state.readerId === story.id && $('reader-dialog').open && selectedPath(story).id === op.target.pathId) {
+      const scrollTop = readerPanel().scrollTop, focused = document.activeElement;
+      $('reader-edit-panel').hidden = true; state.readerEditDraft = null;
+      renderChapterNavigation(story); renderReaderActions(); updateReaderNavigation();
+      readerPanel().scrollTop = scrollTop; if (focused?.isConnected && document.activeElement !== focused) focused.focus({ preventScroll: true });
+    }
+    toast(`Chapter ${op.target.entries.length + 1} is ready. Vocabulary notes are on their way.`); return;
+  }
+  if (state.readerId === story.id) { state.readerChapter = op.target.index; $('reader-edit-panel').hidden = true; state.readerEditDraft = null; updateReader(); }
+  toast('Branch created. Vocabulary notes are on their way.');
+}
 function showOperationResult(op) {
   const story=state.stories.find(s=>op.kind === 'create' ? s.operationId === op.id : s.id === op.target.storyId);
   if (!story) return;
   notifyResult(op, story);
+  if (op.earlyApplied && op.kind !== 'notes') {
+    // The chapter was already shown; only its notes changed.
+    refreshReaderInPlace(story.id);
+    if (readerGeneration?.storyId === story.id) setReaderGeneration(null);
+    queueBackgroundContext(story.id, op.kind === 'continue' ? op.target.pathId : op.kind === 'rewrite' ? `path-${op.id}` : null);
+    toast('Vocabulary notes ready'); return;
+  }
   if (op.kind === 'notes') {
     // Notes rebuilt in place: the learner stays on the same chapter, scroll position and path.
     if (readerGeneration?.storyId === story.id) setReaderGeneration(null);
@@ -737,7 +774,7 @@ function initializePipeline() {
   const entry=workspaceStorage.load('data/generation-checkpoints.json');
   if (entry.status === 'invalid') { state.checkpointBlocked=true; showStorageErrors(); return; }
   const records=entry.value;
-  pipeline=createPipeline({records,persist:value=>workspaceStorage.save('data/generation-checkpoints.json',value),apply:applyContentOperation,parallel:true,onResend:announceResend,changed:()=>{if(pipeline && !pipeline.busy) state.requestId=null; renderCheckpointRecovery();},ai:{
+  pipeline=createPipeline({records,persist:value=>workspaceStorage.save('data/generation-checkpoints.json',value),apply:applyContentOperation,applyPartial:(op,content,{first})=>{applyContentOperation(op,{content}); showEarlyResult(op,first);},discarded:op=>{clearNotesPending(op); const story=state.stories.find(s=>op.kind === 'create' ? s.operationId === op.id : s.id === op.target?.storyId); if(story) refreshReaderInPlace(story.id);},parallel:true,onResend:announceResend,changed:()=>{if(pipeline && !pipeline.busy) state.requestId=null; renderCheckpointRecovery();},ai:{
     start:async args=>{workspaceStorage.assertWritable(); if (!String(args?.model || '').trim()) throw new Error('No AI model is selected. Open Settings and choose an AI model before generating.'); state.requestId='starting'; try {const id=await aiSession.start(args); state.requestId=id; return id;} catch(error){state.requestId=null;throw error;}},
     wait:async id=>{state.requestId=id; try {const text=await ai.wait(id); return text;} finally {if(state.requestId===id) state.requestId=null;}},
     acknowledge:id=>ai.acknowledge(id), cancel:id=>ai.cancel(id)
@@ -971,7 +1008,7 @@ async function runNotesRebuild(target) {
   if (Array.isArray(state.models) && !state.models.some(item => item.id === state.model)) { fail('The selected AI model is not available now. Open Settings and choose an available model.'); return; }
   const difficulty = version.difficulty || story.difficulty;
   const input = { topic: story.topic || '', practice: story.practice || (story.words || []).join(', '), language: LANGUAGES[story.language], languageCode: story.language, difficulty, framework: LEVELS[story.language].framework, levelDescription: guideFor(story.language, difficulty), readingSelfReport: readingDescription(story.language, difficulty), languageExpectations: state.languageExpectations[story.language] || '', learnerProfile: version.learnerContext || { ...profileSnapshot(story), readingStartingPoint: difficulty, readingSelfReport: readingDescription(story.language, difficulty) } };
-  const config = { providerId: state.providerId, model: state.model, reasoning: state.reasoning, light: lightModelChoice(state), notesParts: noteParts(), noteDensity: state.noteDensity, retryBroken: state.retryBrokenReplies !== false };
+  const config = { providerId: state.providerId, model: state.model, reasoning: state.reasoning, light: lightModelChoice(state), notesParts: noteParts(), parallelLimit: parallelLimitFor(state.aiStartLimit), noteDensity: state.noteDensity, retryBroken: state.retryBrokenReplies !== false };
   $('notes-rebuild-dialog').close();
   state.readerEditBusy = true; renderReaderActions();
   setReaderGeneration({ storyId: story.id, phase: 'working', message: 'Rebuilding vocabulary notes…' });
@@ -1094,7 +1131,7 @@ $('reader-edit-submit').addEventListener('click', async () => {
   const story = readerStory(), chapters = pathChapters(story), chapter = chapters[state.readerChapter], version = activeVersion(chapter), mode = $('reader-edit-panel').dataset.mode;
   const path = selectedPath(story), entries = path.entries.map(entry => ({ ...entry })), rewriteIndex = state.readerChapter;
   const sourceVersion = mode === 'continue' ? activeVersion(chapters[chapters.length - 1]) : version;
-  const providerId = state.providerId, model = state.model, config = { providerId, model, reasoning: state.reasoning, light: lightModelChoice(state), notesParts: noteParts(), noteDensity: state.noteDensity, retryBroken: state.retryBrokenReplies !== false }, memoryConfig = lightTaskConfig(state);
+  const providerId = state.providerId, model = state.model, config = { providerId, model, reasoning: state.reasoning, light: lightModelChoice(state), notesParts: noteParts(), parallelLimit: parallelLimitFor(state.aiStartLimit), noteDensity: state.noteDensity, progressive: true, retryBroken: state.retryBrokenReplies !== false }, memoryConfig = lightTaskConfig(state);
   const difficulty = $('reader-level').value, scope = $('reader-scope').value;
   if (!levelDefinition(story.language,difficulty)) { $('reader-edit-error').textContent='Choose a reading level for this generation.'; return; }
   if (ai.available === false || (Array.isArray(state.models) && !state.models.length && $('ai-setup')?.hidden === false)) { $('reader-edit-error').textContent='Open App² → Settings → AI and connect a provider, then return here.'; return; }
@@ -1160,8 +1197,9 @@ async function refreshModels() {
   const select = $('model-select');
   if (!ai.available) { $('ai-setup').hidden = false; $('model-controls').hidden = true; return; }
   try {
-    const {providers} = await ai.providers();
+    const {providers, startLimit} = await ai.providers();
     if (refreshVersion !== modelRefreshVersion) return;
+    state.aiStartLimit = Number.isInteger(startLimit) ? startLimit : null; // App² start limit per minute; null when not reported
     const connected = providers?.filter(provider => provider.connected) || [];
     const provider = connected.find(item => item.id === state.providerId) || connected[0];
     if (!provider) {

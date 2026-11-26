@@ -1,7 +1,7 @@
 // Split vocabulary notes: paragraph parts, merging, the parallel scheduler, and both rate-limit paths
 // (App²'s start limit before inference, the provider's limit during a request). No silent retries.
 import assert from 'node:assert/strict';
-import { createPipeline, pendingRequests, MAX_RUNNING } from '../js/generation-pipeline.js';
+import { createPipeline, pendingRequests, MAX_RUNNING, MAX_PARALLEL, parallelLimitFor } from '../js/generation-pipeline.js';
 import { progressSummary } from '../js/generation-progress.js';
 import { recoverySummary } from '../js/generation-errors.js';
 import { notesParts, noteMinUnits, noteTargetUnits, mergeNoteParts, validateNotes, MAX_NOTE_PARTS } from '../js/learning-validation.js';
@@ -55,7 +55,7 @@ const prose = { title: 'Tiere', story };
 }
 
 // A fake host: each notes request answers with the animals named in its focus (or the whole chapter).
-function harness({ notesParts: parts = 3, startRefusals = {}, waitFailures = {}, records = [] } = {}) {
+function harness({ notesParts: parts = 3, parallelLimit, startRefusals = {}, waitFailures = {}, records = [] } = {}) {
   let n = 0, running = 0, peak = 0; const started = [], kinds = new Map(), events = [];
   const ai = {
     async start(args) {
@@ -79,7 +79,7 @@ function harness({ notesParts: parts = 3, startRefusals = {}, waitFailures = {},
   };
   let applied = null;
   const pipeline = createPipeline({ records, persist: () => {}, ai, parallel: true, apply: async op => { applied = op.result; } });
-  const op = records[0] || pipeline.create({ kind: 'create', language: 'de', planned: true, input: { difficulty: 'A2' }, instructions: 'Write.', config: { providerId: 'p', model: 'main', notesParts: parts } });
+  const op = records[0] || pipeline.create({ kind: 'create', language: 'de', planned: true, input: { difficulty: 'A2' }, instructions: 'Write.', config: { providerId: 'p', model: 'main', notesParts: parts, ...(parallelLimit ? { parallelLimit } : {}) } });
   return { pipeline, op, started, events, get peak() { return peak; }, get applied() { return applied; } };
 }
 
@@ -104,6 +104,17 @@ function harness({ notesParts: parts = 3, startRefusals = {}, waitFailures = {},
   assert.equal(h.peak, MAX_RUNNING, 'parts beyond the running limit wait for a free slot');
   assert.ok(notes.every(item => item.input.focus.of === notes.length));
   assert.ok(WORDS.every(word => h.applied.glossary.some(note => note.word === word)));
+}
+
+{ // App²'s start limit decides how many parts run at once: 6 at 12+ per minute or no limit, else 3.
+  assert.deepEqual([null, undefined, 6, 12, 30, 0].map(parallelLimitFor), [MAX_RUNNING, MAX_RUNNING, MAX_RUNNING, MAX_PARALLEL, MAX_PARALLEL, MAX_PARALLEL]);
+  const h = harness({ notesParts: MAX_NOTE_PARTS, parallelLimit: MAX_PARALLEL });
+  await h.pipeline.run(h.op);
+  const notes = h.started.filter(item => item.input.kind === 'notes');
+  assert.equal(h.peak, Math.min(MAX_PARALLEL, notes.length), 'up to six parts run together');
+  const capped = harness({ notesParts: MAX_NOTE_PARTS, parallelLimit: 50 });
+  await capped.pipeline.run(capped.op);
+  assert.ok(capped.peak <= MAX_PARALLEL, 'a saved limit above MAX_PARALLEL is capped');
 }
 
 { // Split notes off: one ordinary notes request, as before.

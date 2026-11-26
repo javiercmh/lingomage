@@ -87,7 +87,7 @@ console.log('PASS chapter/path removal, shared content and memory, mirrors, name
  c.plannedStory=async(mode,input,instructions,loading,config,applyContext)=>{requested=input;c.state.generationJob={input,applyContext,plan:{vocabulary:[],grammar:[],guidance:''},createdAt:'test',versionId:c.crypto.randomUUID(),chapterId:c.crypto.randomUUID(),alternateId:c.crypto.randomUUID(),writeRequestId:'write'};return JSON.stringify({title:'New',story:'Next scene',glossary:[]});};
  $('reader-level').value='A1';$('reader-scope').value='scene';
  $('reader-edit-submit').addEventListener=(_,fn)=>submit=fn;$('reader-edit-panel').dataset={mode:'continue'};$('reader-prompt').value='';
- Object.assign(c,{estimateFor:()=>null,operationPlan:()=>({}),pendingSummaryCount:()=>0,notifyStopped:()=>{}}); // estimates and notifications are tested in generation-timing.mjs
+ Object.assign(c,{estimateFor:()=>null,operationPlan:()=>({}),pendingSummaryCount:()=>0,notifyStopped:()=>{},parallelLimitFor:()=>3}); // estimates and notifications are tested in generation-timing.mjs
  vm.runInContext(slice("$('reader-edit-submit').addEventListener", "$('reader-dialog').addEventListener"),c);
  c.state.model='';await submit();assert.match($('reader-edit-error').textContent,/No AI model is selected/);assert.equal(requested,undefined,'Continue with no model selected does not start generation');
  c.state.model='removed';c.state.models=[{id:'mock',name:'Mock'}];await submit();assert.match($('reader-edit-error').textContent,/selected AI model is not available/);assert.equal(requested,undefined,'Continue with an unavailable model does not start generation');

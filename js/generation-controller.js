@@ -9,11 +9,39 @@ export function createGenerationController({state, normalizeChapters, ensureStor
   function operationProvenance(op) {
   return {operationId:op.id, promptVersion:op.promptVersion, safeguardVersion:op.safeguardVersion, difficulty:op.input.difficulty,framework:op.input.framework,scope:op.input.scope,languagePlan:op.plan,profileVersion:op.profileVersion,learnerContext:op.input.learnerProfile || {readingStartingPoint:op.input.readingStartingPoint,readingSelfReport:op.input.readingSelfReport,languageExpectations:op.input.languageExpectations}, providerId:op.config.providerId, model:op.config.model, ...(op.config.noteDensity ? {noteDensity:op.config.noteDensity} : {}), ...(String(op.config.light?.model || '').trim() ? {lightModel:op.config.light.model} : {}), createdAt:op.createdAt, ...timingField(op)};
 }
-function applyContentOperation(op) {
-  const provenance=operationProvenance(op), result=op.result;
+// Reading while notes are written: a version shown early carries notesPending until its final apply. A later call
+// for the same operation updates that version's notes (and readings) instead of creating another one.
+const PROGRESSIVE = new Set(['create','continue','rewrite']);
+function updateShownVersion(op, result, pending) {
+  if (!PROGRESSIVE.has(op.kind)) return false;
+  const story=op.kind === 'create' ? state.stories.find(s=>s.operationId === op.id) : state.stories.find(s=>s.id === op.target?.storyId);
+  const version=story?.chapters?.flatMap(c=>c.versions || []).find(v=>v.id === `version-${op.id}`);
+  if (!version) return false;
+  if (!version.notesPending) return true; // already complete: re-applying changes nothing
+  const before=JSON.parse(JSON.stringify(story));
+  const fields={glossary:result.glossary || [], ...(result.titleSegments ? {titleSegments:result.titleSegments, storySegments:result.storySegments} : {})};
+  Object.assign(version, fields, pending ? {} : timingField(op));
+  if (op.kind === 'create' && story.activeVersionId === version.id) Object.assign(story, fields);
+  if (pending) version.notesPending = true; else delete version.notesPending;
+  try { persistReaderStory(story); }
+  catch (error) { for (const key of Object.keys(story)) delete story[key]; Object.assign(story,before); throw error; }
+  return true;
+}
+// Clears notesPending after a discarded operation that had already shown its chapter; the notes saved so far stay.
+function clearNotesPending(op) {
+  const story=op.kind === 'create' ? state.stories.find(s=>s.operationId === op.id) : state.stories.find(s=>s.id === op.target?.storyId);
+  const version=story?.chapters?.flatMap(c=>c.versions || []).find(v=>v.id === `version-${op.id}`);
+  if (!version?.notesPending) return;
+  delete version.notesPending; persistReaderStory(story);
+}
+// partial: {content} while notes are still being written (version marked notesPending); omitted for the final apply.
+function applyContentOperation(op, partial = null) {
+  const provenance=operationProvenance(op), result=partial ? partial.content : op.result, pending=Boolean(partial);
+  if (updateShownVersion(op, result, pending)) return;
+  const mark=pending ? {notesPending:true} : {};
   if (op.kind === 'create') {
     if (state.stories.some(s=>s.operationId === op.id)) return;
-    const version={id:`version-${op.id}`,...result,...provenance};
+    const version={id:`version-${op.id}`,...result,...provenance,...mark};
     const {timing, ...storyProvenance}=provenance; // timing belongs to the version only
     const story={id:`story-${op.id}`,language:op.language,difficulty:op.input.difficulty,readingStartingPoint:op.input.readingStartingPoint,learnerKnowledge:op.input.learnerKnowledge,languageExpectations:op.input.languageExpectations,readingSelfReport:op.input.readingSelfReport,profileVersion:op.profileVersion,...result,...storyProvenance,topic:op.input.topic,practice:op.input.practice,activeVersionId:version.id,chapters:[{id:`chapter-${op.id}`,activeVersionId:version.id,versions:[version],prompt:'',help:[]}]};
     // The initial save time ranks the story, also after a resumed or recovered request; createdAt stays the operation start.
@@ -45,7 +73,7 @@ function applyContentOperation(op) {
     const path=candidate.paths.find(p=>p.id === op.target.pathId);
     if (!path || JSON.stringify(path.entries) !== JSON.stringify(op.target.entries)) throw new Error('The destination path changed. Discard this operation.');
     const chapter=candidate.chapters.find(c=>c.id === op.target.chapterId);
-    const version={id:`version-${op.id}`,...result,...provenance,prompt:op.input.prompt,sourceVersionId:op.target.sourceVersionId,contextLineage:op.kind === 'continue' ? op.target.entries : op.target.entries.slice(0,op.target.index),memoryVersion:MEMORY_VERSION,learnerContext:op.input.learnerProfile};
+    const version={id:`version-${op.id}`,...result,...provenance,...mark,prompt:op.input.prompt,sourceVersionId:op.target.sourceVersionId,contextLineage:op.kind === 'continue' ? op.target.entries : op.target.entries.slice(0,op.target.index),memoryVersion:MEMORY_VERSION,learnerContext:op.input.learnerProfile};
     if (op.kind === 'continue') {
       const next={id:`chapter-${op.id}`,activeVersionId:version.id,versions:[version],prompt:op.input.prompt,basedOnVersionId:op.target.sourceVersionId,learnerContext:op.input.learnerProfile,createdAt:op.createdAt,help:[]};
       candidate.chapters.push(next); path.entries.push({chapterId:next.id,versionId:version.id}); // the learner's selected path is not changed by a finished Continue
@@ -62,5 +90,5 @@ function applyContentOperation(op) {
   catch (error) { for (const key of Object.keys(story)) delete story[key]; Object.assign(story,before); throw error; }
 }
 
-  return {operationProvenance, applyContentOperation};
+  return {operationProvenance, applyContentOperation, clearNotesPending};
 }
