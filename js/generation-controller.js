@@ -1,6 +1,7 @@
 import { MEMORY_VERSION } from './story-memory.js';
 import { markStoryActivity } from './library-activity.js';
 import { summarizeTimings } from './generation-timing.js';
+import { stageModel } from './generation-pipeline.js';
 // Final application remains idempotent by operation ID and rolls back failed saves.
 export function createGenerationController({state, normalizeChapters, ensureStoryPaths, persistReaderStory, savedFollowUps}) {
   // What each step took (js/generation-timing.js); absent when nothing was measured, as in older records.
@@ -24,7 +25,17 @@ function applyContentOperation(op) {
   if (story.chapters?.some(c=>c.versions.some(v=>v.operationId === op.id) || c.help?.some(h=>h.followUps?.some(f=>f.operationId === op.id)))) return;
   const before=JSON.parse(JSON.stringify(story)), candidate=JSON.parse(JSON.stringify(story));
   candidate.chapters=normalizeChapters(candidate); ensureStoryPaths(candidate);
-  if (op.kind === 'examples') {
+  if (op.kind === 'notes') {
+    // Rebuild vocabulary notes: the version's generated notes are replaced; notes the learner added with Define
+    // stay. Text, readings, explanations and provenance of the version are unchanged; notesRebuild records the run.
+    const version=candidate.chapters.find(c=>c.id === op.target.chapterId)?.versions.find(v=>v.id === op.target.versionId);
+    if (!version) throw new Error('The chapter no longer exists. Discard this operation.');
+    if (version.notesRebuild?.operationId === op.id) return;
+    if (version.story !== op.prose.story || version.title !== op.prose.title) throw new Error('The chapter text changed. Discard this operation.');
+    const learnerNotes=(version.glossary || []).filter(note=>note.addedBy === 'learner');
+    version.glossary=[...result.glossary,...learnerNotes];
+    version.notesRebuild={operationId:op.id,promptVersion:op.promptVersion,safeguardVersion:op.safeguardVersion,noteDensity:op.config.noteDensity || 'standard',providerId:op.config.providerId,model:stageModel(op,'notes').model,createdAt:op.createdAt,savedAt:new Date().toISOString(),...timingField(op)};
+  } else if (op.kind === 'examples') {
     const chapter=candidate.chapters.find(c=>c.id === op.target.chapterId), version=chapter?.versions.find(v=>v.id === op.target.versionId);
     const help=chapter?.help?.find(h=>h.id === op.target.helpId);
     if (!help || !version || version.story.slice(op.target.start,op.target.end) !== op.target.passage) throw new Error('The source explanation changed. Discard this operation.');

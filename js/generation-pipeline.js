@@ -32,18 +32,23 @@ const markResent = (op, key) => { op.retried = { ...(op.retried || {}), [key]: (
 const START_REFUSALS = new Set(['request_in_progress', 'usage_limit']);
 const isNotesPart = name => name === 'notes' || name.startsWith('notes-');
 // Parts for a finished prose stage: legacy single "notes" or "notes-1".."notes-N" with canonical offsets.
+// A notes rebuild (kind "notes") keeps the version's saved readings, so it has no readings part.
 export function enrichmentParts(op) {
   const parts = {}, split = notesParts(op.prose.story, Number(op.config.notesParts) || 1, noteMinUnits(op.language));
   if (split.length) split.forEach((part, index) => { parts[`notes-${index + 1}`] = {request:null, done:false, start:part.start, end:part.end}; });
   else parts.notes = {request:null, done:false};
-  if (op.language === 'ja') parts.readings = {request:null, done:false};
+  if (op.language === 'ja' && op.kind !== 'notes') parts.readings = {request:null, done:false};
   return parts;
 }
-// Vocabulary notes and Japanese readings may use the lighter model saved in op.config.light; the plan and
-// the prose always use the main model. A saved operation without `light` uses the main model throughout.
-export const LIGHT_STAGES = new Set(['notes','readings']);
+// Vocabulary notes, Japanese readings and example sentences may use the lighter model saved in op.config.light
+// when its `tasks` (Settings → Advanced → Use the light model for) include them; the plan and story prose always
+// use the main model. A saved light choice without `tasks` (older operations) covers notes and readings. A saved
+// operation without `light` uses the main model throughout.
+const LEGACY_LIGHT_TASKS = ['notes','readings'];
+export const stageTask = (op, stage) => stage === 'notes' || stage === 'readings' ? stage : stage === 'prose' && op.kind === 'examples' ? 'examples' : null;
 export function stageModel(op, stage) {
-  const light = LIGHT_STAGES.has(stage) && String(op.config.light?.model || '').trim() ? op.config.light : null;
+  const task = stageTask(op, stage), tasks = Array.isArray(op.config.light?.tasks) ? op.config.light.tasks : LEGACY_LIGHT_TASKS;
+  const light = task && tasks.includes(task) && String(op.config.light?.model || '').trim() ? op.config.light : null;
   return {providerId:op.config.providerId, model:light ? light.model : op.config.model, reasoningEffort:(light ? light.reasoning : op.config.reasoning) || undefined};
 }
 export function createPipeline({ records, persist, ai, apply, changed = () => {}, onResend = () => {}, parallel = false, now = () => Date.now() }) {
@@ -180,6 +185,8 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
     create(spec) {
       if (busy || records.length) throw new Error('Resume or discard the pending generation before starting another.');
       const op = { ...JSON.parse(JSON.stringify(spec)), id:crypto.randomUUID(), createdAt:new Date().toISOString(), safeguardVersion:SAFEGUARD_VERSION, stage:spec.planned ? 'plan' : 'prose', request:null, parallel:null };
+      // Rebuild vocabulary notes (kind "notes"): spec.prose is the saved chapter version, so only notes run.
+      if (op.kind === 'notes') { const parts = parallel ? enrichmentParts(op) : null; if (parts && Object.keys(parts).length > 1) { op.stage='enrich'; op.parallel=parts; } else op.stage='notes'; }
       records.push(op);
       try { save(); } catch (error) { records.pop(); throw error; }
       return op;
@@ -243,7 +250,7 @@ export function createPipeline({ records, persist, ai, apply, changed = () => {}
             else { op.result=content; op.stage='ready'; }
           } else if (stage === 'notes') {
             op.prose=content;
-            if (op.language === 'ja') op.stage='readings';
+            if (op.language === 'ja' && op.kind !== 'notes') op.stage='readings';
             else { op.result=content; op.stage='ready'; }
           } else { op.result=content; op.stage='ready'; }
           op.request.completed=true;

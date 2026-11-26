@@ -607,6 +607,10 @@ body.has-app-generation-status .toast { bottom: calc(var(--tabbar-h) + 88px + va
 .settings-check input { flex: none; width: 20px; height: 20px; margin: 0; accent-color: var(--accent-strong); }
 #reasoning-select[hidden] ~ #reasoning-hint { display: none; }
 #light-model-hint { margin-bottom: 12px; }
+.light-tasks { min-width: 0; margin: 0 0 6px; padding: 0; border: 0; }
+.light-tasks[hidden] { display: none; }
+.light-tasks > legend { padding: 0; margin-bottom: 2px; }
+.light-tasks .settings-check { min-height: 44px; }
 .retry-broken-hint { margin-bottom: 0; }
 .settings-advanced { margin-top: 6px; padding-top: 4px; border-top: 1px solid var(--line, rgba(255,255,255,.08)); }
 .settings-advanced > summary { display: flex; min-height: 44px; align-items: center; gap: 8px; color: var(--ink); font-size: 14px; font-weight: 600; cursor: pointer; list-style: none; }

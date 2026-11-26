@@ -98,18 +98,22 @@ export function stepStats(samples, step) {
 }
 
 // The steps a new generation will run, mirroring the pipeline and progressSteps. `plan` describes the
-// request: kind, language, scope, notesParts, model and reasoning, light ({model, reasoning} or null),
+// request: kind, language, scope, notesParts, model and reasoning, light ({model, reasoning, tasks} or null),
 // and for Continue/Rewrite the number of story-context summaries still to make and their model.
 export function plannedSteps(plan) {
   const main = {model: text(plan.model), reasoning: text(plan.reasoning)};
-  const light = text(plan.light?.model).trim() ? {model: plan.light.model, reasoning: text(plan.light.reasoning)} : main;
+  const chosen = text(plan.light?.model).trim() ? {model: plan.light.model, reasoning: text(plan.light.reasoning)} : null;
+  // Tasks ticked in Settings → Advanced; a light choice saved without tasks covered notes and readings.
+  const tasks = Array.isArray(plan.light?.tasks) ? plan.light.tasks : ['notes', 'readings'];
+  const modelFor = task => chosen && tasks.includes(task) ? chosen : main;
+  const light = modelFor('notes');
   const common = {language: text(plan.language), scope: text(plan.scope) === 'longer' ? 'chapter' : text(plan.scope)};
   const steps = [];
-  if (plan.contextRequests > 0) steps.push({key: 'context', ...common, ...(plan.context || light), requests: plan.contextRequests});
-  if (plan.kind !== 'examples') steps.push({key: 'plan', ...common, ...main});
-  steps.push({key: 'prose', ...common, ...main});
+  if (plan.contextRequests > 0) steps.push({key: 'context', ...common, ...(plan.context || modelFor('memory')), requests: plan.contextRequests});
+  if (plan.kind !== 'examples' && plan.kind !== 'notes') steps.push({key: 'plan', ...common, ...main});
+  if (plan.kind !== 'notes') steps.push({key: 'prose', ...common, ...(plan.kind === 'examples' ? modelFor('examples') : main)});
   if (plan.kind !== 'examples') steps.push({key: 'notes', ...common, ...light, parts: Math.max(1, Number(plan.notesParts) || 1)});
-  if (plan.language === 'ja') steps.push({key: 'readings', ...common, ...light});
+  if (plan.language === 'ja' && plan.kind !== 'notes') steps.push({key: 'readings', ...common, ...modelFor('readings')});
   return steps;
 }
 

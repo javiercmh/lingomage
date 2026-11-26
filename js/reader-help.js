@@ -823,6 +823,9 @@ export function createReaderHelp({
       if (overlaps.length && !await confirmReplaceHelp(overlaps)) return;
     }
     const providerId = state.providerId, model = state.model, reasoning = state.reasoning;
+    // Explain and More detail use the light model when Settings → Advanced ticks Explanations; Examples go
+    // through the pipeline, which applies the Examples task itself.
+    const explainConfig = lightTaskConfig(state, 'explanations');
     state.readerHelpBusy = true;
     try {
       try { persistReaderStory(story); await releaseSavedInference(); }
@@ -849,10 +852,10 @@ export function createReaderHelp({
           clearLoading(); recordSelectionLookup(passage, 'examples'); showOperationResult(op); return;
         }
         const result = decodeHelp(await readerAi(kind, helpInput, helpInstructions(action), helpRequest.loading, {
-          providerId, model, reasoning, onTaskStarted
+          ...explainConfig, onTaskStarted
         }), action);
         clearLoading();
-        const item = { id: crypto.randomUUID?.() || `help-${Date.now()}`, kind, action, passage: passage.text, start: passage.start, end: passage.end, chapterId: passage.chapterId, versionId: passage.versionId, text: result.explanation || '', followUp, profile: passage.profile, createdAt: new Date().toISOString(), providerId, model, promptVersion: PROMPT_VERSION };
+        const item = { id: crypto.randomUUID?.() || `help-${Date.now()}`, kind, action, passage: passage.text, start: passage.start, end: passage.end, chapterId: passage.chapterId, versionId: passage.versionId, text: result.explanation || '', followUp, profile: passage.profile, createdAt: new Date().toISOString(), providerId: explainConfig.providerId, model: explainConfig.model, promptVersion: PROMPT_VERSION };
         if (action === 'examples') item.examples = result.examples;
         if (action === 'initial') Object.assign(item, resolvedHelpContext(version.story, passage, result));
         if (currentReaderGeneration()) currentReaderGeneration().helpId = existingHelp?.id || item.id;
@@ -1008,7 +1011,7 @@ export function createReaderHelp({
     if (currentBackgroundRun()) await stopBackgroundContext();
     if (state.checkpointBlocked || currentPipeline()?.records.length || state.readerHelpBusy || state.readerEditBusy || state.requestId) { toast('Another AI request is still running. Wait for it to finish.'); return; }
     if (!validTextRange(version.story, passage.start, passage.end) || version.story.slice(passage.start, passage.end) !== passage.text) { toast('Select the word again to define it.'); return; }
-    const config = lightTaskConfig(state);
+    const config = lightTaskConfig(state, 'notes');
     state.readerHelpBusy = true;
     try {
       try { persistReaderStory(story); await releaseSavedInference(); }

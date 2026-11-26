@@ -35,13 +35,13 @@ export function operationLabel(op, stories = [], languageName = '') {
   if (op.kind === 'create') return `New ${languageName || op.language || ''} story${op.input?.difficulty ? ` · ${op.input.difficulty}` : ''}`;
   const story=stories.find(item=>item.id === op.target?.storyId);
   const path=story?.paths?.find(item=>item.id === op.target?.pathId)
-    || (op.kind === 'examples' ? story?.paths?.find(item=>item.entries.some(entry=>entry.chapterId === op.target?.chapterId && entry.versionId === op.target?.versionId)) : null);
+    || (op.kind === 'examples' || op.kind === 'notes' ? story?.paths?.find(item=>item.entries.some(entry=>entry.chapterId === op.target?.chapterId && entry.versionId === op.target?.versionId)) : null);
   const entries=op.target?.entries || path?.entries;
   const index=op.kind === 'continue' ? (entries ? entries.length : -1)
     : op.kind === 'rewrite' ? (Number.isInteger(op.target?.index) ? op.target.index : -1)
     : path ? path.entries.findIndex(entry=>entry.chapterId === op.target?.chapterId && entry.versionId === op.target?.versionId)
     : story && !story.chapters?.length ? 0 : -1;
-  const action={continue:'Continuing',rewrite:'Rewriting',examples:'Examples for'}[op.kind] || 'Generating';
+  const action={continue:'Continuing',rewrite:'Rewriting',examples:'Examples for',notes:'Vocabulary notes for'}[op.kind] || 'Generating';
   const destination=story ? `“${story.title || 'Untitled story'}”` : 'a saved story';
   return `${action} ${destination}${index >= 0 ? ` · Chapter ${index+1}` : ''}${story?.paths?.length > 1 && path ? ` · ${pathLabel(story, path)}` : ''}`;
 }
@@ -64,7 +64,7 @@ function usageLimitReason(op, failure) {
   return `The AI provider reported a rate limit or usage limit: ${message}${saved} Resume ${parts.length > 1 ? 'runs the missing parts one at a time' : 'runs the unfinished step again'}; if the limit is your plan's quota, it fails again until the quota resets.`;
 }
 export function recoverySummary(op) {
-  const names={create:'Story generation',continue:'Story continuation',rewrite:'Chapter rewrite',examples:'Example generation',explain:'Explanation',initial:'Explanation',detail:'More detail',define:'Vocabulary note'};
+  const names={create:'Story generation',continue:'Story continuation',rewrite:'Chapter rewrite',examples:'Example generation',notes:'Vocabulary notes rebuild',explain:'Explanation',initial:'Explanation',detail:'More detail',define:'Vocabulary note'};
   const stages={plan:'language planning',prose:'writing',notes:'vocabulary notes',readings:'Japanese readings',enrich:op.parallel && !op.parallel.readings ? 'vocabulary notes' : 'vocabulary notes and readings',ready:'saving',applied:'finishing the request',setup:'setup',detail:'more detail',initial:'explanation'};
   if (op.discardRequested) return discardFailureMessage(op);
   if (!op.error) return 'An unfinished request has saved progress. Resume it or discard this attempt.';

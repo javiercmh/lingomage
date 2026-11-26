@@ -35,6 +35,7 @@ export function createReaderView({
     remove.textContent = index === path.entries.length - 1 ? `Remove Chapter ${index + 1}…` : `Remove Chapter ${index + 1} onward…`;
     removePath.textContent = story.paths.length > 1 ? 'Delete this storyline…' : 'Delete story…';
     $('reader-rebuild-memory').disabled = blocked || state.storageBlocked;
+    $('reader-rebuild-notes').disabled = blocked || state.storageBlocked || state.readerEditBusy || state.readerHelpBusy;
     $('reader-rebuild-memory').textContent = story.memoryRebuild ? 'Resume memory rebuild…' : 'Rebuild story memory…';
     remove.disabled = blocked; removePath.disabled = blocked; $('reader-actions-note').hidden = !blocked;
   }

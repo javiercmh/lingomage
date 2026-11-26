@@ -15,9 +15,10 @@ export function hasStoryContext(op) { return op.kind === 'continue' || (op.kind 
 export function progressSteps(op) {
   const steps = [];
   if (hasStoryContext(op)) steps.push({ key: 'context', label: 'Story context' });
-  if (op.kind !== 'examples') steps.push({ key: 'plan', label: 'Planning language' });
-  steps.push({ key: 'prose', label: PROSE_LABEL[op.kind] || 'Writing' });
-  if (op.language === 'ja') steps.push({ key: 'readings', label: 'Kanji readings' });
+  // A notes rebuild (kind "notes") runs only the vocabulary notes step.
+  if (op.kind !== 'examples' && op.kind !== 'notes') steps.push({ key: 'plan', label: 'Planning language' });
+  if (op.kind !== 'notes') steps.push({ key: 'prose', label: PROSE_LABEL[op.kind] || 'Writing' });
+  if (op.language === 'ja' && op.kind !== 'notes') steps.push({ key: 'readings', label: 'Kanji readings' });
   if (op.kind !== 'examples') steps.push({ key: 'notes', label: 'Vocabulary notes' });
   const done = new Set();
   if (['ready', 'applied'].includes(op.stage)) steps.forEach(step => done.add(step.key));

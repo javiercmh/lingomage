@@ -69,12 +69,13 @@ export function validSettings(value) {
   if (value.shareVocabularyNotes !== undefined && typeof value.shareVocabularyNotes !== 'boolean') return false;
   if (['splitNotes','retryBrokenReplies','notifyWhenReady'].some(key => value[key] !== undefined && typeof value[key] !== 'boolean')) return false;
   if (value.noteDensity !== undefined && !['fewer','standard','more'].includes(value.noteDensity)) return false;
+  if (value.lightTasks !== undefined && !list(value.lightTasks, item => ['notes','readings','memory','explanations','examples'].includes(item))) return false;
   if (['targetLanguages','standardizedLevels','learnerProfiles','languageExpectations'].some(key => value[key] !== undefined && !object(value[key]))) return false;
   return value.readingPreferences === undefined || object(value.readingPreferences);
 }
 export function validCheckpoints(value) {
   return Array.isArray(value) && value.length <= 1 && value.every(op => object(op) && id(op.id)
-    && ['create','continue','rewrite','examples'].includes(op.kind)
+    && ['create','continue','rewrite','examples','notes'].includes(op.kind)
     && ['plan','prose','notes','readings','enrich','ready','applied'].includes(op.stage)
     && object(op.config) && object(op.input) && id(op.language)
     && (op.discardRequested === undefined || typeof op.discardRequested === 'boolean')
@@ -194,12 +195,12 @@ export function createWorkspaceStorage({read, write, exists}) {
 }
 
 const SETTINGS_PATH = 'data/settings.json';
-const SCALARS = ['providerId','model','reasoning','lightModel','lightReasoning','splitNotes','noteDensity','retryBrokenReplies','notifyWhenReady','languageSetupDismissed','backgroundStoryContext','shareVocabularyNotes','theme'];
+const SCALARS = ['providerId','model','reasoning','lightModel','lightReasoning','lightTasks','splitNotes','noteDensity','retryBrokenReplies','notifyWhenReady','languageSetupDismissed','backgroundStoryContext','shareVocabularyNotes','theme'];
 const MAPS = ['targetLanguages','standardizedLevels','learnerProfiles','languageExpectations'];
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 export function settingsSnapshot(state) {
-  return clone({providerId:state.providerId,model:state.model,reasoning:state.reasoning,lightModel:state.lightModel || '',lightReasoning:state.lightReasoning || '',splitNotes:state.splitNotes !== false,noteDensity:state.noteDensity || 'standard',retryBrokenReplies:state.retryBrokenReplies !== false,notifyWhenReady:state.notifyWhenReady === true,targetLanguages:state.targetLanguages,languageOrder:state.languageOrder,learnerProfiles:state.learnerProfiles,languageExpectations:state.languageExpectations,languageSetupDismissed:state.languageSetupDismissed,backgroundStoryContext:state.backgroundStoryContext !== false,shareVocabularyNotes:state.shareVocabularyNotes === true,standardizedLevels:state.standardizedLevels,readingPreferences:{furigana:state.furigana,fontSize:state.readerFontSize,speechRate:state.speechRate,followAlong:state.followAlong},theme:'dark'});
+  return clone({providerId:state.providerId,model:state.model,reasoning:state.reasoning,lightModel:state.lightModel || '',lightReasoning:state.lightReasoning || '',lightTasks:Array.isArray(state.lightTasks) ? [...state.lightTasks] : ['notes','readings','memory'],splitNotes:state.splitNotes !== false,noteDensity:state.noteDensity || 'standard',retryBrokenReplies:state.retryBrokenReplies !== false,notifyWhenReady:state.notifyWhenReady === true,targetLanguages:state.targetLanguages,languageOrder:state.languageOrder,learnerProfiles:state.learnerProfiles,languageExpectations:state.languageExpectations,languageSetupDismissed:state.languageSetupDismissed,backgroundStoryContext:state.backgroundStoryContext !== false,shareVocabularyNotes:state.shareVocabularyNotes === true,standardizedLevels:state.standardizedLevels,readingPreferences:{furigana:state.furigana,fontSize:state.readerFontSize,speechRate:state.speechRate,followAlong:state.followAlong},theme:'dark'});
 }
 export function restoreSettingsSnapshot(state, value) {
   const {readingPreferences, theme, ...fields} = clone(value);

@@ -1,6 +1,6 @@
 import { chapterShareText, storyShareText, storyExportFile, shareTargets, downloadStoryFile, shareStoryFile, shareText, copyText, importStoryFile, STORY_IMPORT_MAX_BYTES } from './story-share.js';
 import { createStoryModel, pathLabel } from './story-model.js';
-import { lightModelChoice, lightTaskConfig } from './light-model.js';
+import { lightModelChoice, lightTaskConfig, lightTasks, LIGHT_TASKS } from './light-model.js';
 import { markStoryActivity, planLibrary, dateSegments, describeDates } from './library-activity.js';
 import { beginMemoryRebuild, finishMemoryRebuild, createStoryMemory } from './story-memory.js';
 import { createGenerationController } from './generation-controller.js';
@@ -86,7 +86,7 @@ function fillScopeOptions(input, selected = 'scene', describe) {
 // reference text in index.html. PREFERRED_MODEL preselects the story model on first use only.
 const PREFERRED_MODEL = 'gpt-6.2-sol';
 const $ = id => document.getElementById(id);
-const state = { languageOrder: Object.keys(LANGUAGES), standardizedLevels: {}, checkpointBlocked: false, stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', lightModel: '', lightReasoning: '', splitNotes: true, noteDensity: DEFAULT_NOTE_DENSITY, retryBrokenReplies: true, notifyWhenReady: false, targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, libraryLanguage: 'all', librarySort: 'recent', storyMenu: null, libraryStale: false, libraryPlainHero: false, deleteTrigger: null, deleteStoryIds: new Set(), storySelectionMode: false, selectedStoryIds: new Set(), storySelectionFocusId: '', explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', readerHistoryEntry: false, speechVersionKey: '', playerEnabled: false, player: null, playerUnits: [], speechRate: 1, followAlong: true, following: true, wordNoteTrigger: null, backgroundStoryContext: true, shareVocabularyNotes: false, readerEditBusy: false, activeChapterRequest: null, readerEditDraft: null };
+const state = { languageOrder: Object.keys(LANGUAGES), standardizedLevels: {}, checkpointBlocked: false, stories: [], current: null, requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null, pendingReaderResult: null, activeHelpRequest: null, readerPositions: {}, providerId: '', model: '', reasoning: '', lightModel: '', lightReasoning: '', lightTasks: null, splitNotes: true, noteDensity: DEFAULT_NOTE_DENSITY, retryBrokenReplies: true, notifyWhenReady: false, targetLanguages: {}, learnerProfiles: {}, languageExpectations: {}, languageSetupDismissed: false, models: [], toastTimer: null, readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerFontSize: 19, furigana: true, libraryLanguage: 'all', librarySort: 'recent', storyMenu: null, libraryStale: false, libraryPlainHero: false, deleteTrigger: null, deleteStoryIds: new Set(), storySelectionMode: false, selectedStoryIds: new Set(), storySelectionFocusId: '', explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '', readerHistoryEntry: false, speechVersionKey: '', playerEnabled: false, player: null, playerUnits: [], speechRate: 1, followAlong: true, following: true, wordNoteTrigger: null, backgroundStoryContext: true, shareVocabularyNotes: false, readerEditBusy: false, activeChapterRequest: null, readerEditDraft: null };
 
 // One status record covers Create, continuation, rewrite and explanation requests. It is shown in the reader bar
 // while that story is open and in the page-level bar everywhere else (any tab, reader closed, or another story's reader).
@@ -449,6 +449,10 @@ function buildLightModelOptions() {
   }
   $('light-reasoning-label').hidden = !model; effort.hidden = !model; effort.disabled = !(model?.reasoningLevels || []).length;
   effort.value = model?.reasoningLevels?.includes(state.lightReasoning) ? state.lightReasoning : '';
+  // Settings → Advanced → Use the light model for: shown only once a separate light model is chosen.
+  $('light-tasks').hidden = !model;
+  const ticked = lightTasks(state);
+  document.querySelectorAll('[data-light-task]').forEach(box => { box.checked = ticked.includes(box.dataset.lightTask); });
 }
 function persistStories() { workspaceStorage.save('data/stories.json', state.stories); }
 function persistReaderStory(story) {
@@ -683,7 +687,7 @@ async function runContentOperation(spec) {
   workspaceStorage.assertWritable();
   if (!String(spec?.config?.model || '').trim()) throw new Error('No AI model is selected. Open Settings and choose an AI model before generating.');
   if (pipeline.records.length) throw new Error('Resume or discard the pending generation before starting another.');
-  const op = pipeline.create({...spec, promptVersion:PROMPT_VERSION, profileVersion:PROFILE_DEFINITIONS.version, planned:spec.kind !== 'examples'});
+  const op = pipeline.create({...spec, promptVersion:PROMPT_VERSION, profileVersion:PROFILE_DEFINITIONS.version, planned:!['examples','notes'].includes(spec.kind)});
   await aiSession.run(() => pipeline.run(op));
   return op;
 }
@@ -692,6 +696,12 @@ function showOperationResult(op) {
   const story=state.stories.find(s=>op.kind === 'create' ? s.operationId === op.id : s.id === op.target.storyId);
   if (!story) return;
   notifyResult(op, story);
+  if (op.kind === 'notes') {
+    // Notes rebuilt in place: the learner stays on the same chapter, scroll position and path.
+    if (readerGeneration?.storyId === story.id) setReaderGeneration(null);
+    if (state.readerId === story.id && $('reader-dialog').open) { const scrollTop = readerPanel().scrollTop; updateReader(); readerPanel().scrollTop = scrollTop; }
+    toast('Vocabulary notes rebuilt'); return;
+  }
   if (op.kind !== 'examples') queueBackgroundContext(story.id, op.kind === 'continue' ? op.target.pathId : op.kind === 'rewrite' ? `path-${op.id}` : null);
   if (op.kind === 'create') { setReaderGeneration(null); ensureReaderOpen(story).catch(error => toast(error.message)); return; }
   if (readerGeneration && readerGeneration.storyId === story.id) {
@@ -926,6 +936,59 @@ $('reader-rebuild-memory').addEventListener('click', () => {
 $('memory-rebuild-cancel').addEventListener('click', () => $('memory-rebuild-dialog').close());
 $('memory-rebuild-dialog').addEventListener('close', () => $('reader-actions-toggle').focus({ preventScroll: true }));
 $('memory-rebuild-submit').addEventListener('click', () => runMemoryRebuild(memoryRebuildStory));
+
+// Reader ⋮ → Rebuild vocabulary notes: a "notes" operation on the viewed chapter version (PED-002). It uses the
+// current Settings → Vocabulary notes amount and the notes model, keeps Define notes, and recovers like any
+// other saved generation.
+const DENSITY_NAMES = { fewer: 'Fewer', standard: 'Standard', more: 'More' };
+let notesRebuildTarget = null;
+const notesModelName = () => { const id = lightTaskConfig(state, 'notes').model; return state.models?.find(item => item.id === id)?.name || id || 'the selected model'; };
+$('reader-rebuild-notes').addEventListener('click', () => {
+  if (pendingDeletionBlocked() || state.storageBlocked) return;
+  const story = readerStory(), chapter = story && pathChapters(story)[state.readerChapter], version = chapter && activeVersion(chapter);
+  if (!version) return;
+  closeReaderActions();
+  notesRebuildTarget = { storyId: story.id, chapterId: chapter.id, versionId: version.id, index: state.readerChapter };
+  const kept = (version.glossary || []).filter(note => note.addedBy === 'learner').length;
+  $('notes-rebuild-description').textContent = `Chapter ${state.readerChapter + 1} of “${story.title || 'Untitled story'}”. Notes will be written again with the ${DENSITY_NAMES[state.noteDensity] || 'Standard'} amount from Settings → Vocabulary notes, using ${notesModelName()}.`;
+  $('notes-rebuild-effect').textContent = `This uses AI. The chapter’s current vocabulary notes are replaced${kept ? `; the ${kept === 1 ? 'note' : `${kept} notes`} you added with Define stay` : ''}. The text, readings and explanations stay as they are.`;
+  $('notes-rebuild-error').textContent = '';
+  $('notes-rebuild-dialog').showModal(); $('notes-rebuild-cancel').focus();
+});
+$('notes-rebuild-cancel').addEventListener('click', () => $('notes-rebuild-dialog').close());
+$('notes-rebuild-dialog').addEventListener('close', () => { if (!state.readerEditBusy) $('reader-actions-toggle').focus({ preventScroll: true }); });
+$('notes-rebuild-submit').addEventListener('click', () => runNotesRebuild(notesRebuildTarget));
+async function runNotesRebuild(target) {
+  const story = state.stories.find(item => item.id === target?.storyId);
+  const chapter = story && normalizeChapters(story).find(item => item.id === target.chapterId), version = chapter?.versions.find(item => item.id === target.versionId);
+  if (!version) { $('notes-rebuild-dialog').close(); return; }
+  if (state.checkpointBlocked || pipeline?.records.length) { $('notes-rebuild-dialog').close(); if (pipeline?.records.length) showPendingRecovery(); else showStorageErrors(); return; }
+  const fail = message => { $('notes-rebuild-error').textContent = message; };
+  if (pendingDeletionBlocked() || state.readerEditBusy || state.readerHelpBusy) { fail('Another AI request is still running. Wait for it to finish.'); return; }
+  if (ai.available === false) { fail('Open App² → Settings → AI and connect a provider, then return here.'); return; }
+  if (!String(state.model || '').trim()) { fail('No AI model is selected. Open Settings and choose an AI model first.'); return; }
+  if (Array.isArray(state.models) && !state.models.some(item => item.id === state.model)) { fail('The selected AI model is not available now. Open Settings and choose an available model.'); return; }
+  const difficulty = version.difficulty || story.difficulty;
+  const input = { topic: story.topic || '', practice: story.practice || (story.words || []).join(', '), language: LANGUAGES[story.language], languageCode: story.language, difficulty, framework: LEVELS[story.language].framework, levelDescription: guideFor(story.language, difficulty), readingSelfReport: readingDescription(story.language, difficulty), languageExpectations: state.languageExpectations[story.language] || '', learnerProfile: version.learnerContext || { ...profileSnapshot(story), readingStartingPoint: difficulty, readingSelfReport: readingDescription(story.language, difficulty) } };
+  const config = { providerId: state.providerId, model: state.model, reasoning: state.reasoning, light: lightModelChoice(state), notesParts: noteParts(), noteDensity: state.noteDensity, retryBroken: state.retryBrokenReplies !== false };
+  $('notes-rebuild-dialog').close();
+  state.readerEditBusy = true; renderReaderActions();
+  setReaderGeneration({ storyId: story.id, phase: 'working', message: 'Rebuilding vocabulary notes…' });
+  try {
+    if (backgroundRun) await stopBackgroundContext();
+    persistReaderStory(story);
+    await releaseSavedInference();
+    const op = await runContentOperation({ kind: 'notes', language: story.language, input, plan: version.languagePlan || null, prose: { title: version.title, story: version.story }, config, target: { storyId: story.id, chapterId: chapter.id, versionId: version.id, index: target.index } });
+    showOperationResult(op);
+  } catch (error) {
+    try { await releaseInvalidReaderResponse(); } catch {}
+    const cancelled = error.code === 'generation_cancelled';
+    if (readerGeneration?.storyId === story.id) setReaderGeneration(cancelled ? null : { ...readerGeneration, phase: 'error', message: pipeline?.records[0]?.discardRequested ? discardFailureMessage(pipeline.records[0]) : 'Vocabulary notes stopped.' });
+    if (cancelled && !pipeline?.records.length) toast('Generation cancelled');
+    else if (pipeline?.records.length) { renderCheckpointRecovery(); revealRecovery(pipeline.records[0]); }
+    else toast(failureInfo(error, 'notes').message);
+  } finally { state.readerEditBusy = false; renderReaderActions(); }
+}
 async function runMemoryRebuild(story) {
   if (!story || pendingDeletionBlocked() || state.storageBlocked) return;
   state.readerEditBusy = true; $('memory-rebuild-submit').disabled = true;
@@ -1154,13 +1217,16 @@ $('split-notes').addEventListener('change', () => { state.splitNotes = $('split-
 // Settings → Vocabulary notes: picks the notes prompt for chapters started from now on (PED-002).
 $('note-density').addEventListener('change', () => { state.noteDensity = $('note-density').value; trySaveSettings(); });
 $('light-reasoning-select').addEventListener('change', () => { state.lightReasoning = $('light-reasoning-select').value; trySaveSettings(); });
+document.querySelectorAll('[data-light-task]').forEach(box => box.addEventListener('change', () => {
+  state.lightTasks = LIGHT_TASKS.filter(task => document.querySelector(`[data-light-task="${task}"]`).checked); trySaveSettings();
+}));
 window.addEventListener('app2:ai:connection', refreshModels);
 window.addEventListener('pageshow', () => { if (document.visibilityState === 'visible') refreshModels(); });
 
 document.documentElement.style.colorScheme = 'dark';
 state.stories = JSON.parse(JSON.stringify(workspaceStorage.load('data/stories.json').value));
 loadReaderPositions();
-const settings = workspaceStorage.load('data/settings.json').value; state.providerId = settings.providerId || ''; state.model = settings.model || PREFERRED_MODEL; state.reasoning = settings.reasoning || ''; state.lightModel = settings.lightModel || ''; state.lightReasoning = settings.lightReasoning || ''; state.splitNotes = settings.splitNotes !== false; state.noteDensity = NOTE_DENSITIES.includes(settings.noteDensity) ? settings.noteDensity : DEFAULT_NOTE_DENSITY; state.retryBrokenReplies = settings.retryBrokenReplies !== false; state.notifyWhenReady = settings.notifyWhenReady === true;
+const settings = workspaceStorage.load('data/settings.json').value; state.providerId = settings.providerId || ''; state.model = settings.model || PREFERRED_MODEL; state.reasoning = settings.reasoning || ''; state.lightModel = settings.lightModel || ''; state.lightReasoning = settings.lightReasoning || ''; state.lightTasks = lightTasks(settings); state.splitNotes = settings.splitNotes !== false; state.noteDensity = NOTE_DENSITIES.includes(settings.noteDensity) ? settings.noteDensity : DEFAULT_NOTE_DENSITY; state.retryBrokenReplies = settings.retryBrokenReplies !== false; state.notifyWhenReady = settings.notifyWhenReady === true;
 state.furigana = settings.readingPreferences?.furigana !== false;
 state.readerFontSize = Math.max(15, Math.min(30, Number(settings.readingPreferences?.fontSize) || 19));
 state.speechRate = SPEECH_RATES.includes(Number(settings.readingPreferences?.speechRate)) ? Number(settings.readingPreferences.speechRate) : 1;
