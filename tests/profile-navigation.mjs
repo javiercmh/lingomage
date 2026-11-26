@@ -1,10 +1,11 @@
+import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 
 // Static contract for the Profile reorganization: three tabs, one Profile page (practice before languages)
 // and a separate Settings view reached from Profile. Visual and interaction checks are manual.
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-const app = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
+const app = appSource();
 
 const tabs = [...html.matchAll(/<button class="tab[^"]*" data-view="([^"]+)"/g)].map(match => match[1]);
 assert.deepEqual(tabs, ['create', 'library', 'profile'], 'bottom navigation is Create, Library, Profile');

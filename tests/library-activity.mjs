@@ -1,3 +1,4 @@
+import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -216,7 +217,7 @@ for (const kind of ['cont', 'rewrite', 'examples']) {
 
 // Source contract: stamping happens only in the two content-saving paths, never in opens, positions or pre-request saves.
 {
-  const app = fs.readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
+  const app = appSource();
   assert.equal(app.match(/markStoryActivity\(/g).length, 2, 'app.js stamps only the saved explanation/detail result and an imported story (the controller stamps the other content)');
   const body = name => app.slice(app.indexOf(`function ${name}(`), app.indexOf('\n}\n', app.indexOf(`function ${name}(`)));
   assert.match(body('importStoryFromFile'), /markStoryActivity\(story, new Date\(\), 'updated'\);/);
@@ -227,7 +228,7 @@ for (const kind of ['cont', 'rewrite', 'examples']) {
 // Deferred re-render: a result saved while the library is hidden, in selection, or showing a popover never reorders under the learner,
 // and Actions focus returns to the rebuilt button afterwards.
 {
-  const app = fs.readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
+  const app = appSource();
   const part = (from, to) => app.slice(app.indexOf(from), app.indexOf(to));
   let active = true, renders = 0, removed = 0, focused = [];
   const rebuilt = { focus() { focused.push('rebuilt'); } };

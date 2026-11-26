@@ -1,7 +1,8 @@
+const appSource = require('./support/app-source.cjs');
 (async()=>{
 const {bindStory, bindGeneration, bindPanels}=await import('./support/controllers.mjs');
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
-const source=fs.readFileSync('js/app.js','utf8');
+const source=appSource();
 const slice=(start,end)=>source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start)));
 const pathLabelSource=fs.readFileSync('js/story-model.js','utf8').replace(/^[\s\S]*?(?=export function pathLabel)/,'').replaceAll('export function ','function ');
 function fixture(){
@@ -75,7 +76,7 @@ console.log('PASS chapter/path removal, shared content and memory, mirrors, name
  let submit, requested, sequence=0;
  const element=tag=>({tagName:tag,childNodes:[],textContent:'',setAttribute(){},append(...nodes){this.childNodes.push(...nodes);},querySelector(selector){return this.childNodes.find(x=>x.tagName===selector)||this.childNodes.map(x=>x.querySelector?.(selector)).find(Boolean);},remove(){},scrollIntoView(){},addEventListener(){},classList:{add(){}}});
  c.document={createElement:element,querySelectorAll:()=>[]};c.crypto={randomUUID:()=>`generated-${++sequence}`};c.PROMPT_VERSION='test';c.LANGUAGES={de:'German'};c.STORY_GUIDES={de:{beginner:'Simple'}};c.profileSnapshot=()=>({});c.decodeResponse=JSON.parse;c.state.model='mock';c.state.providerId='mock';story.language='de';story.difficulty='beginner';
- Object.assign(c,await import('../js/generation-progress.js'));const painted=[];c.paintChapterProgress=(request,op)=>painted.push(op.stage);c.readerGeneration=null;c.renderReaderGeneration=()=>{};c.setReaderGeneration=value=>{c.readerGeneration=value;};c.renderChapterRequest=()=>{};c.renderCheckpointRecovery=()=>{};vm.runInContext(fs.readFileSync('js/request-lifecycle.js','utf8').replaceAll('export async function ','async function '),c);
+ Object.assign(c,await import('../js/generation-progress.js'));const painted=[];c.paintChapterProgress=(request,op)=>painted.push(op.stage);c.readerGeneration=null;c.renderReaderGeneration=()=>{};c.setReaderGeneration=value=>{c.readerGeneration=value;};c.currentReaderGeneration=()=>c.readerGeneration;c.currentPipeline=()=>c.pipeline;c.currentBackgroundRun=()=>c.backgroundRun;c.renderChapterRequest=()=>{};c.renderCheckpointRecovery=()=>{};vm.runInContext(fs.readFileSync('js/request-lifecycle.js','utf8').replaceAll('export async function ','async function '),c);
  c.LENGTHS={short:{words:[100,150],sentences:[8,12]}};c.lengthPreference=()=> 'short';c.structuredClone=structuredClone;
  bindGeneration(c);
  c.runContentOperation=async spec=>{const op={...spec,id:`operation-${++sequence}`,createdAt:'test',result:JSON.parse(await c.readerAi(spec.kind,spec.input))};c.applyContentOperation(op);return op;};c.showOperationResult=()=>{};

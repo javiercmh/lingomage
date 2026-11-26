@@ -1,8 +1,9 @@
+const appSource = require('./support/app-source.cjs');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 
-const app = fs.readFileSync('js/app.js', 'utf8');
+const app = appSource();
 const helperStart = app.indexOf('function runSelectionAction(');
 const actionsStart = app.indexOf("$('selection-translate').addEventListener", helperStart);
 const actionsEnd = app.indexOf('function openShareDialog(', actionsStart);
@@ -131,7 +132,7 @@ async function clickAndCheck(id, operation) {
   scheduled.fn();assert.equal(toastNode.hidden,true);
   toastContext.toast('Request cancelled');assert.equal(scheduled.ms,2600);
 
-  const source = fs.readFileSync('js/app.js', 'utf8');
+  const source = appSource();
   const start = source.indexOf('async function readerAi(');
   const end = source.indexOf('\nasync function acknowledgeReaderResult', start);
   const readerAi = source.slice(start, end);

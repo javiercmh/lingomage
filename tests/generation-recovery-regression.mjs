@@ -1,3 +1,4 @@
+import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -36,7 +37,7 @@ for (const kind of ['create','continue','rewrite','examples']) {
     await pipeline.discard(op);assert.equal(pipeline.records.length,0);
   }
 }
-const source=fs.readFileSync('js/app.js','utf8');
+const source=appSource();
 const op={kind:'create',stage:'prose',promptVersion:'test',safeguardVersion:'test',error:'service'};
 let runs=0,results=0,resolve;
 const aiSession=createAiSession({ai:{}});

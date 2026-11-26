@@ -1,9 +1,10 @@
+const appSource = require('./support/app-source.cjs');
 // Behavioral checks for the reader redesign helpers (scroll reveal, overlap warning, library actions).
 const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const source = fs.readFileSync(path.join(__dirname, '../js/app.js'), 'utf8');
+const source = appSource();
 function section(start, end) { const at = source.indexOf(start); assert(at >= 0, `missing ${start}`); return source.slice(at, source.indexOf(end, at)); }
 
 // Show: scroll only enough to reveal the bottom of the explanation card.

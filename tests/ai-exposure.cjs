@@ -1,7 +1,8 @@
+const appSource = require('./support/app-source.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const source = fs.readFileSync('js/app.js', 'utf8');
+const source = appSource();
 const start = source.indexOf('async function refreshModels()');
 const end = source.indexOf("$('language-settings-open')", start);
 const refreshSource = source.slice(start, end);

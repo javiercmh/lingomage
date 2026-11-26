@@ -1,3 +1,4 @@
+const appSource = require('./support/app-source.cjs');
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
 const source = fs.readFileSync('js/bridge.js','utf8').slice(fs.readFileSync('js/bridge.js','utf8').indexOf('const TRANSLATION =')).split('// Native Sharesheet:')[0].replace('export const translation', 'const translation') + '\nthis.translation = translation;';
 function harness(channel) { const c = {window: {AppTranslation: channel}, setTimeout, clearTimeout}; vm.createContext(c); vm.runInContext(source,c); return c.translation; }
@@ -8,13 +9,13 @@ function harness(channel) { const c = {window: {AppTranslation: channel}, setTim
  assert.equal((await translation.open({text:'日本語'})).opened,true); assert.equal(channel.last.options.text,'日本語');
  channel.postMessage = function(raw) { const request=JSON.parse(raw); this.onmessage({data:JSON.stringify({id:request.id,error:{code:'invalid_request',message:'Blank text'}})}); };
  await assert.rejects(translation.open({text:''}),e=>e.code==='invalid_request');
- const app=fs.readFileSync('js/app.js','utf8'); assert.match(app,/translation\.open\(\{ text: passage\.text \}\)/); assert.doesNotMatch(app,/pageshow', refreshTranslationAvailability/);
+ const app=appSource(); assert.match(app,/translation\.open\(\{ text: passage\.text \}\)/); assert.doesNotMatch(app,/pageshow', refreshTranslationAvailability/);
  console.log('PASS translation availability, external launch contract, canonical text, unavailable and native error propagation');
 })().catch(e=>{console.error(e);process.exitCode=1;});
 
 // Execute the actual toolbar/controller code with deterministic bridge promises.
 (async () => {
- const app = fs.readFileSync('js/app.js', 'utf8');
+ const app = appSource();
  const buttons = Object.fromEntries(['selection-toolbar', 'selection-translate', 'selection-speak'].map(id => [id, {
    hidden: true, disabled: false, style: {}, attributes: {}, classList: {add(){},remove(){}},
    setAttribute(key,value){this.attributes[key]=value;}, getAttribute(key){return this.attributes[key] ?? null;},
@@ -62,7 +63,7 @@ function harness(channel) { const c = {window: {AppTranslation: channel}, setTim
 })().catch(e=>{console.error(e);process.exitCode=1;});
 
 (async () => {
- const app=fs.readFileSync('js/app.js','utf8'), events={}, button={}, pending=[];
+ const app=appSource(), events={}, button={}, pending=[];
  const c={document:{hidden:false,addEventListener(type,fn){events[type]=fn;}}, $:()=>button,
    translation:{availability(){return new Promise((resolve,reject)=>pending.push({resolve,reject}));}}};
  vm.createContext(c);

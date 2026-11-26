@@ -1,6 +1,7 @@
+const appSource = require('./support/app-source.cjs');
 // Exercise the production chapter Listen/Stop control against delayed native replies.
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
-const app = fs.readFileSync('js/app.js', 'utf8');
+const app = appSource();
 const controls = app.slice(app.indexOf('function renderReaderListen('), app.indexOf("$('reader-dialog').addEventListener('pointerdown'"));
 const speechSource = fs.readFileSync('js/reader-speech.js', 'utf8').replaceAll('export ', '');
 const flush = () => new Promise(setImmediate);
@@ -18,7 +19,7 @@ function harness({story = 'Chapter body', language = 'de', delayVoices = false} 
     activeChapter: () => ({}), activeVersion: () => ({title: 'Title', story}), SPEECH_LANGUAGES: {de: 'de-DE', 'es-CL': 'es-CL'},
     $: id => id === 'reader-listen' ? button : dialog, toast: message => errors.push(message)};
   vm.createContext(c);
-  vm.runInContext("let readerSpeechRun=0, readerSpeechKey='', readerSpeechOwner=0, readerSpeechStop=null;\n" + speechSource + controls, c);
+  vm.runInContext("let readerSpeechRun=0, readerSpeechKey='', readerSpeechOwner=0, readerSpeechStop=null;\nfunction setPlaybackContext(value) { playbackContext = value; }\n" + speechSource + controls, c);
   c.renderReaderListen();
   return {c, button, dialog, speech, speaks, stops, voices, errors, click: handlers.click};
 }

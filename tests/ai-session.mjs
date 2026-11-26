@@ -1,3 +1,4 @@
+import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -6,7 +7,7 @@ import { createPipeline } from '../js/generation-pipeline.js';
 import { failureInfo, recoverySummary } from '../js/generation-errors.js';
 import { readingPlan, validateProse } from '../js/learning-validation.js';
 
-const app = fs.readFileSync('js/app.js', 'utf8');
+const app = appSource();
 const bridgeSource = fs.readFileSync('js/bridge.js', 'utf8');
 const coded = (message, code) => Object.assign(new Error(message), { code });
 

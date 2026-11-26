@@ -1,3 +1,4 @@
+const appSource = require('./support/app-source.cjs');
 (async()=>{
 const {bindStory, bindGeneration, bindPanels}=await import('./support/controllers.mjs');
 const {markStoryActivity}=await import('../js/library-activity.js');
@@ -6,7 +7,7 @@ const prompts=await import('../js/prompts.js');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
-const source = fs.readFileSync(require('node:path').join(__dirname, '../js/app.js'), 'utf8');
+const source = appSource();
 const htmlSource = fs.readFileSync(require('node:path').join(__dirname, '../index.html'), 'utf8');
 const cssSource = fs.readFileSync(require('node:path').join(__dirname, '../css/style.css'), 'utf8');
 const readerTextSource = fs.readFileSync(require('node:path').join(__dirname, '../js/reader-text.js'), 'utf8').replaceAll('export function ', 'function ');
@@ -23,6 +24,8 @@ function sandbox(extra = {}) {
   const c = {backgroundRun:null,workspaceStorage:{assertWritable(){}},usage:{setReader(){},checkpoint(){}},settingsFeedback:{sync(){}},pipeline:null,state:{},console,crypto:{randomUUID:(()=>{let id=0;return ()=>`help-test-${++id}`;})()},PROMPT_VERSION:'test',STORY_GUIDES:{de:{beginner:'Simple sentences'}},renderChapterRequest(){},updateReaderNavigation(){},renderCheckpointRecovery(){},LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},SPEECH_LANGUAGES:{de:'de-DE',ja:'ja-JP',ru:'ru-RU','es-CL':'es-CL'},renderGenerationRecovery(){},readerPanel:()=>({classList:{toggle(){}}}),$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{body:element(),createElement:element,createElementNS:(_ns,name)=>element(name),createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},setTimeout:()=>0,clearTimeout(){},...extra};
   c.readerGeneration = null; c.renderReaderGeneration = () => {}; c.setReaderGeneration = value => { c.readerGeneration = value; };
   vm.createContext(c); c.markStoryActivity = markStoryActivity; for (const name of ['storyInstructions','chapterInstructions','helpInstructions']) if (!(name in c)) c[name] = prompts[name];
+  // app.js accessors for bindings other code reassigns; tests set the plain names.
+  for (const [name, key] of [['currentReaderGeneration','readerGeneration'],['currentPipeline','pipeline'],['currentBackgroundRun','backgroundRun']]) if (!(name in c)) c[name] = () => c[key];
   vm.runInContext(notificationSource, c);
   vm.runInContext(fs.readFileSync('js/story-model.js','utf8').replace(/^[\s\S]*?(?=export function pathLabel)/, '').replaceAll('export function ', 'function '), c);
   vm.runInContext(fs.readFileSync('js/generation-errors.js','utf8').replace(/^import .*\n/m, '').replaceAll('export function ', 'function '), c);
@@ -618,7 +621,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   console.log('PASS saved explanations follow the text (start, then end, then newest) without changing their stored order');
 
   const removal=sandbox({state:{stories:[{id:'a'},{id:'b'}],selectedStoryIds:new Set(['a']),storySelectionMode:true},persistStories(){if(removal.fail)throw Error('disk');},updateCount(){},renderLibrary(){},syncStorySelection(){},window:{scrollY:0,scrollTo(){}},toast(){},fail:false});
-  vm.runInContext(section('function pendingDeletionBlocked(', 'function wireLongPress('),removal);
+  vm.runInContext(section('function pendingDeletionBlocked(', '} = createLibraryView(').replace(/const \{[^}]*$/, '')+section('function confirmStoryDeletion(', 'function wireLongPress('),removal);
   assert.equal(removal.removeSelectedStories(new Set(['a'])),true);assert.deepEqual(removal.state.stories.map(x=>x.id),['b']);assert.equal(removal.state.storySelectionMode,false);
   removal.state.stories=[{id:'a'},{id:'b'}];removal.state.selectedStoryIds=new Set(['a']);removal.state.storySelectionMode=true;removal.fail=true;
   assert.equal(removal.removeSelectedStories(new Set(['a'])),false);assert.deepEqual(removal.state.stories.map(x=>x.id),['a','b']);assert.deepEqual(Array.from(removal.state.selectedStoryIds),['a']);
@@ -776,7 +779,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
     // A press outside an open vocabulary note closes it without opening the note (or explanation) it lands on.
     const popover={hidden:false},events={},activated=[];let closed=0;
     const ctx={$:id=>id==='word-note-popover'?popover:{addEventListener:(type,fn)=>{events[type]=fn;}},closeWordNote(){closed++;popover.hidden=true;},activateReaderText:event=>activated.push(event),WeakSet};
-    vm.createContext(ctx);vm.runInContext(section('let noteDismissPress = false;','// Sentence-level listening player'),ctx);
+    vm.createContext(ctx);vm.runInContext(section('let noteDismissPress = false;','function renderHighlightedText('),ctx);
     const outside={closest:()=>null},inside={closest:selector=>selector==='#word-note-popover'?{}:null};
     events.pointerdown({target:outside});assert.equal(closed,1,'outside press closes the note');
     const click={type:'click'};ctx.activateStoryText(click);ctx.activateStoryText(click);assert.equal(activated.length,0,'the dismissing tap opens nothing, even through both click handlers');

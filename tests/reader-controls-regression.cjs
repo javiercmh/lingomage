@@ -1,8 +1,9 @@
+const appSource = require('./support/app-source.cjs');
 (async()=>{
 const {bindStory, bindGeneration, bindPanels}=await import('./support/controllers.mjs');
 // Exercise compact reader controls through production helpers and event handlers.
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
-const source = fs.readFileSync('js/app.js', 'utf8');
+const source = appSource();
 const slice = (start, end) => source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)));
 const elements = new Map(), documentEvents = {};
 const box = id => {
@@ -27,7 +28,7 @@ const c = {state: {readerFontSize: 19, readerEditBusy: false, readerPositions: p
   persistReaderStory() { if (failed) throw Error('disk'); saved++; },
   updateReader(keep) { updates.push(keep); }, requestAnimationFrame: fn => fn(), restoreReaderPosition(position) { reader.scrollTop = position?.scrollTop || 0; }
 };
-c.readerViewport={width:320,height:640}; c.resizingReader=false; c.restoringPathPosition=false; vm.createContext(c);
+c.readerViewport={width:320,height:640}; c.resizingReader=false; c.restoringPathPosition=false; c.setReaderViewport=value=>{c.readerViewport=value;}; c.setRestoringPathPosition=value=>{c.restoringPathPosition=value;}; vm.createContext(c);
 const panels=bindPanels(c);
 panels.initialize();
 box('path-control').hidden = true;

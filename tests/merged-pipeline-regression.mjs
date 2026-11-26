@@ -1,14 +1,15 @@
+import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {createPipeline} from '../js/generation-pipeline.js';
 import {readingPlan, validateProse} from '../js/learning-validation.js';
-const app=fs.readFileSync('js/app.js','utf8');
+const app=appSource();
 const prose={title:'今日',story:'今日は町へ行きます。町へ行きます。',glossary:[{word:'町',meaning:'town',forms:['町']}]};
 const plan={vocabulary:[{word:'町',meaning:'town'}],grammar:[],guidance:'Clear references.'};
 function harness({phase,language='ja',kind='create'}={}) {
   const events=[],titles=[];let durable=[],cancelClick;const button={addEventListener(name,fn){cancelClick=fn;}};
-  let pipeline;const context={pipeline:null,$:()=>button,toast(message){throw Error(message);}};
+  let pipeline;const context={pipeline:null,currentPipeline:()=>context.pipeline,$:()=>button,toast(message){throw Error(message);}};
   vm.createContext(context);vm.runInContext(app.slice(app.indexOf("$('cancel-generation').addEventListener"),app.indexOf('function renderRecoveryPanel(')),context);
   const click=async()=>{if(kind==='create') await cancelClick();else await pipeline.cancel();};
   const ai={

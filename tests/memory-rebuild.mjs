@@ -1,3 +1,4 @@
+import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -27,7 +28,7 @@ const json = value => JSON.parse(JSON.stringify(value));
   assert.deepEqual(story.chapters, before.chapters); assert.equal(story.promptVersion, before.promptVersion);
 }
 
-const source = fs.readFileSync('js/app.js', 'utf8');
+const source = appSource();
 const code = source.slice(source.indexOf('let memoryRebuildStory = null;'), source.indexOf("$('reader-actions-toggle').addEventListener('click', toggleReaderActions);"));
 function harness(story = fixture()) {
   const elements = new Map();

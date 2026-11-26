@@ -1,5 +1,6 @@
+const appSource = require('./support/app-source.cjs');
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
-const source = fs.readFileSync('js/app.js', 'utf8');
+const source = appSource();
 const section = source.slice(source.indexOf('function showOperationResult('), source.indexOf('function initializePipeline('));
 
 function build({open = true, viewedPath = 'original', chapter = 0} = {}) {

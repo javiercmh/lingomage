@@ -1,3 +1,4 @@
+import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createExposureTracker, paragraphRanges, wordCount, requiredDwellMs, visibleFraction, IDLE_MS, MIN_DWELL_MS, SAMPLE_MS, MAX_SAMPLE_GAP_MS} from '../js/reading-exposure.js';
@@ -72,7 +73,7 @@ function harness(paragraphs, visible = () => 1) {
 
 // --- App wiring: lookups recorded after user actions; exposure follows the rendered chapter -----------------
 {
-  const app = fs.readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
+  const app = appSource();
   assert.match(app, /recordNoteLookup\(notes, glossaryForTrigger\(trigger\), 'note'\)/);
   assert.match(app, /recordNoteLookup\(\[note\], glossaryForTrigger\(trigger\), 'listen'\)/);
   assert.match(app, /opened = true; \}[\s\S]{0,200}if \(opened\) recordSelectionLookup\(passage, 'translate'\)/, 'translate records only after the translator opened');
@@ -84,7 +85,7 @@ function harness(paragraphs, visible = () => 1) {
   assert.match(app, /usage\.setReader\(null\); stopExposure\(\)/);
   // Most looked up rows open a read-only detail sheet; viewing or listening there records nothing.
   assert.ok(/open\.className = 'lookup-row'[\s\S]{0,1500}openLookupDetail\(code, entry\.key, open\)/.test(app), 'each row is a button that opens its detail sheet');
-  const detail = app.slice(app.indexOf('function openLookupDetail'), app.indexOf('function toast('));
+  const detail = app.slice(app.indexOf('function openLookupDetail'), app.indexOf('// end of js/stats-view.js'));
   assert.ok(detail.length > 0 && !/record\w*\(/.test(detail), 'the detail sheet never records a lookup');
   assert.match(detail, /if \(speaking\)[^\n]*speech\.stop\(\)/, 'closing stops only speech the sheet started');
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');

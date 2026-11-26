@@ -1,3 +1,4 @@
+import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -70,8 +71,8 @@ console.log('PASS story import rejects non-LingoMage, newer, malformed and inval
 
 // Real app wiring: the Library handler, the normal stories save, cancellation and rollback.
 {
-  const app = fs.readFileSync('js/app.js', 'utf8');
-  const start = app.indexOf('// Library → Import story…'), end = app.indexOf("$('reader-share').addEventListener");
+  const app = appSource();
+  const start = app.indexOf('// Library → Import story…'), end = app.indexOf('// end of js/share-dialog.js');
   assert.ok(start > 0 && end > start);
   const persistStories = app.slice(app.indexOf('function persistStories()'), app.indexOf('function persistReaderStory('));
   const setup = (saved = [story], {write = () => true} = {}) => {

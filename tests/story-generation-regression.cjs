@@ -1,3 +1,4 @@
+const readAppSource = require('./support/app-source.cjs');
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
 const c = {...require('../js/story-generation.js'),...require('../js/reader-text.js')};
 const valid = JSON.stringify({ vocabulary: [{word:'Markt',meaning:'market'}], grammar: [], guidance: 'Clear context.' });
@@ -25,7 +26,7 @@ const longText=shortText+' '+Array(10).fill('Sie geht weiter und sieht ihre Freu
 const density=text=>{const matches=c.firstGlossaryMatches(text,notes);const tokens=[...text.matchAll(/\S+/g)];return {total:tokens.length,linked:tokens.filter(token=>matches.some(match=>token.index<match.end&&token.index+token[0].length>match.start)).length};};
 assert.deepEqual(density(shortText),{total:20,linked:3});assert.deepEqual(density(longText),{total:100,linked:3});
 console.log('PASS controlled underline density: same three glossary entries link 3/20 words (15%) versus 3/100 words (3%); only first occurrences are linked');
-const appSource=fs.readFileSync('js/app.js','utf8');
+const appSource=readAppSource();
 const defs=JSON.parse(fs.readFileSync('data/learning-profiles.json'));
 for(const lang of ['de','es-CL','ru']) assert.deepEqual(defs.standardizedLevels[lang].levels.map(x=>x.id),['A1','A2','B1','B2','C1','C2']);
 assert.deepEqual(defs.standardizedLevels.ja.levels.map(x=>x.id),['N5','N4','N3','N2','N1']);
@@ -46,7 +47,7 @@ assert.deepEqual(Object.keys(defs.scopes),['scene','chapter']);
   assert.equal((html.match(/id="form-error"/g) || []).length, 1);
   assert.ok(form.includes('id="reading-scope-group"') && form.includes('role="radiogroup"') && !form.includes('<select id="reading-scope"'), 'Reading scope is a segmented radio group');
   assert.ok(!/longer/i.test(html), 'no Longer passage option');
-  const app = fs.readFileSync('js/app.js', 'utf8');
+  const app = readAppSource();
   const fn = name => app.slice(app.indexOf('function ' + name), app.indexOf('\n}', app.indexOf('function ' + name)) + 2);
   const scopeCtx = { SCOPES: defs.scopes, LEGACY_SCOPES: { longer: 'chapter' } };
   vm.createContext(scopeCtx); vm.runInContext(app.slice(app.indexOf('const LEGACY_SCOPES'), app.indexOf('function normalizeScope')) + app.slice(app.indexOf('function normalizeScope'), app.indexOf('\n', app.indexOf('function normalizeScope'))), scopeCtx);

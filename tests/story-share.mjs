@@ -1,3 +1,4 @@
+import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -51,7 +52,7 @@ const legacy={id:'L',title:'Old',story:'Body'};storyShareText(legacy,model);asse
   console.log('PASS share actions: download via Save as or browser, share file or text, copy text; cancel silent; no fallback');
 }
 // Execute the real Library action, dialog setup, each action button and close wiring, including rebuilt opener focus.
-const app=fs.readFileSync('js/app.js','utf8');
+const app=appSource();
 const elements=new Map(), element=()=>({children:[],style:{},dataset:{},attributes:{},isConnected:true,classes:new Set(),get classList(){const c=this.classes;return {toggle:(name,on)=>on?c.add(name):c.delete(name),contains:name=>c.has(name)};},querySelector(){return this.child||(this.child=element());},append(...children){this.children.push(...children);},setAttribute(name,value){this.attributes[name]=value;},addEventListener(name,fn){this[name]=fn;},getBoundingClientRect(){return {height:144,top:60,bottom:104,right:300};},focus(){this.focused=true;},remove(){},showModal(){this.open=true;},close(){this.open=false;this.onclose?.();}});
 const $=id=>{if(!elements.has(id))elements.set(id,element());return elements.get(id);};
 const trigger=element(), rebuilt=element();let rendered=0;const toasts=[], delivered=[];
@@ -63,7 +64,7 @@ const context={$,state:{},workspaceStorage:{entries:new Map([['data/stories.json
   shareText:async payload=>{delivered.push(['shareText',payload.text]);return {cancelled:true};},copyText:async payload=>{delivered.push(['copy',payload.text]);return {done:'copied'};},
   save:{available:false},share:{available:false},isNative:false,document:{createElement:element,body:element(),querySelector:()=>null},window:{innerHeight:800,innerWidth:375},setTimeout:(fn)=>{context.pendingReset=fn;return 1;},clearTimeout(){},renderLibrary(){rendered++;},navigator:{clipboard:{}},trySaveSettings(){context.saves=(context.saves||0)+1;return context.saveResult!==false;},toast:message=>toasts.push(message),console:{warn(){}},beginStorySelection(){},confirmStoryDeletion(){}};
 vm.createContext(context);
-vm.runInContext(app.slice(app.indexOf('function closeStoryMenu('),app.indexOf('function confirmStoryDeletion('))+app.slice(app.indexOf('function openShareDialog('),app.indexOf('// Library → Import story…')),context);
+vm.runInContext(app.slice(app.indexOf('function closeStoryMenu('),app.indexOf('function confirmStoryDeletion('))+app.slice(app.indexOf('function openShareDialog('),app.indexOf('// end of js/reader-help.js'))+app.slice(app.indexOf('// Row summaries state'),app.indexOf('// Library → Import story…')),context);
 const dialog=$('share-dialog');
 context.openStoryMenu(longer2,trigger);assert.equal(context.state.storyMenu.popover.children.length,3);
 context.state.storyMenu.popover.children[1].click();

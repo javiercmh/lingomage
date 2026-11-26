@@ -1,5 +1,6 @@
+const appSource = require('./support/app-source.cjs');
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
-const source = fs.readFileSync('js/app.js', 'utf8');
+const source = appSource();
 const between = (from, to) => source.slice(source.indexOf(from), source.indexOf(to));
 
 // Real openReader, close/popstate handlers and ensureReaderOpen against a fake dialog and a fake browser history stack.

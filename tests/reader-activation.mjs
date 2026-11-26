@@ -1,3 +1,4 @@
+import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createTreeDom } from './support/tree-dom.mjs';
@@ -212,7 +213,7 @@ const BREAD = [{ word: 'Brot', meaning: 'bread', forms: ['Brot'] }];
 {
   // The source chooser is gone; the note carries the only secondary action.
   const read = path => fs.readFileSync(new URL(path, import.meta.url), 'utf8');
-  const css = read('../css/style.css'), html = read('../index.html'), app = read('../js/app.js');
+  const css = read('../css/style.css'), html = read('../index.html'), app = appSource();
   assert.doesNotMatch(css + html + read('../js/reader-activation.js') + app, /source-chooser|sourceChooser|createSourceChooser/, 'obsolete chooser markup, styles and wiring are removed');
   assert.match(css, /\.word-note-view \{[^}]*width: 100%[^}]*min-height: 44px/, 'View saved explanation is a full-width 44px target');
   assert.match(css, /\.word-note-view \{[^}]*border-top: 1px solid/, 'a subtle divider separates it from the meanings');

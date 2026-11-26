@@ -1,3 +1,4 @@
+import readAppSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -229,7 +230,7 @@ try {
   // Story-memory summaries and compaction through the production readerAi, save and release code,
   // the session wrapper and the bridge, while the page is hidden.
   {
-    const appSource = fs.readFileSync('js/app.js', 'utf8');
+    const appSource = readAppSource();
     const section = (start, end) => appSource.slice(appSource.indexOf(start), appSource.indexOf(end, appSource.indexOf(start)));
     const events = [], requests = new Map();
     let active = null, durable = null, serial = 0;
@@ -255,7 +256,7 @@ try {
     const session = createAiSession({ ai: b.ai, isVisible: () => false });
     const node = () => ({ textContent: '', children: [], append(...nodes) { this.children.push(...nodes); }, querySelector() { return this.strong ||= node(); }, addEventListener() {}, remove() {} });
     const ctx = vm.createContext({
-      ai: b.ai, aiSession: session, aiNotification, saveBeforeAcknowledge, failureInfo, readerGeneration: null,
+      ai: b.ai, aiSession: session, aiNotification, saveBeforeAcknowledge, failureInfo, readerGeneration: null, currentReaderGeneration: () => null,
       state: { models: [{ id: 'm' }], providerId: 'p', model: 'm' }, workspaceStorage: { assertWritable() {} },
       document: { createElement: node }, $: () => node(), toast() {}, renderReaderGeneration() {},
       persistReaderStory(story) { durable = structuredClone(story); events.push('save'); },

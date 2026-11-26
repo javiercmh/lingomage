@@ -1,5 +1,6 @@
+const appSource = require('./support/app-source.cjs');
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
-const source = fs.readFileSync('js/app.js', 'utf8');
+const source = appSource();
 const between = (from, to) => source.slice(source.indexOf(from), source.indexOf(to));
 // Story characters on a grid: 10px wide, 20px lines, `columns` per line; character 999 is an unrendered line break.
 let columns = 20;

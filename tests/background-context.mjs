@@ -1,3 +1,4 @@
+import appSource from './support/app-source.cjs';
 // Background story context: queueing, start conditions, stop/settle, quiet cancellation and the setting.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -5,7 +6,7 @@ import vm from 'node:vm';
 import { createStoryMemory } from '../js/story-memory.js';
 import { failureInfo } from '../js/generation-errors.js';
 
-const source = fs.readFileSync('js/app.js', 'utf8');
+const source = appSource();
 const code = source.slice(source.indexOf('let backgroundTarget = null'), source.indexOf("for (const id of ['reader-generation-dismiss'"));
 const element = () => ({ children: [], hidden: false, append(...nodes) { this.children.push(...nodes); }, remove() { this.removed = true; },
   querySelector(selector) { return this.children.find(node => node.className === selector.slice(1)) || null; } });
