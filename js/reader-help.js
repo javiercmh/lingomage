@@ -394,23 +394,28 @@ export function createReaderHelp({
     try { persistReaderStory(story); clearExplanationSelection(); renderSavedHelp(chapter,version); toast(`${ids.size} ${ids.size===1?'explanation':'explanations'} deleted`); return true; }
     catch(error) { chapter.help=before; renderSavedHelp(chapter,version); toast(error.message); return false; }
   }
-  function createHelpLoading(action, followUp) {
+  function createHelpLoading(action, followUp, copyOverride = null) {
     const panel = document.createElement('div'); panel.className = 'help-loading'; panel.setAttribute('role', 'status'); panel.setAttribute('aria-live', 'polite');
     const sparkle = document.createElement('span'); sparkle.className = 'help-loading-sparkle'; sparkle.setAttribute('aria-hidden', 'true'); sparkle.textContent = '✦';
     const copy = document.createElement('div'); copy.className = 'help-loading-copy';
-    const title = document.createElement('strong'); title.textContent = action === 'continue' ? 'Writing the next chapter…' : action === 'rewrite' ? 'Rewriting this chapter…' : action === 'examples' ? 'Generating examples…' : action === 'detail' ? 'Adding more detail…' : 'Preparing an explanation…';
-    const note = document.createElement('p'); note.textContent = ['continue', 'rewrite'].includes(action) ? 'Your current chapter stays available while this is prepared.' : action === 'detail' && followUp ? `Answering: ${followUp}` : 'Your saved explanations will stay here while this is prepared.';
+    const title = document.createElement('strong'); title.textContent = copyOverride?.title || (action === 'continue' ? 'Writing the next chapter…' : action === 'rewrite' ? 'Rewriting this chapter…' : action === 'examples' ? 'Generating examples…' : action === 'detail' ? 'Adding more detail…' : 'Preparing an explanation…');
+    const note = document.createElement('p'); note.textContent = copyOverride?.note || (['continue', 'rewrite'].includes(action) ? 'Your current chapter stays available while this is prepared.' : action === 'detail' && followUp ? `Answering: ${followUp}` : 'Your saved explanations will stay here while this is prepared.');
     copy.append(title, note);
     panel.append(sparkle, copy); return panel;
   }
   // The chapter status card: one Cancel request for the whole run (story memory requests and operation stages).
   // A memory request's own cancel control goes into a hidden host, so the card never shows two.
-  function createChapterLoading(kind) {
-    const panel = createHelpLoading(kind);
+  function createChapterLoading(kind, copyOverride = null) {
+    const panel = createHelpLoading(kind, '', copyOverride);
     panel.requestHost = document.createElement('span'); panel.requestHost.hidden = true;
+    const actions = document.createElement('div'); actions.className = 'help-loading-actions';
+    const openReady = document.createElement('button'); openReady.type = 'button'; openReady.className = 'small-btn small-btn-strong chapter-open-ready'; openReady.hidden = true;
+    openReady.addEventListener('click', () => { panel.onOpenReady?.(); });
     const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'small-btn chapter-cancel'; cancel.textContent = 'Cancel request';
     cancel.addEventListener('click', () => { cancel.disabled = true; cancelGeneration().finally(() => { cancel.disabled = false; }); });
-    panel.append(cancel, panel.requestHost); return panel;
+    actions.append(openReady, cancel);
+    panel.openReadyButton = openReady;
+    panel.append(actions, panel.requestHost); return panel;
   }
   function createShowInTextButton(item) {
     const chars = Array.from(String(item.passage || '').replace(/\s+/g, ' ').trim());

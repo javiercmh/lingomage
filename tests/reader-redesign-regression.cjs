@@ -71,7 +71,7 @@ function section(start, end) { const at = source.indexOf(start); assert(at >= 0,
 // Library Actions: a visible 44px button opens a labelled popover with native Select and Delete. There is no swipe gesture or tray.
 {
   const css = fs.readFileSync(path.join(__dirname, '../css/style.css'), 'utf8');
-  assert(!/swipe|story-actions-tray|story-tray-|--swipe-x|settling/.test(css + source), 'swipe interaction and tray styles are removed');
+  assert(!/story-actions-tray|story-tray-|--swipe-x|settling/.test(css + source), 'library swipe tray styles are removed');
   assert(!/wireStorySwipe|revealStory|closeStoryReveal|STORY_TRAY_WIDTH|revealedStoryId/.test(source), 'swipe code is removed');
   assert(/story-menu-toggle \{[^}]*width: 44px; height: 44px/.test(css) && /story-popover-action \{[^}]*min-height: 44px/.test(css) && /language-chip \{[^}]*min-height: 44px/.test(css), '44px targets');
   assert(/role', 'group'/.test(source) && !/role', 'menu'/.test(source), 'popover is a labelled group of native buttons, not a partial ARIA menu');

@@ -1,5 +1,5 @@
 import { chapterShareText, storyShareText, storyExportFile, shareTargets, downloadStoryFile, shareStoryFile, shareText, copyText, importStoryFile, STORY_IMPORT_MAX_BYTES } from './story-share.js';
-import { createStoryModel, pathLabel } from './story-model.js';
+import { createStoryModel, pathLabel, continuePrefixEntries, continueChapterNumber, continueResultPathId } from './story-model.js';
 import { lightModelChoice, lightTaskConfig, lightTasks, LIGHT_TASKS } from './light-model.js';
 import { markStoryActivity, planLibrary, dateSegments, describeDates } from './library-activity.js';
 import { beginMemoryRebuild, finishMemoryRebuild, createStoryMemory } from './story-memory.js';
@@ -13,7 +13,7 @@ import { annotatedText, applyExplainedMarks, findGlossaryMatches, getCanonicalSe
 import { markParagraphGaps } from './paragraph-gaps.js';
 import { SPEECH_RATES, canonicalRange, createReaderPlayer, speechUnits } from './reader-player.js';
 import { createPipeline, pendingRequests, MAX_BROKEN_RESENDS, parallelLimitFor } from './generation-pipeline.js';
-import { hasStoryContext, progressSummary } from './generation-progress.js';
+import { hasStoryContext, progressSummary, chapterLoadingCopy } from './generation-progress.js';
 import { timingEntry, timingSamples, estimateGeneration, remainingTime, remainingText } from './generation-timing.js';
 import { SAFEGUARD_VERSION, parseContent, validateStory, MAX_NOTE_PARTS } from './learning-validation.js';
 import { PROMPT_VERSION, storyInstructions, chapterInstructions, helpInstructions, NOTE_DENSITIES, DEFAULT_NOTE_DENSITY, scopeGuide } from './prompts.js';
@@ -101,35 +101,60 @@ function currentReaderGeneration() { return readerGeneration; }
 // "Working" is displayed only while a request is actually live, so a cancelled, failed or abandoned request never leaves a stale status.
 function generationLive() { return Boolean(creatingStory || backgroundRun || pipeline?.busy || state.readerEditBusy || state.readerHelpBusy || state.requestId); }
 function definePopoverOpen() { const popover = $('word-note-popover'); return Boolean(popover && !popover.hidden && popover.dataset.define === 'true'); }
+function isViewingChapter(target) {
+  if (!target?.storyId || !target.chapterId || !target.versionId) return false;
+  if (!$('reader-dialog').open || state.readerId !== target.storyId) return false;
+  const story = typeof readerStory === 'function' ? readerStory() : state.stories?.find?.(item => item.id === state.readerId);
+  if (!story) return false;
+  const path = typeof selectedPath === 'function' ? selectedPath(story) : null;
+  if (target.pathId && path?.id !== target.pathId) return false;
+  const chapter = typeof activeChapter === 'function' ? activeChapter(story) : null;
+  const version = typeof activeVersion === 'function' ? activeVersion(chapter, story) : null;
+  return Boolean(chapter && version && chapter.id === target.chapterId && version.id === target.versionId);
+}
 function generationView(status) {
   if (!status) return null;
   const pending = state.pendingReaderResult;
   if (pending && pending.story.id === status.storyId) return { message: pending.saved ? 'Response saved. Finish request.' : 'Response needs saving.', action: pending.saved ? 'Finish request' : 'Save response', dismiss: false };
   // Define shows its progress and Cancel in the note popover at the word, so the bar stays hidden while that is open.
   if (status.phase === 'working' && status.kind === 'define' && definePopoverOpen()) return null;
-  if (status.phase === 'working') return generationLive() ? { message: status.message, action: 'Cancel', dismiss: false, working: true } : null;
-  return { message: status.message, action: { cleanup: 'Finish request', error: 'Review', ready: 'View result' }[status.phase] || '', dismiss: true };
+  if (status.phase === 'working') {
+    if (!generationLive()) return null;
+    if (status.readyTarget) return { message: status.message, action: `Read Ch. ${status.readyTarget.chapterNumber}`, dismiss: false, working: true, readyJump: true };
+    return { message: status.message, action: 'Cancel', dismiss: false, working: true };
+  }
+  return { message: status.message, action: { cleanup: 'Finish request', error: 'Review', ready: status.actionLabel || 'View result' }[status.phase] || '', dismiss: true };
 }
 function paintGenerationBar(bar, view) {
   bar.hidden = !view;
-  if (!view) return;
-  const [message, action, dismiss] = bar.id === 'generation-status-bar' ? ['generation-status-message', 'generation-status-action', 'generation-status-dismiss'] : ['reader-generation-message', 'reader-generation-action', 'reader-generation-dismiss'];
+  if (!view) { bar.classList?.toggle?.('dismissible', false); return; }
+  const pageBar = bar.id === 'generation-status-bar';
+  const [message, action, dismiss, jumpId] = pageBar
+    ? ['generation-status-message', 'generation-status-action', 'generation-status-dismiss', 'generation-status-jump']
+    : ['reader-generation-message', 'reader-generation-action', 'reader-generation-dismiss', 'reader-generation-jump'];
   // Rewriting identical live-region text can be announced again, so only changed text is written.
   if ($(message).textContent !== view.message) $(message).textContent = view.message;
   $(action).hidden = !view.action; $(action).textContent = view.action;
-  $(action).disabled = Boolean(view.working) && !cancelAvailable();
+  $(action).disabled = Boolean(view.working && !view.readyJump) && !cancelAvailable();
   $(dismiss).hidden = !view.dismiss;
   bar.classList.toggle('working', Boolean(view.working)); // the compact bar shows a spinner while work runs
+  bar.classList?.toggle?.('dismissible', Boolean(view.dismiss));
+  const jump = $(jumpId);
+  if (jump) {
+    jump.disabled = !view.canJump;
+    jump.classList?.toggle?.('can-jump', Boolean(view.canJump));
+    jump.setAttribute?.('aria-label', view.canJump ? `${view.message}. Jump to generation details` : view.message);
+  }
 }
 // Cancel is possible only while an operation stage or a memory request is live; the chapter card follows the bar.
 function cancelAvailable() { return !pipeline?.records?.[0]?.discardRequested && Boolean(pipeline?.busy || state.activeChapterRequest && !state.activeChapterRequest.cancelledByUser || document.querySelector('.reader-ai-cancel')); }
-// Ready hides itself after READY_STATUS_MS; the result stays in the reader. Hovering or focusing the bar, or a hidden
-// page, postpones it, and returning to the page restarts the full countdown. Working, errors, cleanup and unsaved
-// responses stay until handled.
+// Ready hides itself after READY_STATUS_MS unless marked persistent; the result stays in the reader. Hovering or focusing
+// the bar, or a hidden page, postpones it, and returning to the page restarts the full countdown. Working, errors,
+// cleanup and unsaved responses stay until handled.
 const READY_STATUS_MS = 8000;
 let readyTimer = null, readyStatus = null;
 function scheduleReadyDismiss(status, view) {
-  const ready = Boolean(view?.dismiss) && status?.phase === 'ready';
+  const ready = Boolean(view?.dismiss) && status?.phase === 'ready' && !status?.persistent;
   if (ready && readyStatus === status) return;
   clearTimeout(readyTimer); readyTimer = null; readyStatus = ready ? status : null;
   if (ready) readyTimer = setTimeout(expireReadyStatus, READY_STATUS_MS);
@@ -145,6 +170,14 @@ function restartReadyCountdown() {
   if (!readyStatus) return;
   clearTimeout(readyTimer); readyTimer = setTimeout(expireReadyStatus, READY_STATUS_MS);
 }
+function elementInView(card, inReader) {
+  if (!card || card.hidden || !card.getClientRects?.().length) return false;
+  const rect = card.getBoundingClientRect();
+  const top = inReader ? $('reader-navigation-bar')?.getBoundingClientRect?.().bottom || 0 : 0;
+  const bottom = inReader ? window.innerHeight : document.querySelector?.('.tabbar')?.getBoundingClientRect?.().top || window.innerHeight;
+  // Ignore a sliver behind fixed navigation; do not use the status bar itself as a boundary.
+  return rect.right > 0 && rect.left < window.innerWidth && Math.min(rect.bottom, bottom) - Math.max(rect.top, top) >= Math.min(44, rect.height);
+}
 function recoveryCardInView(status) {
   if (status?.phase !== 'error') return false;
   const inReader=$('reader-dialog').open, op=pipeline?.records?.[0];
@@ -152,25 +185,50 @@ function recoveryCardInView(status) {
   const checkpoint=op && (op.target?.storyId ?? null) === (status.storyId ?? null);
   const cards=checkpoint
     ? (inReader ? [$('checkpoint-recovery-reader')] : [$('checkpoint-recovery-create'),$('checkpoint-recovery-profile')])
-    : inReader ? [...document.querySelectorAll('.help-request-recovery'), $('reader-memory-recovery')] : [];
-  return cards.some(card=>{
-    if (!card || card.hidden || !card.getClientRects?.().length) return false;
-    const rect=card.getBoundingClientRect();
-    const top=inReader ? $('reader-navigation-bar').getBoundingClientRect?.().bottom || 0 : 0;
-    const bottom=inReader ? window.innerHeight : document.querySelector('.tabbar')?.getBoundingClientRect?.().top || window.innerHeight;
-    // Ignore a sliver behind fixed navigation; do not use the status bar itself as a boundary.
-    return rect.right > 0 && rect.left < window.innerWidth && Math.min(rect.bottom,bottom)-Math.max(rect.top,top) >= Math.min(44,rect.height);
-  });
+    : inReader ? [...(document.querySelectorAll?.('.help-request-recovery') || []), $('reader-memory-recovery')] : [];
+  return cards.some(card => elementInView(card, inReader));
+}
+function workingCardInView(status) {
+  if (status?.phase !== 'working' || state.pendingReaderResult) return false;
+  if (status.storyId == null) {
+    const createCard = $('loading-card');
+    if (!$('view-create').classList.contains('active') || $('reader-dialog').open || createCard.hidden) return false;
+    // Live browsers measure viewport overlap so scrolling past Create's card reveals the pill; layoutless test mocks treat an unhidden card as visible.
+    return createCard.getClientRects?.().length ? elementInView(createCard, false) : true;
+  }
+  if (!$('reader-dialog').open || status.storyId !== state.readerId) return false;
+  const cards = [
+    ...(state.activeChapterRequest?.storyId === status.storyId ? [$('reader-chapter-status')] : []),
+    ...(document.querySelectorAll?.('#reader-help .help-loading') || [])
+  ];
+  return cards.some(card => elementInView(card, true));
+}
+function canJumpToWorkingCard(status, view) {
+  if (!view?.working || (typeof backgroundRun !== 'undefined' && backgroundRun)) return false;
+  if (status.storyId == null) return !$('loading-card').hidden;
+  const sameReader = $('reader-dialog').open && status.storyId === state.readerId;
+  const chapterCard = state.activeChapterRequest?.storyId === status.storyId && !state.activeChapterRequest.opened && (!$('reader-chapter-status').hidden || !sameReader);
+  const helpCard = sameReader ? Boolean(document.querySelector?.('#reader-help .help-loading')) : false;
+  return Boolean(chapterCard || helpCard);
 }
 function renderReaderGeneration() {
   const bar = $('reader-generation-bar'), appBar = $('generation-status-bar');
   if (!bar || !appBar) return;
-  const status = readerGeneration, view = recoveryCardInView(status) ? null : generationView(status);
+  if (readerGeneration?.phase === 'ready' && !readerGeneration.helpId && isViewingChapter(readerGeneration)) {
+    readerGeneration = null;
+  } else if (readerGeneration?.phase === 'working' && readerGeneration.readyTarget && isViewingChapter(readerGeneration.readyTarget)) {
+    delete readerGeneration.readyTarget;
+    const op = pipeline?.records?.[0];
+    if (op?.earlyApplied) readerGeneration.message = typeof notesProgressMessage === 'function' ? notesProgressMessage(op) : 'Adding notes…';
+    if (state.activeChapterRequest?.storyId === state.readerId) state.activeChapterRequest.opened = true;
+    $('reader-chapter-status').hidden = true;
+  }
+  const status = readerGeneration;
+  const view = recoveryCardInView(status) || workingCardInView(status) ? null : generationView(status);
+  if (view) view.canJump = canJumpToWorkingCard(status, view);
   scheduleReadyDismiss(status, view);
   const inReader = Boolean(view) && status.storyId != null && status.storyId === state.readerId && $('reader-dialog').open;
-  // Create's visible progress card (with Cancel) is the indicator on its tab; a resumed Create has no such card.
-  const ownCard = Boolean(view?.working) && status.storyId == null && $('view-create').classList.contains('active') && !$('reader-dialog').open && !$('loading-card').hidden;
-  const page = view && !inReader && !ownCard ? view : null;
+  const page = view && !inReader ? view : null;
   const inDialog = Boolean(page) && $('reader-dialog').open;
   document.querySelectorAll('.chapter-cancel').forEach(button => { button.disabled = !cancelAvailable(); });
   paintGenerationBar(bar, inReader ? view : null);
@@ -240,7 +298,7 @@ async function settleBackgroundContext(storyId, entries) {
 for (const id of ['reader-generation-dismiss', 'generation-status-dismiss']) $(id).addEventListener('click', () => setReaderGeneration(null));
 let recoveryVisibilityFrame=0;
 function scheduleRecoveryVisibility() {
-  if (readerGeneration?.phase !== 'error' || recoveryVisibilityFrame) return;
+  if (!['error', 'working'].includes(readerGeneration?.phase) || recoveryVisibilityFrame) return;
   recoveryVisibilityFrame=requestAnimationFrame(()=>{ recoveryVisibilityFrame=0; renderReaderGeneration(); });
 }
 // Resolves after the reader's own close handler has run (the close event is dispatched asynchronously).
@@ -261,6 +319,24 @@ async function cancelGeneration() {
   if (state.activeChapterRequest) { state.activeChapterRequest.cancelledByUser=true; state.activeChapterRequest.stopped=true; }
   document.querySelector('.reader-ai-cancel')?.click();
 }
+async function openTargetChapter(target) {
+  const story = state.stories.find(item => item.id === target.storyId);
+  if (!story) { toast('That story is no longer available.'); setReaderGeneration(null); return null; }
+  await ensureReaderOpen(story);
+  // The result's own path is used, not whichever path happens to hold the same chapter version first.
+  const holds = item => item.entries.some(entry => entry.chapterId === target.chapterId && entry.versionId === target.versionId);
+  const path = story.paths.find(item => item.id === target.pathId && holds(item)) || story.paths.find(holds);
+  if (!path) { toast('That result is no longer available.'); setReaderGeneration(null); return null; }
+  if (story.activePathId !== path.id) {
+    rememberReaderPosition();
+    const previous = story.activePathId; story.activePathId = path.id;
+    try { persistReaderStory(story); } catch (error) { story.activePathId = previous; toast(error.message); return null; }
+  }
+  state.readerChapter = path.entries.findIndex(entry => entry.chapterId === target.chapterId && entry.versionId === target.versionId);
+  state.readerPositions[`${story.id}:${path.id}`] = { chapterId: target.chapterId, scrollTop: 0 }; persistReaderPosition();
+  updateReader();
+  return target.helpId ? [...$('reader-help').querySelectorAll('.help-card')].find(card => card.dataset.helpId === target.helpId) : $('reader-title');
+}
 async function generationAction() {
   const status = readerGeneration; if (!status) return;
   const pending = state.pendingReaderResult;
@@ -275,6 +351,20 @@ async function generationAction() {
     catch { toast('Could not finish cancelled request. Try again.'); }
     return;
   }
+  if (status.phase === 'working' && status.readyTarget) {
+    const focusTarget = await openTargetChapter(status.readyTarget);
+    if (!focusTarget) return;
+    if (readerGeneration === status) {
+      delete status.readyTarget;
+      const op = pipeline?.records?.[0];
+      status.message = op?.earlyApplied && typeof notesProgressMessage === 'function' ? notesProgressMessage(op) : 'Adding notes…';
+      if (state.activeChapterRequest?.storyId === status.storyId) state.activeChapterRequest.opened = true;
+      $('reader-chapter-status').hidden = true;
+      renderReaderGeneration();
+    }
+    focusTarget.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+    return;
+  }
   if (status.phase === 'working') { await cancelGeneration(); return; }
   const story = state.stories.find(item => item.id === status.storyId);
   if (status.phase === 'error') {
@@ -284,25 +374,84 @@ async function generationAction() {
     if (op?.target?.storyId === story.id) { revealRecovery(op); return; }
     revealCard(story.memoryRebuild ? $('reader-memory-recovery') : document.querySelector('.help-request-recovery') || $('reader-edit-panel')); return;
   }
-  if (!story) { toast('That story is no longer available.'); setReaderGeneration(null); return; }
-  await ensureReaderOpen(story);
-  // The result's own path is used, not whichever path happens to hold the same chapter version first.
-  const holds = item => item.entries.some(entry => entry.chapterId === status.chapterId && entry.versionId === status.versionId);
-  const path = story.paths.find(item => item.id === status.pathId && holds(item)) || story.paths.find(holds);
-  if (!path) { toast('That result is no longer available.'); setReaderGeneration(null); return; }
-  if (story.activePathId !== path.id) {
-    rememberReaderPosition();
-    const previous = story.activePathId; story.activePathId = path.id;
-    try { persistReaderStory(story); } catch (error) { story.activePathId = previous; toast(error.message); return; }
-  }
-  state.readerChapter = path.entries.findIndex(entry => entry.chapterId === status.chapterId && entry.versionId === status.versionId);
-  state.readerPositions[`${story.id}:${path.id}`] = { chapterId: status.chapterId, scrollTop: 0 }; persistReaderPosition();
-  updateReader();
-  const target = status.helpId ? [...$('reader-help').querySelectorAll('.help-card')].find(card => card.dataset.helpId === status.helpId) : $('reader-title');
+  const focusTarget = await openTargetChapter(status);
+  if (!focusTarget) return;
   setReaderGeneration(null);
-  if (status.helpId) revealCard(target); else target?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  if (status.helpId) revealCard(focusTarget); else focusTarget.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
 }
 for (const id of ['reader-generation-action', 'generation-status-action']) $(id).addEventListener('click', generationAction);
+async function jumpToGenerationCard() {
+  const status = readerGeneration;
+  if (!status || status.phase !== 'working' || backgroundRun) return;
+  if (status.storyId == null) {
+    await closeReader(); setView('create');
+    const card = $('loading-card');
+    if (!card.hidden) requestAnimationFrame(() => { card.tabIndex = -1; card.focus({ preventScroll: true }); card.scrollIntoView({ block: 'center', behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); });
+    return;
+  }
+  const story = state.stories.find(item => item.id === status.storyId);
+  if (!story) return;
+  await ensureReaderOpen(story);
+  const card = state.activeChapterRequest?.storyId === story.id && !$('reader-chapter-status').hidden
+    ? $('reader-chapter-status')
+    : document.querySelector('#reader-help .help-loading');
+  if (card) revealCard(card);
+}
+for (const id of ['reader-generation-jump', 'generation-status-jump']) $(id).addEventListener('click', jumpToGenerationCard);
+function attachSwipeDismiss(bar) {
+  let pointerId = null, startX = 0, startY = 0, startTime = 0, locked = false, dx = 0, suppressClick = false;
+  const reset = () => {
+    pointerId = null; locked = false; dx = 0;
+    bar.classList.remove('swiping');
+    bar.style.removeProperty('--bar-swipe-x');
+    bar.style.removeProperty('opacity');
+  };
+  bar.addEventListener('pointerdown', event => {
+    if (!bar.classList.contains('dismissible') || pointerId !== null) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    pointerId = event.pointerId; startX = event.clientX; startY = event.clientY; startTime = Date.now(); locked = false; dx = 0;
+  });
+  bar.addEventListener('pointermove', event => {
+    if (event.pointerId !== pointerId) return;
+    const moveX = event.clientX - startX, moveY = event.clientY - startY;
+    if (!locked) {
+      if (Math.hypot(moveX, moveY) < 10) return;
+      if (Math.abs(moveX) <= Math.abs(moveY) * 1.4) { pointerId = null; return; }
+      locked = true;
+      bar.classList.add('swiping');
+      bar.setPointerCapture?.(pointerId);
+    }
+    dx = moveX;
+    bar.style.setProperty('--bar-swipe-x', `${dx}px`);
+    bar.style.opacity = String(Math.max(0.25, 1 - Math.abs(dx) / 140));
+  });
+  const finish = event => {
+    if (event.pointerId !== pointerId) return;
+    const wasLocked = locked, offset = dx, elapsed = Math.max(1, Date.now() - startTime);
+    try { if (wasLocked && bar.hasPointerCapture?.(pointerId)) bar.releasePointerCapture(pointerId); } catch {}
+    if (!wasLocked) { pointerId = null; return; }
+    const velocity = Math.abs(offset) / elapsed;
+    const dismissed = event.type === 'pointerup' && (Math.abs(offset) >= 64 || (Math.abs(offset) >= 28 && velocity >= 0.45));
+    if (dismissed) {
+      suppressClick = true; setTimeout(() => { suppressClick = false; }, 120);
+      const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      const finishDismiss = () => { reset(); setReaderGeneration(null); };
+      if (reduce) { finishDismiss(); return; }
+      pointerId = null; locked = false;
+      bar.classList.remove('swiping');
+      bar.style.setProperty('--bar-swipe-x', `${Math.sign(offset || 1) * 180}px`);
+      bar.style.opacity = '0';
+      setTimeout(finishDismiss, 160);
+    } else {
+      reset();
+    }
+  };
+  bar.addEventListener('pointerup', finish);
+  bar.addEventListener('pointercancel', finish);
+  bar.addEventListener('click', event => { if (suppressClick) { event.preventDefault(); event.stopPropagation(); suppressClick = false; } }, true);
+}
+attachSwipeDismiss($('reader-generation-bar'));
+attachSwipeDismiss($('generation-status-bar'));
 // Scroll the reader only as far as needed to show the bottom of a card; taller cards align at their top.
 function revealCard(card) {
   if (!card) return;
@@ -602,12 +751,57 @@ function renderCheckpointRecovery() {
   // A running operation always uses the same status card, whether it started here or was resumed from recovery.
   if (op && pipeline.busy && op.kind === 'create' && !creatingStory && $('loading-card').hidden) { resumedCreateCard = true; $('story-form').hidden = true; $('loading-card').hidden = false; }
   if (resumedCreateCard && !pipeline.busy) { resumedCreateCard = false; $('loading-card').hidden = true; $('story-form').hidden = false; }
-  if (op && pipeline.busy && ['continue','rewrite'].includes(op.kind) && !state.activeChapterRequest) { state.activeChapterRequest = { storyId: op.target.storyId, loading: createChapterLoading(op.kind), resumed: true }; renderChapterRequest(); }
+  if (op && pipeline.busy && ['continue','rewrite'].includes(op.kind)) {
+    if (op.target?.storyId === state.readerId && $('reader-edit-panel')) $('reader-edit-panel').hidden = true;
+    if (!state.activeChapterRequest) {
+      const copy = typeof chapterLoadingCopy === 'function' ? chapterLoadingCopy(op.kind, op.target) : null;
+      state.activeChapterRequest = { storyId: op.target.storyId, loading: createChapterLoading(op.kind, copy), resumed: true, opened: false };
+      renderChapterRequest();
+    }
+  }
   if (state.activeChapterRequest?.resumed && !pipeline.busy) { state.activeChapterRequest.loading.remove(); state.activeChapterRequest = null; renderChapterRequest(); }
   if (op && pipeline.busy) {
     if (op.kind === 'create') { $('generation-status').textContent=stageMessage; paintProgress(createProgressRoot(), op); }
-    if (readerGeneration && (readerGeneration.storyId ?? null) === (op.target?.storyId ?? null)) { readerGeneration.phase='working'; readerGeneration.message=op.discardRequested ? 'Cancelling…' : progressSummary(op).text; }
-    if (state.activeChapterRequest && state.activeChapterRequest.storyId === op.target?.storyId) { state.activeChapterRequest.loading.querySelector('strong').textContent=stageMessage; paintChapterProgress(state.activeChapterRequest, op); }
+    if (readerGeneration && (readerGeneration.storyId ?? null) === (op.target?.storyId ?? null)) {
+      readerGeneration.phase = 'working';
+      if (op.discardRequested) {
+        delete readerGeneration.readyTarget;
+        readerGeneration.message = 'Cancelling…';
+      } else if (op.earlyApplied && op.kind === 'continue') {
+        const base = Array.isArray(op.target?.baseEntries) ? op.target.baseEntries : (op.target?.entries || []);
+        const num = typeof continueChapterNumber === 'function' ? continueChapterNumber(op) : (base.length + 1);
+        const resultPathId = typeof continueResultPathId === 'function' ? continueResultPathId(op) : (op.target?.continueMode === 'branch' ? `path-${op.id}` : op.target?.pathId);
+        const isBranch = op.target?.continueMode === 'branch';
+        const notesText = typeof notesProgressMessage === 'function' ? notesProgressMessage(op) : 'Adding notes…';
+        const viewingNew = typeof isViewingChapter === 'function' && isViewingChapter({ storyId: op.target?.storyId, pathId: resultPathId, chapterId: `chapter-${op.id}`, versionId: `version-${op.id}` });
+        if (viewingNew) {
+          delete readerGeneration.readyTarget;
+          readerGeneration.message = notesText;
+        } else {
+          readerGeneration.readyTarget = { storyId: op.target?.storyId, pathId: resultPathId, chapterId: `chapter-${op.id}`, versionId: `version-${op.id}`, chapterNumber: num, isBranch };
+          readerGeneration.message = `${isBranch ? 'Parallel ' : ''}Chapter ${num} ready · ${notesText}`;
+        }
+      } else if (op.earlyApplied) {
+        readerGeneration.message = typeof notesProgressMessage === 'function' ? notesProgressMessage(op) : 'Adding notes…';
+      } else {
+        readerGeneration.message = progressSummary(op).text;
+      }
+    }
+    if (state.activeChapterRequest && state.activeChapterRequest.storyId === op.target?.storyId) {
+      state.activeChapterRequest.loading.querySelector('strong').textContent = stageMessage;
+      paintChapterProgress(state.activeChapterRequest, op);
+      const openBtn = state.activeChapterRequest.loading.openReadyButton;
+      if (openBtn) {
+        const showOpen = Boolean(op.earlyApplied && op.kind === 'continue' && readerGeneration?.readyTarget);
+        openBtn.hidden = !showOpen;
+        if (showOpen) {
+          const base = Array.isArray(op.target?.baseEntries) ? op.target.baseEntries : (op.target?.entries || []);
+          const num = typeof continueChapterNumber === 'function' ? continueChapterNumber(op) : (base.length + 1);
+          openBtn.textContent = `Read Chapter ${num}`;
+          state.activeChapterRequest.loading.onOpenReady = () => generationAction();
+        }
+      }
+    }
   }
   for (const id of ['checkpoint-recovery-create','checkpoint-recovery-profile','checkpoint-recovery-reader']) {
     const box = $(id);
@@ -710,21 +904,93 @@ function refreshReaderInPlace(storyId) {
   if (!$('word-note-popover').hidden || !$('selection-toolbar').hidden) return;
   const scrollTop = readerPanel().scrollTop; updateReader(true); readerPanel().scrollTop = scrollTop;
 }
+function clearReplacedPositions(story, op) {
+  if (op.kind !== 'continue' || op.target?.continueMode !== 'replace') return;
+  const path = story.paths?.find(item => item.id === op.target.pathId);
+  const key = path ? `${story.id}:${path.id}` : '';
+  const saved = key ? state.readerPositions?.[key] : null;
+  if (saved && !path.entries.some(entry => entry.chapterId === saved.chapterId)) delete state.readerPositions[key];
+}
+function watchingChapterLoading(story, op) {
+  if (!$('reader-dialog').open || state.readerId !== story.id) return false;
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return false;
+  if (selectedPath(story)?.id !== op.target?.pathId) return false;
+  if ($('word-note-popover')?.hidden === false || $('selection-toolbar')?.hidden === false) return false;
+  if (state.player || state.explanationSelectionMode) return false;
+  if (['continue-choice-dialog', 'share-dialog', 'reader-removal-dialog', 'notes-rebuild-dialog', 'memory-rebuild-dialog'].some(id => $(id)?.open)) return false;
+  return elementInView($('reader-chapter-status'), true);
+}
+function openContinueResult(story, op) {
+  const resultPathId = continueResultPathId(op);
+  const targetPath = story.paths?.find(item => item.id === resultPathId);
+  if (!targetPath) return null;
+  const index = targetPath.entries.findIndex(entry => entry.chapterId === `chapter-${op.id}` && entry.versionId === `version-${op.id}`);
+  if (index < 0) return null;
+  if (story.activePathId !== targetPath.id) {
+    rememberReaderPosition?.();
+    const previous = story.activePathId; story.activePathId = targetPath.id;
+    try { persistReaderStory(story); } catch (error) { story.activePathId = previous; toast(error.message); return null; }
+  }
+  state.readerChapter = index;
+  if (state.readerPositions) state.readerPositions[`${story.id}:${targetPath.id}`] = { chapterId: `chapter-${op.id}`, scrollTop: 0 };
+  persistReaderPosition?.();
+  $('reader-edit-panel').hidden = true; state.readerEditDraft = null;
+  if ($('reader-chapter-status')) $('reader-chapter-status').hidden = true;
+  updateReader();
+  const panel = readerPanel();
+  if (panel) panel.scrollTop = 0;
+  const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  $('reader-title')?.scrollIntoView?.({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
+  return targetPath;
+}
 function showEarlyResult(op, first) {
   const story = state.stories.find(s => op.kind === 'create' ? s.operationId === op.id : s.id === op.target.storyId);
   if (!story) return;
-  if (!first) { refreshReaderInPlace(story.id); setReaderGeneration({ storyId: story.id, phase: 'working', message: notesProgressMessage(op) }); return; }
-  setReaderGeneration({ storyId: story.id, phase: 'working', message: notesProgressMessage(op) });
-  if (op.kind === 'create') { ensureReaderOpen(story).catch(error => toast(error.message)); toast('Your story is ready. Vocabulary notes are on their way.'); return; }
-  if (op.kind === 'continue') {
+  clearReplacedPositions(story, op);
+  const isContinue = op.kind === 'continue';
+  const num = isContinue ? continueChapterNumber(op) : 0;
+  const isBranch = isContinue && op.target?.continueMode === 'branch';
+  const isReplace = isContinue && op.target?.continueMode === 'replace';
+  const resultPathId = isContinue ? continueResultPathId(op) : '';
+  const targetRef = isContinue ? { storyId: story.id, pathId: resultPathId, chapterId: `chapter-${op.id}`, versionId: `version-${op.id}`, chapterNumber: num, isBranch } : null;
+  if (!first) {
+    refreshReaderInPlace(story.id);
+    if (isContinue && !isViewingChapter(targetRef)) {
+      setReaderGeneration({ storyId: story.id, phase: 'working', message: `${isBranch ? 'Parallel ' : ''}Chapter ${num} ready · ${notesProgressMessage(op)}`, readyTarget: targetRef });
+    } else {
+      setReaderGeneration({ storyId: story.id, phase: 'working', message: notesProgressMessage(op) });
+    }
+    return;
+  }
+  if (op.kind === 'create') { setReaderGeneration({ storyId: story.id, phase: 'working', message: notesProgressMessage(op) }); ensureReaderOpen(story).catch(error => toast(error.message)); toast('Your story is ready. Vocabulary notes are on their way.'); return; }
+  if (isContinue) {
+    const viewingReplaced = isReplace && $('reader-dialog').open && state.readerId === story.id && selectedPath(story)?.id === op.target.pathId && state.readerChapter >= continuePrefixEntries(op.target).length;
+    if (viewingReplaced || watchingChapterLoading(story, op)) {
+      if (state.activeChapterRequest?.storyId === story.id) state.activeChapterRequest.opened = true;
+      const openedPath = openContinueResult(story, op);
+      if (openedPath) {
+        setReaderGeneration({ storyId: story.id, phase: 'working', message: notesProgressMessage(op) });
+        toast(isBranch ? `Chapter ${num} opened (${pathLabel(story, openedPath)}). Vocabulary notes are on their way.` : `Chapter ${num} opened. Vocabulary notes are on their way.`);
+        return;
+      }
+      if (state.activeChapterRequest?.storyId === story.id) state.activeChapterRequest.opened = false;
+    }
     if (state.readerId === story.id && $('reader-dialog').open && selectedPath(story).id === op.target.pathId) {
       const scrollTop = readerPanel().scrollTop, focused = document.activeElement;
       $('reader-edit-panel').hidden = true; state.readerEditDraft = null;
       renderChapterNavigation(story); renderReaderActions(); updateReaderNavigation();
       readerPanel().scrollTop = scrollTop; if (focused?.isConnected && document.activeElement !== focused) focused.focus({ preventScroll: true });
     }
-    toast(`Chapter ${op.target.entries.length + 1} is ready. Vocabulary notes are on their way.`); return;
+    const loading = state.activeChapterRequest?.storyId === story.id ? state.activeChapterRequest.loading : null;
+    if (loading?.openReadyButton) {
+      loading.openReadyButton.hidden = false;
+      loading.openReadyButton.textContent = `Read Chapter ${num}`;
+      loading.onOpenReady = () => generationAction();
+    }
+    setReaderGeneration({ storyId: story.id, phase: 'working', message: `${isBranch ? 'Parallel ' : ''}Chapter ${num} ready · ${notesProgressMessage(op)}`, readyTarget: targetRef });
+    return;
   }
+  setReaderGeneration({ storyId: story.id, phase: 'working', message: notesProgressMessage(op) });
   if (state.readerId === story.id) { state.readerChapter = op.target.index; $('reader-edit-panel').hidden = true; state.readerEditDraft = null; updateReader(); }
   toast('Branch created. Vocabulary notes are on their way.');
 }
@@ -732,11 +998,28 @@ function showOperationResult(op) {
   const story=state.stories.find(s=>op.kind === 'create' ? s.operationId === op.id : s.id === op.target.storyId);
   if (!story) return;
   notifyResult(op, story);
+  clearReplacedPositions(story, op);
+  const isContinue = op.kind === 'continue';
+  const num = isContinue ? continueChapterNumber(op) : 0;
+  const isBranch = isContinue && op.target?.continueMode === 'branch';
+  const isReplace = isContinue && op.target?.continueMode === 'replace';
+  const resultPathId = isContinue ? continueResultPathId(op) : '';
+  const targetRef = isContinue ? { storyId: story.id, pathId: resultPathId, chapterId: `chapter-${op.id}`, versionId: `version-${op.id}` } : null;
   if (op.earlyApplied && op.kind !== 'notes') {
-    // The chapter was already shown; only its notes changed.
+    // The chapter was already saved; only its notes finished.
     refreshReaderInPlace(story.id);
+    queueBackgroundContext(story.id, isContinue ? resultPathId : op.kind === 'rewrite' ? `path-${op.id}` : null);
+    if (isContinue && !isViewingChapter(targetRef)) {
+      const ready = {
+        storyId: story.id, phase: 'ready', persistent: true, actionLabel: `Read Ch. ${num}`,
+        message: isBranch ? `Parallel Chapter ${num} is ready` : `Chapter ${num} is ready`,
+        pathId: resultPathId, chapterId: `chapter-${op.id}`, versionId: `version-${op.id}`, helpId: ''
+      };
+      if (readerGeneration && readerGeneration.storyId === story.id) { Object.assign(readerGeneration, ready); renderReaderGeneration(); }
+      else setReaderGeneration(ready);
+      return;
+    }
     if (readerGeneration?.storyId === story.id) setReaderGeneration(null);
-    queueBackgroundContext(story.id, op.kind === 'continue' ? op.target.pathId : op.kind === 'rewrite' ? `path-${op.id}` : null);
     toast('Vocabulary notes ready'); return;
   }
   if (op.kind === 'notes') {
@@ -745,25 +1028,42 @@ function showOperationResult(op) {
     if (state.readerId === story.id && $('reader-dialog').open) { const scrollTop = readerPanel().scrollTop; updateReader(); readerPanel().scrollTop = scrollTop; }
     toast('Vocabulary notes rebuilt'); return;
   }
-  if (op.kind !== 'examples') queueBackgroundContext(story.id, op.kind === 'continue' ? op.target.pathId : op.kind === 'rewrite' ? `path-${op.id}` : null);
+  if (op.kind !== 'examples') queueBackgroundContext(story.id, isContinue ? resultPathId : op.kind === 'rewrite' ? `path-${op.id}` : null);
   if (op.kind === 'create') { setReaderGeneration(null); ensureReaderOpen(story).catch(error => toast(error.message)); return; }
-  if (readerGeneration && readerGeneration.storyId === story.id) {
-    Object.assign(readerGeneration,{phase:'ready',message:op.kind === 'continue' ? `Chapter ${op.target.entries.length + 1} is ready` : 'Ready',pathId:op.kind === 'continue' ? op.target.pathId : op.kind === 'rewrite' ? `path-${op.id}` : readerGeneration.pathId,chapterId:op.kind === 'examples' ? op.target.chapterId : op.kind === 'continue' ? `chapter-${op.id}` : op.target?.chapterId,versionId:op.kind === 'examples' ? op.target.versionId : `version-${op.id}`,helpId:op.kind === 'examples' ? op.target.helpId : ''});
-    renderReaderGeneration();
-  }
-  if (state.readerId === story.id && op.kind === 'continue') {
-    // Continue never moves the learner: the viewed path, chapter, scroll and focus stay put; only the counts and navigation controls change.
-    if ($('reader-dialog').open && selectedPath(story).id === op.target.pathId) {
+  if (isContinue) {
+    const viewingReplaced = isReplace && $('reader-dialog').open && state.readerId === story.id && selectedPath(story)?.id === op.target.pathId && state.readerChapter >= continuePrefixEntries(op.target).length;
+    if (viewingReplaced || watchingChapterLoading(story, op)) {
+      const openedPath = openContinueResult(story, op);
+      if (openedPath) {
+        if (readerGeneration?.storyId === story.id) setReaderGeneration(null);
+        toast(isBranch ? `Chapter ${num} opened (${pathLabel(story, openedPath)})` : `Chapter ${num} opened`);
+        return;
+      }
+    }
+    const ready = {
+      storyId: story.id, phase: 'ready', persistent: true, actionLabel: `Read Ch. ${num}`,
+      message: isBranch ? `Parallel Chapter ${num} is ready` : `Chapter ${num} is ready`,
+      pathId: resultPathId, chapterId: `chapter-${op.id}`, versionId: `version-${op.id}`, helpId: ''
+    };
+    if (readerGeneration && readerGeneration.storyId === story.id) { Object.assign(readerGeneration, ready); renderReaderGeneration(); }
+    else setReaderGeneration(ready);
+    if (state.readerId === story.id && $('reader-dialog').open && selectedPath(story).id === op.target.pathId) {
       const scrollTop = readerPanel().scrollTop, focused = document.activeElement;
       $('reader-edit-panel').hidden = true; state.readerEditDraft = null;
       renderChapterNavigation(story); renderReaderActions(); updateReaderNavigation();
       readerPanel().scrollTop = scrollTop; if (focused?.isConnected && document.activeElement !== focused) focused.focus({ preventScroll: true });
     }
-  } else if (state.readerId === story.id) {
+    return;
+  }
+  if (readerGeneration && readerGeneration.storyId === story.id) {
+    Object.assign(readerGeneration,{phase:'ready',message:'Ready',pathId:op.kind === 'rewrite' ? `path-${op.id}` : readerGeneration.pathId,chapterId:op.kind === 'examples' ? op.target.chapterId : op.target?.chapterId,versionId:op.kind === 'examples' ? op.target.versionId : `version-${op.id}`,helpId:op.kind === 'examples' ? op.target.helpId : ''});
+    renderReaderGeneration();
+  }
+  if (state.readerId === story.id) {
     if (op.kind !== 'examples') state.readerChapter=op.target.index;
     $('reader-edit-panel').hidden=true; state.readerEditDraft=null; updateReader();
   }
-  toast(op.kind === 'examples' ? 'Examples saved' : op.kind === 'continue' ? 'Chapter added' : 'Branch created');
+  toast(op.kind === 'examples' ? 'Examples saved' : 'Branch created');
 }
 // Automatic resends of unreadable replies are announced, never silent (Settings → Advanced).
 function resendStepName(key) {
@@ -1095,7 +1395,7 @@ window.addEventListener('resize', () => {
   }
   updateReaderNavigation(); renderReaderGeneration();
 });
-$('chapter-select').addEventListener('change', () => { closeReaderPanels(true); state.readerChapter = Number($('chapter-select').value); state.readerVersion = 0; clearExplanationSelection(); updateReader(); });
+$('chapter-select').addEventListener('change', () => { closeReaderPanels(true); if (!state.readerEditBusy) { $('reader-edit-panel').hidden = true; state.readerEditDraft = null; } state.readerChapter = Number($('chapter-select').value); state.readerVersion = 0; clearExplanationSelection(); updateReader(); });
 $('path-select').addEventListener('change', () => {
   if (state.readerEditBusy) { $('path-select').value = selectedPath().id; return; }
   rememberReaderPosition(); closeWordNote(); clearExplanationSelection();
@@ -1108,34 +1408,100 @@ $('path-select').addEventListener('change', () => {
   setRestoringPathPosition(true); restoreReaderPosition(position);
   requestAnimationFrame(() => { setRestoringPathPosition(false); if (keepNavigation && !$('reader-navigation-panel').hidden) positionReaderPanel('navigation'); });
 });
-$('chapter-prev').addEventListener('click', () => { if (state.readerChapter > 0) { state.readerChapter--; clearExplanationSelection(); } updateReader(); });
-$('chapter-next').addEventListener('click', () => { if (state.readerChapter < pathChapters(readerStory()).length - 1) { state.readerChapter++; clearExplanationSelection(); } updateReader(); });
+$('chapter-prev').addEventListener('click', () => { if (state.readerChapter > 0) { state.readerChapter--; clearExplanationSelection(); if (!state.readerEditBusy) { $('reader-edit-panel').hidden = true; state.readerEditDraft = null; } } updateReader(); });
+$('chapter-next').addEventListener('click', () => { if (state.readerChapter < pathChapters(readerStory()).length - 1) { state.readerChapter++; clearExplanationSelection(); if (!state.readerEditBusy) { $('reader-edit-panel').hidden = true; state.readerEditDraft = null; } } updateReader(); });
 readerPanels.initialize();
 $('furigana-toggle').addEventListener('change', () => { state.furigana = $('furigana-toggle').checked; keepReaderLocation(() => { $('reader-story').classList.toggle('hide-furigana', !state.furigana); $('reader-title').classList.toggle('hide-furigana', !state.furigana); requestAnimationFrame(fitReaderTitle); }); document.querySelectorAll('#reader-help .story-text').forEach(node => node.classList.toggle('hide-furigana', !state.furigana)); trySaveSettings(); });
-function showEditPanel(mode) {
+function continueTargetSummary(story, path, k, N, continueMode) {
+  const label = pathLabel(story, path), multi = story.paths.length > 1;
+  const range = k + 1 === N ? `Chapter ${N}` : `Chapters ${k + 1}–${N}`;
+  if (continueMode === 'branch') return { text: `Parallel Chapter ${k + 1} · new storyline from Chapter ${k}`, submit: `Write parallel Chapter ${k + 1}`, danger: false };
+  if (continueMode === 'replace') return { text: `Replaces ${range} after Chapter ${k}. Existing ${range}${multi ? ` on ${label}` : ''} will be replaced once saved; other storylines stay intact.`, submit: `Replace ${range}`, danger: true };
+  return { text: `Chapter ${N + 1} · after Chapter ${N}${multi ? ` on ${label}` : ''}`, submit: `Write Chapter ${N + 1}`, danger: false };
+}
+function showEditPanel(mode, continueMode = 'append') {
   if (state.readerEditBusy) return;
-  const story = readerStory(), version = activeVersion();
+  const story = readerStory(), chapters = pathChapters(story), version = activeVersion();
   fillLevelOptions($('reader-level'), story.language, version.difficulty || story.difficulty);
   $('reader-level-description').textContent = readingDescription(story.language, $('reader-level').value) || 'Choose a reading level for the new version.';
   fillScopeOptions($('reader-scope'), version.scope || story.scope, $('reader-scope-description'));
   $('reader-edit-panel').hidden = false; $('reader-prompt').value = ''; $('reader-edit-error').textContent = '';
   $('reader-edit-panel').dataset.mode = mode;
+  const resolvedMode = mode === 'continue' ? (continueMode || 'append') : '';
+  $('reader-edit-panel').dataset.continueMode = resolvedMode;
+  const k = state.readerChapter + 1, N = chapters.length, earlier = mode === 'continue' && k < N;
+  const targetRow = $('reader-edit-target'), submit = $('reader-edit-submit');
+  if (mode === 'continue') {
+    const info = continueTargetSummary(story, selectedPath(story), k, N, resolvedMode);
+    if (targetRow) {
+      targetRow.hidden = !earlier;
+      targetRow.classList.toggle('is-danger', info.danger);
+      $('reader-edit-target-text').textContent = earlier ? info.text : '';
+    }
+    submit.textContent = info.submit;
+    submit.classList.toggle('is-danger', info.danger);
+  } else {
+    if (targetRow) { targetRow.hidden = true; targetRow.classList.remove('is-danger'); }
+    submit.textContent = 'Rewrite';
+    submit.classList.remove('is-danger');
+  }
   $('reader-prompt-label').textContent = mode === 'continue' ? 'What should happen next? (optional)' : 'How should this chapter change? (optional)';
   $('reader-prompt').placeholder = 'Add ideas in any language, or leave blank.';
-  $('reader-edit-submit').textContent = mode === 'continue' ? 'Continue' : 'Rewrite';
   $('reader-edit-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); $('reader-prompt').focus();
 }
-$('continue-story').addEventListener('click', () => showEditPanel('continue'));
+let continueChoiceTrigger = null;
+function openContinueChoice(trigger = null) {
+  if (state.readerEditBusy) return;
+  const story = readerStory(); if (!story) return;
+  const path = selectedPath(story), k = state.readerChapter + 1, N = path.entries.length;
+  if (k >= N) { showEditPanel('continue', 'append'); return; }
+  const label = pathLabel(story, path), multi = story.paths.length > 1;
+  const range = k + 1 === N ? `Chapter ${N}` : `Chapters ${k + 1}–${N}`;
+  continueChoiceTrigger = trigger;
+  $('continue-choice-subtitle').textContent = `Reading Chapter ${k} of ${N}${multi ? ` · ${label}` : ''}`;
+  $('continue-choice-branch-title').textContent = `Parallel Chapter ${k + 1}`;
+  $('continue-choice-branch-sub').textContent = `New storyline from Chapter ${k} · keeps ${range}${multi ? ` on ${label}` : ''}`;
+  $('continue-choice-append-title').textContent = `Chapter ${N + 1}`;
+  $('continue-choice-append-sub').textContent = `Continue after Chapter ${N}${multi ? ` on ${label}` : ''}`;
+  $('continue-choice-replace-title').textContent = `Replace ${range}`;
+  $('continue-choice-replace-sub').textContent = `Continue after Chapter ${k} · overwrites ${range}${multi ? ` on ${label}` : ''}`;
+  $('continue-choice-dialog').showModal();
+  $('continue-choice-branch').focus();
+}
+function pickContinueChoice(continueMode) {
+  continueChoiceTrigger = null;
+  $('continue-choice-dialog').close();
+  showEditPanel('continue', continueMode);
+}
+$('continue-choice-branch').addEventListener('click', () => pickContinueChoice('branch'));
+$('continue-choice-append').addEventListener('click', () => pickContinueChoice('append'));
+$('continue-choice-replace').addEventListener('click', () => pickContinueChoice('replace'));
+$('continue-choice-cancel').addEventListener('click', () => $('continue-choice-dialog').close());
+$('continue-choice-dialog').addEventListener('click', event => { if (event.target === $('continue-choice-dialog')) $('continue-choice-dialog').close(); });
+$('continue-choice-dialog').addEventListener('close', () => {
+  const trigger = continueChoiceTrigger; continueChoiceTrigger = null;
+  trigger?.focus?.({ preventScroll: true });
+});
+$('reader-edit-change-target').addEventListener('click', () => openContinueChoice($('reader-edit-change-target')));
+function startContinueFlow(trigger) {
+  if (state.readerEditBusy) return;
+  const chapters = pathChapters(readerStory());
+  if (state.readerChapter < chapters.length - 1) openContinueChoice(trigger);
+  else showEditPanel('continue', 'append');
+}
+$('continue-story').addEventListener('click', () => startContinueFlow($('continue-story')));
 $('rewrite-chapter').addEventListener('click', () => showEditPanel('rewrite'));
-for (const [id, mode] of [['reader-menu-continue', 'continue'], ['reader-menu-rewrite', 'rewrite']]) $(id).addEventListener('click', () => { closeReaderActions(); showEditPanel(mode); });
+$('reader-menu-continue').addEventListener('click', () => { closeReaderActions(); startContinueFlow($('reader-actions-toggle')); });
+$('reader-menu-rewrite').addEventListener('click', () => { closeReaderActions(); showEditPanel('rewrite'); });
 $('reader-edit-cancel').addEventListener('click', () => { if (!state.readerEditBusy) { $('reader-edit-panel').hidden = true; state.readerEditDraft = null; } });
 $('reader-edit-submit').addEventListener('click', async () => {
   if (state.readerEditBusy) return;
   if (state.checkpointBlocked || pipeline?.records.length) { if (pipeline?.records.length) showPendingRecovery(); else showStorageErrors(); return; }
   const prompt = $('reader-prompt').value.trim();
   const story = readerStory(), chapters = pathChapters(story), chapter = chapters[state.readerChapter], version = activeVersion(chapter), mode = $('reader-edit-panel').dataset.mode;
+  const continueMode = mode === 'continue' ? ($('reader-edit-panel').dataset.continueMode || 'append') : '';
   const path = selectedPath(story), entries = path.entries.map(entry => ({ ...entry })), rewriteIndex = state.readerChapter;
-  const sourceVersion = mode === 'continue' ? activeVersion(chapters[chapters.length - 1]) : version;
+  const sourceVersion = mode === 'continue' ? (continueMode === 'append' ? activeVersion(chapters[chapters.length - 1]) : version) : version;
   const providerId = state.providerId, model = state.model, config = { providerId, model, reasoning: state.reasoning, light: lightModelChoice(state), notesParts: noteParts(), parallelLimit: parallelLimitFor(state.concurrentRequests), noteDensity: state.noteDensity, progressive: true, retryBroken: state.retryBrokenReplies !== false }, memoryConfig = lightTaskConfig(state);
   const difficulty = $('reader-level').value, scope = $('reader-scope').value;
   if (!levelDefinition(story.language,difficulty)) { $('reader-edit-error').textContent='Choose a reading level for this generation.'; return; }
@@ -1144,18 +1510,29 @@ $('reader-edit-submit').addEventListener('click', async () => {
   if (Array.isArray(state.models) && !state.models.some(item => item.id === model)) { $('reader-edit-error').textContent='The selected AI model is not available now. Open Settings and choose an available model.'; return; }
   const input = { topic: story.topic || '', practice: story.practice || (story.words || []).join(', '), language: LANGUAGES[story.language], languageCode: story.language, difficulty, framework: LEVELS[story.language].framework, levelDescription: guideFor(story.language, difficulty), readingSelfReport: readingDescription(story.language, difficulty), languageExpectations: state.languageExpectations[story.language] || '', scope, scopeDescription: scopeGuide(scope, story.language, difficulty), learnerProfile: { ...profileSnapshot(story), readingStartingPoint: difficulty, readingSelfReport: readingDescription(story.language, difficulty) }, prompt };
   const instructions = chapterInstructions(LANGUAGES[story.language], difficulty, guideFor(story.language, difficulty), mode);
+  const memoryEntries = mode === 'continue' ? (continueMode === 'append' ? entries : entries.slice(0, rewriteIndex + 1)) : entries.slice(0, rewriteIndex);
+  const target = {
+    storyId: story.id, pathId: path.id, entries, chapterId: chapter.id, sourceVersionId: sourceVersion.id, index: rewriteIndex,
+    ...(mode === 'continue' && continueMode !== 'append' ? { continueMode, baseEntries: memoryEntries } : {})
+  };
+  const copyOverride = typeof chapterLoadingCopy === 'function' ? chapterLoadingCopy(mode, target) : null;
   state.readerEditBusy = true; state.readerEditDraft = null; $('path-select').disabled = true;
-  const loading = createChapterLoading(mode);
-  // Earlier chapters are summarized before the operation exists; the checklist shows that as its first step.
-  const memoryEntries = mode === 'continue' ? entries : entries.slice(0, rewriteIndex);
+  const loading = createChapterLoading(mode, copyOverride);
   // The estimate is made now, while it can still count the story-context summaries this run will make.
   const estimate = estimateFor(operationPlan({ kind: mode, language: story.language, input: { scope }, config }, pendingSummaryCount(story, memoryEntries)));
-  const request = state.activeChapterRequest = { storyId: story.id, loading, stopped:false, cancelledByUser:false, clockId: `chapter-request-${Date.now()}`, timings: [], estimate };
+  const request = state.activeChapterRequest = { storyId: story.id, loading, stopped:false, cancelledByUser:false, opened:false, clockId: `chapter-request-${Date.now()}`, timings: [], estimate };
   config.signal=request; memoryConfig.signal=request;
-  const provisional = { id: request.clockId, kind: mode, language: story.language, stage: storyContextReady(story, memoryEntries) && !backgroundRun ? 'plan' : 'context', target: { index: rewriteIndex } };
+  const provisional = { id: request.clockId, kind: mode, language: story.language, stage: storyContextReady(story, memoryEntries) && !backgroundRun ? 'plan' : 'context', target };
   if (hasStoryContext(provisional)) { loading.querySelector('strong').textContent = 'Preparing story context…'; paintChapterProgress(request, provisional); }
+  const formWasInView = typeof elementInView === 'function' && elementInView($('reader-edit-panel'), true);
+  $('reader-edit-panel').hidden = true;
   renderChapterRequest();
+  if (formWasInView) {
+    const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    $('reader-chapter-status').scrollIntoView?.({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+  }
   setReaderGeneration({ storyId: story.id, phase: 'working', message: hasStoryContext(provisional) ? progressSummary(provisional).text : mode === 'continue' ? 'Preparing next chapter…' : 'Preparing rewrite…' });
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => renderReaderGeneration());
   $('reader-edit-cancel').disabled = true; $('reader-prompt').disabled = true; $('reader-level').disabled = true; setScopeDisabled($('reader-scope'), true);
   const button = $('reader-edit-submit'); button.disabled = true; button.textContent = 'Working…'; $('reader-edit-error').textContent = '';
   try {
@@ -1166,13 +1543,14 @@ $('reader-edit-submit').addEventListener('click', async () => {
     const op = await aiSession.run(async () => {
       input.storyMemory = await prepareStoryMemory(story, memoryEntries, loading, memoryConfig, loading.requestHost);
       if (request.cancelledByUser) throw Object.assign(new Error('Generation cancelled.'), {code:'generation_cancelled'});
-      const priorEntry = mode === 'continue' ? entries[entries.length - 1] : entries[rewriteIndex - 1];
+      const priorEntry = mode === 'continue' ? memoryEntries[memoryEntries.length - 1] : entries[rewriteIndex - 1];
       const priorVersion = priorEntry ? normalizeChapters(story).find(c => c.id === priorEntry.chapterId).versions.find(v => v.id === priorEntry.versionId) : null;
       input.recentProse = priorVersion ? recentProse(priorVersion.story) : '';
       if (mode === 'rewrite') input.currentChapter = { title: sourceVersion.title, story: sourceVersion.story };
-      if (readerGeneration) { readerGeneration.message = mode === 'continue' ? 'Writing the next chapter…' : 'Rewriting this chapter…'; renderReaderGeneration(); }
-      loading.querySelector('strong').textContent = mode === 'continue' ? 'Writing the next chapter…' : 'Rewriting this chapter…';
-      return runContentOperation({kind:mode,language:story.language,input,instructions,config,timings:request.timings,target:{storyId:story.id,pathId:path.id,entries,chapterId:chapter.id,sourceVersionId:sourceVersion.id,index:rewriteIndex}});
+      const proseStageMessage = mode === 'continue' ? 'Writing the next chapter…' : 'Rewriting this chapter…';
+      if (readerGeneration) { readerGeneration.message = proseStageMessage; renderReaderGeneration(); }
+      loading.querySelector('strong').textContent = proseStageMessage;
+      return runContentOperation({kind:mode,language:story.language,input,instructions,config,timings:request.timings,target});
     });
     showOperationResult(op);
   } catch (error) {
@@ -1182,14 +1560,23 @@ $('reader-edit-submit').addEventListener('click', async () => {
     if ((error.code === 'generation_cancelled' || request.cancelledByUser) && !pipeline?.records.length) toast('Generation cancelled');
     else if (error.code !== 'generation_cancelled' && !request.cancelledByUser) notifyStopped(mode);
     const message = error.code === 'generation_cancelled' || request.cancelledByUser ? '' : pipeline?.records.length ? '' : `${failureInfo(error, 'context').message} Submit again to retry.`;
-    state.readerEditDraft = { storyId: story.id, pathId: path.id, chapterId: chapter.id, mode, prompt, difficulty, scope, error: message };
+    state.readerEditDraft = { storyId: story.id, pathId: path.id, chapterId: chapter.id, mode, continueMode, prompt, difficulty, scope, error: message };
     if (state.readerId === story.id) {
       state.readerChapter = chapters.indexOf(chapter); updateReader();
-      $('reader-edit-panel').hidden = false; $('reader-prompt').value = prompt; $('reader-edit-panel').dataset.mode = mode;
+      if (typeof showEditPanel === 'function') showEditPanel(mode, continueMode || 'append');
+      else { $('reader-edit-panel').hidden = false; $('reader-edit-panel').dataset.mode = mode; $('reader-edit-panel').dataset.continueMode = continueMode; }
+      $('reader-prompt').value = prompt;
+      if ($('reader-level')) $('reader-level').value = difficulty;
       $('reader-edit-error').textContent = message; renderPendingReaderResult();
     }
   }
-  finally { $('path-select').disabled = false; loading.remove(); state.activeChapterRequest = null; renderChapterRequest(); state.readerEditBusy = false; $('reader-edit-cancel').disabled = false; $('reader-prompt').disabled = false; $('reader-level').disabled = false; setScopeDisabled($('reader-scope'), false); button.disabled = false; button.textContent = mode === 'continue' ? 'Continue' : 'Rewrite'; renderCheckpointRecovery(); }
+  finally {
+    $('path-select').disabled = false; loading.remove(); state.activeChapterRequest = null; renderChapterRequest();
+    state.readerEditBusy = false; $('reader-edit-cancel').disabled = false; $('reader-prompt').disabled = false;
+    $('reader-level').disabled = false; setScopeDisabled($('reader-scope'), false); button.disabled = false;
+    if (typeof showEditPanel !== 'function' || $('reader-edit-panel').hidden) { button.classList?.remove?.('is-danger'); button.textContent = mode === 'continue' ? 'Continue' : 'Rewrite'; }
+    renderCheckpointRecovery();
+  }
 
 });
 $('reader-dialog').addEventListener('click', event => { if (event.target === $('reader-dialog')) $('reader-dialog').close(); });

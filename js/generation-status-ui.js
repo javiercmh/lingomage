@@ -5,6 +5,7 @@ import { progressSummary } from './generation-progress.js';
 import { remainingText, remainingTime, estimateGeneration, timingSamples } from './generation-timing.js';
 import { lightTaskConfig } from './light-model.js';
 import { hasNotificationPermission, requestNotificationPermission, notify } from './bridge.js';
+import { continueChapterNumber } from './story-model.js';
 
 export function createGenerationStatusUi({
   $, generationLive, state, trySaveSettings
@@ -128,7 +129,9 @@ export function createGenerationStatusUi({
   }
   function notifyResult(op, story) {
     if (!['create', 'continue', 'rewrite'].includes(op.kind)) return;
-    notifyWhileAway(op.kind === 'create' ? 'Your story is ready' : op.kind === 'continue' ? `Chapter ${op.target.entries.length + 1} is ready` : 'Your rewritten chapter is ready', story?.title || 'Open LingoMage to read it.');
+    const number = op.kind === 'continue' ? continueChapterNumber(op) : 0;
+    const title = op.kind === 'create' ? 'Your story is ready' : op.kind === 'continue' ? `${op.target?.continueMode === 'branch' ? 'Parallel ' : ''}Chapter ${number} is ready` : 'Your rewritten chapter is ready';
+    notifyWhileAway(title, story?.title || 'Open LingoMage to read it.');
   }
   function notifyStopped(kind) {
     if (['create', 'continue', 'rewrite'].includes(kind)) notifyWhileAway('Generation stopped', 'Open LingoMage to see what happened. Finished steps are kept.');

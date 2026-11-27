@@ -2,6 +2,7 @@ import { MEMORY_VERSION } from './story-memory.js';
 import { markStoryActivity } from './library-activity.js';
 import { summarizeTimings } from './generation-timing.js';
 import { stageModel } from './generation-pipeline.js';
+import { continuePrefixEntries, pruneStoryContent } from './story-model.js';
 // Final application remains idempotent by operation ID and rolls back failed saves.
 export function createGenerationController({state, normalizeChapters, ensureStoryPaths, persistReaderStory, savedFollowUps}) {
   // What each step took (js/generation-timing.js); absent when nothing was measured, as in older records.
@@ -75,10 +76,20 @@ function applyContentOperation(op, partial = null) {
     const path=candidate.paths.find(p=>p.id === op.target.pathId);
     if (!path || JSON.stringify(path.entries) !== JSON.stringify(op.target.entries)) throw new Error('The destination path changed. Discard this operation.');
     const chapter=candidate.chapters.find(c=>c.id === op.target.chapterId);
-    const version={id:`version-${op.id}`,...result,...provenance,...mark,prompt:op.input.prompt,sourceVersionId:op.target.sourceVersionId,contextLineage:op.kind === 'continue' ? op.target.entries : op.target.entries.slice(0,op.target.index),memoryVersion:MEMORY_VERSION,learnerContext:op.input.learnerProfile};
+    const prefix=continuePrefixEntries(op.target), continueMode=op.target.continueMode || 'append';
+    const version={id:`version-${op.id}`,...result,...provenance,...mark,prompt:op.input.prompt,sourceVersionId:op.target.sourceVersionId,contextLineage:op.kind === 'continue' ? prefix : op.target.entries.slice(0,op.target.index),memoryVersion:MEMORY_VERSION,learnerContext:op.input.learnerProfile};
     if (op.kind === 'continue') {
       const next={id:`chapter-${op.id}`,activeVersionId:version.id,versions:[version],prompt:op.input.prompt,basedOnVersionId:op.target.sourceVersionId,learnerContext:op.input.learnerProfile,createdAt:op.createdAt,help:[]};
-      candidate.chapters.push(next); path.entries.push({chapterId:next.id,versionId:version.id}); // the learner's selected path is not changed by a finished Continue
+      candidate.chapters.push(next);
+      if (continueMode === 'branch') {
+        candidate.paths.push({id:`path-${op.id}`,name:`Alternate ${candidate.nextAlternateNumber++}`,forkChapter:prefix.length+1,parentPathId:path.id,parentPathName:path.name,uncertain:path.uncertain,entries:[...prefix,{chapterId:next.id,versionId:version.id}]});
+      } else if (continueMode === 'replace') {
+        path.entries=[...prefix,{chapterId:next.id,versionId:version.id}];
+        if (path.forkChapter > path.entries.length) { delete path.forkChapter; delete path.parentPathId; delete path.parentPathName; }
+        pruneStoryContent(candidate, normalizeChapters);
+      } else {
+        path.entries.push({chapterId:next.id,versionId:version.id}); // the learner's selected path is not changed by a finished Continue
+      }
     } else {
       if (!chapter) throw new Error('The destination chapter no longer exists.');
       chapter.versions.push(version);

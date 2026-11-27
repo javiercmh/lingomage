@@ -1,4 +1,4 @@
-import { pathLabel } from './story-model.js';
+import { pathLabel, continueChapterNumber } from './story-model.js';
 // Background work that Android or the operation session did not allow to continue. Local pause
 // (background_paused) means the page was hidden and no session was held, so no host call was made.
 const BACKGROUND_CODES = new Set(['background_service', 'background_paused', 'session_idle', 'session_timeout', 'session_ended']);
@@ -37,13 +37,19 @@ export function operationLabel(op, stories = [], languageName = '') {
   const path=story?.paths?.find(item=>item.id === op.target?.pathId)
     || (op.kind === 'examples' || op.kind === 'notes' ? story?.paths?.find(item=>item.entries.some(entry=>entry.chapterId === op.target?.chapterId && entry.versionId === op.target?.versionId)) : null);
   const entries=op.target?.entries || path?.entries;
-  const index=op.kind === 'continue' ? (entries ? entries.length : -1)
+  const continueMode=op.kind === 'continue' ? (op.target?.continueMode || 'append') : '';
+  const chapterNum=op.kind === 'continue' && op.target?.entries ? continueChapterNumber(op) : -1;
+  const index=op.kind === 'continue' ? (chapterNum > 0 ? chapterNum - 1 : -1)
     : op.kind === 'rewrite' ? (Number.isInteger(op.target?.index) ? op.target.index : -1)
     : path ? path.entries.findIndex(entry=>entry.chapterId === op.target?.chapterId && entry.versionId === op.target?.versionId)
     : story && !story.chapters?.length ? 0 : -1;
-  const action={continue:'Continuing',rewrite:'Rewriting',examples:'Examples for',notes:'Vocabulary notes for'}[op.kind] || 'Generating';
+  const action=op.kind === 'continue'
+    ? ({branch:'Branching',replace:'Replacing'}[continueMode] || 'Continuing')
+    : ({rewrite:'Rewriting',examples:'Examples for',notes:'Vocabulary notes for'}[op.kind] || 'Generating');
   const destination=story ? `“${story.title || 'Untitled story'}”` : 'a saved story';
-  return `${action} ${destination}${index >= 0 ? ` · Chapter ${index+1}` : ''}${story?.paths?.length > 1 && path ? ` · ${pathLabel(story, path)}` : ''}`;
+  const replaceEnd=continueMode === 'replace' && entries ? entries.length : -1;
+  const chapterLabel=index >= 0 ? (replaceEnd > index + 1 ? ` · Chapters ${index + 1}–${replaceEnd}` : ` · Chapter ${index + 1}`) : '';
+  return `${action} ${destination}${chapterLabel}${story?.paths?.length > 1 && path ? ` · ${pathLabel(story, path)}` : ''}`;
 }
 
 export function discardFailureMessage(op) {

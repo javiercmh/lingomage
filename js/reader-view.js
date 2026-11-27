@@ -77,26 +77,6 @@ export function createReaderView({
     $('reader-removal-error').textContent = '';
     $('reader-removal-dialog').showModal(); $('reader-removal-cancel').focus();
   }
-  function pruneStoryContent(story) {
-    const used = new Map();
-    for (const path of story.paths) for (const entry of path.entries) {
-      if (!used.has(entry.chapterId)) used.set(entry.chapterId, new Set());
-      used.get(entry.chapterId).add(entry.versionId);
-    }
-    story.chapters = normalizeChapters(story).filter(chapter => used.has(chapter.id)).map(chapter => {
-      const versions = used.get(chapter.id);
-      return { ...chapter, versions: chapter.versions.filter(version => versions.has(version.id)),
-        activeVersionId: versions.has(chapter.activeVersionId) ? chapter.activeVersionId : [...versions][0],
-        help: (chapter.help || []).filter(item => !item.versionId || versions.has(item.versionId)) };
-    });
-    story.memories = (story.memories || []).filter(record => Array.isArray(record.lineage) && record.lineage.length && story.paths.some(path =>
-      record.lineage.length <= path.entries.length && record.lineage.every((id, index) => path.entries[index].versionId === id)));
-    if (story.memoryRebuild && !story.paths.some(path => story.memoryRebuild.entries.length <= path.entries.length && story.memoryRebuild.entries.every((entry, index) => path.entries[index].versionId === entry.versionId))) story.memoryRebuild = null;
-    const path = story.paths.find(item => item.id === story.activePathId) || story.paths[0];
-    const first = path.entries[0], chapter = story.chapters.find(item => item.id === first.chapterId), version = chapter.versions.find(item => item.id === first.versionId);
-    for (const key of ['title', 'story', 'glossary', 'titleSegments', 'storySegments', 'providerId', 'model', 'promptVersion']) story[key] = version[key];
-    story.activeVersionId = version.id;
-  }
   function removeReaderContent(target = state.readerRemoval) {
     if (!target || pendingDeletionBlocked()) { $('reader-removal-error').textContent = 'Finish or save the current AI response before deleting.'; return false; }
     const story = state.stories.find(item => item.id === target.storyId) || (state.current?.id === target.storyId ? state.current : null);
@@ -151,7 +131,7 @@ export function createReaderView({
       : story.paths.find(item => item.id !== path.id && item.name === (path.parentPathName || 'Original'));
     return `Different version from Chapter ${path.forkChapter}.${parent ? ` Later chapters remain on ${pathLabel(story, parent)}.` : ''}`;
   }
-  const { normalizeChapters, ensureStoryPaths, initializePathCounter, selectedPath, pathChapters, activeChapter, activeVersion } = createStoryModel({state, readerStory});
+  const { normalizeChapters, ensureStoryPaths, initializePathCounter, pruneStoryContent, selectedPath, pathChapters, activeChapter, activeVersion } = createStoryModel({state, readerStory});
   const { memoryChunks, recentProse, decodeMemory, prepareStoryMemory, storyContextReady, pendingSummaryCount } = createStoryMemory({state, normalizeChapters, readerAi:(...args)=>readerAi(...args), savePendingReaderResult:(...args)=>savePendingReaderResult(...args), discardResponse:()=>releaseInvalidReaderResponse()});
   function readerStory() { return state.stories.find(item => item.id === state.readerId) || (state.current?.id === state.readerId ? state.current : null); }
   function profileSnapshot(story) {
@@ -218,8 +198,9 @@ export function createReaderView({
   function renderChapterRequest() {
     const request = state.activeChapterRequest;
     const host = $('reader-chapter-status');
-    host.hidden = !request || request.storyId !== state.readerId;
+    host.hidden = !request || request.storyId !== state.readerId || Boolean(request.opened);
     if (!host.hidden) host.append(request.loading);
+    if (typeof renderReaderGeneration === 'function') renderReaderGeneration();
   }
   function closeWordNote(restoreFocus = false) {
     const popover = $('word-note-popover');
@@ -450,11 +431,11 @@ export function createReaderView({
     state.readerChapter = Math.max(0, pathChapters(story).findIndex(chapter => chapter.id === position?.chapterId));
     $('reader-help-section').hidden = true; $('reader-edit-panel').hidden = true; $('reader-prompt').value = '';
     updateReader();
-    if (draft) { showEditPanel(draft.mode); $('reader-prompt').value = draft.prompt; if (draft.difficulty) { fillLevelOptions($('reader-level'),story.language,draft.difficulty); $('reader-level-description').textContent=readingDescription(story.language,draft.difficulty); } if (draft.scope) fillScopeOptions($('reader-scope'),draft.scope,$('reader-scope-description')); $('reader-edit-error').textContent = draft.error; }
+    if (draft) { showEditPanel(draft.mode, draft.continueMode); $('reader-prompt').value = draft.prompt; if (draft.difficulty) { fillLevelOptions($('reader-level'),story.language,draft.difficulty); $('reader-level-description').textContent=readingDescription(story.language,draft.difficulty); } if (draft.scope) fillScopeOptions($('reader-scope'),draft.scope,$('reader-scope-description')); $('reader-edit-error').textContent = draft.error; }
     const entry = { ...(history.state && typeof history.state === 'object' ? history.state : {}), lingomageReader: story.id };
     if (state.readerHistoryEntry) history.replaceState(entry, ''); else history.pushState(entry, '');
     state.readerHistoryEntry = true;
-    selectionMenuRouter.reset(); $('reader-dialog').showModal(); usage.setReader({ storyId: story.id, language: story.language }); readerViewport = { width: window.innerWidth, height: window.innerHeight }; restoreReaderPosition(position); rememberReaderPosition(); rememberReaderLocation(); updateReaderNavigation(); renderGenerationRecovery(); settingsFeedback.sync();
+    selectionMenuRouter.reset(); $('reader-dialog').showModal(); usage.setReader({ storyId: story.id, language: story.language }); readerViewport = { width: window.innerWidth, height: window.innerHeight }; restoreReaderPosition(position); rememberReaderPosition(); rememberReaderLocation(); updateReaderNavigation(); renderGenerationRecovery(); if (typeof renderReaderGeneration === 'function') { renderReaderGeneration(); if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => renderReaderGeneration()); } settingsFeedback.sync();
   }
   $('reader-dialog').addEventListener('close', () => {
     usage.setReader(null); stopExposure();
@@ -462,6 +443,7 @@ export function createReaderView({
     if (!state.switchingReader) history.replaceState?.({ ...history.state, lingomageReader: null, lingomagePosition: null }, '');
     if (state.readerHistoryEntry && !state.switchingReader) { state.readerHistoryEntry = false; history.back(); }
     if ($('reader-removal-dialog').open) $('reader-removal-dialog').close();
+    if ($('continue-choice-dialog')?.open) $('continue-choice-dialog').close();
     closeReaderPanels(); closeReaderActions(); stopSpeech(); state.speechVersionKey = ''; closeWordNote(); rememberReaderPosition(); persistReaderPosition(); clearExplanationSelection(); setView('library');
   });
   window.addEventListener('popstate', () => {

@@ -5,9 +5,10 @@ const BAR = ['reader-generation-bar', 'generation-status-bar'];
 
 function build(extra = {}) {
   const elements = new Map(), classes = new Set();
-  const element = id => {
-    if (!elements.has(id)) elements.set(id, {id, hidden: false, disabled: false, open: false, textContent: '', writes: 0, parentNode: null, children: [],
+    const element = id => {
+    if (!elements.has(id)) elements.set(id, {id, hidden: false, disabled: false, open: false, textContent: '', writes: 0, parentNode: null, children: [], attributes: {},
       classList: {toggle(name, on) { on ? classes.add(`${id}:${name}`) : classes.delete(`${id}:${name}`); }, contains: name => classes.has(`${id}:${name}`)},
+      setAttribute(name, value) { this.attributes[name] = value; },
       append(node) { node.parentNode = this; }, scrollIntoView() {}, querySelectorAll: () => []});
     return elements.get(id);
   };
@@ -223,4 +224,70 @@ const visible = (t, id) => !t.element(id).hidden;
   w.context.setReaderGeneration({storyId: 'story', phase: 'ready', message: 'ready', pathId: 'alt', chapterId: 'c1', versionId: 'v1'});
   await w.context.generationAction(); assert.deepEqual(w.context.toasts, ['That story is no longer available.']);
   console.log('PASS generation status: all task kinds across tabs/readers, no stale working after cancel/error, saved-response recovery, cancel from the page bar and exact-path View result with rollback');
+
+  // Working bottom pill hides whenever its inline chapter or help loading card is visibly in view, and returns when scrolled away.
+  {
+    const w = build({ window: { innerWidth: 360, innerHeight: 800 }, pipeline: { busy: true } });
+    const c = w.context;
+    w.element('reader-dialog').open = true; c.state.readerId = 'story';
+    c.state.activeChapterRequest = { storyId: 'story' };
+    let top = 300;
+    const statusCard = w.element('reader-chapter-status');
+    statusCard.hidden = false;
+    statusCard.getClientRects = () => [{}];
+    statusCard.getBoundingClientRect = () => ({ left: 12, right: 348, top, bottom: top + 180, height: 180 });
+    w.element('reader-navigation-bar').getBoundingClientRect = () => ({ bottom: 80 });
+    c.setReaderGeneration({ storyId: 'story', phase: 'working', message: 'Step 4 of 4 · Vocabulary notes' });
+    assert.equal(visible(w, 'reader-generation-bar'), false, 'pill hides while big chapter status card is visible');
+    assert.equal(visible(w, 'generation-status-bar'), false);
+    top = 900; c.renderReaderGeneration();
+    assert.equal(visible(w, 'reader-generation-bar'), true, 'pill appears when scrolled away from status card');
+    assert.equal(w.element('reader-generation-jump').disabled, false, 'scrolled-away working pill is tappable to jump');
+    assert.ok(w.classes.has('reader-generation-jump:can-jump'));
+    top = -150; c.renderReaderGeneration();
+    assert.equal(visible(w, 'reader-generation-bar'), true, 'card covered by sticky nav does not hide the pill');
+
+    // Help loading card inside #reader-help also suppresses duplicate pill while in view.
+    c.state.activeChapterRequest = null;
+    statusCard.hidden = true;
+    let helpTop = 260;
+    const helpCard = { hidden: false, getClientRects: () => [{}], getBoundingClientRect: () => ({ left: 12, right: 348, top: helpTop, bottom: helpTop + 90, height: 90 }) };
+    c.document.querySelectorAll = sel => sel === '#reader-help .help-loading' ? [helpCard] : [];
+    c.document.querySelector = sel => sel === '#reader-help .help-loading' ? helpCard : null;
+    c.renderReaderGeneration();
+    assert.equal(visible(w, 'reader-generation-bar'), false, 'pill hides while explanation loading card is visible');
+    helpTop = 900; c.renderReaderGeneration();
+    assert.equal(visible(w, 'reader-generation-bar'), true, 'pill returns when explanation loading card scrolls out of view');
+    assert.equal(w.element('reader-generation-jump').disabled, false);
+  }
+
+  // Persistent ready pills never auto-dismiss after 8s, and working readyTarget exposes Read Ch. N.
+  {
+    const w = build({ pipeline: { busy: true } }), c = w.context;
+    const live = () => c.timers.filter(timer => !timer.cleared && !timer.fired);
+    w.element('reader-dialog').open = true; c.state.readerId = 'story';
+    c.setReaderGeneration({ storyId: 'story', phase: 'ready', persistent: true, actionLabel: 'Read Ch. 3', message: 'Chapter 3 is ready' });
+    assert.equal(live().length, 0, 'persistent ready bar schedules no 8-second timer');
+    assert.equal(w.element('reader-generation-action').textContent, 'Read Ch. 3');
+    assert.ok(w.classes.has('reader-generation-bar:dismissible'));
+
+    const storyObj = makeStory();
+    w.context.state.stories = [storyObj];
+    w.context.state.readerPositions = {};
+    w.context.rememberReaderPosition = () => {};
+    w.context.persistReaderStory = () => {};
+    w.context.persistReaderPosition = () => {};
+    w.context.updateReader = () => {};
+    w.context.readerPanel = () => w.element('reader-panel');
+    w.context.setReaderGeneration({
+      storyId: 'story', phase: 'working', message: 'Chapter 2 ready · Notes 1 of 4',
+      readyTarget: { storyId: 'story', pathId: 'original', chapterId: 'c2', versionId: 'v2', chapterNumber: 2, isBranch: false }
+    });
+    assert.equal(w.element('reader-generation-action').textContent, 'Read Ch. 2');
+    assert.equal(w.element('reader-generation-action').disabled, false);
+    await w.context.generationAction();
+    assert.equal(w.context.state.readerChapter, 1);
+    assert.equal(w.element('reader-generation-action').textContent, 'Cancel');
+    console.log('PASS working card visibility dedup, tappable jump state, persistent ready bar, and Read Ch. N action');
+  }
 })();

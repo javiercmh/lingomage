@@ -1,4 +1,25 @@
 // Additive legacy interpretation; paths pin exact versions (PED-003).
+export function pruneStoryContent(story, normalizeChapters) {
+  const used = new Map();
+  for (const path of story.paths) for (const entry of path.entries) {
+    if (!used.has(entry.chapterId)) used.set(entry.chapterId, new Set());
+    used.get(entry.chapterId).add(entry.versionId);
+  }
+  story.chapters = normalizeChapters(story).filter(chapter => used.has(chapter.id)).map(chapter => {
+    const versions = used.get(chapter.id);
+    return { ...chapter, versions: chapter.versions.filter(version => versions.has(version.id)),
+      activeVersionId: versions.has(chapter.activeVersionId) ? chapter.activeVersionId : [...versions][0],
+      help: (chapter.help || []).filter(item => !item.versionId || versions.has(item.versionId)) };
+  });
+  story.memories = (story.memories || []).filter(record => Array.isArray(record.lineage) && record.lineage.length && story.paths.some(path =>
+    record.lineage.length <= path.entries.length && record.lineage.every((id, index) => path.entries[index].versionId === id)));
+  if (story.memoryRebuild && !story.paths.some(path => story.memoryRebuild.entries.length <= path.entries.length && story.memoryRebuild.entries.every((entry, index) => path.entries[index].versionId === entry.versionId))) story.memoryRebuild = null;
+  const path = story.paths.find(item => item.id === story.activePathId) || story.paths[0];
+  const first = path.entries[0], chapter = story.chapters.find(item => item.id === first.chapterId), version = chapter.versions.find(item => item.id === first.versionId);
+  for (const key of ['title', 'story', 'glossary', 'titleSegments', 'storySegments', 'providerId', 'model', 'promptVersion']) story[key] = version[key];
+  story.activeVersionId = version.id;
+}
+
 export function createStoryModel({state, readerStory}) {
   function normalizeChapters(story) {
     if (Array.isArray(story.chapters) && story.chapters.length) return story.chapters;
@@ -55,7 +76,7 @@ export function createStoryModel({state, readerStory}) {
     return chapter.versions.find(version => version.id === entry?.versionId) || chapter.versions.find(version => version.id === chapter.activeVersionId) || chapter.versions[0];
   }
 
-  return {normalizeChapters, ensureStoryPaths, initializePathCounter, selectedPath, pathChapters, activeChapter, activeVersion};
+  return {normalizeChapters, ensureStoryPaths, initializePathCounter, pruneStoryContent: story => pruneStoryContent(story, normalizeChapters), selectedPath, pathChapters, activeChapter, activeVersion};
 }
 
 // Display names for story paths ("storylines"), derived from saved structure so legacy
@@ -71,4 +92,16 @@ export function pathLabel(story, path) {
   const siblings = paths.filter(item => item.forkChapter === path.forkChapter);
   const position = siblings.findIndex(item => item.id === path.id) + 1;
   return `Branch at Chapter ${path.forkChapter}${position > 1 ? ` (Version ${position})` : ''}`;
+}
+
+export function continuePrefixEntries(target) {
+  return Array.isArray(target?.baseEntries) ? target.baseEntries : (target?.entries || []);
+}
+
+export function continueChapterNumber(op) {
+  return continuePrefixEntries(op?.target).length + 1;
+}
+
+export function continueResultPathId(op) {
+  return op?.target?.continueMode === 'branch' ? `path-${op.id}` : op?.target?.pathId;
 }

@@ -9,6 +9,32 @@ const ORDER = ['context', 'plan', 'prose', 'notes', 'readings'];
 // summary requests made before the operation exists). A saved operation has always finished that step.
 export function hasStoryContext(op) { return op.kind === 'continue' || (op.kind === 'rewrite' && op.target?.index > 0); }
 
+export function chapterLoadingCopy(kind, target) {
+  if (kind !== 'continue') return null;
+  const baseEntries = Array.isArray(target?.baseEntries) ? target.baseEntries : (target?.entries || []);
+  const prefixLen = baseEntries.length, nextNum = prefixLen ? prefixLen + 1 : 0;
+  const mode = target?.continueMode || 'append';
+  if (mode === 'branch') {
+    return {
+      note: prefixLen
+        ? `Parallel Chapter ${nextNum} · new storyline from Chapter ${prefixLen}. Your current chapter stays available.`
+        : 'Parallel chapter · your current chapter stays available.'
+    };
+  }
+  if (mode === 'replace') {
+    const endNum = Array.isArray(target?.entries) ? target.entries.length : 0;
+    const range = nextNum && endNum > nextNum ? `Chapters ${nextNum}–${endNum}` : nextNum ? `Chapter ${nextNum}` : 'later chapters';
+    return {
+      note: prefixLen
+        ? `Replacing ${range} from Chapter ${prefixLen} once saved. Your current chapter stays available.`
+        : 'Your current chapter stays available while this is prepared.'
+    };
+  }
+  return nextNum
+    ? { note: `Writing Chapter ${nextNum}. Your current chapter stays available.` }
+    : null;
+}
+
 // Steps in display order; "notes" and "readings" are the parallel pair for Japanese. Readings are listed
 // first because they usually finish first, so the unfinished step stays at the bottom of the list.
 // A provisional record with stage "context" describes the story-memory step before the operation is created.
