@@ -15,6 +15,8 @@ def require_node():
     version = subprocess.run(['node', '--version'], text=True, stdout=subprocess.PIPE).stdout.strip()
     major, minor = (int(part) for part in version.lstrip('v').split('.')[:2])
     assert (major, minor) >= (22, 12), 'Node 22.12 or newer is required (found ' + version + ')'
+    # `node` comes from PATH, so the version varies by machine; print it so every run records what it tested.
+    print('Node ' + version)
 
 
 def main():
