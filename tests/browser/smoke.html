@@ -21,9 +21,12 @@ async function retryLoading(){const loaded=new Promise(resolve=>frame.addEventLi
 function failSettingsWrites(on){const win=frame.contentWindow;win.__failSettings=on;const proto=win.XMLHttpRequest.prototype;if(proto.__plainOpen)return;proto.__plainOpen=proto.open;proto.open=function(method,url,...rest){if(win.__failSettings&&/writeFile\?/.test(url)&&decodeURIComponent(url).includes('name=data/settings.json'))url='/__bridge/unavailable';return proto.__plainOpen.call(this,method,url,...rest);};}
 const fire=(control,type)=>control.dispatchEvent(new Event(type,{bubbles:true}));
 // Back dismisses an open vocabulary note first and restores the reader's history entry, so only a second Back leaves the reader.
-async function closeReader(){const note=field('word-note-popover');const noteOpen=!note.hidden;frame.contentWindow.history.back();
- if(noteOpen){await until(()=>note.hidden,'Back did not dismiss the vocabulary note');assert(field('reader-dialog').open,'Back closed the reader before the vocabulary note');await delay(50);frame.contentWindow.history.back();}
- await until(()=>!field('reader-dialog').open,'Reader did not close');}
+// Waits for the dialog's close event, not just `open` turning false: the event (and the reader's close handler, which
+// may call history.back) runs as a later task, and reopening a story before it has run lets that late handler close
+// the reopened reader. The app's own closeReader waits the same way.
+async function closeReader(){const note=field('word-note-popover');const noteOpen=!note.hidden;const dialog=field('reader-dialog');let closed=false;dialog.addEventListener('close',()=>{closed=true;},{once:true});frame.contentWindow.history.back();
+ if(noteOpen){await until(()=>note.hidden,'Back did not dismiss the vocabulary note');assert(dialog.open,'Back closed the reader before the vocabulary note');await delay(50);frame.contentWindow.history.back();}
+ await until(()=>!dialog.open && closed,'Reader did not close');}
 function tab(name){doc().querySelector(`[data-view="${name}"]`).click();}
 async function completeGeneration(){await until(()=>field('reader-dialog').open && field('reader-story').textContent.trim(),'Generation did not open the reader');await until(()=>!field('generate').disabled,'Generation remained blocked');}
 document.querySelector('#run').addEventListener('click',async event=>{

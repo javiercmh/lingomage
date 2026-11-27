@@ -41,6 +41,11 @@ DEV_PREFERENCES = 'data/dev-preferences.json'
 
 
 class DevServer(HTTPServer):
+    # The server handles one request at a time, so connections queue while it works. Python's default backlog of 5
+    # overflows when the app starts (about 50 modules fetched in parallel, often while the previous page's last
+    # saves are still arriving), and the OS then resets connections: a module fails to load and the app never starts.
+    request_queue_size = 128
+
     def __init__(self, address, workspace, ai_mode='off', codex='codex'):
         self.workspace = Path(workspace).resolve()
         # Learner files (the manifest's seedFiles) live in a gitignored folder, seeded from seedDefaults like a
