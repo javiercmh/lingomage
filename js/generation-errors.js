@@ -44,7 +44,7 @@ export function operationLabel(op, stories = [], languageName = '') {
     : path ? path.entries.findIndex(entry=>entry.chapterId === op.target?.chapterId && entry.versionId === op.target?.versionId)
     : story && !story.chapters?.length ? 0 : -1;
   const action=op.kind === 'continue'
-    ? ({branch:'Branching',replace:'Replacing'}[continueMode] || 'Continuing')
+    ? ({branch:'New storyline for',replace:'Replacing'}[continueMode] || 'Continuing')
     : ({rewrite:'Rewriting',examples:'Examples for',notes:'Vocabulary notes for'}[op.kind] || 'Generating');
   const destination=story ? `“${story.title || 'Untitled story'}”` : 'a saved story';
   const replaceEnd=continueMode === 'replace' && entries ? entries.length : -1;

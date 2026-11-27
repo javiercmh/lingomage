@@ -80,18 +80,19 @@ export function createStoryModel({state, readerStory}) {
 }
 
 // Display names for story paths ("storylines"), derived from saved structure so legacy
-// stories read the same way. Saved `path.name` values stay unchanged for compatibility.
+// stories read the same way (`Main story`, `Storyline 2`, `Storyline 3`, ...).
+// Saved `path.name` values stay unchanged for compatibility.
 export function pathLabel(story, path) {
   if (!path) return '';
   const paths = story?.paths || [];
-  if (!path.forkChapter) {
-    if (paths.find(item => !item.forkChapter)?.id === path.id) return 'Main story';
-    const number = /^Alternate (\d+)$/.exec(path.name || '')?.[1];
-    return number ? `Branch ${number}` : (path.name || 'Storyline');
+  if (!path.forkChapter && (paths.find(item => !item.forkChapter)?.id === path.id || (!paths.length && path.name === 'Original'))) {
+    return 'Main story';
   }
-  const siblings = paths.filter(item => item.forkChapter === path.forkChapter);
-  const position = siblings.findIndex(item => item.id === path.id) + 1;
-  return `Branch at Chapter ${path.forkChapter}${position > 1 ? ` (Version ${position})` : ''}`;
+  const alternate = /^Alternate (\d+)$/.exec(path.name || '');
+  if (alternate) return `Storyline ${Number(alternate[1]) + 1}`;
+  const index = paths.findIndex(item => item.id === path.id);
+  if (path.name && path.name !== 'Original') return path.name;
+  return index > 0 ? `Storyline ${index + 1}` : 'Storyline';
 }
 
 export function continuePrefixEntries(target) {

@@ -721,7 +721,12 @@ function applyGenerationLocks() {
   for (const id of ['topic','language','difficulty','reading-scope']) $(id).disabled = Boolean(op?.kind === 'create' || busy);
   setScopeDisabled($('reading-scope'), Boolean(op?.kind === 'create' || busy));
   const readerFrozen = !!(state.readerEditBusy || op && op.target?.storyId === state.readerId && ['continue','rewrite'].includes(op.kind));
-  for (const id of ['reader-prompt','reader-level','reader-edit-submit','continue-story','rewrite-chapter','reader-menu-continue','reader-menu-rewrite','path-select']) $(id).disabled=readerFrozen;
+  for (const id of ['reader-prompt','reader-level','reader-edit-submit','continue-story','rewrite-chapter','reader-menu-continue','reader-menu-rewrite']) $(id).disabled=readerFrozen;
+  const pathList=$('path-list');
+  if (pathList) {
+    if (pathList.dataset) pathList.dataset.disabled=readerFrozen ? 'true' : '';
+    pathList.querySelectorAll?.('button').forEach(button=>{ button.disabled=readerFrozen; });
+  }
   setScopeDisabled($('reader-scope'), readerFrozen);
   $('reader-edit-submit').disabled=Boolean(readerFrozen || op || busy || state.storageBlocked || state.checkpointBlocked);
 }
@@ -992,7 +997,7 @@ function showEarlyResult(op, first) {
   }
   setReaderGeneration({ storyId: story.id, phase: 'working', message: notesProgressMessage(op) });
   if (state.readerId === story.id) { state.readerChapter = op.target.index; $('reader-edit-panel').hidden = true; state.readerEditDraft = null; updateReader(); }
-  toast('Branch created. Vocabulary notes are on their way.');
+  toast('New storyline created. Vocabulary notes are on their way.');
 }
 function showOperationResult(op) {
   const story=state.stories.find(s=>op.kind === 'create' ? s.operationId === op.id : s.id === op.target.storyId);
@@ -1063,7 +1068,7 @@ function showOperationResult(op) {
     if (op.kind !== 'examples') state.readerChapter=op.target.index;
     $('reader-edit-panel').hidden=true; state.readerEditDraft=null; updateReader();
   }
-  toast(op.kind === 'examples' ? 'Examples saved' : 'Branch created');
+  toast(op.kind === 'examples' ? 'Examples saved' : 'New storyline created');
 }
 // Automatic resends of unreadable replies are announced, never silent (Settings → Advanced).
 function resendStepName(key) {
@@ -1396,28 +1401,44 @@ window.addEventListener('resize', () => {
   updateReaderNavigation(); renderReaderGeneration();
 });
 $('chapter-select').addEventListener('change', () => { closeReaderPanels(true); if (!state.readerEditBusy) { $('reader-edit-panel').hidden = true; state.readerEditDraft = null; } state.readerChapter = Number($('chapter-select').value); state.readerVersion = 0; clearExplanationSelection(); updateReader(); });
-$('path-select').addEventListener('change', () => {
-  if (state.readerEditBusy) { $('path-select').value = selectedPath().id; return; }
+$('path-list').addEventListener('click', event => {
+  const button = event.target?.closest?.('.storyline-option');
+  const nextId = button?.dataset?.pathId;
+  if (!nextId || button.disabled || state.readerEditBusy) return;
+  const story = readerStory();
+  if (!story || selectedPath(story).id === nextId) return;
   rememberReaderPosition(); closeWordNote(); clearExplanationSelection();
-  const story = readerStory(), previous = story.activePathId; story.activePathId = $('path-select').value;
-  try { persistReaderStory(story); } catch (error) { story.activePathId = previous; toast(error.message); }
+  const previous = story.activePathId; story.activePathId = nextId;
+  try { persistReaderStory(story); } catch (error) { story.activePathId = previous; toast(error.message); return; }
   const position = state.readerPositions[`${story.id}:${selectedPath(story).id}`];
   state.readerChapter = Math.max(0, pathChapters(story).findIndex(chapter => chapter.id === position?.chapterId));
   const keepNavigation = !$('reader-navigation-panel').hidden;
   $('reader-edit-panel').hidden = true; state.readerEditDraft = null; updateReader(keepNavigation);
   setRestoringPathPosition(true); restoreReaderPosition(position);
-  requestAnimationFrame(() => { setRestoringPathPosition(false); if (keepNavigation && !$('reader-navigation-panel').hidden) positionReaderPanel('navigation'); });
+  requestAnimationFrame(() => {
+    setRestoringPathPosition(false);
+    if (keepNavigation && !$('reader-navigation-panel').hidden) positionReaderPanel('navigation');
+    $('path-list')?.querySelector?.('.storyline-option.is-active')?.focus?.({ preventScroll: true });
+  });
+});
+$('path-list').addEventListener('keydown', event => {
+  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+  const options = [...($('path-list')?.querySelectorAll?.('.storyline-option:not(:disabled)') || [])];
+  const current = options.indexOf(event.target?.closest?.('.storyline-option'));
+  if (current < 0 || !options.length) return;
+  event.preventDefault();
+  const next = options[(current + (event.key === 'ArrowDown' ? 1 : options.length - 1)) % options.length];
+  next.focus();
 });
 $('chapter-prev').addEventListener('click', () => { if (state.readerChapter > 0) { state.readerChapter--; clearExplanationSelection(); if (!state.readerEditBusy) { $('reader-edit-panel').hidden = true; state.readerEditDraft = null; } } updateReader(); });
 $('chapter-next').addEventListener('click', () => { if (state.readerChapter < pathChapters(readerStory()).length - 1) { state.readerChapter++; clearExplanationSelection(); if (!state.readerEditBusy) { $('reader-edit-panel').hidden = true; state.readerEditDraft = null; } } updateReader(); });
 readerPanels.initialize();
 $('furigana-toggle').addEventListener('change', () => { state.furigana = $('furigana-toggle').checked; keepReaderLocation(() => { $('reader-story').classList.toggle('hide-furigana', !state.furigana); $('reader-title').classList.toggle('hide-furigana', !state.furigana); requestAnimationFrame(fitReaderTitle); }); document.querySelectorAll('#reader-help .story-text').forEach(node => node.classList.toggle('hide-furigana', !state.furigana)); trySaveSettings(); });
 function continueTargetSummary(story, path, k, N, continueMode) {
-  const label = pathLabel(story, path), multi = story.paths.length > 1;
   const range = k + 1 === N ? `Chapter ${N}` : `Chapters ${k + 1}–${N}`;
-  if (continueMode === 'branch') return { text: `Parallel Chapter ${k + 1} · new storyline from Chapter ${k}`, submit: `Write parallel Chapter ${k + 1}`, danger: false };
-  if (continueMode === 'replace') return { text: `Replaces ${range} after Chapter ${k}. Existing ${range}${multi ? ` on ${label}` : ''} will be replaced once saved; other storylines stay intact.`, submit: `Replace ${range}`, danger: true };
-  return { text: `Chapter ${N + 1} · after Chapter ${N}${multi ? ` on ${label}` : ''}`, submit: `Write Chapter ${N + 1}`, danger: false };
+  if (continueMode === 'branch') return { text: `Parallel Chapter ${k + 1} · new storyline after Chapter ${k}`, submit: `Write parallel Chapter ${k + 1}`, danger: false };
+  if (continueMode === 'replace') return { text: `Replaces ${range} after Chapter ${k} on this storyline once saved; other storylines stay intact.`, submit: `Replace ${range}`, danger: true };
+  return { text: `Chapter ${N + 1} · after Chapter ${N} on this storyline`, submit: `Write Chapter ${N + 1}`, danger: false };
 }
 function showEditPanel(mode, continueMode = 'append') {
   if (state.readerEditBusy) return;
@@ -1460,11 +1481,11 @@ function openContinueChoice(trigger = null) {
   continueChoiceTrigger = trigger;
   $('continue-choice-subtitle').textContent = `Reading Chapter ${k} of ${N}${multi ? ` · ${label}` : ''}`;
   $('continue-choice-branch-title').textContent = `Parallel Chapter ${k + 1}`;
-  $('continue-choice-branch-sub').textContent = `New storyline from Chapter ${k} · keeps ${range}${multi ? ` on ${label}` : ''}`;
-  $('continue-choice-append-title').textContent = `Chapter ${N + 1}`;
-  $('continue-choice-append-sub').textContent = `Continue after Chapter ${N}${multi ? ` on ${label}` : ''}`;
+  $('continue-choice-branch-sub').textContent = `Starts a new storyline after Chapter ${k}. Keeps ${k + 1 === N ? `the current Chapter ${N}` : range}.`;
+  $('continue-choice-append-title').textContent = `Add Chapter ${N + 1}`;
+  $('continue-choice-append-sub').textContent = `Continues from the end of this storyline, after Chapter ${N}.`;
   $('continue-choice-replace-title').textContent = `Replace ${range}`;
-  $('continue-choice-replace-sub').textContent = `Continue after Chapter ${k} · overwrites ${range}${multi ? ` on ${label}` : ''}`;
+  $('continue-choice-replace-sub').textContent = `Writes a new Chapter ${k + 1} after Chapter ${k} and removes ${k + 1 === N ? 'the current one' : range}.`;
   $('continue-choice-dialog').showModal();
   $('continue-choice-branch').focus();
 }
@@ -1516,7 +1537,12 @@ $('reader-edit-submit').addEventListener('click', async () => {
     ...(mode === 'continue' && continueMode !== 'append' ? { continueMode, baseEntries: memoryEntries } : {})
   };
   const copyOverride = typeof chapterLoadingCopy === 'function' ? chapterLoadingCopy(mode, target) : null;
-  state.readerEditBusy = true; state.readerEditDraft = null; $('path-select').disabled = true;
+  state.readerEditBusy = true; state.readerEditDraft = null;
+  const busyPathList = $('path-list');
+  if (busyPathList) {
+    if (busyPathList.dataset) busyPathList.dataset.disabled = 'true';
+    busyPathList.querySelectorAll?.('button').forEach(item => { item.disabled = true; });
+  }
   const loading = createChapterLoading(mode, copyOverride);
   // The estimate is made now, while it can still count the story-context summaries this run will make.
   const estimate = estimateFor(operationPlan({ kind: mode, language: story.language, input: { scope }, config }, pendingSummaryCount(story, memoryEntries)));
@@ -1571,7 +1597,12 @@ $('reader-edit-submit').addEventListener('click', async () => {
     }
   }
   finally {
-    $('path-select').disabled = false; loading.remove(); state.activeChapterRequest = null; renderChapterRequest();
+    const idlePathList = $('path-list');
+    if (idlePathList) {
+      if (idlePathList.dataset) idlePathList.dataset.disabled = '';
+      idlePathList.querySelectorAll?.('button').forEach(item => { item.disabled = false; });
+    }
+    loading.remove(); state.activeChapterRequest = null; renderChapterRequest();
     state.readerEditBusy = false; $('reader-edit-cancel').disabled = false; $('reader-prompt').disabled = false;
     $('reader-level').disabled = false; setScopeDisabled($('reader-scope'), false); button.disabled = false;
     if (typeof showEditPanel !== 'function' || $('reader-edit-panel').hidden) { button.classList?.remove?.('is-danger'); button.textContent = mode === 'continue' ? 'Continue' : 'Rewrite'; }

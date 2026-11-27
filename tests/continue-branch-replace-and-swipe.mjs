@@ -123,7 +123,7 @@ function makeController(story, { failPersist = false } = {}) {
   const branchOp = { kind: 'continue', target: { storyId: 'S', pathId: 'original', entries: story.paths[0].entries, continueMode: 'branch', baseEntries: [{ chapterId: 'c1', versionId: 'v1' }] } };
   const replaceOp = { kind: 'continue', target: { storyId: 'S', pathId: 'original', entries: story.paths[0].entries, continueMode: 'replace', baseEntries: [{ chapterId: 'c1', versionId: 'v1' }] } };
   assert.match(operationLabel(appendOp, [story]), /^Continuing “Start” · Chapter 4/);
-  assert.match(operationLabel(branchOp, [story]), /^Branching “Start” · Chapter 2/);
+  assert.match(operationLabel(branchOp, [story]), /^New storyline for “Start” · Chapter 2/);
   assert.match(operationLabel(replaceOp, [story]), /^Replacing “Start” · Chapters 2–3/);
 
   const sent = [];

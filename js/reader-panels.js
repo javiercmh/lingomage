@@ -34,8 +34,12 @@ export function createReaderPanels({state, $, window, document, getComputedStyle
     if (wasOpen) return;
     panel.hidden = false; $(`reader-${name}-toggle`).setAttribute('aria-expanded', 'true');
     positionReaderPanel(name);
-    const first = name === 'preferences' ? $('reader-text-size') : !$('path-control').hidden ? $('path-select') : $('chapter-select');
-    first.focus({ preventScroll: true });
+    const first = name === 'preferences'
+      ? $('reader-text-size')
+      : !$('path-control').hidden
+        ? ($('path-list')?.querySelector?.('.storyline-option.is-active, .storyline-option') || $('path-list'))
+        : $('chapter-select');
+    first?.focus?.({ preventScroll: true });
   }
   function setReaderTextSize(value) {
     state.readerFontSize = Math.max(15, Math.min(30, Number(value) || 19));

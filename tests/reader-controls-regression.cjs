@@ -52,21 +52,29 @@ documentEvents.keydown({key: 'Escape', preventDefault() { prevented = true; }, s
 assert(prevented && stopped, 'Escape is consumed before reader dismissal');
 assert.equal(box('reader-preferences-panel').hidden, true); assert.equal(box('reader-preferences-toggle').focused, true);
 assert.equal(box('reader-preferences-toggle').focusOptions.preventScroll, true, 'returning focus must not scroll a pinned control back to its document position');
+const originalOption = { className: 'storyline-option', dataset: { pathId: 'original' }, disabled: false, focus(options) { this.focused = true; this.focusOptions = options; }, closest: () => originalOption };
+const altOption = { className: 'storyline-option is-active', dataset: { pathId: 'alt' }, disabled: false, focus(options) { this.focused = true; this.focusOptions = options; }, closest: () => altOption };
+const pathList = box('path-list');
+pathList.querySelector = () => story.activePathId === 'alt' ? altOption : originalOption;
+pathList.querySelectorAll = () => [originalOption, altOption].filter(item => !item.disabled);
 box('path-control').hidden = false; box('reader-navigation-toggle').events.click();
-assert.equal(box('path-select').focused, true, 'multiple paths focus Story path');
+assert.equal(originalOption.focused, true, 'multiple paths focus active Storyline option');
 documentEvents.pointerdown({target: {closest: () => true}}); assert.equal(box('reader-navigation-panel').hidden, false);
 documentEvents.pointerdown({target: {closest: () => null}}); assert.equal(box('reader-navigation-panel').hidden, true);
 // Path changes preserve existing remembered positions and recover failed writes.
-vm.runInContext(slice("$('path-select').addEventListener", "$('chapter-prev').addEventListener"), c);
-box('reader-navigation-toggle').events.click(); box('path-select').value = 'alt'; box('path-select').events.change();
+vm.runInContext(slice("$('path-list').addEventListener", "$('chapter-prev').addEventListener"), c);
+box('reader-navigation-toggle').events.click(); box('path-list').events.click({ target: altOption });
 assert.equal(story.activePathId, 'alt'); assert.equal(c.state.readerChapter, 0); assert.equal(reader.scrollTop, 20);
 assert.equal(updates.at(-1), true); assert.equal(box('reader-navigation-panel').hidden, false);
-failed = true; box('path-select').value = 'original'; box('path-select').events.change();
+failed = true; box('path-list').events.click({ target: originalOption });
 assert.equal(story.activePathId, 'alt'); assert.equal(reader.scrollTop, 20); assert.deepEqual(messages, ['disk']);
-c.state.readerEditBusy = true; box('path-select').value = 'original'; box('path-select').events.change();
-assert.equal(box('path-select').value, 'alt'); assert.equal(story.activePathId, 'alt');
+failed = false; c.state.readerEditBusy = true; box('path-list').events.click({ target: originalOption });
+assert.equal(story.activePathId, 'alt');
+c.state.readerEditBusy = false; originalOption.disabled = true; box('path-list').events.click({ target: originalOption });
+assert.equal(story.activePathId, 'alt');
+originalOption.disabled = false;
 // Chapter choice closes navigation and restores its trigger before rendering.
-vm.runInContext(slice("$('chapter-select').addEventListener", "$('path-select').addEventListener"), c);
+vm.runInContext(slice("$('chapter-select').addEventListener", "$('path-list').addEventListener"), c);
 box('chapter-select').value = '1'; box('chapter-select').events.change();
 assert.equal(c.state.readerChapter, 1); assert.equal(box('reader-navigation-panel').hidden, true);
 assert.equal(box('reader-navigation-toggle').focused, true);

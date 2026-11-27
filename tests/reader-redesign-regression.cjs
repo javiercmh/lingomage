@@ -33,7 +33,7 @@ function section(start, end) { const at = source.indexOf(start); assert(at >= 0,
 {
   const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
   const headerStart = html.indexOf('<header class="reader-title-section"'), header = html.slice(headerStart, html.indexOf('</header>', headerStart));
-  for (const id of ['reader-title-meta', 'reader-title', 'reader-actions-toggle', 'reader-menu-continue', 'reader-menu-rewrite', 'reader-share', 'reader-remove-chapters', 'reader-delete-path', 'reader-listen', 'chapter-select'])
+  for (const id of ['reader-title-meta', 'reader-title', 'reader-actions-toggle', 'reader-menu-continue', 'reader-menu-rewrite', 'reader-share', 'reader-remove-chapters', 'reader-delete-path', 'reader-listen', 'path-list', 'chapter-select'])
     assert(header.includes(`id="${id}"`), `${id} belongs to the title section`);
   assert(header.includes('aria-label="Listen to this chapter"'), 'icon-only Listen retains its accessible scope');
   assert(!header.includes('Listen to chapter</span>'));

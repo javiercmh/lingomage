@@ -73,9 +73,9 @@ assert.equal($('share-chapter-row').hidden,true,'Library share has no chapter ro
 assert.equal($('share-download').hidden,false);assert.equal($('share-send-file').hidden,true);assert.equal($('share-story-send').hidden,true,'browser: Copy only');
 assert.ok($('share-download').querySelector('.share-row-icon').classList.contains('small-btn-strong'),'without sharing, Save backup is the primary action');
 assert.equal($('share-download').focused,true,'focus starts on the primary file action');
-assert.equal($('share-story-sub').textContent,'All chapters · Branch 1');
+assert.equal($('share-story-sub').textContent,'All chapters · Storyline 2');
 assert.equal($('share-notes').checked,false,'notes start off without a saved preference');
-$('share-notes').checked=true;$('share-notes').change();assert.equal($('share-story-sub').textContent,'All chapters · Branch 1','summaries do not repeat the notes switch');
+$('share-notes').checked=true;$('share-notes').change();assert.equal($('share-story-sub').textContent,'All chapters · Storyline 2','summaries do not repeat the notes switch');
 assert.equal(context.state.shareVocabularyNotes,true);assert.equal(context.saves,1,'the notes choice is saved to settings');
 await $('share-story-copy').click();assert.deepEqual(delivered.at(-1),['copy',storyShareText(longer2,model,{notes:true})]);
 assert.ok($('share-story-copy').classList.contains('copied'),'Copy shows a check');assert.equal($('share-live').textContent,'Story text copied');
@@ -126,8 +126,8 @@ console.log('PASS AppShare bridge correlation, launch acknowledgement, host erro
 {
   const paths=[{id:'original',name:'Original',entries:[]},{id:'a',name:'Alternate 1',forkChapter:3,entries:[]},{id:'b',name:'Alternate 2',forkChapter:3,entries:[]},{id:'c',name:'Alternate 3',forkChapter:5,entries:[]},{id:'d',name:'Alternate 4',entries:[]}];
   const s={paths};
-  assert.deepEqual(paths.map(path=>pathLabel(s,path)),['Main story','Branch at Chapter 3','Branch at Chapter 3 (Version 2)','Branch at Chapter 5','Branch 4']);
-  assert.equal(pathLabel({paths:paths.slice(1)},paths[1]),'Branch at Chapter 3');
+  assert.deepEqual(paths.map(path=>pathLabel(s,path)),['Main story','Storyline 2','Storyline 3','Storyline 4','Storyline 5']);
+  assert.equal(pathLabel({paths:paths.slice(1)},paths[1]),'Storyline 2');
   assert.equal(paths[1].name,'Alternate 1');
-  console.log('PASS storyline labels: main story, branch chapter, same-chapter numbering, unforked legacy fallback');
+  console.log('PASS storyline labels: main story, sequential storylines, unforked legacy fallback');
 }

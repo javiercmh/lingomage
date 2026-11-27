@@ -153,12 +153,38 @@ export function createReaderView({
     const select = $('chapter-select'); select.textContent = '';
     chapters.forEach((item, index) => { const option = document.createElement('option'); option.value = String(index); option.textContent = `Chapter ${index + 1}`; select.append(option); });
     select.value = String(state.readerChapter);
-    const path = selectedPath(story), pathSelect = $('path-select'); pathSelect.textContent = '';
-    story.paths.forEach(item => { const option = document.createElement('option'); option.value = item.id; option.textContent = pathLabel(story, item); pathSelect.append(option); });
-    pathSelect.value = path.id; $('path-control').hidden = story.paths.length < 2;
+    const path = selectedPath(story), pathList = $('path-list');
+    if (pathList) {
+      pathList.textContent = '';
+      const disabled = Boolean(state.readerEditBusy || pathList.dataset?.disabled === 'true');
+      story.paths.forEach(item => {
+        const active = item.id === path.id;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = active ? 'storyline-option is-active' : 'storyline-option';
+        button.setAttribute('role', 'radio');
+        button.setAttribute('aria-checked', String(active));
+        if (button.dataset) button.dataset.pathId = item.id;
+        button.disabled = disabled;
+        const text = document.createElement('span'); text.className = 'storyline-option-text';
+        const name = document.createElement('span'); name.className = 'storyline-option-name'; name.textContent = pathLabel(story, item);
+        const meta = document.createElement('span'); meta.className = 'storyline-option-meta';
+        const count = item.entries?.length || 0;
+        const countText = `${count} ${count === 1 ? 'chapter' : 'chapters'}`;
+        meta.textContent = item.forkChapter ? `From Chapter ${item.forkChapter} · ${countText}` : countText;
+        text.append(name, meta);
+        button.append(text);
+        if (active) {
+          const check = document.createElement('span'); check.className = 'storyline-option-check'; check.setAttribute('aria-hidden', 'true'); check.textContent = '✓';
+          button.append(check);
+        }
+        pathList.append(button);
+      });
+    }
+    $('path-control').hidden = story.paths.length < 2;
     $('chapter-prev').disabled = state.readerChapter === 0; $('chapter-next').disabled = state.readerChapter >= chapters.length - 1;
-    $('chapter-context-note').hidden = !path.forkChapter && !path.uncertain;
-    $('chapter-context-note').textContent = [pathForkDescription(story, path), path.uncertain ? 'This older story has incomplete version history; its original continuity is uncertain.' : ''].filter(Boolean).join(' ');
+    $('chapter-context-note').hidden = !path.uncertain;
+    $('chapter-context-note').textContent = path.uncertain ? 'This older story has incomplete version history; its original continuity is uncertain.' : '';
   }
   function updateReader(keepNavigation = false) {
     renderCheckpointRecovery();

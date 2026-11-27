@@ -222,7 +222,7 @@ const section = source.slice(source.indexOf('function notesProgressMessage('), s
     const t = build({ chapter: 2 }); t.generation({ storyId: 'story', phase: 'working', message: 'Rewriting' });
     t.context.showOperationResult({ id: 'op2', kind: 'rewrite', target: { storyId: 'story', pathId: 'original', chapterId: 'c1', index: 1, entries: [{}, {}] } });
     assert.equal(t.context.state.readerChapter, 1); assert.ok(t.calls.includes('updateReader'));
-    assert.equal(t.status().pathId, 'path-op2'); assert.deepEqual(t.context.toasts, ['Branch created']);
+    assert.equal(t.status().pathId, 'path-op2'); assert.deepEqual(t.context.toasts, ['New storyline created']);
   }
   {
     const t = build(); t.generation({ storyId: null, phase: 'working', message: 'Writing your story…' });

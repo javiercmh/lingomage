@@ -17,7 +17,7 @@ export function chapterLoadingCopy(kind, target) {
   if (mode === 'branch') {
     return {
       note: prefixLen
-        ? `Parallel Chapter ${nextNum} · new storyline from Chapter ${prefixLen}. Your current chapter stays available.`
+        ? `Parallel Chapter ${nextNum} · new storyline after Chapter ${prefixLen}. Your current chapter stays available.`
         : 'Parallel chapter · your current chapter stays available.'
     };
   }
@@ -26,7 +26,7 @@ export function chapterLoadingCopy(kind, target) {
     const range = nextNum && endNum > nextNum ? `Chapters ${nextNum}–${endNum}` : nextNum ? `Chapter ${nextNum}` : 'later chapters';
     return {
       note: prefixLen
-        ? `Replacing ${range} from Chapter ${prefixLen} once saved. Your current chapter stays available.`
+        ? `Replacing ${range} after Chapter ${prefixLen} once saved. Your current chapter stays available.`
         : 'Your current chapter stays available while this is prepared.'
     };
   }
