@@ -2,13 +2,13 @@
 // stage (no plan, prose or readings), honours the saved density and light-model tasks, and its application
 // replaces generated notes while keeping Define notes, idempotently and only on unchanged text.
 import assert from 'node:assert/strict';
-import { createPipeline } from '../js/generation-pipeline.js';
-import { createGenerationController } from '../js/generation-controller.js';
-import { notesInstructions } from '../js/prompts.js';
-import { progressSteps } from '../js/generation-progress.js';
-import { plannedSteps } from '../js/generation-timing.js';
-import { validCheckpoints } from '../js/workspace-storage.js';
-import { operationLabel, recoverySummary } from '../js/generation-errors.js';
+import { createPipeline } from '../js/generation/generation-pipeline.js';
+import { createGenerationController } from '../js/generation/generation-controller.js';
+import { notesInstructions } from '../js/generation/prompts.js';
+import { progressSteps } from '../js/generation/generation-progress.js';
+import { plannedSteps } from '../js/generation/generation-timing.js';
+import { validCheckpoints } from '../js/core/workspace-storage.js';
+import { operationLabel, recoverySummary } from '../js/generation/generation-errors.js';
 
 const prose = { title: 'Am Bahnhof', story: 'Mia kauft Brot. Mia geht zum Bahnhof.' };
 const glossary = [{ word: 'kaufen', meaning: 'buy', forms: ['kauft'] }, { word: 'Bahnhof', meaning: 'railway station', forms: ['Bahnhof'] }];

@@ -2,11 +2,11 @@
 // part) has notes and, for Japanese, its readings are ready; each finished notes part adds its notes to the same
 // version, and the final apply completes it.
 import assert from 'node:assert/strict';
-import { createPipeline } from '../js/generation-pipeline.js';
-import { createGenerationController } from '../js/generation-controller.js';
-import { firstGlossaryMatches } from '../js/reader-text.js';
-import { progressSteps } from '../js/generation-progress.js';
-import { MAX_NOTE_PARTS, readingPlan, attachReadingMap, readingSpansFor, validateReadings } from '../js/learning-validation.js';
+import { createPipeline } from '../js/generation/generation-pipeline.js';
+import { createGenerationController } from '../js/generation/generation-controller.js';
+import { firstGlossaryMatches } from '../js/reader/reader-text.js';
+import { progressSteps } from '../js/generation/generation-progress.js';
+import { MAX_NOTE_PARTS, readingPlan, attachReadingMap, readingSpansFor, validateReadings } from '../js/generation/learning-validation.js';
 
 const WORDS = ['Hund', 'Katze', 'Vogel', 'Fisch', 'Pferd', 'Maus'];
 const story = WORDS.map(word => `Der ${word} läuft schnell durch den Garten. `.repeat(30).trim()).join('\n\n');

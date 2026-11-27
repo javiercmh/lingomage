@@ -1,11 +1,11 @@
 import { MEMORY_VERSION } from './story-memory.js';
-import { markStoryActivity } from './library-activity.js';
+import { markStoryActivity } from '../screens/library-activity.js';
 import { summarizeTimings } from './generation-timing.js';
 import { stageModel } from './generation-pipeline.js';
-import { continuePrefixEntries, pruneStoryContent } from './story-model.js';
+import { continuePrefixEntries, pruneStoryContent } from '../core/story-model.js';
 // Final application remains idempotent by operation ID and rolls back failed saves.
 export function createGenerationController({state, normalizeChapters, ensureStoryPaths, persistReaderStory, savedFollowUps}) {
-  // What each step took (js/generation-timing.js); absent when nothing was measured, as in older records.
+  // What each step took (js/generation/generation-timing.js); absent when nothing was measured, as in older records.
   const timingField = op => { const timing = summarizeTimings(op); return timing ? {timing} : {}; };
   function operationProvenance(op) {
   return {operationId:op.id, promptVersion:op.promptVersion, safeguardVersion:op.safeguardVersion, difficulty:op.input.difficulty,framework:op.input.framework,scope:op.input.scope,languagePlan:op.plan,profileVersion:op.profileVersion,learnerContext:op.input.learnerProfile || {readingStartingPoint:op.input.readingStartingPoint,readingSelfReport:op.input.readingSelfReport,languageExpectations:op.input.languageExpectations}, providerId:op.config.providerId, model:op.config.model, ...(op.config.noteDensity ? {noteDensity:op.config.noteDensity} : {}), ...(String(op.config.light?.model || '').trim() ? {lightModel:op.config.light.model} : {}), createdAt:op.createdAt, ...timingField(op)};

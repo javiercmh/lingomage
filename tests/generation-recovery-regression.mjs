@@ -1,10 +1,20 @@
-import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import vm from 'node:vm';
-import {createPipeline,pendingRequests} from '../js/generation-pipeline.js';
-import {failureInfo,recoverySummary,operationLabel} from '../js/generation-errors.js';
-import {createAiSession} from '../js/ai-session.js';
+import {createPipeline,pendingRequests} from '../js/generation/generation-pipeline.js';
+import {failureInfo,recoverySummary,operationLabel} from '../js/generation/generation-errors.js';
+import {createAiSession} from '../js/core/ai-session.js';
+import {PROMPT_VERSION} from '../js/generation/prompts.js';
+import {SAFEGUARD_VERSION} from '../js/generation/learning-validation.js';
+const {loadFactory,deps,stubDom}=await import('./support/factory-harness.mjs');
+const createCheckpointRecovery=await loadFactory('js/generation/checkpoint-recovery.js','createCheckpointRecovery');
+globalThis.requestAnimationFrame=fn=>fn();
+// The production recovery factory; runtime holds the shared bindings (pipeline, status) app.js would pass.
+function recovery(pipeline,{state={},...given}={}){
+  const runtime={pipeline,readerGeneration:null,backgroundRun:null};
+  const api=createCheckpointRecovery(deps({$:stubDom().$,LANGUAGES:{},state:{readerEditDraft:null,stories:[],...state},runtime,
+    setReaderGeneration(value){runtime.readerGeneration=value;},...given}));
+  return Object.assign(api,{runtime});
+}
 const prose={title:'Brot',story:'Mia kauft Brot.'};
 const notes={glossary:[{word:'Brot',meaning:'bread',forms:['Brot']}]};
 const examples={examples:Array.from({length:3},()=>({sentence:'Brot',translation:'Bread',highlightStart:0,highlightEnd:4}))};
@@ -37,12 +47,10 @@ for (const kind of ['create','continue','rewrite','examples']) {
     await pipeline.discard(op);assert.equal(pipeline.records.length,0);
   }
 }
-const source=appSource();
-const op={kind:'create',stage:'prose',promptVersion:'test',safeguardVersion:'test',error:'service'};
+const op={kind:'create',stage:'prose',promptVersion:PROMPT_VERSION,safeguardVersion:SAFEGUARD_VERSION,error:'service'};
 let runs=0,results=0,resolve;
 const aiSession=createAiSession({ai:{}});
-const context={backgroundRun:null,aiSession,pendingRequests,notifyStopped:()=>{},state:{readerEditDraft:null},PROMPT_VERSION:'test',SAFEGUARD_VERSION:'test',pipeline:{records:[op],busy:false,async run(){runs++;this.busy=true;await new Promise(r=>resolve=r);this.records=[];this.busy=false;}},readerGeneration:null,setReaderGeneration(value){context.readerGeneration=value;},showOperationResult(){results++;},toast(){},renderCheckpointRecovery(){},revealRecovery(){},failureInfo};
-vm.createContext(context);vm.runInContext(source.slice(source.indexOf('async function resumeCheckpoint('),source.indexOf('function revealRecovery(')),context);
+const context=recovery({records:[op],busy:false,async run(){runs++;this.busy=true;await new Promise(r=>resolve=r);this.records=[];this.busy=false;}},{aiSession,showOperationResult(){results++;}});
 const retry=context.resumeCheckpoint(op);assert.equal(runs,1);await context.resumeCheckpoint(op);assert.equal(runs,1);resolve();await retry;assert.equal(results,1);await context.resumeCheckpoint(op);assert.equal(runs,1);
 assert.match(recoverySummary({kind:'create',stage:'notes',prose,error:'service',failure:failureInfo(Object.assign(Error('Service failed'),{code:'service'}),'notes')}),/vocabulary notes.*Completed prose is preserved/);
 assert.equal(failureInfo(Error('Cannot set properties of null'),'prose').category,'internal');
@@ -51,11 +59,10 @@ assert.ok(!failureInfo(Error('https://example.test/callback?token=secret Bearer 
 assert.ok(!failureInfo(Error('session_id=secret sessionId: secret'),'prose').message.includes('secret'),'session ids are redacted like request and account ids');
 // Resume obeys the same status rules: only explicit in-app cancellation clears it; external interruptions point to recovery, Create has no story id.
 for (const [message, kind, expected] of [['Request cancelled. Resume to explicitly retry, or discard this attempt.','continue','error'],['Service failed','continue','error'],['Request cancelled.','create','error'],['Service failed','create','error'],['Generation cancelled.','create',null]]) {
-  const failing={kind,stage:'prose',promptVersion:'test',safeguardVersion:'test',error:'',target:kind==='create'?undefined:{storyId:'story'}};
-  const ctx={backgroundRun:null,aiSession,pendingRequests,notifyStopped:()=>{},state:{readerEditDraft:null},PROMPT_VERSION:'test',SAFEGUARD_VERSION:'test',pipeline:{records:[failing],busy:false,async run(){throw Object.assign(new Error(message),message==='Generation cancelled.'?{code:'generation_cancelled'}:{});}},readerGeneration:null,setReaderGeneration(value){ctx.readerGeneration=value;},showOperationResult(){},toast(){},renderCheckpointRecovery(){},revealRecovery(){},failureInfo};
-  vm.createContext(ctx);vm.runInContext(source.slice(source.indexOf('async function resumeCheckpoint('),source.indexOf('function revealRecovery(')),ctx);
+  const failing={kind,stage:'prose',promptVersion:PROMPT_VERSION,safeguardVersion:SAFEGUARD_VERSION,error:'',target:kind==='create'?undefined:{storyId:'story'}};
+  const ctx=recovery({records:[failing],busy:false,async run(){throw Object.assign(new Error(message),message==='Generation cancelled.'?{code:'generation_cancelled'}:{});}},{aiSession});
   await ctx.resumeCheckpoint(failing);
-  assert.equal(ctx.readerGeneration?.phase ?? null,expected,`${kind} resume failure "${message}"`);
+  assert.equal(ctx.runtime.readerGeneration?.phase ?? null,expected,`${kind} resume failure "${message}"`);
 }
 // invalid_request surfaces the real cause (including missing model on legacy checkpoints) instead of blaming the AI service.
 {
@@ -74,24 +81,14 @@ for (const [message, kind, expected] of [['Request cancelled. Resume to explicit
 
   // runContentOperation refuses blank model before creating a checkpoint.
   let created = 0;
-  const runCtx = {
-    workspaceStorage: { assertWritable() {} },
-    pipeline: { records: [], create() { created++; return {}; }, async run() {} },
-    aiSession: { run: fn => fn() },
-    PROMPT_VERSION: 'test',
-    PROFILE_DEFINITIONS: { version: 1 }
-  };
-  vm.createContext(runCtx);
-  vm.runInContext(source.slice(source.indexOf('async function runContentOperation('), source.indexOf('const { operationProvenance')), runCtx);
+  const runCtx = recovery({ records: [], create() { created++; return {}; }, async run() {} }, { aiSession: { run: fn => fn() }, PROFILE_DEFINITIONS: { version: 1 }, workspaceStorage: { assertWritable() {} } });
   await assert.rejects(runCtx.runContentOperation({ kind: 'continue', config: { providerId: 'chatgpt', model: '' } }), /No AI model is selected/);
   assert.equal(created, 0, 'No checkpoint is created when no AI model is selected');
 
   // resumeCheckpoint adopts the newly selected Settings model if an older checkpoint had a blank model.
-  const blankOp = { kind: 'continue', stage: 'plan', config: { providerId: 'chatgpt', model: '', reasoning: '' }, promptVersion: 'test', safeguardVersion: 'test', error: 'Invalid request.' };
+  const blankOp = { kind: 'continue', stage: 'plan', config: { providerId: 'chatgpt', model: '', reasoning: '' }, promptVersion: PROMPT_VERSION, safeguardVersion: SAFEGUARD_VERSION, error: 'Invalid request.' };
   let resumedModel = '';
-  const resumeCtx = { backgroundRun: null, aiSession, pendingRequests, notifyStopped: () => {}, state: { readerEditDraft: null, providerId: 'chatgpt', model: 'gpt-5', reasoning: 'medium' }, PROMPT_VERSION: 'test', SAFEGUARD_VERSION: 'test', pipeline: { records: [blankOp], busy: false, async run(o) { resumedModel = o.config.model; this.records = []; } }, readerGeneration: null, setReaderGeneration() {}, showOperationResult() {}, toast() {}, renderCheckpointRecovery() {}, revealRecovery() {}, failureInfo };
-  vm.createContext(resumeCtx);
-  vm.runInContext(source.slice(source.indexOf('async function resumeCheckpoint('), source.indexOf('function revealRecovery(')), resumeCtx);
+  const resumeCtx = recovery({ records: [blankOp], busy: false, async run(o) { resumedModel = o.config.model; this.records = []; } }, { aiSession, state: { providerId: 'chatgpt', model: 'gpt-5', reasoning: 'medium' } });
   await resumeCtx.resumeCheckpoint(blankOp);
   assert.equal(resumedModel, 'gpt-5', 'Resume adopts the selected model when a saved checkpoint had none');
 }

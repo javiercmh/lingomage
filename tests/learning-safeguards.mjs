@@ -1,18 +1,20 @@
 import appSource from './support/app-source.cjs';
-import * as prompts from '../js/prompts.js';
+import * as prompts from '../js/generation/prompts.js';
 const { PLAN_INSTRUCTIONS, NOTES_INSTRUCTIONS } = prompts;
 import { bindGeneration } from './support/controllers.mjs';
-import { failureInfo, recoverySummary, operationLabel, discardFailureMessage } from '../js/generation-errors.js';
-import { progressSummary } from '../js/generation-progress.js';
-import { pendingRequests } from '../js/generation-pipeline.js';
+import { failureInfo, recoverySummary, operationLabel, discardFailureMessage } from '../js/generation/generation-errors.js';
+import { progressSummary } from '../js/generation/generation-progress.js';
+import { pendingRequests } from '../js/generation/generation-pipeline.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { execFileSync } from 'node:child_process';
-import { validateProse, validateNotes, validateStory, validateExamples, validateScript, wordCount, sentenceCount, readingPlan, attachReadings, SAFEGUARD_VERSION } from '../js/learning-validation.js';
-import { createPipeline } from '../js/generation-pipeline.js';
-import { annotatedText, getCanonicalSelection, japaneseSegments } from '../js/reader-text.js';
-import {MEMORY_VERSION} from '../js/story-memory.js';
+import { validateProse, validateNotes, validateStory, validateExamples, validateScript, wordCount, sentenceCount, readingPlan, attachReadings, SAFEGUARD_VERSION } from '../js/generation/learning-validation.js';
+import { createPipeline } from '../js/generation/generation-pipeline.js';
+import { annotatedText, getCanonicalSelection, japaneseSegments } from '../js/reader/reader-text.js';
+import {MEMORY_VERSION} from '../js/generation/story-memory.js';
+const { loadFactory, deps } = await import('./support/factory-harness.mjs');
+const createCheckpointRecovery = await loadFactory('js/generation/checkpoint-recovery.js', 'createCheckpointRecovery');
 const tested = id => console.log(`SAFEGUARD ${id}`);
 const story = (language='de', length='short') => {
   const count=language === 'ja' ? 8 : 100;
@@ -188,9 +190,10 @@ from dev_server import Handler
 print(Handler.mock_readings(SimpleNamespace(server=SimpleNamespace(workspace=Path('.'))),json.load(sys.stdin)))`],{encoding:'utf8',input:JSON.stringify({spans:fixturePlan.spans})}));
 attachReadings(japaneseFixture.content,fixturePlan,fixtureReadings);
 // UI recovery must work for a fresh Create operation with no reader status.
-const boxes=new Map();const box=id=>{if(!boxes.has(id)){const b=element('section');b.hidden=true;b.dataset={};boxes.set(id,b);}return boxes.get(id);};
-const recovery={createProgressView(){return {querySelector(){return null;}};},pendingRequests,progressSummary,createProgressRoot(){return {};},paintProgress(){},failureInfo,recoverySummary,operationLabel,discardFailureMessage,LANGUAGES:{},appendFailureDetails(){},PROMPT_VERSION:'test',SAFEGUARD_VERSION:'test',pipeline:{records:[{kind:'create',stage:'readings'}],busy:true},readerGeneration:null,state:{readerId:null},$:box,document:{createElement:element},renderReaderGeneration(){},resumeCheckpoint(){},setScopeDisabled(){},creatingStory:false,resumedCreateCard:false,renderChapterRequest(){},paintChapterProgress(){},createChapterLoading:kind=>({kind,removed:false,remove(){this.removed=true;},querySelector:()=>({})})};
-vm.createContext(recovery);vm.runInContext(source.slice(source.indexOf('function applyGenerationLocks('),source.indexOf('async function resumeCheckpoint(')),recovery);recovery.renderCheckpointRecovery();
+const boxes=new Map();const box=id=>{if(!boxes.has(id)){const b=element('section');b.hidden=true;b.dataset={};b.after=()=>{};boxes.set(id,b);}return boxes.get(id);};
+const recovery={createProgressView(){return {querySelector(){return null;}};},pendingRequests,progressSummary,createProgressRoot(){return {};},paintProgress(){},failureInfo,recoverySummary,operationLabel,discardFailureMessage,LANGUAGES:{},appendFailureDetails(){},pipeline:{records:[{kind:'create',stage:'readings'}],busy:true},readerGeneration:null,state:{readerId:null},$:box,document:{createElement:element},renderReaderGeneration(){},resumeCheckpoint(){},setScopeDisabled(){},creatingStory:false,resumedCreateCard:false,renderChapterRequest(){},paintChapterProgress(){},createChapterLoading:kind=>({kind,removed:false,remove(){this.removed=true;},querySelector:()=>({append(){}}),classList:{add(){}}})};
+// The production recovery factory; runtime is the fixture itself, so recovery.pipeline and recovery.readerGeneration are the shared bindings.
+recovery.runtime=recovery;globalThis.document=recovery.document;Object.assign(recovery,createCheckpointRecovery(deps(recovery)));recovery.renderCheckpointRecovery();
 assert.equal(box('generation-status').textContent,'Adding kanji readings…');assert.equal(box('checkpoint-recovery-reader').hidden,true);
 assert.equal(box('loading-card').hidden,false,'a resumed Create shows the same progress card as a fresh one');assert.equal(box('story-form').hidden,true);
 recovery.pipeline.records[0]={kind:'continue',stage:'notes',target:{storyId:'story'}};recovery.state.readerId='story';recovery.readerGeneration={storyId:'story',phase:'ready'};
@@ -205,14 +208,16 @@ assert.equal(box('reader-pending-progress').hidden,true,'returning to the owning
 recovery.pipeline.busy=true;
 const heading={append(){}};recovery.state.activeChapterRequest={storyId:'story',loading:{querySelector:()=>heading,classList:{add(){}}}};recovery.renderCheckpointRecovery();assert.equal(heading.textContent,'Adding vocabulary notes…');assert.equal(box('checkpoint-recovery-reader').hidden,true);delete recovery.state.activeChapterRequest;
 
-recovery.pipeline.records[0]={kind:'create',stage:'notes',promptVersion:'test',safeguardVersion:'test'};
+recovery.pipeline.records[0]={kind:'create',stage:'notes',promptVersion:prompts.PROMPT_VERSION,safeguardVersion:SAFEGUARD_VERSION};
 
 recovery.pipeline.busy=false;
 recovery.pipeline.records[0].error='The AI included a vocabulary note for a word or phrase that does not appear in the chapter. Explicitly retry or discard this request.';
 recovery.renderCheckpointRecovery();
 assert.equal(box('checkpoint-recovery-create').children.at(-1).children[0].textContent,'Retry');
 assert.ok(box('checkpoint-recovery-create').children[0].textContent.includes('Story generation stopped during vocabulary notes'));
-assert.ok(!box('checkpoint-recovery-create').textContent.includes('Explicitly retry'));
+{ const panel=box('checkpoint-recovery-create').children, details=panel.filter(node=>node.className==='failure-details');
+  assert.ok(!panel.filter(node=>node.className!=='failure-details').some(node=>node.textContent.includes('Explicitly retry')),'visible recovery copy omits the raw instruction');
+  assert.equal(details.length,1);assert.ok(details[0].textContent.includes('Explicitly retry'),'Technical details keep the full diagnostic message'); }
 // An unchanged panel is not rebuilt: focus survives and an existing alert is not announced again.
 const renderedActions=box('checkpoint-recovery-create').children.at(-1);recovery.renderCheckpointRecovery();assert.equal(box('checkpoint-recovery-create').children.at(-1),renderedActions,'unchanged recovery panel was rebuilt');
 recovery.pipeline.records[0].stage='ready';recovery.renderCheckpointRecovery();

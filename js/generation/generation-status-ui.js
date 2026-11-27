@@ -1,11 +1,11 @@
 // Generation waiting screens: field locks, the stage checklist and segmented bar, time estimates and time left,
-// and opt-in ready notifications. Timing shown here is in memory only (js/generation-timing.js computes it).
+// and opt-in ready notifications. Timing shown here is in memory only (js/generation/generation-timing.js computes it).
 // The code is the former app.js section, moved verbatim; app.js calls createGenerationStatusUi where it used to be.
 import { progressSummary } from './generation-progress.js';
 import { remainingText, remainingTime, estimateGeneration, timingSamples } from './generation-timing.js';
-import { lightTaskConfig } from './light-model.js';
-import { hasNotificationPermission, requestNotificationPermission, notify } from './bridge.js';
-import { continueChapterNumber } from './story-model.js';
+import { lightTaskConfig } from '../core/light-model.js';
+import { hasNotificationPermission, requestNotificationPermission, notify } from '../bridge.js';
+import { continueChapterNumber } from '../core/story-model.js';
 
 export function createGenerationStatusUi({
   $, generationLive, state, trySaveSettings
@@ -81,7 +81,7 @@ export function createGenerationStatusUi({
     if (note) note.hidden = !generationLive() || Boolean(root.estimate && root.estimate.total < 60000);
   }
 
-  // Estimates (js/generation-timing.js): the sum of each step's median over similar earlier chapters on
+  // Estimates (js/generation/generation-timing.js): the sum of each step's median over similar earlier chapters on
   // this device, with the reasoning effort each flow actually sends.
   function estimateFor(plan) { return estimateGeneration(plan, timingSamples(state.stories)); }
   function operationPlan(op, contextRequests = 0) {

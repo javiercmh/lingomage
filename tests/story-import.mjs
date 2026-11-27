@@ -2,10 +2,10 @@ import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import {storyExportFile, importStoryFile, STORY_IMPORT_MAX_BYTES} from '../js/story-share.js';
-import {createStoryModel} from '../js/story-model.js';
-import {createWorkspaceStorage, validStories} from '../js/workspace-storage.js';
-import {markStoryActivity} from '../js/library-activity.js';
+import {storyExportFile, importStoryFile, STORY_IMPORT_MAX_BYTES} from '../js/screens/story-share.js';
+import {createStoryModel} from '../js/core/story-model.js';
+import {createWorkspaceStorage, validStories} from '../js/core/workspace-storage.js';
+import {markStoryActivity} from '../js/screens/library-activity.js';
 
 const {normalizeChapters} = createStoryModel({state:{}, readerStory:() => null});
 const version = {id:'v', title:'買い物', story:'買います。', storySegments:[{text:'買', reading:'か'}, {text:'います。'}], glossary:[{word:'買う', meaning:'buy', forms:['買います']}]};
@@ -72,7 +72,7 @@ console.log('PASS story import rejects non-LingoMage, newer, malformed and inval
 // Real app wiring: the Library handler, the normal stories save, cancellation and rollback.
 {
   const app = appSource();
-  const start = app.indexOf('// Library → Import story…'), end = app.indexOf('// end of js/share-dialog.js');
+  const start = app.indexOf('// Library → Import story…'), end = app.indexOf('// end of js/screens/share-dialog.js');
   assert.ok(start > 0 && end > start);
   const persistStories = app.slice(app.indexOf('function persistStories()'), app.indexOf('function persistReaderStory('));
   const setup = (saved = [story], {write = () => true} = {}) => {

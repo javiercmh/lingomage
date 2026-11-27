@@ -60,7 +60,7 @@ Interaction details are in [`DESIGN.md`](../../DESIGN.md); pipeline and storage 
 
 ## Implementation
 
-- Code: `js/app.js` (reader, help requests), `js/reader-text.js` (canonical text, glossary display), `js/learning-validation.js` (validation), `js/prompts.js` (notes prompt `NOTES_INSTRUCTIONS`, help prompts `helpInstructions`).
+- Code: `js/reader/help-cards.js`, `js/reader/reader-requests.js`, `js/reader/define-note.js` (reader, help requests), `js/reader/reader-text.js` (canonical text, glossary display), `js/generation/learning-validation.js` (validation), `js/generation/prompts.js` (notes prompt `NOTES_INSTRUCTIONS`, help prompts `helpInstructions`).
 - Provenance: saved help records passage offsets, source version, profile snapshot, model and prompt version; follow-ups add question, response and their own provenance; legacy JSON detail objects remain readable. Prompt or learning-behavior changes increment `PROMPT_VERSION`; copy and presentation changes do not; saved records never relabel.
 - Lookups of notes, explanations, follow-ups, examples and translations are recorded under [PED-005](PED-005-consultation-signals.md); recording changes no help content or prompt.
 

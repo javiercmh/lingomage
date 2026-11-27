@@ -5,8 +5,8 @@ recommendation. Other documents link here rather than restating it.
 
 Scoped terminology review, not a systematic review. Only abstracts and publisher
 or standards records were inspected; no research full text was read. Current
-implementation facts were checked against `js/learning-validation.js`,
-`js/reader-text.js`, `js/app.js` and `js/workspace-storage.js` at prompt version
+implementation facts were checked against `js/generation/learning-validation.js`,
+`js/reader/reader-text.js`, `js/app.js` and `js/core/workspace-storage.js` at prompt version
 `2026-10-14.21`.
 
 ## Research question
@@ -90,7 +90,7 @@ the reviewed L2 vocabulary-learning sources.
 
 These describe what the code does today. They are not claims about linguistic
 correctness or learning effect. Prompt text is `NOTES_INSTRUCTIONS` in
-`js/prompts.js`.
+`js/generation/prompts.js`.
 
 | Concept | Operational definition (as implemented) | Limitation, not settled |
 | --- | --- | --- |
@@ -114,7 +114,7 @@ This is a proposal for review. It does not change any UI copy or schema key.
 | Headword / lemma (canonical lookup form) | Schema key `word`; UI “Dictionary form: …” | Keep “Dictionary form”. The `word` key stays |
 | Contextual sense | Schema key `meaning` | Keep |
 | Attested form (surface form in the chapter) | Schema key `forms` | Keep |
-| Term (terminology-work sense) | `term` exists only as a legacy compatibility alias input, normalized to `word`; see `js/workspace-storage.js` | Do not use as a label |
+| Term (terminology-work sense) | `term` exists only as a legacy compatibility alias input, normalized to `word`; see `js/core/workspace-storage.js` | Do not use as a label |
 
 ## Recommendation
 
@@ -135,7 +135,7 @@ evidence (above). The product-copy choice is a terminology and usability
 judgment. It has no tested learning benefit and no learner comprehension test.
 
 **Storage.** Keep `word` as the schema key. The `term` and `text` aliases in
-[`workspace-storage.js`](../../js/workspace-storage.js) are temporary
+[`workspace-storage.js`](../../js/core/workspace-storage.js) are temporary
 compatibility inputs; their presence is no endorsement of either label.
 
 ## Limits and questions for future publication

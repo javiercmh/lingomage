@@ -1,6 +1,6 @@
 import { failureInfo } from './generation-errors.js';
 import { timingEntry } from './generation-timing.js';
-import { aiNotification } from './ai-notification.js';
+import { aiNotification } from '../core/ai-notification.js';
 import { decodePlan } from './story-generation.js';
 import { PLAN_INSTRUCTIONS, notesInstructions, READING_INSTRUCTIONS } from './prompts.js';
 import { parseContent, validateContentSize, validateProse, validateNotes, validateStory, validateExamples, readingPlan, attachReadings, attachReadingMap, validateReadings, readingSpansFor, notesParts, noteMinUnits, noteTargetUnits, mergeNoteParts, SAFEGUARD_VERSION } from './learning-validation.js';
@@ -85,7 +85,7 @@ export function stageModel(op, stage) {
 export function createPipeline({ records, persist, ai, apply, applyPartial = null, discarded = () => {}, changed = () => {}, onResend = () => {}, parallel = false, now = () => Date.now() }) {
   let busy = false;
   // Requests started by this page. A saved request from an earlier page completes when this page notices,
-  // so its timing is approximate (see js/generation-timing.js).
+  // so its timing is approximate (see js/generation/generation-timing.js).
   const startedHere = new WeakSet();
   // Appends one finished attempt to op.timings; the next checkpoint save keeps it. Cancellation records nothing.
   const track = (op, request, stage, part, outcome) => {
@@ -160,7 +160,7 @@ export function createPipeline({ records, persist, ai, apply, applyPartial = nul
     const content = {...validateProse(op.prose, op.language), glossary:notesSoFar(op), ...(segments ? {titleSegments:segments.titleSegments, storySegments:segments.storySegments} : {})};
     const first = !op.earlyApplied;
     mark('apply'); await applyPartial(op, content, {first});
-    if (first) { op.earlyApplied = true; op.openedAt = now(); save(); } // openedAt: time-to-read estimates (js/generation-timing.js)
+    if (first) { op.earlyApplied = true; op.openedAt = now(); save(); } // openedAt: time-to-read estimates (js/generation/generation-timing.js)
   }
   // Japanese notes and readings both need only the saved prose, so they run together. Each part keeps
   // its own request and validated content; a failed part never discards a finished one.

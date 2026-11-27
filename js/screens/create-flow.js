@@ -1,28 +1,27 @@
 // Create: generating a new story from the form, its cancel control, the saved-progress recovery panel and
 // saving the generated story to the Library.
 // The code is the former app.js section, moved verbatim except that bindings other app.js code reassigns are
-// read through accessors (currentPipeline(), currentReaderGeneration(), currentBackgroundRun(), setCreatingStory()).
+// read and written on the shared `runtime` object (runtime.pipeline, runtime.readerGeneration, …).
 // app.js calls createCreateFlow where the section used to be.
-import { ai } from './bridge.js';
-import { storyInstructions } from './prompts.js';
-import { lightModelChoice } from './light-model.js';
-import { parallelLimitFor } from './generation-pipeline.js';
-import { recoverySummary, failureInfo, appendFailureDetails, discardFailureMessage } from './generation-errors.js';
-import { saveBeforeAcknowledge } from './request-lifecycle.js';
+import { ai } from '../bridge.js';
+import { storyInstructions } from '../generation/prompts.js';
+import { lightModelChoice } from '../core/light-model.js';
+import { parallelLimitFor } from '../generation/generation-pipeline.js';
+import { recoverySummary, failureInfo, appendFailureDetails, discardFailureMessage } from '../generation/generation-errors.js';
+import { saveBeforeAcknowledge } from '../core/request-lifecycle.js';
 
 export function createCreateFlow({
-  $, LANGUAGES, PROFILE_DEFINITIONS, createProgressRoot, currentBackgroundRun, currentPipeline,
-  currentReaderGeneration, guideFor, noteParts, notifyStopped, openReader, persistReaderStory,
+  $, LANGUAGES, PROFILE_DEFINITIONS, createProgressRoot, guideFor, noteParts, notifyStopped, openReader, persistReaderStory,
   populateDifficulty, readingDescription, renderCheckpointRecovery, renderReaderGeneration, revealRecovery,
-  runContentOperation, setCreatingStory, setReaderGeneration, showOperationResult, showPendingRecovery,
+  runContentOperation, runtime, setReaderGeneration, showOperationResult, showPendingRecovery,
   showStorageErrors, state, stopBackgroundContext, storyInput, toast
 }) {
   async function generate(event) {
     event.preventDefault(); $('form-error').textContent = ''; $('create-error-details').textContent='';
-    if (state.checkpointBlocked || currentPipeline()?.records.length) { if (currentPipeline()?.records.length) showPendingRecovery(); else showStorageErrors(); return; }
+    if (state.checkpointBlocked || runtime.pipeline?.records.length) { if (runtime.pipeline?.records.length) showPendingRecovery(); else showStorageErrors(); return; }
     if (state.pendingReaderResult) { $('form-error').textContent = 'Save the completed reader response before generating another story.'; return; }
     if (state.pendingGeneration) { $('form-error').textContent = 'Finish saving the completed story before generating another.'; return; }
-    if (currentBackgroundRun()) await stopBackgroundContext();
+    if (runtime.backgroundRun) await stopBackgroundContext();
     if (state.requestId || state.readerEditBusy || state.readerHelpBusy) { $('form-error').textContent = 'Finish the current AI request before generating another story.'; return; }
     if (!ai.available) { $('form-error').textContent = 'Open App² → Settings → AI and connect a provider, then return here.'; return; }
     try {
@@ -44,29 +43,29 @@ export function createCreateFlow({
       const requestInput = storyInput();
       const requestProfile = JSON.parse(requestInput);
       $('story-form').hidden = true; $('loading-card').hidden = false; { const root = createProgressRoot(); root.hidden = true; delete root.dataset.signature; }
-      setCreatingStory(true); setReaderGeneration({storyId:null,phase:'working',message:'Writing your story…'});
+      runtime.creatingStory = true; setReaderGeneration({storyId:null,phase:'working',message:'Writing your story…'});
       $('generation-status').textContent = ai.developmentMock ? 'Using the offline development response.' : 'Weaving your ideas into a story.';
       const op = await runContentOperation({kind:'create', language:languageCode, input:requestProfile, profileVersion:PROFILE_DEFINITIONS.version, instructions:storyInstructions(LANGUAGES[languageCode],difficulty,guideFor(languageCode,difficulty)), config:{providerId:provider.id,model:model.id,reasoning:chosenEffort,light:lightModelChoice(state),notesParts:noteParts(),parallelLimit:parallelLimitFor(state.concurrentRequests),noteDensity:state.noteDensity,progressive:true,retryBroken:state.retryBrokenReplies !== false}});
       showOperationResult(op);
     } catch (error) {
       if (error.code === 'generation_cancelled') { setReaderGeneration(null); toast('Generation cancelled'); return; }
       notifyStopped('create');
-      if (state.requestId && !state.pendingGeneration && !currentPipeline()?.records.length) {
+      if (state.requestId && !state.pendingGeneration && !runtime.pipeline?.records.length) {
         try { await ai.acknowledge(state.requestId); state.requestId = null; state.pendingStoryRequestId = null; }
         catch (releaseError) { error.message = `${error.message} The AI result still needs release: ${releaseError.message}`; }
       }
-      const op = currentPipeline()?.records[0];
+      const op = runtime.pipeline?.records[0];
       $('form-error').textContent = op ? '' : recoverySummary({kind:'create',stage:'setup',error:error.message,failure:failureInfo(error,'setup')});
       if (!op) appendFailureDetails($('create-error-details'), failureInfo(error,'setup'));
       else requestAnimationFrame(()=>revealRecovery(op));
       // A deliberate cancel leaves no status; a failure with saved progress points to its recovery.
-      if (currentReaderGeneration()?.storyId == null) setReaderGeneration(op ? {storyId:null,phase:'error',message:op.discardRequested ? discardFailureMessage(op) : 'Story generation stopped.'} : null);
-    } finally { setCreatingStory(false); $('loading-card').hidden = true; $('story-form').hidden = false; renderCheckpointRecovery(); renderReaderGeneration(); }
+      if (runtime.readerGeneration?.storyId == null) setReaderGeneration(op ? {storyId:null,phase:'error',message:op.discardRequested ? discardFailureMessage(op) : 'Story generation stopped.'} : null);
+    } finally { runtime.creatingStory = false; $('loading-card').hidden = true; $('story-form').hidden = false; renderCheckpointRecovery(); renderReaderGeneration(); }
   }
   $('story-form').addEventListener('submit', generate);
   $('language').addEventListener('change', () => populateDifficulty());
   $('difficulty').addEventListener('change', () => { $('difficulty-description').textContent = readingDescription($('language').value,$('difficulty').value); });
-  $('cancel-generation').addEventListener('click', async () => { try { await currentPipeline().cancel(); } catch (error) { toast(error.message); } });
+  $('cancel-generation').addEventListener('click', async () => { try { await runtime.pipeline.cancel(); } catch (error) { toast(error.message); } });
 
   function renderRecoveryPanel(container, pending, savedLabel) {
     container.textContent = ''; container.hidden = !pending;

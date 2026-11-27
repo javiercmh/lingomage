@@ -1,10 +1,6 @@
-import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import vm from 'node:vm';
-import { lightTaskConfig } from '../js/light-model.js';
-import { beginMemoryRebuild, finishMemoryRebuild, createStoryMemory } from '../js/story-memory.js';
-import { failureInfo } from '../js/generation-errors.js';
+import { beginMemoryRebuild, finishMemoryRebuild, createStoryMemory } from '../js/generation/story-memory.js';
 
 const fixture = () => ({ id: 's', title: 'Saved story', language: 'de', promptVersion: 'original', activePathId: 'main',
   chapters: [{ id: 'c1', help: [{ text: 'Kept explanation' }], versions: [{ id: 'v1', title: 'First', story: 'Mia waits.', glossary: [{ word: 'waits' }] }] },
@@ -28,8 +24,8 @@ const json = value => JSON.parse(JSON.stringify(value));
   assert.deepEqual(story.chapters, before.chapters); assert.equal(story.promptVersion, before.promptVersion);
 }
 
-const source = appSource();
-const code = source.slice(source.indexOf('let memoryRebuildStory = null;'), source.indexOf("$('reader-actions-toggle').addEventListener('click', toggleReaderActions);"));
+const { loadFactory, deps, bridge } = await import('./support/factory-harness.mjs');
+const createStoryRebuild = await loadFactory('js/reader/story-rebuild.js', 'createStoryRebuild');
 function harness(story = fixture()) {
   const elements = new Map();
   const node = () => ({ hidden: false, open: false, children: [], handlers: {}, textContent: '',
@@ -38,15 +34,15 @@ function harness(story = fixture()) {
     close() { this.open = false; }, showModal() { this.open = true; }, focus() {}, remove() {} });
   const calls = [], state = { stories: [story], readerId: story.id, providerId: 'mock', model: 'mock', models: [{ id: 'mock' }] };
   let disk = json(story), summaries = 0;
-  const ctx = { state, lightTaskConfig, beginMemoryRebuild, finishMemoryRebuild, document: { createElement: node },
+  const ctx = { state, document: { createElement: node },
     $: id => { if (!elements.has(id)) elements.set(id, node()); return elements.get(id); },
     readerStory: () => story, selectedPath: s => s.paths[0], pendingDeletionBlocked: () => Boolean(state.readerEditBusy || state.pendingReaderResult || state.pendingReaderRequestId),
     closeReaderActions() {}, renderChapterRequest() {}, renderReaderActions() {}, renderReaderGeneration() {},
     createHelpLoading: node, toast: message => calls.push(message), ai: { available: true },
     aiSession: { async run(fn) { calls.push('session'); return fn(); } }, workspaceStorage: { assertWritable() {} },
-    async stopBackgroundContext() { calls.push('stop-background'); }, async releaseSavedInference() { if (ctx.releaseError) throw ctx.releaseError; }, async releaseInvalidReaderResponse() {},
+    async stopBackgroundContext() { calls.push('stop-background'); }, async releaseSavedInference() { if (ctx.releaseError) throw ctx.releaseError; }, async releaseInvalidReaderResponse() { if (ctx.releaseInvalid) await ctx.releaseInvalid(); },
     persistReaderStory(s) { if (ctx.failSave) throw Error('disk'); disk = json(s); calls.push('save'); },
-    setReaderGeneration(status) { ctx.status = status; }, failureInfo, appendFailureDetails() {} };
+    setReaderGeneration(status) { ctx.status = status; } };
   const memory = createStoryMemory({ state, promptVersion: 'test', normalizeChapters: s => s.chapters,
     async readerAi(kind, input, instructions, panel, config) {
       assert.equal(kind, 'summary'); assert.ok(config.signal); summaries++;
@@ -59,7 +55,10 @@ function harness(story = fixture()) {
       state.pendingReaderResult = null;
     } });
   ctx.prepareStoryMemory = memory.prepareStoryMemory;
-  vm.createContext(ctx); vm.runInContext(code, ctx);
+  // The production factory; ctx stays live so tests can flip failures on it, and runtime holds app.js's shared bindings.
+  ctx.runtime = { pipeline: null, readerGeneration: null, backgroundRun: null };
+  bridge.ai.available = true; globalThis.document = ctx.document;
+  Object.assign(ctx, createStoryRebuild(deps(ctx)));
   return { ctx, story, state, calls, disk: () => disk, summaries: () => summaries };
 }
 {
@@ -124,7 +123,7 @@ const assertHostText = (text, suffix = '') => {
 }
 { // A request whose release failed keeps its cleanup status, now with the bounded, redacted reason.
   const h = harness(); h.ctx.failAt = 1; h.ctx.failWith = hostError('response_too_large');
-  h.ctx.releaseInvalidReaderResponse = async () => { h.state.pendingReaderRequestId = 'held'; throw Error('Cannot release'); };
+  h.ctx.releaseInvalid = async () => { h.state.pendingReaderRequestId = 'held'; throw Error('Cannot release'); };
   await h.ctx.runMemoryRebuild(h.story);
   assert.equal(h.ctx.status.phase, 'cleanup'); assertHostText(h.ctx.status.message);
 }

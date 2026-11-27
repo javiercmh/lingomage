@@ -1,10 +1,9 @@
-const appSource = require('./support/app-source.cjs');
-const vm = require('node:vm'), assert = require('node:assert/strict');
-const source = appSource();
-const section = source.slice(source.indexOf('function notesProgressMessage('), source.indexOf('function initializePipeline('));
+const assert = require('node:assert/strict');
 
 (async () => {
-  const { continuePrefixEntries, continueChapterNumber, continueResultPathId, pathLabel } = await import('../js/story-model.js');
+  const { loadFactory, deps } = await import('./support/factory-harness.mjs');
+  const createGenerationResults = await loadFactory('js/generation/generation-results.js', 'createGenerationResults');
+  const { continuePrefixEntries, continueChapterNumber, continueResultPathId, pathLabel } = await import('../js/core/story-model.js');
 
   function makeStory() {
     return {
@@ -27,6 +26,7 @@ const section = source.slice(source.indexOf('function notesProgressMessage('), s
       if (!elements.has(id)) elements.set(id, { id, hidden: id === 'word-note-popover' ? !noteOpen : id === 'selection-toolbar' ? !selectionOpen : false, open: id === 'reader-dialog' ? open : id === 'share-dialog' ? modalOpen : false, scrollIntoView() { calls.push(`scroll:${id}`); } });
       return elements.get(id);
     };
+    const runtime = { pipeline: null, readerGeneration: null, backgroundRun: null };
     const loading = { openReadyButton: { hidden: true, textContent: '' }, onOpenReady: null };
     const context = {
       calls, panel, focused, toasts: [], story,
@@ -55,17 +55,17 @@ const section = source.slice(source.indexOf('function notesProgressMessage('), s
       ensureReaderOpen: async s => { calls.push(`open:${s.id}`); },
       queueBackgroundContext: (storyId, pathId) => calls.push(`background:${storyId}:${pathId}`),
       setReaderGeneration(v) {
-        vm.runInContext(`readerGeneration = ${JSON.stringify(v)};`, context);
+        runtime.readerGeneration = v == null ? null : JSON.parse(JSON.stringify(v));
         calls.push(`status:${v?.phase || null}`);
       },
       toast: m => context.toasts.push(m)
     };
     context.document.activeElement = focused;
-    vm.createContext(context);
-    vm.runInContext('let readerGeneration = null;', context);
-    vm.runInContext(section, context);
-    const generation = value => vm.runInContext(`readerGeneration = ${JSON.stringify(value)};`, context);
-    const status = () => JSON.parse(vm.runInContext('JSON.stringify(readerGeneration)', context));
+    globalThis.document = context.document;
+    // The production factory; runtime holds the shared bindings (pipeline, status) app.js would pass.
+    Object.assign(context, createGenerationResults(deps({ ...context, runtime })));
+    const generation = value => { runtime.readerGeneration = JSON.parse(JSON.stringify(value)); };
+    const status = () => JSON.parse(JSON.stringify(runtime.readerGeneration));
     return { context, calls, panel, focused, edit: getEl('reader-edit-panel'), loading, generation, status, story };
   }
 

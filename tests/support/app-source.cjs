@@ -4,8 +4,13 @@
 const fs = require('node:fs'), path = require('node:path');
 const root = path.join(__dirname, '../..');
 // app.js comes last: some tests evaluate from a marker to the end of app.js.
-const MODULES = ['js/reader-view.js', 'js/create-flow.js', 'js/generation-status-ui.js', 'js/reader-help.js', 'js/language-settings.js', 'js/library-view.js', 'js/reader-player-ui.js', 'js/share-dialog.js', 'js/stats-view.js'];
+const MODULES = ['js/reader/reader-view.js', 'js/screens/create-flow.js', 'js/generation/generation-status-ui.js', 'js/reader/reader-selection.js', 'js/reader/reader-listen.js', 'js/reader/help-cards.js', 'js/reader/reader-requests.js', 'js/reader/define-note.js', 'js/screens/language-settings.js', 'js/screens/library-view.js', 'js/reader/reader-player-ui.js', 'js/screens/share-dialog.js', 'js/screens/stats-view.js',
+  'js/generation/generation-bar.js', 'js/generation/background-context.js', 'js/tracking/learner-tracking.js', 'js/core/settings-controls.js', 'js/generation/checkpoint-recovery.js', 'js/generation/generation-results.js', 'js/screens/library-selection.js', 'js/reader/story-rebuild.js', 'js/reader/reader-controls.js', 'js/reader/continue-flow.js', 'js/generation/model-settings.js'];
 const APP_SOURCES = [...MODULES, 'js/app.js'];
+// Modules whose text some tests still slice or match (checked by removing each module and running the tests).
+// Keep their marker functions together and in order; migrate those tests to factory-harness.mjs before
+// restructuring them. Every other module is included only for whole-source invariants and may change freely.
+const MODULES_SLICED = ['js/reader/reader-view.js', 'js/screens/create-flow.js', 'js/reader/reader-selection.js', 'js/reader/reader-listen.js', 'js/reader/help-cards.js', 'js/reader/reader-requests.js', 'js/reader/define-note.js', 'js/screens/library-view.js', 'js/screens/share-dialog.js', 'js/screens/stats-view.js', 'js/generation/generation-bar.js', 'js/generation/checkpoint-recovery.js', 'js/screens/library-selection.js', 'js/reader/reader-controls.js', 'js/reader/continue-flow.js', 'js/generation/model-settings.js'];
 function appSource() {
   const read = file => fs.readFileSync(path.join(root, file), 'utf8');
   // A module is reduced to the former app.js section: its imports, the factory's opening and returned
@@ -23,3 +28,4 @@ function appSource() {
 }
 module.exports = appSource;
 module.exports.APP_SOURCES = APP_SOURCES;
+module.exports.MODULES_SLICED = MODULES_SLICED;

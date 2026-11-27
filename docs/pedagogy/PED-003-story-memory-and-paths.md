@@ -42,7 +42,7 @@ Legacy stories derive paths lazily from version-source and predecessor links (sa
 
 ## Implementation and tests
 
-`js/story-model.js`, `js/story-memory.js`, `js/app.js`. Tests: `tests/story-memory-regression.cjs` (budgets, change merging with code-assigned ids and checked links, knowledge and beliefs, target-sized candidates with the kept set, compaction that never blocks, cache keys by memory prompt version, compaction coverage, name and length checks, source excerpts, retry without regenerating summaries), `tests/reader-management-regression.cjs`, `tests/memory-rebuild.mjs` (rebuild rollback, captured lineage, cancellation, reload/resume, no request for a tiny gain, arc budget). Mock output cannot establish narrative accuracy, language quality or pedagogical value.
+`js/core/story-model.js`, `js/generation/story-memory.js`, `js/generation/background-context.js`, `js/reader/continue-flow.js`, `js/reader/story-rebuild.js`. Tests: `tests/story-memory-regression.cjs` (budgets, change merging with code-assigned ids and checked links, knowledge and beliefs, target-sized candidates with the kept set, compaction that never blocks, cache keys by memory prompt version, compaction coverage, name and length checks, source excerpts, retry without regenerating summaries), `tests/reader-management-regression.cjs`, `tests/memory-rebuild.mjs` (rebuild rollback, captured lineage, cancellation, reload/resume, no request for a tiny gain, arc budget). Mock output cannot establish narrative accuracy, language quality or pedagogical value.
 
 ## Open experiment
 

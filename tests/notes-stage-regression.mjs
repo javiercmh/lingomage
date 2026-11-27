@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import {createPipeline} from '../js/generation-pipeline.js';
-import {validateProse,validateNotes} from '../js/learning-validation.js';
-import {notesInstructions,NOTE_DENSITIES} from '../js/prompts.js';
+import {createPipeline} from '../js/generation/generation-pipeline.js';
+import {validateProse,validateNotes} from '../js/generation/learning-validation.js';
+import {notesInstructions,NOTE_DENSITIES} from '../js/generation/prompts.js';
 const prose={title:'Am Bahnhof',story:'Mia kauft Brot. Mia geht zum Bahnhof.'};
 const glossary=[{word:'kaufen',meaning:'buy; kauft is singular present',forms:['kauft']},{word:'Brot',meaning:'bread',forms:['Brot']},{word:'Bahnhof',meaning:'railway station',forms:['Bahnhof']}];
 assert.deepEqual(validateProse({...prose,glossary:[{forms:['absent']}]},'de'),prose);

@@ -44,4 +44,6 @@ Then open [localhost:8888](http://localhost:8888). Your test stories and setting
 python3 scripts/check.py
 ```
 
+Code lives in `js/`: `app.js` starts and wires the app, `bridge.js` talks to App², and the modules are grouped in `core/`, `generation/`, `reader/`, `screens/` and `tracking/` ([architecture overview](docs/architecture/overview.md#modules)).
+
 Contributors and coding agents start with [AGENTS.md](AGENTS.md). See also the [pedagogical decisions](docs/pedagogy/README.md).

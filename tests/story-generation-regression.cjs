@@ -1,6 +1,6 @@
 const readAppSource = require('./support/app-source.cjs');
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
-const c = {...require('../js/story-generation.js'),...require('../js/reader-text.js')};
+const c = {...require('../js/generation/story-generation.js'),...require('../js/reader/reader-text.js')};
 const valid = JSON.stringify({ vocabulary: [{word:'Markt',meaning:'market'}], grammar: [], guidance: 'Clear context.' });
 assert.equal(c.decodePlan(valid).vocabulary.length, 1);
 assert.throws(()=>c.decodePlan(valid,'ru'),/script/);
@@ -11,7 +11,7 @@ assert.throws(() => c.decodePlan(JSON.stringify({vocabulary:Array(6).fill({word:
 assert.throws(() => c.decodePlan(JSON.stringify({vocabulary:[],grammar:Array(3).fill({focus:'a',explanation:'a'}),guidance:''})));
 const story={title:'A market',story:'A Markt. '+'word '.repeat(300),glossary:[{word:'Markt',meaning:'market',forms:['Markt']}]};
 // Equivalent script/form checks exercise the validator used by the live pipeline.
-const {validateStory}=require('../js/learning-validation.js');
+const {validateStory}=require('../js/generation/learning-validation.js');
 validateStory(story,'de');
 assert.throws(()=>validateStory({...story,story:'Marktplatz.'},'de'));
 assert.deepEqual(validateStory({...story,glossary:[{word:'Markt',meaning:'market',forms:['missing']}]},'de').glossary[0].forms,['Markt'], 'production repairs unattested forms from an attested headword');

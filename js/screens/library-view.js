@@ -1,6 +1,6 @@
 // Library: story cards, the hero, sort, Story Actions popover, long-press selection and deletion.
 // The code is the former app.js section, moved verbatim; app.js calls createLibraryView where it used to be.
-// Ordering and date labels are js/library-activity.js.
+// Ordering and date labels are js/screens/library-activity.js.
 import { dateSegments, describeDates, planLibrary } from './library-activity.js';
 
 export function createLibraryView({
@@ -83,7 +83,7 @@ export function createLibraryView({
     card.addEventListener('contextmenu', event => { if (origin || completed) event.preventDefault(); clear(); });
     return clear;
   }
-  // Library: one hero (the latest saved activity) and every other story once below it, in the session-only sort (js/library-activity.js). A result saved while a selection or Actions popover is open re-renders afterwards.
+  // Library: one hero (the latest saved activity) and every other story once below it, in the session-only sort (js/screens/library-activity.js). A result saved while a selection or Actions popover is open re-renders afterwards.
   function libraryChanged() {
     if (!$('view-library').classList.contains('active')) { state.libraryStale = false; return; }
     if (state.storySelectionMode || state.storyMenu || state.shareDialog) { state.libraryStale = true; return; }

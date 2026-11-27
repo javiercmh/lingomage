@@ -1,8 +1,8 @@
 // Reader: the sentence-level listening player (floating controls, spoken-sentence highlight, Follow, rate).
 // The code is the former app.js section, moved verbatim; app.js calls createReaderPlayerUi where it used to be.
-// Playback itself is js/reader-player.js.
+// Playback itself is js/reader/reader-player.js.
 import { speechUnits, createReaderPlayer, canonicalRange } from './reader-player.js';
-import { speech } from './bridge.js';
+import { speech } from '../bridge.js';
 
 export function createReaderPlayerUi({
   $, SPEECH_LANGUAGES, clearExplanationSelection, closeWordNote, readerPanel, state, stopSpeech, toast,

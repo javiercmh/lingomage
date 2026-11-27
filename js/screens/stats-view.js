@@ -1,8 +1,8 @@
 // Profile → Stats: time totals from data/usage.json and "Most looked up" (PED-005) with its detail sheet.
 // The code is the former app.js section, moved verbatim; app.js calls createStatsView where it used to be.
-import { summarize, hasUsage, ACTIVITY_LABELS, formatDuration, RANGES } from './usage-stats.js';
-import { speech } from './bridge.js';
-import { prepareSpeechOptions } from './reader-speech.js';
+import { summarize, hasUsage, ACTIVITY_LABELS, formatDuration, RANGES } from '../tracking/usage-stats.js';
+import { speech } from '../bridge.js';
+import { prepareSpeechOptions } from '../reader/reader-speech.js';
 
 export function createStatsView({
   $, LANGUAGES, SPEECH_LANGUAGES, signals, state, toast, usage

@@ -1,12 +1,14 @@
 // Reader → Share: the share dialog (notes switch, row summaries, download/send/copy actions) and Library → Import story.
-// The code is the former app.js section, moved verbatim; app.js calls createShareDialog where it used to be.
-import { storyExportFile, downloadStoryFile, shareStoryFile, chapterShareText, storyShareText, copyText, shareText, STORY_IMPORT_MAX_BYTES, importStoryFile } from './story-share.js';
-import { save, isNative, share } from './bridge.js';
+// The code is the former app.js section, moved verbatim, plus openShareDialog (formerly in js/reader-help.js) at the end;
+// app.js calls createShareDialog where the section used to be.
+import { storyExportFile, downloadStoryFile, shareStoryFile, chapterShareText, storyShareText, copyText, shareText, STORY_IMPORT_MAX_BYTES, importStoryFile, shareTargets } from './story-share.js';
+import { pathLabel } from '../core/story-model.js';
+import { save, isNative, share } from '../bridge.js';
 import { markStoryActivity } from './library-activity.js';
 
 export function createShareDialog({
   $, activeVersion, libraryChanged, normalizeChapters, pathChapters, persistStories, readJson, renderLibrary,
-  state, toast, trySaveSettings, workspaceStorage
+  selectedPath, state, toast, trySaveSettings, workspaceStorage
 }) {
   // Row summaries state which text each row holds; the notes switch is shown once, above the rows.
   function updateShareSummaries() {
@@ -106,7 +108,31 @@ export function createShareDialog({
       toast(error.userMessage || (['store_invalid', 'write_failed'].includes(error.code) ? error.message : 'Could not import the story. Your stories are unchanged.'));
     } finally { state.importingStory = false; $('import-story').disabled = false; input.value = ''; $('import-story').focus({preventScroll:true}); }
   });
+  function openShareDialog(story, {chapterIndex = null, trigger}) {
+    const saved = workspaceStorage.entries.get('data/stories.json')?.value.find(item => item.id === story.id);
+    if (!saved) { toast('Could not share the story.'); return; }
+    const snapshot = JSON.parse(JSON.stringify(saved));
+    const modelStory = JSON.parse(JSON.stringify(snapshot));
+    const chapter = chapterIndex === null ? null : pathChapters(modelStory)[chapterIndex];
+    state.shareDialog = {story:snapshot, modelStory, chapter, chapterIndex, trigger, id:story.id};
+    const targets = shareTargets({save, share, isNative});
+    $('share-title').textContent = snapshot.title || 'Untitled story';
+    $('share-send-file').hidden = !targets.shareFile; $('share-download').hidden = !targets.download;
+    // The first available file action is the primary one (Share in App², Save backup otherwise): only its icon is accent-tinted.
+    const primary = targets.shareFile ? $('share-send-file') : $('share-download');
+    for (const button of [$('share-send-file'), $('share-download')]) button.querySelector('.share-row-icon').classList.toggle('small-btn-strong', button === primary);
+    $('share-chapter-send').hidden = $('share-story-send').hidden = !targets.shareText;
+    $('share-chapter-row').hidden = !chapter;
+    const name = chapter ? `Chapter ${chapterIndex + 1}` : '';
+    $('share-chapter-name').textContent = name;
+    state.shareDialog.chapterTitle = chapter ? activeVersion(chapter, modelStory).title || '' : '';
+    state.shareDialog.storyline = modelStory.paths.length > 1 ? pathLabel(modelStory, selectedPath(modelStory)) : '';
+    $('share-chapter-copy').setAttribute('aria-label', `Copy ${name} text`); $('share-chapter-send').setAttribute('aria-label', `Share ${name} text`);
+    $('share-story-copy').setAttribute('aria-label', 'Copy whole story text'); $('share-story-send').setAttribute('aria-label', 'Share whole story text');
+    $('share-notes').checked = state.shareVocabularyNotes === true; $('share-live').textContent = ''; resetCopyLabels(); updateShareSummaries();
+    $('share-dialog').showModal(); primary.focus();
+  }
   return {
-    resetCopyLabels, updateShareSummaries
+    openShareDialog
   };
 }

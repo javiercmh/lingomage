@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Dependency-free test entry point. Run from any directory with Python 3.12+ and Node 22."""
 import json
+import posixpath
 import re
 import subprocess
 import sys
@@ -50,21 +51,23 @@ def main():
     for name in files:
         if name.endswith(('.js', '.css', '.html')):
             assert name in update['managedFiles'], 'Code file would not ship in updates: ' + name
-    for path in sorted((ROOT / 'js').glob('*.js')):
-        assert 'js/' + path.name in files, 'Module is not in the manifest: ' + path.name
+    for path in sorted((ROOT / 'js').rglob('*.js')):
+        module = path.relative_to(ROOT).as_posix()
+        assert module in files, 'Module is not in the manifest: ' + module
     for name in files:
         if name.startswith('js/') and name.endswith('.js'):
-            for imported in re.findall(r"from\s+'\./([^']+)'", (ROOT / name).read_text(encoding='utf-8')):
-                assert 'js/' + imported in files, name + ' imports a module outside the manifest: ' + imported
+            for imported in re.findall(r"from\s+'(\.\.?/[^']+)'", (ROOT / name).read_text(encoding='utf-8')):
+                target = posixpath.normpath(posixpath.join(posixpath.dirname(name), imported))
+                assert target in files, name + ' imports a module outside the manifest: ' + imported
     for name in ['data/stories.json', 'data/settings.json', 'data/generation-checkpoints.json', 'data/usage.json', 'data/learning-signals.json']:
         assert name in update['seedFiles']
     assert update['seedDefaults']['data/generation-checkpoints.json'] == []
     assert update['seedDefaults']['data/usage.json'] == {'version': 1, 'days': {}}
     assert update['seedDefaults']['data/learning-signals.json'] == {'version': 1, 'languages': {}}
     assert json.loads((ROOT / 'data/learning-signals.json').read_text(encoding='utf-8')) == {'version': 1, 'languages': {}}, 'Learner lookup history must not be committed'
-    for name in ['js/usage-stats.js', 'js/usage-tracker.js', 'js/consultation-signals.js', 'js/reading-exposure.js']:
+    for name in ['js/tracking/usage-stats.js', 'js/tracking/usage-tracker.js', 'js/tracking/consultation-signals.js', 'js/tracking/reading-exposure.js']:
         assert name in update['managedFiles']
-    for name in ['js/learning-validation.js', 'js/generation-pipeline.js', 'data/language-safeguards.json']:
+    for name in ['js/generation/learning-validation.js', 'js/generation/generation-pipeline.js', 'data/language-safeguards.json']:
         assert name in update['managedFiles']
     print('PASS safeguard coverage and manifest ownership')
     return subprocess.call([sys.executable, '-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_*.py'], cwd=ROOT)

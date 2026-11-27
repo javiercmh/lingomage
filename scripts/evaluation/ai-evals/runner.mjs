@@ -1,8 +1,8 @@
 // Live orchestration (only reachable through --live). Reuses the production stage pipeline for generation and the
 // gateway for every request. Nothing is retried, rerolled or replaced unless the operator passes --retry.
 import fs from 'node:fs';
-import {createPipeline} from '../../../js/generation-pipeline.js';
-import {SAFEGUARD_VERSION} from '../../../js/learning-validation.js';
+import {createPipeline} from '../../../js/generation/generation-pipeline.js';
+import {SAFEGUARD_VERSION} from '../../../js/generation/learning-validation.js';
 import {validateModelSettings} from './bridge.mjs';
 import {createGateway} from './gateway.mjs';
 import {BudgetExhausted, createLedger, FatalEvalError} from './ledger.mjs';

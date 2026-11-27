@@ -1,10 +1,10 @@
 // Shared harness wiring imports production modules; callbacks remain replaceable
 // by a test without re-evaluating fragments of their implementation.
-import { createStoryModel } from '../../js/story-model.js';
-import { createStoryMemory } from '../../js/story-memory.js';
-import { createGenerationController } from '../../js/generation-controller.js';
-import { createReaderPanels } from '../../js/reader-panels.js';
-import { lightModelChoice, lightTaskConfig } from '../../js/light-model.js';
+import { createStoryModel } from '../../js/core/story-model.js';
+import { createStoryMemory } from '../../js/generation/story-memory.js';
+import { createGenerationController } from '../../js/generation/generation-controller.js';
+import { createReaderPanels } from '../../js/reader/reader-panels.js';
+import { lightModelChoice, lightTaskConfig } from '../../js/core/light-model.js';
 export function bindStory(context) {
   Object.assign(context, createStoryModel({state:context.state, readerStory:(...args)=>context.readerStory(...args)}));
   Object.assign(context, createStoryMemory({state:context.state, discardResponse:(...args)=>context.discardResponse?.(...args), normalizeChapters:(...args)=>context.normalizeChapters(...args), readerAi:(...args)=>context.readerAi(...args), savePendingReaderResult:(...args)=>context.savePendingReaderResult(...args)}));

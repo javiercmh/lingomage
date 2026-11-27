@@ -21,9 +21,10 @@ function build(extra = {}) {
     document: {body, querySelectorAll: () => dialog.open ? [dialog] : [], querySelector: () => null}, toast(message) { context.toasts.push(message); },
     timers: [], setTimeout(fn, ms) { context.timers.push({fn, ms}); return context.timers.length; }, clearTimeout(id) { if (context.timers[id - 1]) context.timers[id - 1].cleared = true; }, ...extra};
   Object.defineProperty(context, 'bodyClass', {get: () => body.classList.contains('x')});
+  context.runtime = context; context.maybeStartBackgroundContext ??= () => {}; // app.js's shared runtime bindings are plain context properties here
   vm.createContext(context);
   // The status core, then the View result handler; both are the production source.
-  vm.runInContext(source.slice(source.indexOf('let readerGeneration'), source.indexOf("for (const id of ['reader-generation-dismiss'")), context);
+  vm.runInContext(source.slice(source.indexOf('function setReaderGeneration('), source.indexOf("for (const id of ['reader-generation-dismiss'")), context);
   vm.runInContext(source.slice(source.indexOf('function closeReader('), source.indexOf("for (const id of ['reader-generation-action'")), context);
   return {context, element, classes};
 }

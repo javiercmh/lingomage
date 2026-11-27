@@ -6,10 +6,10 @@ import { createTreeDom } from './support/tree-dom.mjs';
 const dom = createTreeDom();
 Object.assign(globalThis, dom.globals);
 const { document, window, dispatch } = dom;
-const { annotatedText, applyExplainedMarks } = await import('../js/reader-text.js');
-const { createReaderActivation, glossaryForTrigger, indexGlossaryTriggers, normalizeReaderControls } = await import('../js/reader-activation.js');
-const { createSelectionMenuRouter } = await import('../js/selection-menu.js');
-const { markParagraphGaps } = await import('../js/paragraph-gaps.js');
+const { annotatedText, applyExplainedMarks } = await import('../js/reader/reader-text.js');
+const { createReaderActivation, glossaryForTrigger, indexGlossaryTriggers, normalizeReaderControls } = await import('../js/reader/reader-activation.js');
+const { createSelectionMenuRouter } = await import('../js/core/selection-menu.js');
+const { markParagraphGaps } = await import('../js/reader/paragraph-gaps.js');
 
 const make = (tag, attrs = {}, parent = document.body) => {
   const element = document.createElement(tag);
@@ -214,7 +214,7 @@ const BREAD = [{ word: 'Brot', meaning: 'bread', forms: ['Brot'] }];
   // The source chooser is gone; the note carries the only secondary action.
   const read = path => fs.readFileSync(new URL(path, import.meta.url), 'utf8');
   const css = read('../css/style.css'), html = read('../index.html'), app = appSource();
-  assert.doesNotMatch(css + html + read('../js/reader-activation.js') + app, /source-chooser|sourceChooser|createSourceChooser/, 'obsolete chooser markup, styles and wiring are removed');
+  assert.doesNotMatch(css + html + read('../js/reader/reader-activation.js') + app, /source-chooser|sourceChooser|createSourceChooser/, 'obsolete chooser markup, styles and wiring are removed');
   assert.match(css, /\.word-note-view \{[^}]*width: 100%[^}]*min-height: 44px/, 'View saved explanation is a full-width 44px target');
   assert.match(css, /\.word-note-view \{[^}]*border-top: 1px solid/, 'a subtle divider separates it from the meanings');
   assert.match(css, /\.word-note-view:hover, \.word-note-view:focus-visible/, 'visible keyboard focus');

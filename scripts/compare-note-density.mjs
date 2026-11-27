@@ -1,14 +1,14 @@
 // Development-only comparison of vocabulary-note density prompts (Settings → Vocabulary notes: Fewer / Standard /
-// More, built by notesInstructions in js/prompts.js) across models. Uses production splitting, validation and merging on frozen corpus chapters. Offline it
+// More, built by notesInstructions in js/generation/prompts.js) across models. Uses production splitting, validation and merging on frozen corpus chapters. Offline it
 // prints the plan; --live runs inference through local `dev_server.py --chatgpt` bridges (one per concurrent
 // request). Nothing is retried; every raw reply is saved before its request is acknowledged. Output goes to a
 // new directory under the Git-ignored ai-evals/runs/.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { notesInstructions, NOTE_DENSITIES } from '../js/prompts.js';
-import { firstGlossaryMatches } from '../js/reader-text.js';
-import { notesParts, noteMinUnits, mergeNoteParts, validateNotes, parseContent } from '../js/learning-validation.js';
+import { notesInstructions, NOTE_DENSITIES } from '../js/generation/prompts.js';
+import { firstGlossaryMatches } from '../js/reader/reader-text.js';
+import { notesParts, noteMinUnits, mergeNoteParts, validateNotes, parseContent } from '../js/generation/learning-validation.js';
 
 const args = process.argv.slice(2), option = (key, fallback) => args.includes(key) ? args[args.indexOf(key) + 1] : fallback;
 const CORPUS = 'docs/evaluation/generation-tests/notes-prompt-experiment/corpus.json';

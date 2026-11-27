@@ -92,14 +92,14 @@ Full notes are in the [consultation signals review](../research/consultation-sig
 ## Implementation
 
 - **Storage:**
-  - `js/workspace-storage.js` defines `SIGNALS_PATH` and `validSignals`, and makes the store optional, like usage history.
+  - `js/core/workspace-storage.js` defines `SIGNALS_PATH` and `validSignals`, and makes the store optional, like usage history.
   - An unreadable file never blocks stories, settings or generation, and is never overwritten.
   - Deleting stories or languages leaves it intact.
   - The repository seed is empty.
 - **Tracking:**
-  - `js/consultation-signals.js` holds recording, the two-minute dedupe, exposure counting, ranking and merge-on-repair.
-  - `js/reading-exposure.js` holds paragraphs, `Intl.Segmenter` word counts and the dwell rules.
-- **Hooks in `js/app.js`:**
+  - `js/tracking/consultation-signals.js` holds recording, the two-minute dedupe, exposure counting, ranking and merge-on-repair.
+  - `js/tracking/reading-exposure.js` holds paragraphs, `Intl.Segmenter` word counts and the dwell rules.
+- **Hooks** (wired in `js/tracking/learner-tracking.js`, called from the reader modules in `js/reader/`):
   - word note open and Listen
   - Explain and follow-ups, recorded after the result is saved
   - examples

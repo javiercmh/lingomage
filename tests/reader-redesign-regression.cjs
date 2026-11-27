@@ -15,7 +15,7 @@ function section(start, end) { const at = source.indexOf(start); assert(at >= 0,
   const make = rect => ({ getBoundingClientRect: () => rect, setAttribute() {}, focus() {}, classList: { add: name => classes.add(name), remove: name => classes.delete(name) } });
   let navigation = null;
   const context = { getComputedStyle: () => ({top: '24px'}), document: { querySelector: selector => selector === '.reader-panel' ? panel : navigation, querySelectorAll: () => [{ hidden: false, offsetParent: null, getClientRects: () => [{}], getBoundingClientRect: () => ({ top: 700 }) }] }, window: { innerHeight: 800, matchMedia: () => ({ matches: false }) }, requestAnimationFrame: fn => fn(), setTimeout: () => 0 };
-  vm.createContext(context); vm.runInContext(section('function revealCard(', '\nfunction readJson('), context);
+  vm.createContext(context); vm.runInContext(section('function revealCard(', '\n// end of js/generation/generation-bar.js'), context);
   const reveal = rect => { scrolls.length = 0; context.revealCard(make(rect)); return scrolls[0]; };
   assert.equal(reveal({ top: 100, bottom: 400, height: 300 }), undefined, 'fully visible card does not scroll');
   assert.equal(reveal({ top: 500, bottom: 900, height: 400 }).top, 900 + 12 - 700, 'partly hidden card scrolls only to reveal its bottom');
@@ -55,7 +55,7 @@ function section(start, end) { const at = source.indexOf(start); assert(at >= 0,
 
 // Explained expressions: newest range owns overlaps; overlapping explanations are detected for replacement.
 {
-  const textSource = fs.readFileSync(path.join(__dirname, '../js/reader-text.js'), 'utf8').replaceAll('export function ', 'function ');
+  const textSource = fs.readFileSync(path.join(__dirname, '../js/reader/reader-text.js'), 'utf8').replaceAll('export function ', 'function ');
   const context = {}; vm.createContext(context);
   vm.runInContext(textSource + '\n' + section('function overlappingHelp(', 'function confirmReplaceHelp('), context);
   const segments = JSON.parse(JSON.stringify(context.explainedSegments(20, [{ id: 'old', start: 2, end: 10, label: 'a' }, { id: 'new', start: 6, end: 14, label: 'b' }])));

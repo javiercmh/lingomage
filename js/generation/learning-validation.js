@@ -1,4 +1,4 @@
-import { glossaryRanges, resolveGlossaryForms, stripRussianStress, withRussianStress } from './reader-text.js';
+import { glossaryRanges, resolveGlossaryForms, stripRussianStress, withRussianStress } from '../reader/reader-text.js';
 
 export const SAFEGUARD_VERSION = '2026-10-14.1';
 // A generous transport/storage bound, independent of note count and reading level.

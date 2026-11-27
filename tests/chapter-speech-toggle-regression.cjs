@@ -3,7 +3,7 @@ const appSource = require('./support/app-source.cjs');
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
 const app = appSource();
 const controls = app.slice(app.indexOf('function renderReaderListen('), app.indexOf("$('reader-dialog').addEventListener('pointerdown'"));
-const speechSource = fs.readFileSync('js/reader-speech.js', 'utf8').replaceAll('export ', '');
+const speechSource = fs.readFileSync('js/reader/reader-speech.js', 'utf8').replaceAll('export ', '');
 const flush = () => new Promise(setImmediate);
 function deferred() { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return {promise, resolve, reject}; }
 function harness({story = 'Chapter body', language = 'de', delayVoices = false} = {}) {
@@ -18,8 +18,9 @@ function harness({story = 'Chapter body', language = 'de', delayVoices = false} 
   const c = {Intl, state: {speechVersionKey: 'S:C:V'}, speech, trackedSpeech: speech, usage: {checkpoint() {}}, readerStory: () => ({title: 'Title', language}),
     activeChapter: () => ({}), activeVersion: () => ({title: 'Title', story}), SPEECH_LANGUAGES: {de: 'de-DE', 'es-CL': 'es-CL'},
     $: id => id === 'reader-listen' ? button : dialog, toast: message => errors.push(message)};
+  c.runtime = c;
   vm.createContext(c);
-  vm.runInContext("let readerSpeechRun=0, readerSpeechKey='', readerSpeechOwner=0, readerSpeechStop=null;\nfunction setPlaybackContext(value) { playbackContext = value; }\n" + speechSource + controls, c);
+  vm.runInContext("let readerSpeechRun=0, readerSpeechKey='', readerSpeechOwner=0, readerSpeechStop=null;\n" + speechSource + controls, c);
   c.renderReaderListen();
   return {c, button, dialog, speech, speaks, stops, voices, errors, click: handlers.click};
 }

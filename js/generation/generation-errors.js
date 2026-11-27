@@ -1,4 +1,4 @@
-import { pathLabel, continueChapterNumber } from './story-model.js';
+import { pathLabel, continueChapterNumber } from '../core/story-model.js';
 // Background work that Android or the operation session did not allow to continue. Local pause
 // (background_paused) means the page was hidden and no session was held, so no host call was made.
 const BACKGROUND_CODES = new Set(['background_service', 'background_paused', 'session_idle', 'session_timeout', 'session_ended']);

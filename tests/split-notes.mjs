@@ -1,12 +1,12 @@
 // Split vocabulary notes: paragraph parts, merging, the parallel scheduler, and both rate-limit paths
 // (a start refused before inference, the provider's limit during a request). No silent retries.
 import assert from 'node:assert/strict';
-import { createPipeline, pendingRequests, MAX_PARALLEL, parallelLimitFor } from '../js/generation-pipeline.js';
+import { createPipeline, pendingRequests, MAX_PARALLEL, parallelLimitFor } from '../js/generation/generation-pipeline.js';
 const LEGACY_RUNNING = 3; // operations saved without config.parallelLimit
-import { progressSummary } from '../js/generation-progress.js';
-import { recoverySummary } from '../js/generation-errors.js';
-import { notesParts, noteMinUnits, noteTargetUnits, mergeNoteParts, validateNotes, MAX_NOTE_PARTS } from '../js/learning-validation.js';
-import { NOTES_INSTRUCTIONS } from '../js/prompts.js';
+import { progressSummary } from '../js/generation/generation-progress.js';
+import { recoverySummary } from '../js/generation/generation-errors.js';
+import { notesParts, noteMinUnits, noteTargetUnits, mergeNoteParts, validateNotes, MAX_NOTE_PARTS } from '../js/generation/learning-validation.js';
+import { NOTES_INSTRUCTIONS } from '../js/generation/prompts.js';
 
 const WORDS = ['Hund', 'Katze', 'Vogel', 'Fisch', 'Pferd', 'Maus'];
 const paragraph = word => `Der ${word} läuft schnell durch den Garten. `.repeat(30).trim();

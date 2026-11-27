@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import {createPipeline} from '../js/generation-pipeline.js';
-import {recoverySummary} from '../js/generation-errors.js';
-import {validCheckpoints} from '../js/workspace-storage.js';
+import {createPipeline} from '../js/generation/generation-pipeline.js';
+import {recoverySummary} from '../js/generation/generation-errors.js';
+import {validCheckpoints} from '../js/core/workspace-storage.js';
 
 const deferred = () => { let resolve, reject; const promise=new Promise((a,b)=>{resolve=a;reject=b;}); return {promise,resolve,reject}; };
 const tick = () => new Promise(resolve=>setImmediate(resolve));

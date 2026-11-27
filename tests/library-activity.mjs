@@ -2,10 +2,10 @@ import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { parseTime, storyActivity, markStoryActivity, planLibrary, SORTS, formatDay, formatDate, dateSegments, describeDates } from '../js/library-activity.js';
-import { createStoryModel } from '../js/story-model.js';
-import { createGenerationController } from '../js/generation-controller.js';
-import { createWorkspaceStorage } from '../js/workspace-storage.js';
+import { parseTime, storyActivity, markStoryActivity, planLibrary, SORTS, formatDay, formatDate, dateSegments, describeDates } from '../js/screens/library-activity.js';
+import { createStoryModel } from '../js/core/story-model.js';
+import { createGenerationController } from '../js/generation/generation-controller.js';
+import { createWorkspaceStorage } from '../js/core/workspace-storage.js';
 
 // Library ordering, date copy and activity stamping. Pure functions and in-memory fixtures only: no learner data,
 // no network, no files written. Navigation only; nothing here measures progress or learning.
@@ -131,7 +131,7 @@ const plainEntry = { ...entry, activityAt: entry.createdAt, updated: false };
 assert.equal(text(plainEntry, 'hero'), 'Created 12 Oct'); assert.equal(text(plainEntry, 'recent'), 'Created 12 Oct');
 assert.equal(text({ createdAt: NaN, activityAt: NaN, updated: false }, 'hero'), '', 'invalid or missing dates are omitted');
 assert.equal(describeDates(entry), 'Updated 18 October 2026. Created 12 October 2026'); assert.equal(describeDates(plainEntry), 'Created 12 October 2026');
-assert.ok(!/Active|Continue|progress|Completed|Last studied/i.test(fs.readFileSync(new URL('../js/library-activity.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')), 'no progress-implying labels');
+assert.ok(!/Active|Continue|progress|Completed|Last studied/i.test(fs.readFileSync(new URL('../js/screens/library-activity.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')), 'no progress-implying labels');
 
 // Generation controller: stamp only on a saved continue/rewrite/examples; roll back with the content; idempotent.
 function fixture() {

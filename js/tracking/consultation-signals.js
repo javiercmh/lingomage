@@ -1,6 +1,6 @@
 import { localCalendar } from './usage-stats.js';
-import { stripRussianStress } from './reader-text.js';
-import { emptySignals } from './workspace-storage.js';
+import { stripRussianStress } from '../reader/reader-text.js';
+import { emptySignals } from '../core/workspace-storage.js';
 
 // Learning signals (PED-005). Records what the learner looked up and which tracked items they later met
 // while reading, then ranks items for the "Most looked up" list. The file is written whole after each

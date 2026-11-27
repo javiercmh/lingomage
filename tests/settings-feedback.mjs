@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import {createWorkspaceStorage, createSettingsPersistence} from '../js/workspace-storage.js';
-import {createSettingsFeedback, unsavedWorkReason} from '../js/settings-feedback.js';
+import {createWorkspaceStorage, createSettingsPersistence} from '../js/core/workspace-storage.js';
+import {createSettingsFeedback, unsavedWorkReason} from '../js/core/settings-feedback.js';
 import {createFakeDocument} from './support/fake-dom.mjs';
 
 // Production persistence and feedback modules, wired the way app.js wires them, over fake files and a fake DOM.

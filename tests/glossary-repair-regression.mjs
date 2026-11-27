@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import {validateNotes} from '../js/learning-validation.js';
-import {findGlossaryMatches} from '../js/reader-text.js';
+import {validateNotes} from '../js/generation/learning-validation.js';
+import {findGlossaryMatches} from '../js/reader/reader-text.js';
 // Cases are taken from real model responses (archived in Git history at 7fd046c, docs/validation/generation-evaluation) that
 // previously failed the whole chapter with "vocabulary note for a word ... that does not appear".
 const note=(word,forms,meaning='an English explanation')=>({word,meaning,forms});

@@ -14,7 +14,7 @@ Every JSON file the app reads or writes, what it holds, and how unreadable or fa
 | `data/learning-profiles.json` | managed | Level definitions, generation guides, scopes |
 | `data/language-safeguards.json` | managed | Safeguard register |
 
-User files are seeded only when absent, preserved by updates and never packaged with local content. Saved records stay readable across versions; no general migration exists (one temporary glossary-alias migration, `term`/`text` → `word`, lives in `js/workspace-storage.js` until the next major release).
+User files are seeded only when absent, preserved by updates and never packaged with local content. Saved records stay readable across versions; no general migration exists (one temporary glossary-alias migration, `term`/`text` → `word`, lives in `js/core/workspace-storage.js` until the next major release).
 
 ## Storage states
 

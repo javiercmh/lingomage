@@ -1,8 +1,8 @@
 // Define (PED-002): an on-demand vocabulary note must pass chapter-note repair and cover the selection.
 import assert from 'node:assert/strict';
-import { validateDefinedNote } from '../js/learning-validation.js';
-import { findGlossaryMatches, firstGlossaryMatches } from '../js/reader-text.js';
-import { DEFINE_INSTRUCTIONS } from '../js/prompts.js';
+import { validateDefinedNote } from '../js/generation/learning-validation.js';
+import { findGlossaryMatches, firstGlossaryMatches } from '../js/reader/reader-text.js';
+import { DEFINE_INSTRUCTIONS } from '../js/generation/prompts.js';
 
 const prose = { title: 'Der Markt', story: 'Am Morgen geht Lena zum Markt. Sie kauft frische Äpfel. Der Markt ist voll.' };
 const at = text => { const start = prose.story.indexOf(text); return { start, end: start + text.length }; };

@@ -2,12 +2,12 @@
 // times per stage or part, and every resend is announced. Rate limits, cancellation and errors a resend cannot fix are
 // never resent; after the limit or without retryBroken, recovery is explicit.
 import assert from 'node:assert/strict';
-import { createPipeline, MAX_BROKEN_RESENDS } from '../js/generation-pipeline.js';
-import { progressSteps } from '../js/generation-progress.js';
-import { recoverySummary } from '../js/generation-errors.js';
-import { decodePlan } from '../js/story-generation.js';
-import { parseContent } from '../js/learning-validation.js';
-import { validSettings, settingsSnapshot } from '../js/workspace-storage.js';
+import { createPipeline, MAX_BROKEN_RESENDS } from '../js/generation/generation-pipeline.js';
+import { progressSteps } from '../js/generation/generation-progress.js';
+import { recoverySummary } from '../js/generation/generation-errors.js';
+import { decodePlan } from '../js/generation/story-generation.js';
+import { parseContent } from '../js/generation/learning-validation.js';
+import { validSettings, settingsSnapshot } from '../js/core/workspace-storage.js';
 
 const WORDS = ['Hund', 'Katze', 'Vogel', 'Fisch', 'Pferd', 'Maus'];
 const story = WORDS.map(word => `Der ${word} läuft schnell durch den Garten. `.repeat(12).trim()).join('\n\n');

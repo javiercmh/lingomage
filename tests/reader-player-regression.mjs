@@ -1,6 +1,6 @@
 // Sentence player: segmentation, rate options, pause/resume, skipping and cancellation safety.
 import assert from 'node:assert/strict';
-import { speechUnits, createReaderPlayer } from '../js/reader-player.js';
+import { speechUnits, createReaderPlayer } from '../js/reader/reader-player.js';
 
 const flush = () => new Promise(setImmediate);
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };

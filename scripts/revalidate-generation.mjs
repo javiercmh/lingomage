@@ -1,6 +1,6 @@
 // Offline policy revalidation of captured outputs. Never performs inference or rewrites history.
 import fs from 'node:fs';import path from 'node:path';
-import {parseContent,validateStory,validateNotes,validateProse,validateContentSize,readingPlan,attachReadings,SAFEGUARD_VERSION} from '../js/learning-validation.js';
+import {parseContent,validateStory,validateNotes,validateProse,validateContentSize,readingPlan,attachReadings,SAFEGUARD_VERSION} from '../js/generation/learning-validation.js';
 const directory=path.resolve(process.argv[2]||'docs/evaluation/generation-tests/models');
 for(const name of fs.readdirSync(directory).filter(n=>n.endsWith('.json')&&!n.startsWith('suite'))){
  const filename=path.join(directory,name),record=JSON.parse(fs.readFileSync(filename));if(!record.stages)continue;

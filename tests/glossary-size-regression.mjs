@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import {MAX_CONTENT_UNITS,parseContent,validateNotes,validateContentSize} from '../js/learning-validation.js';
-import {hasGlossaryForm,findGlossaryMatches,firstGlossaryMatches} from '../js/reader-text.js';
+import {MAX_CONTENT_UNITS,parseContent,validateNotes,validateContentSize} from '../js/generation/learning-validation.js';
+import {hasGlossaryForm,findGlossaryMatches,firstGlossaryMatches} from '../js/reader/reader-text.js';
 const keys=Array.from({length:250},(_,i)=>'Wort'+i),prose={title:'Viele Wörter',story:keys.join(' ')};
 const glossary=keys.map(word=>({word,meaning:'a distinct example expression',forms:[word]}));
 assert.equal(validateNotes({glossary},prose,'de').glossary.length,250);

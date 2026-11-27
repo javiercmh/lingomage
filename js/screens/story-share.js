@@ -1,4 +1,4 @@
-import { validStories } from './workspace-storage.js';
+import { validStories } from '../core/workspace-storage.js';
 // Canonical saved text only; presentation readings never enter shared text.
 export function chapterShareText(story, chapter, version, {notes = false} = {}) {
   const parts = [version.title || story.title || '', version.story || ''];

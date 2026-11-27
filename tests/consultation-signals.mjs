@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {createWorkspaceStorage, emptySignals, validSignals, optionalStore, SIGNALS_PATH} from '../js/workspace-storage.js';
-import {createSignalsTracker, rankItems, itemScore, itemKey, mergeSignals, DEDUPE_MS, HALF_LIFE_DAYS} from '../js/consultation-signals.js';
+import {createWorkspaceStorage, emptySignals, validSignals, optionalStore, SIGNALS_PATH} from '../js/core/workspace-storage.js';
+import {createSignalsTracker, rankItems, itemScore, itemKey, mergeSignals, DEDUPE_MS, HALF_LIFE_DAYS} from '../js/tracking/consultation-signals.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 const calendar = {dateKey: ms => new Date(ms).toISOString().slice(0, 10)};
@@ -219,7 +219,7 @@ const note = (extra = {}) => ({language: 'de', kind: 'note', word: 'kaufen', mea
 
 // --- Story deletion does not touch signals: the tracker never reads stories ------------------------------
 {
-  const source = fs.readFileSync(new URL('../js/consultation-signals.js', import.meta.url), 'utf8');
+  const source = fs.readFileSync(new URL('../js/tracking/consultation-signals.js', import.meta.url), 'utf8');
   assert.equal(/stories\.json/.test(source), false);
 }
 

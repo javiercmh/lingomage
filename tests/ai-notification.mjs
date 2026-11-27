@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { aiNotification } from '../js/ai-notification.js';
+import { aiNotification } from '../js/core/ai-notification.js';
 
 const cases = [
   ['create', 'plan', 'Planning your story'], ['create', 'prose', 'Writing your story'],

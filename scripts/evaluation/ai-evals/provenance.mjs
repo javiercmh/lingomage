@@ -2,8 +2,8 @@
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import {PROMPT_VERSION, storyInstructions, chapterInstructions, PLAN_INSTRUCTIONS, NOTES_INSTRUCTIONS, READING_INSTRUCTIONS} from '../../../js/prompts.js';
-import {SAFEGUARD_VERSION} from '../../../js/learning-validation.js';
+import {PROMPT_VERSION, storyInstructions, chapterInstructions, PLAN_INSTRUCTIONS, NOTES_INSTRUCTIONS, READING_INSTRUCTIONS} from '../../../js/generation/prompts.js';
+import {SAFEGUARD_VERSION} from '../../../js/generation/learning-validation.js';
 import {RUBRIC_HASH_SOURCE, RUBRIC_VERSION} from './rubric.mjs';
 import {ROOT} from './store.mjs';
 
@@ -16,9 +16,9 @@ export function canonicalJson(value) {
 export const hashOf = value => sha256(canonicalJson(value));
 
 // Production code that determines generation or validation, plus the evaluator itself.
-const PRODUCTION_CODE = ['js/prompts.js', 'js/generation-pipeline.js', 'js/learning-validation.js', 'js/story-generation.js', 'js/generation-errors.js', 'js/reader-text.js'];
+const PRODUCTION_CODE = ['js/generation/prompts.js', 'js/generation/generation-pipeline.js', 'js/generation/learning-validation.js', 'js/generation/story-generation.js', 'js/generation/generation-errors.js', 'js/reader/reader-text.js'];
 
-// The writer prompts are imported from the shipped js/prompts.js, never copied.
+// The writer prompts are imported from the shipped js/generation/prompts.js, never copied.
 export function loadWriterPrompts() {
   const source = `${storyInstructions}\n${chapterInstructions}`;
   return {promptVersion: PROMPT_VERSION, source, storyInstructions, chapterInstructions};

@@ -1,6 +1,6 @@
 // Preliminary AI issue-finding, never a teacher review or certification.
 import fs from 'node:fs';import path from 'node:path';import {createHash} from 'node:crypto';
-import {parseContent} from '../js/learning-validation.js';
+import {parseContent} from '../js/generation/learning-validation.js';
 const args=process.argv.slice(2);const option=(key,fallback)=>{const i=args.indexOf(key);return i<0?fallback:args[i+1];};
 const directory=path.resolve(option('--input','docs/evaluation/generation-tests/models'));
 const endpoint=option('--endpoint','http://localhost:8890'),model=option('--model','gpt-6.1-sol'),effort=option('--effort','low');

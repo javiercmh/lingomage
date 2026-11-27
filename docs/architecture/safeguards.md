@@ -27,7 +27,7 @@ The LANG-008 prompt-contract test checks scene vocabulary guidance in planning a
 
 ## Enforcement and regression coverage
 
-[data/language-safeguards.json](../../data/language-safeguards.json) is the versioned register. `js/learning-validation.js` enforces structural content rules. `js/generation-pipeline.js` saves validated stages before releasing requests. `js/app.js` captures context, exposes recovery and applies results using operation IDs.
+[data/language-safeguards.json](../../data/language-safeguards.json) is the versioned register. `js/generation/learning-validation.js` enforces structural content rules. `js/generation/generation-pipeline.js` saves validated stages before releasing requests. `js/screens/create-flow.js` and `js/reader/continue-flow.js` capture context, `js/generation/checkpoint-recovery.js` exposes recovery and `js/generation/generation-results.js` applies results using operation IDs.
 
 Every active register ID must be emitted by a passing behavioral or prompt-contract test. `python3 scripts/check.py` runs those tests, existing reader/memory/host-bridge regression harnesses, manifest checks and Python server checks. CI runs the same command on Node 22 and Python 3.12. It needs no third-party test dependencies or production build step.
 

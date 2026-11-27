@@ -4,7 +4,7 @@ const {bindStory, bindGeneration, bindPanels}=await import('./support/controller
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
 const source=appSource();
 const slice=(start,end)=>source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start)));
-const pathLabelSource=fs.readFileSync('js/story-model.js','utf8').replace(/^[\s\S]*?(?=export function pathLabel)/,'').replaceAll('export function ','function ');
+const pathLabelSource=fs.readFileSync('js/core/story-model.js','utf8').replace(/^[\s\S]*?(?=export function pathLabel)/,'').replaceAll('export function ','function ');
 function fixture(){
  const version=(id,text,sourceVersionId)=>({id,title:text,story:text,glossary:[],providerId:'fixture',model:'mock',promptVersion:'test',sourceVersionId});
  return {id:'S',title:'Deleted original mirror',story:'Deleted original mirror',activeVersionId:'a',nextAlternateNumber:4,activePathId:'original',
@@ -22,7 +22,7 @@ function harness(story=fixture()){
  const c={pipeline:null,state:{readerId:'S',readerChapter:1,stories:[story],readerPositions:{'S:original':{chapterId:'C'},'S:alt1':{chapterId:'B'},'S:alt3':{chapterId:'A'}},readerEditDraft:{storyId:'S',pathId:'original',chapterId:'C'}},$,console,window:{innerWidth:390,innerHeight:844},
  readerStory:()=>c.state.stories.find(x=>x.id===c.state.readerId),persistReaderStory(s){assert.equal(s,c.state.stories[0]);if(failed)throw Error('disk');saves++;},
  clearExplanationSelection(){},closeWordNote(){},updateReader(){},readerPanel:()=>({scrollTop:0}),toast(){},setView(){},confirmStoryDeletion(ids){deleted=ids;}};
- vm.createContext(c);vm.runInContext(pathLabelSource,c);vm.runInContext(slice('function pendingDeletionBlocked(', 'function syncStorySelection('),c);bindStory(c); bindPanels(c); vm.runInContext(slice('function renderReaderActions(', 'const { normalizeChapters'),c);
+ c.runtime=c;vm.createContext(c);vm.runInContext(pathLabelSource,c);vm.runInContext(slice('function pendingDeletionBlocked(', 'const {\n  beginStorySelection'),c);bindStory(c); bindPanels(c); vm.runInContext(slice('function renderReaderActions(', 'const { normalizeChapters'),c);
  return {c,story,$,fail:value=>failed=value,saves:()=>saves,deleted:()=>deleted};
 }
 function target(story,pathId,kind,index=1){return {storyId:story.id,pathId,kind,index,entries:JSON.stringify(story.paths.find(p=>p.id===pathId).entries)};}
@@ -76,19 +76,19 @@ console.log('PASS chapter/path removal, shared content and memory, mirrors, name
  let submit, requested, sequence=0;
  const element=tag=>({tagName:tag,childNodes:[],textContent:'',setAttribute(){},append(...nodes){this.childNodes.push(...nodes);},querySelector(selector){return this.childNodes.find(x=>x.tagName===selector)||this.childNodes.map(x=>x.querySelector?.(selector)).find(Boolean);},remove(){},scrollIntoView(){},addEventListener(){},classList:{add(){}}});
  c.document={createElement:element,querySelectorAll:()=>[]};c.crypto={randomUUID:()=>`generated-${++sequence}`};c.PROMPT_VERSION='test';c.LANGUAGES={de:'German'};c.STORY_GUIDES={de:{beginner:'Simple'}};c.profileSnapshot=()=>({});c.decodeResponse=JSON.parse;c.state.model='mock';c.state.providerId='mock';story.language='de';story.difficulty='beginner';
- Object.assign(c,await import('../js/generation-progress.js'));const painted=[];c.paintChapterProgress=(request,op)=>painted.push(op.stage);c.readerGeneration=null;c.renderReaderGeneration=()=>{};c.setReaderGeneration=value=>{c.readerGeneration=value;};c.currentReaderGeneration=()=>c.readerGeneration;c.currentPipeline=()=>c.pipeline;c.currentBackgroundRun=()=>c.backgroundRun;c.renderChapterRequest=()=>{};c.renderCheckpointRecovery=()=>{};vm.runInContext(fs.readFileSync('js/request-lifecycle.js','utf8').replaceAll('export async function ','async function '),c);
+ Object.assign(c,await import('../js/generation/generation-progress.js'));const painted=[];c.paintChapterProgress=(request,op)=>painted.push(op.stage);c.readerGeneration=null;c.renderReaderGeneration=()=>{};c.setReaderGeneration=value=>{c.readerGeneration=value;};c.renderChapterRequest=()=>{};c.renderCheckpointRecovery=()=>{};vm.runInContext(fs.readFileSync('js/core/request-lifecycle.js','utf8').replaceAll('export async function ','async function '),c);
  c.LENGTHS={short:{words:[100,150],sentences:[8,12]}};c.lengthPreference=()=> 'short';c.structuredClone=structuredClone;
  bindGeneration(c);
  c.runContentOperation=async spec=>{const op={...spec,id:`operation-${++sequence}`,createdAt:'test',result:JSON.parse(await c.readerAi(spec.kind,spec.input))};c.applyContentOperation(op);return op;};c.showOperationResult=()=>{};
  c.ai={acknowledge:async()=>{}};c.aiSession={run:fn=>fn()};c.readerAi=async(kind,input)=>{c.state.pendingReaderRequestId='request';if(kind==='summary')return JSON.stringify({newEvents:[{ref:'e1',event:input.chapterChunk}]});requested=input;return JSON.stringify({title:'New',story:'Next scene',glossary:[]});};
- Object.assign(c,await import('../js/prompts.js'));vm.runInContext(slice('async function acknowledgeReaderResult(', 'function decodeHelp(')+slice('function createHelpLoading(', 'function renderSavedHelp('),c);
+ Object.assign(c,await import('../js/generation/prompts.js'));vm.runInContext(slice('async function acknowledgeReaderResult(', 'function decodeHelp(')+slice('function createHelpLoading(', 'function renderSavedHelp('),c);
  c.state.languageExpectations={};c.levelDefinition=()=>({id:'A1'});c.guideFor=()=> 'Simple';c.readingDescription=()=> 'I can read simple text';c.LEVELS={de:{framework:'CEFR'}};c.SCOPES={scene:{description:'One event'}};c.setScopeDisabled=()=>{};c.renderJobRecovery=()=>{};c.generationProvenance=job=>({difficulty:job.input.difficulty,scope:job.input.scope,languagePlan:job.plan,learnerContext:{}});
  c.acknowledgeStoryRequest=async id=>{await c.ai.acknowledge(id);if(c.state.generationJob?.writeRequestId===id)c.state.generationJob=null;};
  c.plannedStory=async(mode,input,instructions,loading,config,applyContext)=>{requested=input;c.state.generationJob={input,applyContext,plan:{vocabulary:[],grammar:[],guidance:''},createdAt:'test',versionId:c.crypto.randomUUID(),chapterId:c.crypto.randomUUID(),alternateId:c.crypto.randomUUID(),writeRequestId:'write'};return JSON.stringify({title:'New',story:'Next scene',glossary:[]});};
  $('reader-level').value='A1';$('reader-scope').value='scene';
  $('reader-edit-submit').addEventListener=(_,fn)=>submit=fn;$('reader-edit-panel').dataset={mode:'continue'};$('reader-prompt').value='';
  Object.assign(c,{estimateFor:()=>null,operationPlan:()=>({}),pendingSummaryCount:()=>0,notifyStopped:()=>{},parallelLimitFor:()=>3}); // estimates and notifications are tested in generation-timing.mjs
- vm.runInContext(slice("$('reader-edit-submit').addEventListener", "$('reader-dialog').addEventListener"),c);
+ vm.runInContext(slice("$('reader-edit-submit').addEventListener", '// end of js/reader/continue-flow.js'),c);
  c.state.model='';await submit();assert.match($('reader-edit-error').textContent,/No AI model is selected/);assert.equal(requested,undefined,'Continue with no model selected does not start generation');
  c.state.model='removed';c.state.models=[{id:'mock',name:'Mock'}];await submit();assert.match($('reader-edit-error').textContent,/selected AI model is not available/);assert.equal(requested,undefined,'Continue with an unavailable model does not start generation');
  c.state.model='mock';

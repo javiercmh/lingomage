@@ -1,5 +1,5 @@
 import { localCalendar } from './usage-stats.js';
-import { emptyUsage } from './workspace-storage.js';
+import { emptyUsage } from '../core/workspace-storage.js';
 
 // Time tracking keeps counters in memory and writes the whole usage file only when something changed.
 //

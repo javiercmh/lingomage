@@ -1,6 +1,6 @@
 const appSource = require('./support/app-source.cjs');
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-const c={Intl};vm.createContext(c);vm.runInContext(fs.readFileSync('js/reader-speech.js','utf8').replaceAll('export ',''),c);
+const c={Intl};c.runtime=c;vm.createContext(c);vm.runInContext(fs.readFileSync('js/reader/reader-speech.js','utf8').replaceAll('export ',''),c);
 (async()=>{
  const calls=[];const speech={speak:async options=>{calls.push(options);return {status:'completed'};}};
  const text=c.chapterSpeechText({title:'日本語の章😀',story:'日本語😀'.repeat(1100),storySegments:[{text:'日本語',reading:'にほんご'}]},'Fallback');
@@ -18,7 +18,7 @@ const c={Intl};vm.createContext(c);vm.runInContext(fs.readFileSync('js/reader-sp
  const original=JSON.stringify(fixture);calls.length=0;
  Object.assign(c,{state:{speechVersionKey:'S:C:V'},readerStory:()=>({title:'章の名前',language:'ja'}),activeChapter:()=>({}),activeVersion:()=>fixture,
  speech:{available:true,speak:speech.speak},trackedSpeech:{available:true,speak:speech.speak},usage:{checkpoint(){}},SPEECH_LANGUAGES:{ja:'ja-JP'},$:id=>id==='reader-listen'?button:dialog,toast:message=>{throw Error(message);}});
- vm.runInContext("let readerSpeechRun=0, readerSpeechKey='', readerSpeechOwner=0, readerSpeechStop=null;\nfunction setPlaybackContext(value) { playbackContext = value; }\n"+app.slice(app.indexOf("function renderReaderListen("),app.indexOf("$('reader-dialog').addEventListener('pointerdown'")),c);
+ vm.runInContext("let readerSpeechRun=0, readerSpeechKey='', readerSpeechOwner=0, readerSpeechStop=null;\n"+app.slice(app.indexOf("function renderReaderListen("),app.indexOf("$('reader-dialog').addEventListener('pointerdown'")),c);
  await handlers.click();assert.equal(calls.map(x=>x.text).join(''),'章の名前\n\n本文😀');
  assert.ok(calls.every(x=>x.language==='ja-JP'));assert.equal(button.disabled,false);assert.equal(JSON.stringify(fixture),original);
  console.log('PASS whole chapter speech: complete canonical text, bounded Unicode-safe chunks, locale, cancellation and navigation guard');

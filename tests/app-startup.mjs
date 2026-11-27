@@ -93,8 +93,8 @@ app.failWrites('data/settings.json', false); app.click(app.buttonWithText(app.el
 assert.equal(settingsFile(app).targetLanguages.ru, 'enabled', 'Retry repeats the Add'); assert.equal(settingsFile(app).targetLanguages.fr, 'enabled');
 // Host failures render through the real app: accurate wording, the code in Technical details, and an explicit Retry (nothing resumes by itself).
 {
-  const {failureInfo} = await import('../js/generation-errors.js'), {SAFEGUARD_VERSION} = await import('../js/learning-validation.js');
-  const {PROMPT_VERSION: promptVersion} = await import('../js/prompts.js');
+  const {failureInfo} = await import('../js/generation/generation-errors.js'), {SAFEGUARD_VERSION} = await import('../js/generation/learning-validation.js');
+  const {PROMPT_VERSION: promptVersion} = await import('../js/generation/prompts.js');
   const cases = {
     background_service: ['Android could not start background work (ForegroundServiceStartNotAllowedException).', /Android could not keep background work running\. Steps that finished earlier are saved\./],
     session_idle: ['The background session was released after a period without a running request.', /after a pause without a running step/],

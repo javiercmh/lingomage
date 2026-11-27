@@ -1,5 +1,5 @@
 // Every AI prompt the app sends, except the story-memory prompts, which carry their own versions in
-// js/story-memory.js. Changing any prompt here, or the learning behavior it asks for, needs a new
+// js/generation/story-memory.js. Changing any prompt here, or the learning behavior it asks for, needs a new
 // PROMPT_VERSION (see AGENTS.md); saved stories and help keep the version they were made with.
 export const PROMPT_VERSION = '2026-11-26.5';
 

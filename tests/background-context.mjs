@@ -2,35 +2,39 @@ import appSource from './support/app-source.cjs';
 // Background story context: queueing, start conditions, stop/settle, quiet cancellation and the setting.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import vm from 'node:vm';
-import { createStoryMemory } from '../js/story-memory.js';
-import { failureInfo } from '../js/generation-errors.js';
+import { createStoryMemory } from '../js/generation/story-memory.js';
 
 const source = appSource();
-const code = source.slice(source.indexOf('let backgroundTarget = null'), source.indexOf("for (const id of ['reader-generation-dismiss'"));
+const { loadFactory, deps, bridge } = await import('./support/factory-harness.mjs');
+const createBackgroundContext = await loadFactory('js/generation/background-context.js', 'createBackgroundContext');
 const element = () => ({ children: [], hidden: false, append(...nodes) { this.children.push(...nodes); }, remove() { this.removed = true; },
   querySelector(selector) { return this.children.find(node => node.className === selector.slice(1)) || null; } });
 
+// The production factory with a fake story memory; runtime holds the shared bindings app.js would pass.
 function harness({ ready = false, enabled = true } = {}) {
   const story = { id: 'story', paths: [{ id: 'main', entries: [{ chapterId: 'c1', versionId: 'v1' }] }, { id: 'alt', entries: [{ chapterId: 'c1', versionId: 'v2' }] }] };
   const calls = [], toasts = [];
-  const ctx = { state: { backgroundStoryContext: enabled, stories: [story], model: 'mock', providerId: 'p', reasoning: '' }, ai: { available: true }, pipeline: { records: [] },
-    readerGeneration: null, calls, toasts, story, console, failureInfo,
-    document: { createElement: element, body: element() },
-    lightTaskConfig: () => ({ providerId: 'p', model: 'light-mock', reasoning: 'low' }),
-    generationLive: () => false, selectedPath: s => s.paths[0], storyContextReady: () => ready, toast: message => toasts.push(message),
-    renderReaderGeneration() {},
-    setReaderGeneration(value) { ctx.readerGeneration = value; ctx.maybeStartBackgroundContext(); },
+  const runtime = { pipeline: { records: [] }, readerGeneration: null, backgroundRun: null };
+  // Story context summaries use the light tasks model (js/core/light-model.js) when one is chosen.
+  const state = { backgroundStoryContext: enabled, stories: [story], providerId: 'p', model: 'mock', reasoning: '', lightModel: 'light-mock', lightReasoning: 'low', models: [{ id: 'mock' }, { id: 'light-mock', reasoningLevels: ['low'] }] };
+  const h = { calls, toasts, story, state, runtime, run: () => runtime.backgroundRun };
+  Object.defineProperty(h, 'readerGeneration', { get: () => runtime.readerGeneration, set: value => { runtime.readerGeneration = value; } });
+  h.setReaderGeneration = value => { runtime.readerGeneration = value; h.maybeStartBackgroundContext(); };
+  bridge.ai.available = true;
+  globalThis.document = { createElement: element, body: element() };
+  Object.assign(h, createBackgroundContext(deps({
+    state, runtime, toast: message => toasts.push(message),
+    generationLive: () => false, selectedPath: s => s.paths[0], storyContextReady: () => ready,
+    setReaderGeneration: value => h.setReaderGeneration(value),
     // Each summary request waits for the test; its cancel control lives in the hidden host like readerAi's.
     prepareStoryMemory(s, entries, loading, config, host) {
       calls.push({ entries, config });
-      const cancel = { className: 'reader-ai-cancel', click() { ctx.pending.reject(new Error('Request cancelled.')); } };
+      const cancel = { className: 'reader-ai-cancel', click() { h.pending.reject(new Error('Request cancelled.')); } };
       host.append(cancel);
-      return new Promise((resolve, reject) => { ctx.pending = { resolve, reject }; });
-    } };
-  vm.createContext(ctx);
-  vm.runInContext(code + '\nObject.assign(globalThis, { queueBackgroundContext, maybeStartBackgroundContext, stopBackgroundContext, settleBackgroundContext, run: () => backgroundRun });', ctx);
-  return ctx;
+      return new Promise((resolve, reject) => { h.pending = { resolve, reject }; });
+    }
+  })));
+  return h;
 }
 
 { // Starts after the ready status is gone, shows its own status, and clears it when done.
@@ -104,7 +108,7 @@ function harness({ ready = false, enabled = true } = {}) {
   assert.equal(memory.storyContextReady(story, entries), true, 'a saved summary means Continue makes no memory request');
 }
 { // Settings: the preference is saved, defaults on, and the toggle is wired.
-  const storage = fs.readFileSync('js/workspace-storage.js', 'utf8'), html = fs.readFileSync('index.html', 'utf8');
+  const storage = fs.readFileSync('js/core/workspace-storage.js', 'utf8'), html = fs.readFileSync('index.html', 'utf8');
   assert.match(storage, /backgroundStoryContext:state\.backgroundStoryContext !== false/);
   assert.match(source, /state\.backgroundStoryContext = settings\.backgroundStoryContext !== false;/);
   assert.match(html, /<input id="background-context" type="checkbox" checked aria-describedby="background-context-hint">/);

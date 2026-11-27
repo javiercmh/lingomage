@@ -5,12 +5,12 @@
 // setRestoringPathPosition) used by app.js code that changes those bindings.
 // app.js calls createReaderView where the section used to be.
 import { createReaderPanels } from './reader-panels.js';
-import { pathLabel, createStoryModel } from './story-model.js';
-import { createStoryMemory } from './story-memory.js';
+import { pathLabel, createStoryModel } from '../core/story-model.js';
+import { createStoryMemory } from '../generation/story-memory.js';
 import { annotatedText, stripRussianStress, withRussianStress } from './reader-text.js';
 import { markParagraphGaps } from './paragraph-gaps.js';
 import { indexGlossaryTriggers, glossaryForTrigger } from './reader-activation.js';
-import { speech } from './bridge.js';
+import { speech } from '../bridge.js';
 import { prepareSpeechOptions } from './reader-speech.js';
 import { canonicalRange } from './reader-player.js';
 

@@ -2,13 +2,13 @@ import readAppSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { createPipeline } from '../js/generation-pipeline.js';
-import { createAiSession } from '../js/ai-session.js';
-import { readingPlan } from '../js/learning-validation.js';
-import { createStoryMemory } from '../js/story-memory.js';
-import { aiNotification } from '../js/ai-notification.js';
-import { saveBeforeAcknowledge } from '../js/request-lifecycle.js';
-import { failureInfo } from '../js/generation-errors.js';
+import { createPipeline } from '../js/generation/generation-pipeline.js';
+import { createAiSession } from '../js/core/ai-session.js';
+import { readingPlan } from '../js/generation/learning-validation.js';
+import { createStoryMemory } from '../js/generation/story-memory.js';
+import { aiNotification } from '../js/core/ai-notification.js';
+import { saveBeforeAcknowledge } from '../js/core/request-lifecycle.js';
+import { failureInfo } from '../js/generation/generation-errors.js';
 
 const source = fs.readFileSync('js/bridge.js', 'utf8');
 const realSetTimeout = globalThis.setTimeout;
@@ -256,7 +256,7 @@ try {
     const session = createAiSession({ ai: b.ai, isVisible: () => false });
     const node = () => ({ textContent: '', children: [], append(...nodes) { this.children.push(...nodes); }, querySelector() { return this.strong ||= node(); }, addEventListener() {}, remove() {} });
     const ctx = vm.createContext({
-      ai: b.ai, aiSession: session, aiNotification, saveBeforeAcknowledge, failureInfo, readerGeneration: null, currentReaderGeneration: () => null,
+      ai: b.ai, aiSession: session, aiNotification, saveBeforeAcknowledge, failureInfo, runtime: { readerGeneration: null, pipeline: null, backgroundRun: null },
       state: { models: [{ id: 'm' }], providerId: 'p', model: 'm' }, workspaceStorage: { assertWritable() {} },
       document: { createElement: node }, $: () => node(), toast() {}, renderReaderGeneration() {},
       persistReaderStory(story) { durable = structuredClone(story); events.push('save'); },

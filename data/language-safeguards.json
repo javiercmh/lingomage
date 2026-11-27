@@ -7,7 +7,7 @@
       "status": "retired",
       "enforcement": "deterministic",
       "requirement": "Numerical story-length quotas retired by PED-004: learner selects narrative scope independently of standardized reading target.",
-      "implementation": "js/learning-validation.js",
+      "implementation": "js/generation/learning-validation.js",
       "test": "tests/learning-safeguards.mjs",
       "limitation": "Technical output bounds remain active under LANG-004; narrative scope is prompt guidance."
     },
@@ -16,7 +16,7 @@
       "status": "active",
       "enforcement": "deterministic",
       "requirement": "Japanese/Russian canonical output and glossary forms use target script without Latin transliteration; Russian stress is not categorically rejected.",
-      "implementation": "js/learning-validation.js",
+      "implementation": "js/generation/learning-validation.js",
       "test": "tests/learning-safeguards.mjs",
       "limitation": "Behavioral tests establish the stated structural contract only."
     },
@@ -25,7 +25,7 @@
       "status": "active",
       "enforcement": "deterministic",
       "requirement": "New chapters have useful nonempty note structure and exact in-chapter forms matched as the reader matches them.",
-      "implementation": "js/learning-validation.js",
+      "implementation": "js/generation/learning-validation.js",
       "test": "tests/learning-safeguards.mjs",
       "limitation": "Semantic accuracy, novelty and pedagogical suitability require content review."
     },
@@ -34,7 +34,7 @@
       "status": "active",
       "enforcement": "deterministic",
       "requirement": "Technical field bounds, per-note form bounds and a 1000000 UTF-16-unit total response bound reject malformed or oversized outputs; there is no fixed note-count cap.",
-      "implementation": "js/learning-validation.js",
+      "implementation": "js/generation/learning-validation.js",
       "test": "tests/learning-safeguards.mjs",
       "limitation": "Behavioral tests establish the stated structural contract only."
     },
@@ -43,7 +43,7 @@
       "status": "active",
       "enforcement": "deterministic",
       "requirement": "App-owned kanji spans require exactly one bounded kana reading per occurrence ID.",
-      "implementation": "js/learning-validation.js",
+      "implementation": "js/generation/learning-validation.js",
       "test": "tests/learning-safeguards.mjs",
       "limitation": "Behavioral tests establish the stated structural contract only."
     },
@@ -52,7 +52,7 @@
       "status": "active",
       "enforcement": "deterministic",
       "requirement": "Exactly three examples have canonical target-script sentences, translations and valid UTF-16 highlights; Japanese examples use app-owned readings.",
-      "implementation": "js/learning-validation.js",
+      "implementation": "js/generation/learning-validation.js",
       "test": "tests/learning-safeguards.mjs",
       "limitation": "Behavioral tests establish the stated structural contract only."
     },
@@ -61,7 +61,7 @@
       "status": "active",
       "enforcement": "deterministic",
       "requirement": "Legacy annotations are uniquely aligned for display without changing stored text or guessing ambiguous readings.",
-      "implementation": "js/reader-text.js",
+      "implementation": "js/reader/reader-text.js",
       "test": "tests/learning-safeguards.mjs",
       "limitation": "Behavioral tests establish the stated structural contract only."
     },
@@ -79,7 +79,7 @@
       "status": "active",
       "enforcement": "deterministic",
       "requirement": "Glossary notes stay integrated as inline underlines; legacy empty glossaries remain readable.",
-      "implementation": "js/reader-text.js",
+      "implementation": "js/reader/reader-text.js",
       "test": "tests/learning-safeguards.mjs",
       "limitation": "Behavioral tests establish the stated structural contract only."
     },
@@ -88,7 +88,7 @@
       "status": "active",
       "enforcement": "deterministic",
       "requirement": "Validated prose/readings are saved as checkpoints before acknowledgement, then applied once as completed content.",
-      "implementation": "js/generation-pipeline.js and js/app.js",
+      "implementation": "js/generation/generation-pipeline.js and js/app.js",
       "test": "tests/learning-safeguards.mjs",
       "limitation": "Behavioral tests establish the stated structural contract only."
     },
@@ -97,7 +97,7 @@
       "status": "active",
       "enforcement": "deterministic",
       "requirement": "Recovery reuses saved stages and handles persistence/release failures without regenerating completed work.",
-      "implementation": "js/generation-pipeline.js and js/app.js",
+      "implementation": "js/generation/generation-pipeline.js and js/app.js",
       "test": "tests/learning-safeguards.mjs",
       "limitation": "Behavioral tests establish the stated structural contract only."
     },
@@ -106,7 +106,7 @@
       "status": "active",
       "enforcement": "deterministic",
       "requirement": "Cancellation and malformed output stop subsequent stages; retries and discard are explicit.",
-      "implementation": "js/generation-pipeline.js and js/app.js",
+      "implementation": "js/generation/generation-pipeline.js and js/app.js",
       "test": "tests/learning-safeguards.mjs",
       "limitation": "Behavioral tests establish the stated structural contract only."
     },
@@ -115,7 +115,7 @@
       "status": "active",
       "enforcement": "deterministic",
       "requirement": "Captured preferences and destination references preserve provenance and prevent duplicate application across entry points.",
-      "implementation": "js/generation-pipeline.js and js/app.js",
+      "implementation": "js/generation/generation-pipeline.js and js/app.js",
       "test": "tests/learning-safeguards.mjs",
       "limitation": "Behavioral tests establish the stated structural contract only."
     }

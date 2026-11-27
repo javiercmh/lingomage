@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const app = appSource();
 const helperStart = app.indexOf('function runSelectionAction(');
 const actionsStart = app.indexOf("$('selection-translate').addEventListener", helperStart);
-const actionsEnd = app.indexOf('function openShareDialog(', actionsStart);
+const actionsEnd = app.indexOf('// end of js/reader/reader-selection.js', actionsStart);
 assert(helperStart >= 0 && actionsStart > helperStart && actionsEnd > actionsStart, 'selection action runner and handlers exist');
 
 function deferred() {
@@ -110,7 +110,7 @@ async function clickAndCheck(id, operation) {
   const pressContext = { $: () => toolbar, clearTimeout() {}, selectionTimer:null,
     document:{addEventListener(type, fn) {docEvents[type]=fn;}}, window:{addEventListener(type,fn){winEvents[type]=fn;}} };
   vm.createContext(pressContext);
-  vm.runInContext(app.slice(app.indexOf('let selectionPressedButton = null;'),app.indexOf('// Flex sizing')),pressContext);
+  vm.runInContext(app.slice(app.indexOf('let selectionPressedButton = null;'),app.indexOf('function runSelectionAction(')),pressContext);
   const down = () => events.pointerdown({button:0,preventDefault(){},target:{closest:()=>pressed}});
   down(); assert(pressed.classes.has('selection-action-pressed'));
   docEvents.pointerup({clientX:30,clientY:30}); assert(!pressed.classes.has('selection-action-pressed'));

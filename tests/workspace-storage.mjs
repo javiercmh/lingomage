@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {createWorkspaceStorage, validStories, validSettings, validCheckpoints, settingsSnapshot, restoreSettingsSnapshot, createSettingsPersistence} from '../js/workspace-storage.js';
+import {createWorkspaceStorage, validStories, validSettings, validCheckpoints, settingsSnapshot, restoreSettingsSnapshot, createSettingsPersistence} from '../js/core/workspace-storage.js';
 const paths=['data/stories.json','data/settings.json','data/generation-checkpoints.json'];
 function fixture(initial={}) {
   const files=new Map(Object.entries(initial)); let writes=0, failRead=false, failWrite=false;

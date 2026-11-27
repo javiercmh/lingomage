@@ -1,11 +1,11 @@
 // Generation timing and estimates: the pipeline stamps every request with a fake clock, the finished
 // operation saves what each step took, and estimates are the sum of each step's median over similar runs.
 import assert from 'node:assert/strict';
-import { createPipeline } from '../js/generation-pipeline.js';
-import { createGenerationController } from '../js/generation-controller.js';
-import { progressSteps } from '../js/generation-progress.js';
-import { busyTime, summarizeTimings, timingSamples, estimateGeneration, remainingTime, remainingText, plannedSteps, MIN_SAMPLES } from '../js/generation-timing.js';
-import { validSettings, settingsSnapshot } from '../js/workspace-storage.js';
+import { createPipeline } from '../js/generation/generation-pipeline.js';
+import { createGenerationController } from '../js/generation/generation-controller.js';
+import { progressSteps } from '../js/generation/generation-progress.js';
+import { busyTime, summarizeTimings, timingSamples, estimateGeneration, remainingTime, remainingText, plannedSteps, MIN_SAMPLES } from '../js/generation/generation-timing.js';
+import { validSettings, settingsSnapshot } from '../js/core/workspace-storage.js';
 
 const WORDS = ['Hund', 'Katze', 'Vogel', 'Fisch', 'Pferd', 'Maus'];
 const story = WORDS.map(word => `Der ${word} läuft schnell durch den Garten. `.repeat(12).trim()).join('\n\n');

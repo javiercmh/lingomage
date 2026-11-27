@@ -2,10 +2,10 @@ import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { createAiSession } from '../js/ai-session.js';
-import { createPipeline } from '../js/generation-pipeline.js';
-import { failureInfo, recoverySummary } from '../js/generation-errors.js';
-import { readingPlan, validateProse } from '../js/learning-validation.js';
+import { createAiSession } from '../js/core/ai-session.js';
+import { createPipeline } from '../js/generation/generation-pipeline.js';
+import { failureInfo, recoverySummary } from '../js/generation/generation-errors.js';
+import { readingPlan, validateProse } from '../js/generation/learning-validation.js';
 
 const app = appSource();
 const bridgeSource = fs.readFileSync('js/bridge.js', 'utf8');
@@ -234,10 +234,10 @@ for (const [kind, language, stages] of [
   const between = (from, to) => app.slice(app.indexOf(from), app.indexOf(to, app.indexOf(from)));
   const resume = between('async function resumeCheckpoint(', 'function revealRecovery(');
   assert.ok(resume.indexOf('pipeline.finishRequest(op)') < resume.indexOf('aiSession.run('), 'Resume finishes a completed request before, and outside, any session');
-  const cont = between("$('reader-edit-submit').addEventListener", "$('reader-dialog').addEventListener");
+  const cont = between("$('reader-edit-submit').addEventListener", '// end of js/reader/continue-flow.js');
   assert.ok(cont.indexOf('releaseSavedInference()') < cont.indexOf('aiSession.run('), 'Cleanup of earlier results happens before the session');
   assert.ok(cont.indexOf('aiSession.run(') < cont.indexOf('prepareStoryMemory(') && cont.indexOf('prepareStoryMemory(') < cont.indexOf('runContentOperation('), 'Summary preparation is inside the Continue/Rewrite session');
-  assert.match(between('async function runContentOperation(', 'const { operationProvenance'), /aiSession\.run\(\(\) => pipeline\.run\(op\)\)/);
+  assert.match(between('async function runContentOperation(', 'const { operationProvenance'), /aiSession\.run\(\(\) => runtime\.pipeline\.run\(op\)\)/);
   for (const name of ['async function acknowledgeReaderResult(', 'async function releaseSavedInference(', 'async function releaseInvalidReaderResponse(', 'async function savePendingReaderResult(']) {
     assert.ok(!/aiSession|ai\.start/.test(between(name, '\nasync function ') || between(name, '\nfunction ')), `${name} needs no session or inference`);
   }

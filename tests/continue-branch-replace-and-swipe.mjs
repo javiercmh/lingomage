@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import { createGenerationController } from '../js/generation-controller.js';
-import { createStoryModel } from '../js/story-model.js';
-import { operationLabel } from '../js/generation-errors.js';
+import { createGenerationController } from '../js/generation/generation-controller.js';
+import { createStoryModel } from '../js/core/story-model.js';
+import { operationLabel } from '../js/generation/generation-errors.js';
 import appSource from './support/app-source.cjs';
 
 const ver = (id, text, extra = {}) => ({
@@ -135,7 +135,7 @@ function makeController(story, { failPersist = false } = {}) {
   };
   globalThis.document = { visibilityState: 'hidden', createElement: () => ({ hidden: false, className: '', append() {}, querySelector: () => ({ hidden: false, addEventListener() {} }) }), querySelectorAll: () => [] };
   try {
-    const { createGenerationStatusUi } = await import('../js/generation-status-ui.js');
+    const { createGenerationStatusUi } = await import('../js/generation/generation-status-ui.js');
     const ui = createGenerationStatusUi({ $: () => ({}), generationLive: () => false, state: { notifyWhenReady: true, stories: [story] }, trySaveSettings: () => true });
     ui.notifyResult(appendOp, story);
     ui.notifyResult(branchOp, story);

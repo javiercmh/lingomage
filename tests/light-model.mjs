@@ -1,9 +1,9 @@
 // Light tasks model: choice resolution, stage routing in the pipeline, provenance and the settings file.
 import assert from 'node:assert/strict';
-import { lightModelChoice, lightTaskConfig, lightTasks, DEFAULT_LIGHT_TASKS } from '../js/light-model.js';
-import { stageModel, createPipeline } from '../js/generation-pipeline.js';
-import { createGenerationController } from '../js/generation-controller.js';
-import { validSettings, settingsSnapshot } from '../js/workspace-storage.js';
+import { lightModelChoice, lightTaskConfig, lightTasks, DEFAULT_LIGHT_TASKS } from '../js/core/light-model.js';
+import { stageModel, createPipeline } from '../js/generation/generation-pipeline.js';
+import { createGenerationController } from '../js/generation/generation-controller.js';
+import { validSettings, settingsSnapshot } from '../js/core/workspace-storage.js';
 
 const models = [{ id: 'main', reasoningLevels: ['low', 'high'] }, { id: 'fast', reasoningLevels: ['low', 'medium'] }, { id: 'plain' }];
 

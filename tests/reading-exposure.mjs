@@ -1,7 +1,7 @@
 import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {createExposureTracker, paragraphRanges, wordCount, requiredDwellMs, visibleFraction, IDLE_MS, MIN_DWELL_MS, SAMPLE_MS, MAX_SAMPLE_GAP_MS} from '../js/reading-exposure.js';
+import {createExposureTracker, paragraphRanges, wordCount, requiredDwellMs, visibleFraction, IDLE_MS, MIN_DWELL_MS, SAMPLE_MS, MAX_SAMPLE_GAP_MS} from '../js/tracking/reading-exposure.js';
 
 // --- Paragraphs and word counts -------------------------------------------------------------------------
 {
@@ -85,7 +85,7 @@ function harness(paragraphs, visible = () => 1) {
   assert.match(app, /usage\.setReader\(null\); stopExposure\(\)/);
   // Most looked up rows open a read-only detail sheet; viewing or listening there records nothing.
   assert.ok(/open\.className = 'lookup-row'[\s\S]{0,1500}openLookupDetail\(code, entry\.key, open\)/.test(app), 'each row is a button that opens its detail sheet');
-  const detail = app.slice(app.indexOf('function openLookupDetail'), app.indexOf('// end of js/stats-view.js'));
+  const detail = app.slice(app.indexOf('function openLookupDetail'), app.indexOf('// end of js/screens/stats-view.js'));
   assert.ok(detail.length > 0 && !/record\w*\(/.test(detail), 'the detail sheet never records a lookup');
   assert.match(detail, /if \(speaking\)[^\n]*speech\.stop\(\)/, 'closing stops only speech the sheet started');
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');

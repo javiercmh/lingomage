@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {createReaderPanels} from '../js/reader-panels.js';
+import {createReaderPanels} from '../js/reader/reader-panels.js';
 const targets=new Map();
 function target(id){
  if(!targets.has(id))targets.set(id,{hidden:true,handlers:new Map(),setAttribute(){},focus(){},addEventListener(type,handler){if(!this.handlers.has(type))this.handlers.set(type,new Set());this.handlers.get(type).add(handler);},removeEventListener(type,handler){this.handlers.get(type)?.delete(handler);}});

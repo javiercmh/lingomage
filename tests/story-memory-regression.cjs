@@ -1,5 +1,5 @@
 (async()=>{
-const {bindStory}=await import('./support/controllers.mjs');const {estimateTokens,emptyMemory}=await import('../js/story-memory.js');
+const {bindStory}=await import('./support/controllers.mjs');const {estimateTokens,emptyMemory}=await import('../js/generation/story-memory.js');
 const assert = require('node:assert/strict');
 const plain = value => JSON.parse(JSON.stringify(value));
 
@@ -136,7 +136,7 @@ const loading={querySelector:()=>({textContent:''})};
  await assert.rejects(c.prepareStoryMemory(story,entries,loading),/cancelled/,'cancellation during compaction still stops');
 
  // Memory cache keys use the memory prompt versions, not the app prompt version; older memory versions are dropped on save.
- const {SUMMARY_PROMPT_VERSION,COMPACTION_PROMPT_VERSION,MEMORY_VERSION}=await import('../js/story-memory.js');
+ const {SUMMARY_PROMPT_VERSION,COMPACTION_PROMPT_VERSION,MEMORY_VERSION}=await import('../js/generation/story-memory.js');
  const summaryRecord=story.memories.find(r=>!r.compactedFrom);assert.equal(JSON.parse(summaryRecord.key)[1],SUMMARY_PROMPT_VERSION);assert.equal(summaryRecord.promptVersion,SUMMARY_PROMPT_VERSION);
  assert.ok(condensed.every(r=>JSON.parse(r.key)[1]===COMPACTION_PROMPT_VERSION&&r.promptVersion===COMPACTION_PROMPT_VERSION));
  story.memories=[{key:'legacy',memoryVersion:'1',memory:{}}];c.readerAi=async(kind,input)=>oneEvent(input);

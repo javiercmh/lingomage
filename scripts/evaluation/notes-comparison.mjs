@@ -1,7 +1,7 @@
 // Offline utilities share the production validator, without changing repair policy.
 import fs from 'node:fs';
 import {createHash} from 'node:crypto';
-import {parseContent, validateProse, validateNotes, SAFEGUARD_VERSION} from '../../js/learning-validation.js';
+import {parseContent, validateProse, validateNotes, SAFEGUARD_VERSION} from '../../js/generation/learning-validation.js';
 export const hash=value=>createHash('sha256').update(typeof value==='string'?value:JSON.stringify(value)).digest('hex');
 export const read=file=>JSON.parse(fs.readFileSync(file,'utf8'));
 export function write(file,value){fs.writeFileSync(file+'.tmp',JSON.stringify(value,null,2)+'\n');fs.renameSync(file+'.tmp',file);}

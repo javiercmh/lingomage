@@ -2,8 +2,8 @@ import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import {chapterShareText, storyShareText, storyExportFile, slugify, shareTargets, downloadStoryFile, shareStoryFile, shareText, copyText} from '../js/story-share.js';
-import {createStoryModel, pathLabel} from '../js/story-model.js';
+import {chapterShareText, storyShareText, storyExportFile, slugify, shareTargets, downloadStoryFile, shareStoryFile, shareText, copyText} from '../js/screens/story-share.js';
+import {createStoryModel, pathLabel} from '../js/core/story-model.js';
 const version = {id:'v',title:'買い物',story:'買います。',storySegments:[{text:'買',reading:'か'},{text:'います。'}],glossary:[{word:'買う',meaning:'buy'}]};
 const alternate = {...version,id:'a',title:'別',story:'帰ります。'};
 const story = {id:'S',title:'日本の話',unknown:{future:true},memories:[{lineage:['v']}],memoryRebuild:{entries:[]},chapters:[{id:'c',versions:[version,alternate],help:[{text:'explanation'}]}],paths:[{id:'original',name:'Original',entries:[{chapterId:'c',versionId:'v'}]},{id:'alt',name:'Alternate 1',entries:[{chapterId:'c',versionId:'a'}]}],activePathId:'alt'};
@@ -64,7 +64,7 @@ const context={$,state:{},workspaceStorage:{entries:new Map([['data/stories.json
   shareText:async payload=>{delivered.push(['shareText',payload.text]);return {cancelled:true};},copyText:async payload=>{delivered.push(['copy',payload.text]);return {done:'copied'};},
   save:{available:false},share:{available:false},isNative:false,document:{createElement:element,body:element(),querySelector:()=>null},window:{innerHeight:800,innerWidth:375},setTimeout:(fn)=>{context.pendingReset=fn;return 1;},clearTimeout(){},renderLibrary(){rendered++;},navigator:{clipboard:{}},trySaveSettings(){context.saves=(context.saves||0)+1;return context.saveResult!==false;},toast:message=>toasts.push(message),console:{warn(){}},beginStorySelection(){},confirmStoryDeletion(){}};
 vm.createContext(context);
-vm.runInContext(app.slice(app.indexOf('function closeStoryMenu('),app.indexOf('function confirmStoryDeletion('))+app.slice(app.indexOf('function openShareDialog('),app.indexOf('// end of js/reader-help.js'))+app.slice(app.indexOf('// Row summaries state'),app.indexOf('// Library → Import story…')),context);
+vm.runInContext(app.slice(app.indexOf('function closeStoryMenu('),app.indexOf('function confirmStoryDeletion('))+app.slice(app.indexOf('function openShareDialog('),app.indexOf('// end of js/screens/share-dialog.js'))+app.slice(app.indexOf('// Row summaries state'),app.indexOf('// Library → Import story…')),context);
 const dialog=$('share-dialog');
 context.openStoryMenu(longer2,trigger);assert.equal(context.state.storyMenu.popover.children.length,3);
 context.state.storyMenu.popover.children[1].click();

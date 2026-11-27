@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import {createPipeline, pendingRequests} from '../js/generation-pipeline.js';
-import {progressSteps, progressSummary} from '../js/generation-progress.js';
-import {readingPlan, validateProse} from '../js/learning-validation.js';
+import {createPipeline, pendingRequests} from '../js/generation/generation-pipeline.js';
+import {progressSteps, progressSummary} from '../js/generation/generation-progress.js';
+import {readingPlan, validateProse} from '../js/generation/learning-validation.js';
 // Japanese notes and readings run together, each checkpointed and released on its own.
 const prose={title:'今日',story:'今日は町へ行きます。',glossary:[{word:'町',meaning:'town',forms:['町']}]};
 const plan={vocabulary:[],grammar:[],guidance:'Clear.'};

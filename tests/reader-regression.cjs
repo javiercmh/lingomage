@@ -1,8 +1,8 @@
 const appSource = require('./support/app-source.cjs');
 (async()=>{
 const {bindStory, bindGeneration, bindPanels}=await import('./support/controllers.mjs');
-const {markStoryActivity}=await import('../js/library-activity.js');
-const prompts=await import('../js/prompts.js');
+const {markStoryActivity}=await import('../js/screens/library-activity.js');
+const prompts=await import('../js/generation/prompts.js');
 // Dependency-free regression harness; exercises production functions with isolated DOM/AI stubs.
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -10,26 +10,26 @@ const assert = require('node:assert/strict');
 const source = appSource();
 const htmlSource = fs.readFileSync(require('node:path').join(__dirname, '../index.html'), 'utf8');
 const cssSource = fs.readFileSync(require('node:path').join(__dirname, '../css/style.css'), 'utf8');
-const readerTextSource = fs.readFileSync(require('node:path').join(__dirname, '../js/reader-text.js'), 'utf8').replaceAll('export function ', 'function ');
-const learningSource = fs.readFileSync(require('node:path').join(__dirname, '../js/learning-validation.js'), 'utf8').replace(/^import .*;\n/m, '').replaceAll('export ', '');
-const requestLifecycleSource = fs.readFileSync(require('node:path').join(__dirname, '../js/request-lifecycle.js'), 'utf8').replaceAll('export async function ', 'async function ');
-const speechSource = fs.readFileSync(require('node:path').join(__dirname, '../js/reader-speech.js'), 'utf8').replaceAll('export function ', 'function ').replaceAll('export async function ', 'async function ');
-const notificationSource = fs.readFileSync(require('node:path').join(__dirname, '../js/ai-notification.js'), 'utf8').replaceAll('export function ', 'function ');
+const readerTextSource = fs.readFileSync(require('node:path').join(__dirname, '../js/reader/reader-text.js'), 'utf8').replaceAll('export function ', 'function ');
+const learningSource = fs.readFileSync(require('node:path').join(__dirname, '../js/generation/learning-validation.js'), 'utf8').replace(/^import .*;\n/m, '').replaceAll('export ', '');
+const requestLifecycleSource = fs.readFileSync(require('node:path').join(__dirname, '../js/core/request-lifecycle.js'), 'utf8').replaceAll('export async function ', 'async function ');
+const speechSource = fs.readFileSync(require('node:path').join(__dirname, '../js/reader/reader-speech.js'), 'utf8').replaceAll('export function ', 'function ').replaceAll('export async function ', 'async function ');
+const notificationSource = fs.readFileSync(require('node:path').join(__dirname, '../js/core/ai-notification.js'), 'utf8').replaceAll('export function ', 'function ');
 function section(start, end) { return source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start))); }
 function sandbox(extra = {}) {
   const elements = new Map();
   const element = (tag = 'div') => ({tagName:tag,hidden:false,classList:{toggle(){},contains:()=>false},dataset:{},childNodes:[],events:{},attributes:{},
     get textContent(){return this.childNodes.map(node=>node.textContent).join('');},set textContent(value){this.childNodes=value ? [{tagName:'#text',textContent:String(value)}] : [];},
     append(...nodes){this.childNodes.push(...nodes);},addEventListener(name,fn){this.events[name]=fn;},setAttribute(name,value){this.attributes[name]=value;},focus(){this.focused=true;},scrollIntoView(){},remove(){},querySelector(selector){return this.childNodes.find(node=>node.tagName===selector) || this.childNodes.map(node=>node.querySelector?.(selector)).find(Boolean) || null;},querySelectorAll(){return [];},classList:{add(){},remove(){},toggle(){}}});
-  // js/light-model.js lightTaskConfig without a light model: every task uses the story model.
+  // js/core/light-model.js lightTaskConfig without a light model: every task uses the story model.
   const c = {parallelLimitFor:()=>3,lightTaskConfig:(state)=>({providerId:state.providerId,model:state.model,reasoning:state.reasoning}),backgroundRun:null,workspaceStorage:{assertWritable(){}},usage:{setReader(){},checkpoint(){}},settingsFeedback:{sync(){}},pipeline:null,state:{},console,crypto:{randomUUID:(()=>{let id=0;return ()=>`help-test-${++id}`;})()},PROMPT_VERSION:'test',STORY_GUIDES:{de:{beginner:'Simple sentences'}},renderChapterRequest(){},updateReaderNavigation(){},renderCheckpointRecovery(){},LANGUAGES:{ja:'Japanese',de:'German',ru:'Russian','es-CL':'Spanish'},SPEECH_LANGUAGES:{de:'de-DE',ja:'ja-JP',ru:'ru-RU','es-CL':'es-CL'},renderGenerationRecovery(){},readerPanel:()=>({classList:{toggle(){}}}),$:id=>{if(!elements.has(id)) elements.set(id,element()); return elements.get(id);},document:{body:element(),createElement:element,createElementNS:(_ns,name)=>element(name),createTextNode:value=>({tagName:'#text',textContent:value}),querySelectorAll:()=>[]},toast(){},setTimeout:()=>0,clearTimeout(){},...extra};
   c.readerGeneration = null; c.renderReaderGeneration = () => {}; c.setReaderGeneration = value => { c.readerGeneration = value; };
   vm.createContext(c); c.markStoryActivity = markStoryActivity; for (const name of ['storyInstructions','chapterInstructions','helpInstructions']) if (!(name in c)) c[name] = prompts[name];
-  // app.js accessors for bindings other code reassigns; tests set the plain names.
-  for (const [name, key] of [['currentReaderGeneration','readerGeneration'],['currentPipeline','pipeline'],['currentBackgroundRun','backgroundRun']]) if (!(name in c)) c[name] = () => c[key];
+  // app.js's shared runtime bindings (runtime.pipeline, …); tests set the plain names.
+  c.runtime = c; c.maybeStartBackgroundContext ??= () => {};
   vm.runInContext(notificationSource, c);
-  vm.runInContext(fs.readFileSync('js/story-model.js','utf8').replace(/^[\s\S]*?(?=export function pathLabel)/, '').replaceAll('export function ', 'function '), c);
-  vm.runInContext(fs.readFileSync('js/generation-errors.js','utf8').replace(/^import .*\n/m, '').replaceAll('export function ', 'function '), c);
+  vm.runInContext(fs.readFileSync('js/core/story-model.js','utf8').replace(/^[\s\S]*?(?=export function pathLabel)/, '').replaceAll('export function ', 'function '), c);
+  vm.runInContext(fs.readFileSync('js/generation/generation-errors.js','utf8').replace(/^import .*\n/m, '').replaceAll('export function ', 'function '), c);
   vm.runInContext(readerTextSource, c);
   vm.runInContext(learningSource, c);
   vm.runInContext(requestLifecycleSource, c);
@@ -254,7 +254,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   const original={id:'A',language:'ja',chapters:[{id:'CA',help:[],versions:[{id:'VA',story:'日本'}]}]};
   const other={id:'B',language:'de',chapters:[{id:'CB',help:[],versions:[{id:'VB'}]}]};current=original;
   const help=sandbox({state:{readerId:'A',readerSelection:{storyId:'A',text:'日本',start:0,end:2,chapterId:'CA',versionId:'VA',profile:{}},model:'mock',providerId:'mock'},readerStory:()=>current,normalizeChapters:s=>s.chapters,activeChapter:()=>current.chapters[0],activeVersion:()=>current.chapters[0].versions[0],readerPanel:()=>({scrollTop:150}),persistReaderStory(story){persisted.push({id:story.id,stamp:story.lastActivityAt});},readerAi:()=>{helpRequests++;return new Promise(r=>finish=r);},decodeHelp:JSON.parse,renderSavedHelp(){},ai:{acknowledge:async()=>{}}});
-  vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(',"$('selection-translate')"),help);
+  vm.runInContext(section('function helpContext(', 'function renderHighlightedText(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(','// end of js/reader/reader-requests.js'),help);
   const pending=help.explainSelection();await new Promise(r=>setImmediate(r));
   await help.explainSelection();assert.equal(helpRequests,1);
   assert.equal(help.state.activeHelpRequest.storyId,'A');assert.equal(help.state.activeHelpRequest.chapterId,'CA');assert.equal(help.state.activeHelpRequest.versionId,'VA');assert.equal(help.state.activeHelpRequest.action,'initial');
@@ -274,7 +274,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
     const target={id:'F',language:'ja',chapters:[{id:'CF',help:[],versions:[{id:'VF',story:'日本'}]}]};let resolveAi,failSave=true,failAck=true,saves=[];
     const run=sandbox({state:{readerId:'F',readerSelection:{storyId:'F',text:'日本',start:0,end:2,chapterId:'CF',versionId:'VF',profile:{}},model:'mock',providerId:'mock'},readerStory:()=>target,normalizeChapters:s=>s.chapters,activeChapter:()=>target.chapters[0],activeVersion:()=>target.chapters[0].versions[0],readerPanel:()=>({scrollTop:0}),renderPendingReaderResult(){},
       persistReaderStory(story){saves.push(story.lastActivityAt);if(failSave&&saves.length>1)throw new Error('disk full');},readerAi:()=>new Promise(r=>{run.state.pendingReaderRequestId='req-F';resolveAi=r;}),decodeHelp:JSON.parse,renderSavedHelp(){},ai:{acknowledge:async()=>{if(failAck)throw new Error('ack down');}}});
-    vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(',"$('selection-translate')"),run);
+    vm.runInContext(section('function helpContext(', 'function renderHighlightedText(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(','// end of js/reader/reader-requests.js'),run);
     const request=run.explainSelection();await new Promise(r=>setImmediate(r));resolveAi(JSON.stringify({translation:'Japan',explanation:'Meaning'}));await request;
     assert.equal(target.lastActivityAt,undefined,'a failed save leaves no stamp');assert.equal(target.chapters[0].help.length,0);assert.equal(run.state.pendingReaderResult.saved,false);
     failSave=false;await assert.rejects(run.savePendingReaderResult(),/ack down/);
@@ -290,7 +290,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
     let calls=0,fail=true,captured;
     const selected={storyId:'S',chapterId:'C',versionId:'V',text:'Brot',start:0,end:4,profile:{},helpId:action==='detail'?'H':undefined};
     const retryHelp=sandbox({state:{readerId:'S',readerSelection:selected,model:'mock',providerId:'mock'},readerStory:()=>story,normalizeChapters:s=>s.chapters,activeChapter:()=>story.chapters[0],activeVersion:()=>story.chapters[0].versions[0],readerPanel:()=>({scrollTop:0}),persistReaderStory(){},readerAi:async(kind,input)=>{calls++;captured=input;if(fail)throw Object.assign(Error('Service failed'),{code:'service'});return JSON.stringify({explanation:'Saved response'});},decodeHelp:JSON.parse,renderSavedHelp(){},ai:{acknowledge:async()=>{}}});
-    vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(',"$('selection-translate')"),retryHelp);
+    vm.runInContext(section('function helpContext(', 'function renderHighlightedText(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(','// end of js/reader/reader-requests.js'),retryHelp);
     await retryHelp.explainSelection('explain',action,'Why this form?',selected);
     assert.equal(retryHelp.state.readerHelpBusy,false);assert.equal(calls,1);
     const recovery=retryHelp.$('reader-help').childNodes.find(node=>node.className==='recovery-panel help-request-recovery');assert.ok(recovery);
@@ -309,7 +309,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
     const selected={storyId:'S',chapterId:'C',versionId:'V',helpId:'H',text:'Brot',start:0,end:4,profile:{}};
     let shouldCancel=true;
     const c=sandbox({state:{readerId:'S',model:'mock',providerId:'mock'},readerStory:()=>story,normalizeChapters:s=>s.chapters,activeChapter:()=>story.chapters[0],activeVersion:()=>story.chapters[0].versions[0],readerPanel:()=>({scrollTop:0}),persistReaderStory(){},readerAi:async()=>{c.state.pendingReaderRequestId='cancelled-id';if(shouldCancel)throw Error('Request cancelled.');return JSON.stringify({explanation:'New detail'});},decodeHelp:JSON.parse,renderSavedHelp(){},ai:{acknowledge:async()=>{if(cleanupFails)throw Error('offline');}}});
-    vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(',"$('selection-translate')"),c);
+    vm.runInContext(section('function helpContext(', 'function renderHighlightedText(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(','// end of js/reader/reader-requests.js'),c);
     await c.explainSelection('explain',action,'Why this form?',selected);
     assert.equal(c.readerGeneration?.phase,cleanupFails?'cleanup':undefined);
     assert.equal(c.state.readerHelpBusy,false);
@@ -353,7 +353,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   console.log('PASS root, ruby, text-node and reading-boundary selections omit readings');
 
   const focused=sandbox();
-  vm.runInContext(section('function helpContext(', 'function selectedPassage('), focused);
+  vm.runInContext(section('function helpContext(', 'function renderHighlightedText('), focused);
   for (const [language, sentence, fragment] of [
     ['ja', '空は青く、風はやさしいです。', 'く'],
     ['de', 'Wir gehen mit dem Kind.', 'dem'],
@@ -385,7 +385,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
     const story = {id:'S',language:code,chapters:[chapter]};
     let request, instructions, saved = false;
     const f = sandbox({state:{readerId:'S',providerId:'mock',model:'model'},readerStory:()=>story,normalizeChapters:s=>s.chapters,activeChapter:()=>chapter,activeVersion:()=>version,readerPanel:()=>({scrollTop:0}),persistReaderStory(){saved=true;},readerAi:async(kind,input,prompt)=>{request=input;instructions=prompt;f.state.pendingReaderRequestId='r';saved=false;return 'The ending adds a boundary.\n\n「でも」 marks a contrast.';},decodeHelp:text=>({explanation:text}),renderSavedHelp(){},ai:{acknowledge:async()=>{assert.equal(saved,true);}}});
-    vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(', "$('selection-translate')"),f);
+    vm.runInContext(section('function helpContext(', 'function renderHighlightedText(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(', '// end of js/reader/reader-requests.js'),f);
     const selected = {storyId:'S',chapterId:'C',versionId:'V',helpId:'H',text:'く',start:3,end:4,profile:{}};
     await f.explainSelection('explain','detail','explain prefixes',selected);
     assert.equal(request.followUp,'explain prefixes');
@@ -440,7 +440,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
         assert.equal(JSON.parse(stored).chapters[0].help[0].followUps.at(-1).followUp,draft.question);
       }}
     });
-    vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(', "$('selection-translate')"),f);
+    vm.runInContext(section('function helpContext(', 'function renderHighlightedText(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(', '// end of js/reader/reader-requests.js'),f);
     const selected = {storyId:'S',chapterId:'C',versionId:'V',helpId:'H',text:'Wort',start:4,end:8,profile:{}};
     const regenerate = () => f.explainSelection('explain','detail',draft.question,selected,undefined,draft);
     if (failGeneration) {
@@ -505,7 +505,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
     const panel = {scrollTop:900}; let renders = 0;
     const f = sandbox({state:{readerId:'S',providerId:'mock',model:'model'},readerStory:()=>story,normalizeChapters:s=>s.chapters,activeChapter:()=>chapter,activeVersion:()=>version,readerPanel:()=>panel,persistReaderStory(){},
       readerAi:async()=>{panel.scrollTop=120;f.state.pendingReaderRequestId='r';return 'More detail.';},decodeHelp:text=>({explanation:text}),renderSavedHelp(){renders++;panel.scrollTop=0;},recordSelectionLookup(){},ai:{acknowledge:async()=>{}}});
-    vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(', "$('selection-translate')"),f);
+    vm.runInContext(section('function helpContext(', 'function renderHighlightedText(')+section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section('async function explainSelection(', '// end of js/reader/reader-requests.js'),f);
     await f.explainSelection('explain','detail','',{storyId:'S',chapterId:'C',versionId:'V',helpId:'H',text:'く',start:3,end:4,profile:{}});
     assert.equal(entry.followUps.length,1); assert.equal(renders,2);
     assert.equal(panel.scrollTop,120,'completion keeps where the learner scrolled during the request, not where they asked');
@@ -513,7 +513,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   console.log('PASS a finished explanation request never moves the learner back to where they asked');
 
   const contract=sandbox();
-  vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function decodeHelp(', 'async function explainSelection('), contract);
+  vm.runInContext(section('function helpContext(', 'function renderHighlightedText(')+section('function decodeHelp(', 'async function explainSelection('), contract);
   const promptContract=prompts;
   const detailPrompt=promptContract.helpInstructions('detail');
   assert.ok(detailPrompt.includes('Return only the explanation text'));
@@ -548,7 +548,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   console.log('PASS explanation/example contracts reject malformed counts, ranges, translations and annotations');
 
   const rendered=sandbox({normalizeReaderControls(){},createReaderActivation:()=>()=>{},activateStoryText(){},glossaryForTrigger:()=>null,state:{furigana:true,explanationSelectionMode:false,selectedExplanationIds:new Set()},readerStory:()=>({id:'S',language:'ja'}),profileSnapshot:()=>({})});
-  vm.runInContext(section('function helpContext(', 'function selectedPassage(')+section('function wireLongPress(', 'function renderLibrary(')+section('function renderHighlightedText(', 'async function readerAi('),rendered);
+  vm.runInContext(section('function helpContext(', 'function renderHighlightedText(')+section('function wireLongPress(', 'function renderLibrary(')+section('function renderHighlightedText(', 'async function readerAi('),rendered);
   const formatted=rendered.document.createElement('div');
   rendered.renderDetailText(formatted, 'In “al salir,” **al** contracts **a + el**.\n\nUse **bold with *italic* inside** and `a él`. <img src=x> Unmatched **marker');
   const flatten = node => [node,...(node.childNodes || []).flatMap(flatten)];
@@ -622,7 +622,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   console.log('PASS saved explanations follow the text (start, then end, then newest) without changing their stored order');
 
   const removal=sandbox({state:{stories:[{id:'a'},{id:'b'}],selectedStoryIds:new Set(['a']),storySelectionMode:true},persistStories(){if(removal.fail)throw Error('disk');},updateCount(){},renderLibrary(){},syncStorySelection(){},window:{scrollY:0,scrollTo(){}},toast(){},fail:false});
-  vm.runInContext(section('function pendingDeletionBlocked(', '} = createLibraryView(').replace(/const \{[^}]*$/, '')+section('function confirmStoryDeletion(', 'function wireLongPress('),removal);
+  vm.runInContext(section('function pendingDeletionBlocked(', 'const {\n  beginStorySelection')+section('function syncStorySelection(', '// end of js/screens/library-selection.js')+section('function confirmStoryDeletion(', 'function wireLongPress('),removal);
   assert.equal(removal.removeSelectedStories(new Set(['a'])),true);assert.deepEqual(removal.state.stories.map(x=>x.id),['b']);assert.equal(removal.state.storySelectionMode,false);
   removal.state.stories=[{id:'a'},{id:'b'}];removal.state.selectedStoryIds=new Set(['a']);removal.state.storySelectionMode=true;removal.fail=true;
   assert.equal(removal.removeSelectedStories(new Set(['a'])),false);assert.deepEqual(removal.state.stories.map(x=>x.id),['a','b']);assert.deepEqual(Array.from(removal.state.selectedStoryIds),['a']);
@@ -667,7 +667,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   gen.showOperationResult=()=>{};
   gen.aiSession={run:fn=>fn()};
   gen.structuredClone=structuredClone;
-  Object.assign(gen,await import('../js/generation-progress.js'));gen.paintChapterProgress=()=>{};
+  Object.assign(gen,await import('../js/generation/generation-progress.js'));gen.paintChapterProgress=()=>{};
   bindGeneration(gen);
   gen.state.stories=[story3];
   gen.document.createElement = sandbox().document.createElement;
@@ -676,7 +676,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   bindStory(gen);
   Object.assign(gen,{estimateFor:()=>null,operationPlan:()=>({}),pendingSummaryCount:()=>0,notifyStopped:()=>{}}); // estimates and notifications are tested in generation-timing.mjs
   Object.assign(gen,prompts);
-  vm.runInContext(section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section("$('reader-edit-submit').addEventListener", "$('reader-dialog').addEventListener"),gen);
+  vm.runInContext(section('function createHelpLoading(', 'function renderSavedHelp(')+lifecycle+section("$('reader-edit-submit').addEventListener", '// end of js/reader/continue-flow.js'),gen);
   await submit();
   assert.ok(requested.storyMemory.events.some(item=>item.event==='Text three'));assert.equal(requested.recentProse,'Text three');assert.equal(requested.priorActiveChapters,undefined);assert.equal(requested.precedingChapters,undefined);
   assert.equal(story3.chapters.length,4);assert.equal(story3.chapters[3].basedOnVersionId,'threev');assert.equal(story3.chapters[1].versions.length,1);
@@ -771,7 +771,7 @@ const lifecycle = section('async function acknowledgeReaderResult(', 'function d
   assert.equal(pos.$('reader-prompt').value,'Keep a clue');assert.equal(pos.$('reader-edit-error').textContent,'Provider failed');
   console.log('PASS reopening a failed chapter request restores its original chapter and prompt');
   // A legacy story with an empty chapters array gets real chapters, so synthesized paths resolve and later saves validate.
-  const {validStories}=await import('../js/workspace-storage.js');
+  const {validStories}=await import('../js/core/workspace-storage.js');
   const emptyChapters={id:'E',language:'de',title:'T',story:'Text.',chapters:[]};
   pos.state.readerPositions={};pos.openReader(emptyChapters);
   assert.equal(emptyChapters.chapters.length,1);assert.equal(emptyChapters.paths[0].entries[0].chapterId,emptyChapters.chapters[0].id);assert.ok(validStories([emptyChapters]));
