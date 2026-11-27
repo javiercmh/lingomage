@@ -6,16 +6,17 @@ import { ai } from '../bridge.js';
 import { continueChapterNumber, continuePrefixEntries, continueResultPathId, pathLabel } from '../core/story-model.js';
 import { createGenerationController } from './generation-controller.js';
 import { failureInfo } from './generation-errors.js';
+import { savedFollowUps } from '../reader/help-context.js';
 
 export function createGenerationResults({
   $, aiSession, elementInView, ensureReaderOpen, ensureStoryPaths, fillLevelOptions, generationAction,
   isViewingChapter, normalizeChapters, notifyResult, persistReaderPosition, persistReaderStory,
   queueBackgroundContext, readerPanel, readingDescription, rememberReaderPosition, renderChapterNavigation,
-  renderCheckpointRecovery, renderReaderActions, renderReaderGeneration, runtime, savedFollowUps, selectedPath,
+  renderCheckpointRecovery, renderReaderActions, renderReaderGeneration, runtime, selectedPath,
   setReaderGeneration, setScope, showStorageErrors, state, toast, updateReader, updateReaderNavigation,
   workspaceStorage
 }) {
-  const { operationProvenance, applyContentOperation, clearNotesPending } = createGenerationController({state, normalizeChapters:(...args)=>normalizeChapters(...args), ensureStoryPaths:(...args)=>ensureStoryPaths(...args), persistReaderStory, savedFollowUps: (...args) => savedFollowUps(...args)});
+  const { operationProvenance, applyContentOperation, clearNotesPending } = createGenerationController({state, normalizeChapters:(...args)=>normalizeChapters(...args), ensureStoryPaths:(...args)=>ensureStoryPaths(...args), persistReaderStory, savedFollowUps});
   // Reading while notes are written: the chapter opens once its text (and Japanese readings) is saved; notes appear as
   // their parts finish. The status bar keeps Cancel and counts saved note parts; the reader keeps its place.
   function notesProgressMessage(op) {

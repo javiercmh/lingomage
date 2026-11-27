@@ -9,13 +9,14 @@ import { lightModelChoice, lightTaskConfig } from '../core/light-model.js';
 import { markStoryActivity } from '../screens/library-activity.js';
 import { saveBeforeAcknowledge } from '../core/request-lifecycle.js';
 import { timingEntry } from '../generation/generation-timing.js';
+import { helpContext, overlappingHelp, resolvedHelpContext, savedFollowUps, validTextRange } from './help-context.js';
 
 export function createReaderRequests({
   $, activeChapter, activeVersion, aiSession, confirmReplaceHelp, createHelpLoading, finishGeneratedRequest,
-  helpContext, LANGUAGES, normalizeChapters, overlappingHelp, persistReaderStory, readerPanel, readerStory,
-  recordSelectionLookup, renderCheckpointRecovery, renderReaderGeneration, renderSavedHelp, resolvedHelpContext,
-  runContentOperation, runtime, savedFollowUps, setReaderGeneration, showOperationResult, state,
-  stopBackgroundContext, toast, updateReader, validTextRange, workspaceStorage
+  LANGUAGES, normalizeChapters, persistReaderStory, readerPanel, readerStory,
+  recordSelectionLookup, renderCheckpointRecovery, renderReaderGeneration, renderSavedHelp,
+  runContentOperation, runtime, setReaderGeneration, showOperationResult, state,
+  stopBackgroundContext, toast, updateReader, workspaceStorage
 }) {
   async function readerAi(kind, input, instructions, requestPanel, config = { providerId: state.providerId, model: state.model, reasoning: state.reasoning }) {
     if (config.signal?.stopped || config.signal?.cancelledByUser) throw new Error('Request cancelled.');

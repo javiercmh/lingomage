@@ -7,12 +7,13 @@ import { glossaryForTrigger } from './reader-activation.js';
 import { lightTaskConfig } from '../core/light-model.js';
 import { markStoryActivity } from '../screens/library-activity.js';
 import { validateDefinedNote } from '../generation/learning-validation.js';
+import { validTextRange } from './help-context.js';
 
 export function createDefineNote({
   $, activeChapter, activeVersion, closeWordNote, LANGUAGES, normalizeChapters, persistReaderStory, readerAi,
   readerPanel, readerStory, releaseInvalidReaderResponse, releaseSavedInference, renderCheckpointRecovery,
   renderPendingReaderResult, renderReaderGeneration, runtime, savePendingReaderResult, setReaderGeneration,
-  showWordNote, state, stopBackgroundContext, toast, updateReader, validTextRange
+  showWordNote, state, stopBackgroundContext, toast, updateReader
 }) {
   // Define (PED-002): an on-demand vocabulary note for the selection, saved with the chapter's notes and
   // underlined like them. A selection inside an existing note opens that note without an AI request.

@@ -81,10 +81,10 @@ function fillScopeOptions(input, selected = 'scene', describe) {
 // reference text in index.html. PREFERRED_MODEL preselects the story model on first use only.
 const PREFERRED_MODEL = 'gpt-6.2-sol';
 const $ = id => document.getElementById(id);
-// Runtime state by area. Some fields are first set where they are needed (for example storageBlocked, readerHelpBusy).
+// Runtime state by area. Every field a module reads or sets is declared here with its initial value.
 const state = {
   // Stores
-  stories: [], current: null, readerPositions: {}, checkpointBlocked: false,
+  stories: [], current: null, readerPositions: {}, checkpointBlocked: false, storageBlocked: false,
   // Settings (saved in data/settings.json; SETTINGS_ADMIT in js/core/settings-controls.js limits what loads)
   languageOrder: Object.keys(LANGUAGES), standardizedLevels: {}, targetLanguages: {}, learnerProfiles: {},
   languageExpectations: {}, languageSetupDismissed: false, providerId: '', model: '', reasoning: '', lightModel: '',
@@ -96,71 +96,33 @@ const state = {
   // AI requests in flight and unsaved responses
   requestId: null, pendingStoryRequestId: null, pendingGeneration: null, pendingReaderRequestId: null,
   pendingReaderResult: null, activeHelpRequest: null, activeChapterRequest: null, readerEditBusy: false,
-  readerEditDraft: null,
+  readerEditDraft: null, readerHelpBusy: false, memoryRebuildFailure: null,
   // Reader
   readerId: null, readerChapter: 0, readerVersion: 0, readerSelection: null, readerHistoryEntry: false,
   wordNoteTrigger: null, explanationSelectionMode: false, selectedExplanationIds: new Set(), selectionFocusId: '',
+  followUpEdit: null, readerRemoval: null, switchingReader: false,
   // Chapter listening
-  speechVersionKey: '', playerEnabled: false, player: null, playerUnits: [], following: true,
+  speechVersionKey: '', playerEnabled: false, player: null, playerUnits: [], playerRate: null, following: true,
   // Library
   libraryLanguage: 'all', librarySort: 'recent', storyMenu: null, libraryStale: false, libraryPlainHero: false,
   deleteTrigger: null, deleteStoryIds: new Set(), storySelectionMode: false, selectedStoryIds: new Set(),
-  storySelectionFocusId: '',
+  storySelectionFocusId: '', importingStory: false, shareDialog: null, shareCopiedTimer: null,
+  // Profile
+  statsRange: 'today',
   // Page
   toastTimer: null
 };
 
 // Bindings that several modules read and reassign live on `runtime`, so every module sees the current value.
 const runtime = { pipeline: null, readerGeneration: null, creatingStory: false, backgroundRun: null, playbackContext: {storyId:'', language:''} };
-const {
-  cancelGeneration, closeReader, elementInView, ensureReaderOpen, generationAction, generationLive,
-  isViewingChapter, renderReaderGeneration, restartReadyCountdown, revealCard, scheduleRecoveryVisibility,
-  setReaderGeneration
-} = createGenerationBar({
-  $, activeChapter: (...args) => activeChapter(...args), activeVersion: (...args) => activeVersion(...args),
-  maybeStartBackgroundContext: (...args) => maybeStartBackgroundContext(...args),
-  notesProgressMessage: (...args) => notesProgressMessage(...args),
-  openReader: (...args) => openReader(...args),
-  persistReaderPosition: (...args) => persistReaderPosition(...args), persistReaderStory,
-  readerPanel: (...args) => readerPanel(...args), readerStory: (...args) => readerStory(...args),
-  releaseInvalidReaderResponse: (...args) => releaseInvalidReaderResponse(...args),
-  rememberReaderPosition: (...args) => rememberReaderPosition(...args),
-  revealRecovery: (...args) => revealRecovery(...args), runtime,
-  savePendingReaderResult: (...args) => savePendingReaderResult(...args),
-  selectedPath: (...args) => selectedPath(...args), setView, state, toast,
-  updateReader: (...args) => updateReader(...args)
-});
-const {
-  maybeStartBackgroundContext, queueBackgroundContext, settleBackgroundContext, stopBackgroundContext
-} = createBackgroundContext({
-  generationLive, prepareStoryMemory: (...args) => prepareStoryMemory(...args), renderReaderGeneration, runtime,
-  selectedPath: (...args) => selectedPath(...args), setReaderGeneration, state,
-  storyContextReady: (...args) => storyContextReady(...args), toast
-});
 function readJson(path, fallback) {
   try { const text = readFile(path); return text.trim() ? JSON.parse(text) : fallback; }
   catch (error) { console.error(`Could not read ${path}`, error); return fallback; }
 }
 const workspaceStorage = createWorkspaceStorage({read:readFile, write:writeFile, exists:path => { const files=listFiles({strict:true}); return files.some(file=>file.name === path); }});
-const {
-  recordNoteLookup, recordSelectionLookup, signals, startExposure, stopExposure, trackedSpeech, usage
-} = createLearnerTracking({
-  $, activeChapter: (...args) => activeChapter(...args), activeVersion: (...args) => activeVersion(...args),
-  readerPanel: (...args) => readerPanel(...args), readerStory: (...args) => readerStory(...args),
-  renderLookupStatus: (...args) => renderLookupStatus(...args),
-  renderUsageStatus: (...args) => renderUsageStatus(...args), runtime,
-  sentenceContext: (...args) => sentenceContext(...args), SPEECH_LANGUAGES, state, workspaceStorage
-});
-const {
-  buildLightModelOptions, buildReasoningOptions, noteParts, SETTINGS_ADMIT, settingsFeedback,
-  settingsPersistence
-} = createSettingsControls({
-  $, enabledLanguages: (...args) => enabledLanguages(...args), LANGUAGES, levelDefinition, LEVELS,
-  paintNotificationControls: (...args) => paintNotificationControls(...args),
-  renderPlayerFollow: (...args) => renderPlayerFollow(...args),
-  setReaderTextSize: (...args) => setReaderTextSize(...args), state, STORY_GUIDES,
-  syncLanguageSettings: (...args) => syncLanguageSettings(...args), workspaceStorage
-});
+// Android's own selection menu would compete with the LingoMage bar on story text, but fields need Cut/Copy/Paste.
+const selectionMenuRouter = createSelectionMenuRouter({ host: selectionMenu, document, window });
+
 function persistStories() { workspaceStorage.save('data/stories.json', state.stories); }
 function persistReaderStory(story) {
   const alreadySaved = state.stories.some(item => item.id === story.id);
@@ -190,11 +152,6 @@ $('storage-retry').addEventListener('click', () => {
   $('storage-retry-note').textContent=reason;
   if (!reason) window.location.reload();
 });
-const {
-  renderLookupStatus, renderLookups, renderStats, renderUsageStatus, startStatsRefresh, stopStatsRefresh
-} = createStatsView({
-  $, LANGUAGES, SPEECH_LANGUAGES, signals, state, toast, usage
-});
 function toast(message) {
   const el = $('toast');
   ([...document.querySelectorAll('dialog[open]')].at(-1) || document.body).append(el);
@@ -217,6 +174,35 @@ function setView(name) {
   history.replaceState?.({ ...history.state, lingomageView: name }, '');
   renderReaderGeneration();
 }
+function storyInput() {
+  workspaceStorage.assertWritable();
+  const language = $('language').value, difficulty = $('difficulty').value;
+  const level = levelDefinition(language, difficulty);
+  if (!level) throw new Error('Choose a reading level before generating.');
+  const scope = $('reading-scope').value;
+  return JSON.stringify({ language: LANGUAGES[language], languageCode: language, difficulty, framework: LEVELS[language].framework, levelDescription: level.guide, readingStartingPoint: state.standardizedLevels[language] || difficulty, readingSelfReport: level.description, languageExpectations: state.languageExpectations[language] || '', scope, scopeDescription: scopeGuide(scope, language, difficulty), profileVersion: PROFILE_DEFINITIONS.version, topic: $('topic').value.trim(), practice: '' });
+}
+function populateDifficulty(selected = '') {
+  const language = $('language').value, select = $('difficulty');
+  fillLevelOptions(select, language, selected || state.standardizedLevels[language]);
+  $('difficulty-description').textContent = readingDescription(language, select.value) || 'Select the description closest to what you can comfortably read.';
+}
+function populateTargetPicker(preferred = '') {
+  const select = $('language'), previous = preferred || select.value;
+  select.textContent = '';
+  const allLanguages = state.languageOrder;
+  const selectedLanguages = allLanguages.filter(code => state.targetLanguages[code]);
+  const availableLanguages = selectedLanguages.length ? selectedLanguages : allLanguages;
+  $('language-setup').hidden = Boolean(selectedLanguages.length) || state.languageSetupDismissed;
+  availableLanguages.forEach(code => { const option = document.createElement('option'); option.value = code; option.textContent = LANGUAGES[code]; select.append(option); });
+  select.value = availableLanguages.includes(previous) ? previous : (select.options[0]?.value || '');
+  select.disabled = false;
+  populateDifficulty();
+  applyGenerationLocks();
+}
+function decodeResponse(text, languageCode) { return validateStory(parseContent(text),languageCode); }
+function pendingDeletionBlocked() { return !!(state.checkpointBlocked || runtime.pipeline?.records.length || state.requestId || state.pendingGeneration || state.pendingStoryRequestId || state.pendingReaderRequestId || state.pendingReaderResult || state.readerEditBusy || state.readerHelpBusy); }
+
 $('background-context').addEventListener('change', () => {
   state.backgroundStoryContext = $('background-context').checked;
   if (!trySaveSettings()) return;
@@ -251,85 +237,42 @@ function updateKeyboardNavigation() {
 window.visualViewport?.addEventListener('resize', updateKeyboardNavigation);
 window.addEventListener('resize', updateKeyboardNavigation);
 
+// Factories are created in dependency order; call-time wrappers `(...args) => fn(...args)` remain only for true cycles.
+const {
+  recordNoteLookup, recordSelectionLookup, signals, startExposure, stopExposure, trackedSpeech, usage
+} = createLearnerTracking({
+  $, activeChapter: (...args) => activeChapter(...args), activeVersion: (...args) => activeVersion(...args),
+  readerPanel: (...args) => readerPanel(...args), readerStory: (...args) => readerStory(...args),
+  renderLookupStatus: (...args) => renderLookupStatus(...args),
+  renderUsageStatus: (...args) => renderUsageStatus(...args), runtime,
+  sentenceContext: (...args) => sentenceContext(...args), SPEECH_LANGUAGES, state, workspaceStorage
+});
+const {
+  renderLookupStatus, renderLookups, renderStats, renderUsageStatus, startStatsRefresh, stopStatsRefresh
+} = createStatsView({
+  $, LANGUAGES, SPEECH_LANGUAGES, signals, state, toast, usage
+});
 const {
   createProgressView, estimateFor, notifyResult, notifyStopped, operationPlan, paintNotificationControls,
   paintProgress, setReadyNotifications
 } = createGenerationStatusUi({
-  $, generationLive, state, trySaveSettings
+  $, generationLive: (...args) => generationLive(...args), state, trySaveSettings
 });
-const {
-  applyGenerationLocks, createProgressRoot, paintChapterProgress, renderCheckpointRecovery, revealRecovery,
-  runContentOperation, showPendingRecovery
-} = createCheckpointRecovery({
-  $, aiSession, closeReader, createChapterLoading: (...args) => createChapterLoading(...args),
-  createProgressView, ensureReaderOpen, generationAction, isViewingChapter, LANGUAGES,
-  notesProgressMessage: (...args) => notesProgressMessage(...args), notifyStopped, paintProgress,
-  PROFILE_DEFINITIONS, renderChapterRequest: (...args) => renderChapterRequest(...args), renderReaderGeneration,
-  revealCard, runtime, setReaderGeneration, setScopeDisabled, setView,
-  showOperationResult: (...args) => showOperationResult(...args), state, stopBackgroundContext, toast,
-  workspaceStorage
-});
-const {
-  initializePipeline, notesProgressMessage, showOperationResult
-} = createGenerationResults({
-  $, aiSession, elementInView, ensureReaderOpen, ensureStoryPaths: (...args) => ensureStoryPaths(...args),
-  fillLevelOptions, generationAction, isViewingChapter,
-  normalizeChapters: (...args) => normalizeChapters(...args), notifyResult,
-  persistReaderPosition: (...args) => persistReaderPosition(...args), persistReaderStory,
-  queueBackgroundContext, readerPanel: (...args) => readerPanel(...args), readingDescription,
-  rememberReaderPosition: (...args) => rememberReaderPosition(...args),
-  renderChapterNavigation: (...args) => renderChapterNavigation(...args), renderCheckpointRecovery,
-  renderReaderActions: (...args) => renderReaderActions(...args), renderReaderGeneration, runtime,
-  savedFollowUps: (...args) => savedFollowUps(...args), selectedPath: (...args) => selectedPath(...args),
-  setReaderGeneration, setScope, showStorageErrors, state, toast,
-  updateReader: (...args) => updateReader(...args),
-  updateReaderNavigation: (...args) => updateReaderNavigation(...args), workspaceStorage
-});
-function storyInput() {
-  workspaceStorage.assertWritable();
-  const language = $('language').value, difficulty = $('difficulty').value;
-  const level = levelDefinition(language, difficulty);
-  if (!level) throw new Error('Choose a reading level before generating.');
-  const scope = $('reading-scope').value;
-  return JSON.stringify({ language: LANGUAGES[language], languageCode: language, difficulty, framework: LEVELS[language].framework, levelDescription: level.guide, readingStartingPoint: state.standardizedLevels[language] || difficulty, readingSelfReport: level.description, languageExpectations: state.languageExpectations[language] || '', scope, scopeDescription: scopeGuide(scope, language, difficulty), profileVersion: PROFILE_DEFINITIONS.version, topic: $('topic').value.trim(), practice: '' });
-}
-function populateDifficulty(selected = '') {
-  const language = $('language').value, select = $('difficulty');
-  fillLevelOptions(select, language, selected || state.standardizedLevels[language]);
-  $('difficulty-description').textContent = readingDescription(language, select.value) || 'Select the description closest to what you can comfortably read.';
-}
-function populateTargetPicker(preferred = '') {
-  const select = $('language'), previous = preferred || select.value;
-  select.textContent = '';
-  const allLanguages = state.languageOrder;
-  const selectedLanguages = allLanguages.filter(code => state.targetLanguages[code]);
-  const availableLanguages = selectedLanguages.length ? selectedLanguages : allLanguages;
-  $('language-setup').hidden = Boolean(selectedLanguages.length) || state.languageSetupDismissed;
-  availableLanguages.forEach(code => { const option = document.createElement('option'); option.value = code; option.textContent = LANGUAGES[code]; select.append(option); });
-  select.value = availableLanguages.includes(previous) ? previous : (select.options[0]?.value || '');
-  select.disabled = false;
-  populateDifficulty();
-  applyGenerationLocks();
-}
 const {
   enabledLanguages, renderTargetLanguageSettings, syncLanguageSettings
 } = createLanguageSettings({
   $, LANGUAGES, applyStorageBlock, fillLevelOptions, levelDefinition, populateDifficulty, populateTargetPicker,
   readingDescription, state, trySaveSettings
 });
-function decodeResponse(text, languageCode) { return validateStory(parseContent(text),languageCode); }
-
-$('reader-level').addEventListener('change', () => { $('reader-level-description').textContent = readingDescription(readerStory().language, $('reader-level').value); });
-
 const {
-  finishGeneratedRequest, renderGenerationRecovery
-} = createCreateFlow({
-  $, LANGUAGES, PROFILE_DEFINITIONS, createProgressRoot, guideFor, noteParts, notifyStopped, openReader: (...args) => openReader(...args), persistReaderStory,
-  populateDifficulty, readingDescription, renderCheckpointRecovery, renderReaderGeneration, revealRecovery,
-  runContentOperation, runtime, setReaderGeneration, showOperationResult, showPendingRecovery,
-  showStorageErrors, state, stopBackgroundContext, storyInput, toast
+  buildLightModelOptions, buildReasoningOptions, noteParts, SETTINGS_ADMIT, settingsFeedback,
+  settingsPersistence
+} = createSettingsControls({
+  $, enabledLanguages, LANGUAGES, levelDefinition, LEVELS, paintNotificationControls,
+  renderPlayerFollow: (...args) => renderPlayerFollow(...args),
+  setReaderTextSize: (...args) => setReaderTextSize(...args), state, STORY_GUIDES,
+  syncLanguageSettings, workspaceStorage
 });
-function pendingDeletionBlocked() { return !!(state.checkpointBlocked || runtime.pipeline?.records.length || state.requestId || state.pendingGeneration || state.pendingStoryRequestId || state.pendingReaderRequestId || state.pendingReaderResult || state.readerEditBusy || state.readerHelpBusy); }
 const {
   beginStorySelection, leaveStorySelection, removeSelectedStories, syncStorySelection, toggleStorySelection
 } = createLibrarySelection({
@@ -339,11 +282,11 @@ const {
 const {
   closeStoryMenu, confirmStoryDeletion, libraryChanged, renderLibrary, wireLongPress
 } = createLibraryView({
-  $, LANGUAGES, beginStorySelection, finishDeletedStoryReader: (...args) => finishDeletedStoryReader(...args), leaveStorySelection, openReader: (...args) => openReader(...args), openShareDialog: (...args) => openShareDialog(...args),
-  pendingDeletionBlocked, removeSelectedStories, state, syncStorySelection, toast, toggleStorySelection
+  $, LANGUAGES, beginStorySelection, finishDeletedStoryReader: (...args) => finishDeletedStoryReader(...args),
+  leaveStorySelection, openReader: (...args) => openReader(...args),
+  openShareDialog: (...args) => openShareDialog(...args), pendingDeletionBlocked, removeSelectedStories,
+  state, syncStorySelection, toast, toggleStorySelection
 });
-// Functions created further down are passed as wrappers resolved at call time; selectionMenuRouter is an
-// object created further down, so the reader gets a forwarder for the one method it calls (reset).
 const {
   activeChapter, activeVersion, closeReaderActions, closeReaderPanels, closeWordNote, confirmReaderRemoval,
   createInlineListenButton, ensureStoryPaths, finishDeletedStoryReader, keepReaderLocation, loadReaderPositions,
@@ -360,26 +303,80 @@ const {
   confirmStoryDeletion, fillLevelOptions, fillScopeOptions, fitReaderTitle: (...args) => fitReaderTitle(...args),
   pendingDeletionBlocked, persistReaderStory, persistStories, readerAi: (...args) => readerAi(...args),
   readingDescription, recordNoteLookup,
-  releaseInvalidReaderResponse: (...args) => releaseInvalidReaderResponse(...args), renderCheckpointRecovery,
-  renderGenerationRecovery, renderMemoryRebuild: (...args) => renderMemoryRebuild(...args),
-  renderPendingReaderResult: (...args) => renderPendingReaderResult(...args), renderReaderGeneration,
+  releaseInvalidReaderResponse: (...args) => releaseInvalidReaderResponse(...args),
+  renderCheckpointRecovery: (...args) => renderCheckpointRecovery(...args),
+  renderGenerationRecovery: (...args) => renderGenerationRecovery(...args),
+  renderMemoryRebuild: (...args) => renderMemoryRebuild(...args),
+  renderPendingReaderResult: (...args) => renderPendingReaderResult(...args),
+  renderReaderGeneration: (...args) => renderReaderGeneration(...args),
   renderReaderListen: (...args) => renderReaderListen(...args),
   renderSavedHelp: (...args) => renderSavedHelp(...args),
   savePendingReaderResult: (...args) => savePendingReaderResult(...args),
-  selectionMenuRouter: { reset: () => selectionMenuRouter.reset() }, setView, settingsFeedback, showEditPanel: (...args) => showEditPanel(...args),
+  selectionMenuRouter, setView, settingsFeedback, showEditPanel: (...args) => showEditPanel(...args),
   showExplanationForHelp: (...args) => showExplanationForHelp(...args), startExposure, state, stopExposure,
   stopSpeech: (...args) => stopSpeech(...args), toast, trySaveSettings, usage
 });
 const {
+  cancelGeneration, closeReader, elementInView, ensureReaderOpen, generationAction, generationLive,
+  isViewingChapter, renderReaderGeneration, restartReadyCountdown, revealCard, scheduleRecoveryVisibility,
+  setReaderGeneration
+} = createGenerationBar({
+  $, activeChapter, activeVersion,
+  maybeStartBackgroundContext: (...args) => maybeStartBackgroundContext(...args),
+  notesProgressMessage: (...args) => notesProgressMessage(...args),
+  openReader, persistReaderPosition, persistReaderStory, readerPanel, readerStory,
+  releaseInvalidReaderResponse: (...args) => releaseInvalidReaderResponse(...args),
+  rememberReaderPosition, revealRecovery: (...args) => revealRecovery(...args), runtime,
+  savePendingReaderResult: (...args) => savePendingReaderResult(...args),
+  selectedPath, setView, state, toast, updateReader
+});
+const {
+  activateStoryText, clearExplanationSelection, confirmReplaceHelp, createChapterLoading, createHelpLoading,
+  renderSavedHelp, showExplanationForHelp
+} = createHelpCards({
+  $, activeChapter, activeVersion, cancelGeneration, closeWordNote, createInlineListenButton,
+  explainSelection: (...args) => explainSelection(...args), pendingDeletionBlocked, persistReaderStory,
+  profileSnapshot, readerPanel, readerStory, revealCard, showWordNote, SPEECH_LANGUAGES, state, toast,
+  wireLongPress
+});
+const {
+  maybeStartBackgroundContext, queueBackgroundContext, settleBackgroundContext, stopBackgroundContext
+} = createBackgroundContext({
+  generationLive, prepareStoryMemory, renderReaderGeneration, runtime,
+  selectedPath, setReaderGeneration, state, storyContextReady, toast
+});
+const {
+  initializePipeline, notesProgressMessage, showOperationResult
+} = createGenerationResults({
+  $, aiSession, elementInView, ensureReaderOpen, ensureStoryPaths, fillLevelOptions, generationAction,
+  isViewingChapter, normalizeChapters, notifyResult, persistReaderPosition, persistReaderStory,
+  queueBackgroundContext, readerPanel, readingDescription, rememberReaderPosition, renderChapterNavigation,
+  renderCheckpointRecovery: (...args) => renderCheckpointRecovery(...args),
+  renderReaderActions, renderReaderGeneration, runtime, selectedPath, setReaderGeneration, setScope,
+  showStorageErrors, state, toast, updateReader, updateReaderNavigation, workspaceStorage
+});
+const {
+  applyGenerationLocks, createProgressRoot, paintChapterProgress, renderCheckpointRecovery, revealRecovery,
+  runContentOperation, showPendingRecovery
+} = createCheckpointRecovery({
+  $, aiSession, closeReader, createChapterLoading, createProgressView, ensureReaderOpen, generationAction,
+  isViewingChapter, LANGUAGES, notesProgressMessage, notifyStopped, paintProgress, PROFILE_DEFINITIONS,
+  renderChapterRequest, renderReaderGeneration, revealCard, runtime, setReaderGeneration, setScopeDisabled,
+  setView, showOperationResult, state, stopBackgroundContext, toast, workspaceStorage
+});
+const {
+  finishGeneratedRequest, renderGenerationRecovery
+} = createCreateFlow({
+  $, LANGUAGES, PROFILE_DEFINITIONS, createProgressRoot, guideFor, noteParts, notifyStopped, openReader,
+  persistReaderStory, populateDifficulty, readingDescription, renderCheckpointRecovery, renderReaderGeneration,
+  revealRecovery, runContentOperation, runtime, setReaderGeneration, showOperationResult, showPendingRecovery,
+  showStorageErrors, state, stopBackgroundContext, storyInput, toast
+});
+const {
   renderPlayerFollow, runReaderPlayer
 } = createReaderPlayerUi({
-  $, SPEECH_LANGUAGES, clearExplanationSelection: (...args) => clearExplanationSelection(...args), closeWordNote, readerPanel, state, stopSpeech: (...args) => stopSpeech(...args), toast,
-  trackedSpeech, trySaveSettings
-});
-createReaderSelection({
-  $, activeChapter, activeVersion, closeWordNote, defineSelection: (...args) => defineSelection(...args),
-  explainSelection: (...args) => explainSelection(...args), profileSnapshot, readerStory, recordSelectionLookup,
-  sentenceContext, SPEECH_LANGUAGES, state, toast
+  $, SPEECH_LANGUAGES, clearExplanationSelection, closeWordNote, readerPanel, state,
+  stopSpeech: (...args) => stopSpeech(...args), toast, trackedSpeech, trySaveSettings
 });
 const {
   fitReaderTitle, renderReaderListen, stopSpeech
@@ -388,24 +385,13 @@ const {
   trackedSpeech, usage
 });
 const {
-  activateStoryText, clearExplanationSelection, confirmReplaceHelp, createChapterLoading, createHelpLoading,
-  helpContext, overlappingHelp, renderSavedHelp, resolvedHelpContext, savedFollowUps, showExplanationForHelp,
-  validTextRange
-} = createHelpCards({
-  $, activeChapter, activeVersion, cancelGeneration, closeWordNote, createInlineListenButton,
-  explainSelection: (...args) => explainSelection(...args), pendingDeletionBlocked, persistReaderStory,
-  profileSnapshot, readerPanel, readerStory, revealCard, showWordNote, SPEECH_LANGUAGES, state, toast,
-  wireLongPress
-});
-const {
   explainSelection, readerAi, releaseInvalidReaderResponse, releaseSavedInference, renderPendingReaderResult,
   savePendingReaderResult
 } = createReaderRequests({
   $, activeChapter, activeVersion, aiSession, confirmReplaceHelp, createHelpLoading, finishGeneratedRequest,
-  helpContext, LANGUAGES, normalizeChapters, overlappingHelp, persistReaderStory, readerPanel, readerStory,
-  recordSelectionLookup, renderCheckpointRecovery, renderReaderGeneration, renderSavedHelp, resolvedHelpContext,
-  runContentOperation, runtime, savedFollowUps, setReaderGeneration, showOperationResult, state,
-  stopBackgroundContext, toast, updateReader, validTextRange, workspaceStorage
+  LANGUAGES, normalizeChapters, persistReaderStory, readerPanel, readerStory, recordSelectionLookup,
+  renderCheckpointRecovery, renderReaderGeneration, renderSavedHelp, runContentOperation, runtime,
+  setReaderGeneration, showOperationResult, state, stopBackgroundContext, toast, updateReader, workspaceStorage
 });
 const {
   defineSelection
@@ -413,7 +399,11 @@ const {
   $, activeChapter, activeVersion, closeWordNote, LANGUAGES, normalizeChapters, persistReaderStory, readerAi,
   readerPanel, readerStory, releaseInvalidReaderResponse, releaseSavedInference, renderCheckpointRecovery,
   renderPendingReaderResult, renderReaderGeneration, runtime, savePendingReaderResult, setReaderGeneration,
-  showWordNote, state, stopBackgroundContext, toast, updateReader, validTextRange
+  showWordNote, state, stopBackgroundContext, toast, updateReader
+});
+createReaderSelection({
+  $, activeChapter, activeVersion, closeWordNote, defineSelection, explainSelection, profileSnapshot,
+  readerStory, recordSelectionLookup, sentenceContext, SPEECH_LANGUAGES, state, toast
 });
 const {
   openShareDialog
@@ -421,13 +411,6 @@ const {
   $, activeVersion, libraryChanged, normalizeChapters, pathChapters, persistStories, readJson, renderLibrary,
   selectedPath, state, toast, trySaveSettings, workspaceStorage
 });
-$('reader-share').addEventListener('click', () => {
-  const story = readerStory(); if (!story) return;
-  closeReaderActions(); openShareDialog(story, {chapterIndex:state.readerChapter, trigger:$('reader-actions-toggle')});
-});
-// Android's own selection menu would compete with the LingoMage bar on story text, but fields need Cut/Copy/Paste.
-const selectionMenuRouter = createSelectionMenuRouter({ host: selectionMenu, document, window });
-
 const {
   renderMemoryRebuild
 } = createStoryRebuild({
@@ -458,14 +441,18 @@ const {
   setReaderGeneration, setScopeDisabled, settleBackgroundContext, showOperationResult, showPendingRecovery,
   showStorageErrors, state, storyContextReady, toast, updateReader
 });
-$('reader-dialog').addEventListener('click', event => { if (event.target === $('reader-dialog')) $('reader-dialog').close(); });
-
 const {
   refreshModels
 } = createModelSettings({
   $, buildLightModelOptions, buildReasoningOptions, PREFERRED_MODEL, setReadyNotifications, setView, state,
   trySaveSettings
 });
+$('reader-level').addEventListener('change', () => { $('reader-level-description').textContent = readingDescription(readerStory().language, $('reader-level').value); });
+$('reader-share').addEventListener('click', () => {
+  const story = readerStory(); if (!story) return;
+  closeReaderActions(); openShareDialog(story, {chapterIndex:state.readerChapter, trigger:$('reader-actions-toggle')});
+});
+$('reader-dialog').addEventListener('click', event => { if (event.target === $('reader-dialog')) $('reader-dialog').close(); });
 document.documentElement.style.colorScheme = 'dark';
 state.stories = JSON.parse(JSON.stringify(workspaceStorage.load('data/stories.json').value));
 loadReaderPositions();

@@ -346,11 +346,7 @@ function harness(paragraphs, visible = () => 1) {
         activeChapter: () => chapter,
         activeVersion: () => version,
         readerPanel: () => panel,
-        validTextRange: (text, start, end) => Number.isInteger(start) && Number.isInteger(end) && start >= 0 && end <= text.length && start < end,
-        overlappingHelp: () => [],
-        savedFollowUps: () => [],
-        helpContext: () => ({}),
-        resolvedHelpContext: () => ({}),
+        confirmReplaceHelp: async () => true,
         createHelpLoading: () => dom.document.createElement('div'),
         persistReaderStory() { if (!saveSucceeds && state.pendingReaderResult) throw new Error('disk full'); },
         renderSavedHelp() {},
@@ -378,10 +374,11 @@ function harness(paragraphs, visible = () => 1) {
       assert.deepEqual(lookups, [['Brot', 'explain']], 'explain records only after the result is saved');
       assert.ok(!toasts.includes('Explanation saved'), 'saved explanations appear in place without a notice');
 
-      await explainSelection('explain', 'detail', 'Why?', { ...passage, helpId: 'h1' });
+      const savedHelpId = chapter.help.at(-1).id;
+      await explainSelection('explain', 'detail', 'Why?', { ...passage, helpId: savedHelpId });
       assert.deepEqual(lookups, [['Brot', 'explain'], ['Brot', 'detail']]);
 
-      await explainSelection('explain', 'examples', '', { ...passage, helpId: 'h1' });
+      await explainSelection('explain', 'examples', '', { ...passage, helpId: savedHelpId });
       assert.deepEqual(lookups, [['Brot', 'explain'], ['Brot', 'detail'], ['Brot', 'examples']]);
     }
 

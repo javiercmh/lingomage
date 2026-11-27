@@ -52,5 +52,6 @@ console.log('PASS merged plan/prose/readings ordering, durable reuse, actual Cre
 let shareAction, shared;
 const appJs = fs.readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
 const shareContext={state:{readerChapter:0},readerStory:()=>({id:'saved'}),closeReaderActions(){},openShareDialog(story,options){shared={story,options};},$:()=>({addEventListener(name,fn){shareAction=fn;}})};
-vm.createContext(shareContext);vm.runInContext(appJs.slice(appJs.indexOf("$('reader-share').addEventListener"),appJs.indexOf('// Android\'s own selection menu')),shareContext);shareAction();assert.equal(shared.story.id,'saved');assert.equal(shared.options.chapterIndex,0);
+const shareStart = appJs.indexOf("$('reader-share').addEventListener");
+vm.createContext(shareContext);vm.runInContext(appJs.slice(shareStart, appJs.indexOf('\n});', shareStart) + 4),shareContext);shareAction();assert.equal(shared.story.id,'saved');assert.equal(shared.options.chapterIndex,0);
 console.log('PASS reader Share opens chapter dialog');

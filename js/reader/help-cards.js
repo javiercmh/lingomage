@@ -1,10 +1,11 @@
 // Reader: story-text activation (vocabulary notes, explained passages), saved help cards with follow-ups and examples,
 // explanation selection mode, help locating in the text, and the loading and chapter status cards. PED-002.
-// The code is the former js/reader-help.js section, moved verbatim, with the help-context helpers (formerly at the top
-// of that module) moved down beside the cards; app.js calls createHelpCards where the section used to be.
-import { applyExplainedMarks, getCanonicalSelection, japaneseSegments } from './reader-text.js';
+import { applyExplainedMarks } from './reader-text.js';
 import { createReaderActivation, glossaryForTrigger, normalizeReaderControls } from './reader-activation.js';
-import { translation } from '../bridge.js';
+import {
+  helpContext, overlappingHelp, renderDetailText, renderHighlightedText, resolvedHelpContext, savedFollowUps,
+  validTextRange
+} from './help-context.js';
 
 export function createHelpCards({
   $, activeChapter, activeVersion, cancelGeneration, closeWordNote, createInlineListenButton, explainSelection,
@@ -22,36 +23,6 @@ export function createHelpCards({
   function activateStoryText(event) {
     if (event.type === 'click' && (noteDismissPress || noteDismissClicks.has(event))) { noteDismissPress = false; noteDismissClicks.add(event); return; }
     activateReaderText(event);
-  }
-  // PED-002: retain the exact fragment and locate it in canonical context.
-  function helpContext(text, start, end) {
-    const boundary = /[.!?。！？\n]/u;
-    let left = start;
-    while (left > 0 && !boundary.test(text[left - 1])) left--;
-    let right = end;
-    if (!boundary.test(text[end - 1] || '')) {
-      while (right < text.length && !boundary.test(text[right])) right++;
-      if (right < text.length) right++;
-    }
-    return { sentence: text.slice(left, right), selectionStart: start - left, selectionEnd: end - left };
-  }
-  function validTextRange(text, start, end) {
-    const boundary = offset => !(offset > 0 && offset < text.length && /[\uD800-\uDBFF]/u.test(text[offset - 1]) && /[\uDC00-\uDFFF]/u.test(text[offset]));
-    return Number.isInteger(start) && Number.isInteger(end) && start >= 0 && end > start && end <= text.length && boundary(start) && boundary(end);
-  }
-  function resolvedHelpContext(source, passage, result) {
-    const valid = validTextRange(source, result.contextStart, result.contextEnd) && result.contextStart <= passage.start && result.contextEnd >= passage.end;
-    if (valid) return { contextStart: result.contextStart, contextEnd: result.contextEnd, contextTranslation: result.contextTranslation || '' };
-    const fallback = helpContext(source, passage.start, passage.end);
-    const start = passage.start - fallback.selectionStart;
-    // A translation of an invalid excerpt need not match the fallback sentence.
-    return { contextStart: start, contextEnd: start + fallback.sentence.length, contextTranslation: '' };
-  }
-  function savedFollowUps(item) {
-    return item.followUps || (item.more ? [{ ...(item.detailProvenance || {}), action: 'detail', text: item.more }] : []);
-  }
-  function overlappingHelp(chapter, versionId, start, end) {
-    return (chapter.help || []).filter(entry => entry.versionId === versionId && Number.isFinite(entry.start) && Number.isFinite(entry.end) && entry.start < end && start < entry.end);
   }
   function confirmReplaceHelp(items) {
     const dialog = $('replace-help-dialog');
@@ -71,33 +42,6 @@ export function createHelpCards({
       dialog.showModal(); $('replace-help-cancel').focus();
     });
   }
-  function renderHighlightedText(container, canonical, segments, highlightStart, highlightEnd, excerptStart = 0, excerptEnd = canonical.length) {
-    container.textContent = '';
-    container.classList.toggle('hide-furigana', !state.furigana);
-    const parts = /\p{Script=Han}/u.test(canonical) ? japaneseSegments(canonical, segments) : Array.isArray(segments) && segments.every(part => part && typeof part.text === 'string') && segments.map(part => part.text).join('') === canonical ? segments : [{ text: canonical }];
-    let offset = 0;
-    for (const part of parts) {
-      const partStart = offset; offset += part.text.length;
-      const left = Math.max(excerptStart, partStart), right = Math.min(excerptEnd, offset);
-      if (right <= left) continue;
-      const target = part.reading && left === partStart && right === offset ? document.createElement('ruby') : container;
-      const boundaries = [...new Set([left, right, Math.max(left, Math.min(right, highlightStart)), Math.max(left, Math.min(right, highlightEnd))])].sort((a, b) => a - b);
-      for (let index = 0; index < boundaries.length - 1; index++) {
-        const start = boundaries[index], end = boundaries[index + 1];
-        const text = canonical.slice(start, end);
-        if (start >= highlightStart && end <= highlightEnd) {
-          const mark = document.createElement('mark'); mark.className = 'help-highlight'; mark.textContent = text; target.append(mark);
-        } else target.append(document.createTextNode(text));
-      }
-      if (target !== container) {
-        const rt = document.createElement('rt'); rt.textContent = part.reading; target.append(rt); container.append(target);
-      }
-    }
-    container.addEventListener('copy', event => {
-      const selection = getCanonicalSelection(container); if (!selection) return;
-      event.clipboardData?.setData('text/plain', selection.text); event.preventDefault();
-    });
-  }
   function renderHelpExamples(card, examples, language = 'en') {
     const section = document.createElement('section'); section.className = 'help-examples help-text-selectable';
     const title = document.createElement('h3'); title.textContent = 'Examples';
@@ -105,33 +49,13 @@ export function createHelpCards({
     for (const example of examples) {
       const row = document.createElement('li');
       const sentence = document.createElement('p'); sentence.className = 'help-example-sentence story-text help-text-selectable'; sentence.lang = SPEECH_LANGUAGES[language] || 'en';
-      renderHighlightedText(sentence, example.sentence, example.segments, example.highlightStart, example.highlightEnd);
+      renderHighlightedText(sentence, example.sentence, example.segments, example.highlightStart, example.highlightEnd, 0, example.sentence.length, { hideFurigana: !state.furigana });
       const translation = document.createElement('p'); translation.className = 'help-context-translation help-text-selectable'; translation.textContent = example.translation;
       const line = document.createElement('div'); line.className = 'help-example-line';
       line.append(sentence, createInlineListenButton(example.sentence, language));
       row.append(line, translation); list.append(row);
     }
     section.append(title, list); card.append(section);
-  }
-  // Render a deliberately small formatting subset without interpreting HTML.
-  function renderDetailText(container, text) {
-    function inline(parent, value, emphasis = true) {
-      const pattern = emphasis ? /(`[^`\n]+`|\*\*[^*\n]+(?:\*[^*\n]+\*)?[^*\n]*\*\*|\*[^*\n]+\*)/g : /(`[^`\n]+`)/g;
-      let offset = 0;
-      for (const match of value.matchAll(pattern)) {
-        parent.append(document.createTextNode(value.slice(offset, match.index)));
-        const token = match[0], code = token.startsWith('`'), bold = token.startsWith('**');
-        const node = document.createElement(code ? 'code' : bold ? 'strong' : 'em');
-        const content = token.slice(bold ? 2 : 1, bold ? -2 : -1);
-        if (code) node.textContent = content;
-        else inline(node, content, bold);
-        parent.append(node); offset = match.index + token.length;
-      }
-      parent.append(document.createTextNode(value.slice(offset)));
-    }
-    for (const paragraph of String(text || '').split(/\r?\n[ \t]*\r?\n/)) {
-      const node = document.createElement('p'); inline(node, paragraph); container.append(node);
-    }
   }
   function toggleAllExplanations() {
     const ids = [...$('reader-help').querySelectorAll('.help-card')].map(card => card.dataset.helpId);
@@ -337,7 +261,7 @@ export function createHelpCards({
       const title = item.kind === 'translate' ? document.createElement('strong') : null; if (title) { title.className = 'help-text-selectable'; title.textContent = 'Translation'; }
       const quote = document.createElement('p'); quote.className = 'help-quote story-text help-text-selectable'; quote.lang = SPEECH_LANGUAGES[readerStory().language] || 'en';
       const hasContext = validTextRange(version.story || '', item.contextStart, item.contextEnd) && item.contextStart <= item.start && item.contextEnd >= item.end;
-      if (hasContext) renderHighlightedText(quote, version.story, version.storySegments, item.start, item.end, item.contextStart, item.contextEnd);
+      if (hasContext) renderHighlightedText(quote, version.story, version.storySegments, item.start, item.end, item.contextStart, item.contextEnd, { hideFurigana: !state.furigana });
       else quote.textContent = item.passage;
       const body = document.createElement('p'); body.className = 'help-text-selectable'; body.textContent = item.text;
       const profile = item.profile || {};

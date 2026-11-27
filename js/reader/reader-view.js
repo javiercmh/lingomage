@@ -1,18 +1,14 @@
 // Reader: opening and closing the reader, chapters and paths (exact shared versions), title and navigation,
-// reader panels and preferences, vocabulary-note cards, inline Listen buttons, reading location and
-// scroll-position restore across rotation and reflow, and story memory for a path.
-// The code is the former app.js section, moved verbatim except for two setters (setReaderViewport,
-// setRestoringPathPosition) used by app.js code that changes those bindings.
-// app.js calls createReaderView where the section used to be.
+// reader panels and preferences, actions and removal, and story memory for a path.
+// Composes reader-panels, word-note, reader-position, story-model, and story-memory.
 import { createReaderPanels } from './reader-panels.js';
+import { createWordNote } from './word-note.js';
+import { createReaderPosition } from './reader-position.js';
 import { pathLabel, createStoryModel } from '../core/story-model.js';
 import { createStoryMemory } from '../generation/story-memory.js';
-import { annotatedText, stripRussianStress, withRussianStress } from './reader-text.js';
+import { annotatedText } from './reader-text.js';
 import { markParagraphGaps } from './paragraph-gaps.js';
-import { indexGlossaryTriggers, glossaryForTrigger } from './reader-activation.js';
-import { speech } from '../bridge.js';
-import { prepareSpeechOptions } from './reader-speech.js';
-import { canonicalRange } from './reader-player.js';
+import { indexGlossaryTriggers } from './reader-activation.js';
 
 export function createReaderView({
   $, LANGUAGES, PROFILE_DEFINITIONS, SPEECH_LANGUAGES, activateStoryText, clearExplanationSelection,
@@ -26,6 +22,18 @@ export function createReaderView({
   // Reader management preserves exact shared versions across surviving paths.
   let restoringPathPosition = false;
   function setRestoringPathPosition(value) { restoringPathPosition = value; }
+  function readerStory() { return state.stories.find(item => item.id === state.readerId) || (state.current?.id === state.readerId ? state.current : null); }
+  const { normalizeChapters, ensureStoryPaths, initializePathCounter, pruneStoryContent, selectedPath, pathChapters, activeChapter, activeVersion } = createStoryModel({state, readerStory});
+  const { memoryChunks, recentProse, decodeMemory, prepareStoryMemory, storyContextReady, pendingSummaryCount } = createStoryMemory({state, normalizeChapters, readerAi:(...args)=>readerAi(...args), savePendingReaderResult:(...args)=>savePendingReaderResult(...args), discardResponse:()=>releaseInvalidReaderResponse()});
+  const { closeWordNote, createInlineListenButton, showWordNote } = createWordNote({
+    $, SPEECH_LANGUAGES, readerStory, recordNoteLookup, renderReaderGeneration, showExplanationForHelp, state, toast
+  });
+  const {
+    keepReaderLocation, loadReaderPositions, persistReaderPosition, readerPanel, readerPositionLocked,
+    rememberReaderLocation, rememberReaderPosition, restoreReaderPosition, setReaderViewport
+  } = createReaderPosition({
+    $, activeChapter, activeVersion, persistStories, readerStory, selectedPath, state
+  });
   const readerPanels = createReaderPanels({state, $, window, document, getComputedStyle, readerPanel, closeWordNote, persistSettings: trySaveSettings, toast, keepReadingLocation: change => keepReaderLocation(change)});
   const { closeReaderActions, closeReaderPanels, positionReaderPanel, toggleReaderPanel, setReaderTextSize, updateReaderNavigation } = readerPanels;
   function renderReaderActions() {
@@ -125,15 +133,6 @@ export function createReaderView({
     if (!rebuild?.pathName) return pathLabel(story, selectedPath(story));
     return rebuild.pathName === 'Original' ? 'Main story' : pathLabel({paths: []}, {name: rebuild.pathName});
   }
-  function pathForkDescription(story, path) {
-    if (!path.forkChapter) return '';
-    const parent = path.parentPathId ? story.paths.find(item => item.id === path.parentPathId)
-      : story.paths.find(item => item.id !== path.id && item.name === (path.parentPathName || 'Original'));
-    return `Different version from Chapter ${path.forkChapter}.${parent ? ` Later chapters remain on ${pathLabel(story, parent)}.` : ''}`;
-  }
-  const { normalizeChapters, ensureStoryPaths, initializePathCounter, pruneStoryContent, selectedPath, pathChapters, activeChapter, activeVersion } = createStoryModel({state, readerStory});
-  const { memoryChunks, recentProse, decodeMemory, prepareStoryMemory, storyContextReady, pendingSummaryCount } = createStoryMemory({state, normalizeChapters, readerAi:(...args)=>readerAi(...args), savePendingReaderResult:(...args)=>savePendingReaderResult(...args), discardResponse:()=>releaseInvalidReaderResponse()});
-  function readerStory() { return state.stories.find(item => item.id === state.readerId) || (state.current?.id === state.readerId ? state.current : null); }
   function profileSnapshot(story) {
     const version = state.readerId === story.id ? activeVersion(activeChapter(), story) : null;
     const level = version?.difficulty || state.standardizedLevels[story.language] || story.readingStartingPoint || story.difficulty || 'beginner';
@@ -228,224 +227,6 @@ export function createReaderView({
     if (!host.hidden) host.append(request.loading);
     if (typeof renderReaderGeneration === 'function') renderReaderGeneration();
   }
-  function closeWordNote(restoreFocus = false) {
-    const popover = $('word-note-popover');
-    // While Define's popover is open it carries the progress, so the status bar returns when it closes.
-    const wasDefine = popover.dataset.define === 'true';
-    delete popover.dataset.define;
-    if (popover.hidden) { if (wasDefine) renderReaderGeneration(); return; }
-    popover.hidden = true;
-    if (restoreFocus) state.wordNoteTrigger?.focus();
-    state.wordNoteTrigger = null;
-    document.querySelectorAll('.gloss-note-trigger[aria-expanded="true"]').forEach(button => { button.removeAttribute('aria-expanded'); button.removeAttribute('aria-controls'); });
-    if (wasDefine) renderReaderGeneration();
-  }
-  let inlineSpeechRun = 0;
-  let inlineSpeechButton = null;
-  let inlineSpeechStopPending = false;
-  function renderInlineSpeech(button, playing, stopping = false) {
-    const label = stopping ? 'Stop audio' : playing ? 'Stop audio' : button.dataset.listenLabel;
-    button.disabled = !speech.available;
-    button.title = speech.available ? label : 'Listening requires App²';
-    button.setAttribute('aria-label', label);
-    button.setAttribute('aria-pressed', String(playing));
-    button.setAttribute('aria-busy', String(stopping));
-    button.dataset.playing = String(playing);
-  }
-  function createInlineListenButton(text, language, onStart) {
-    const listen = document.createElement('button'); listen.type = 'button'; listen.className = 'icon-btn inline-listen';
-    listen.dataset.listenLabel = `Listen to ${text || 'expression'}`;
-    renderInlineSpeech(listen, false);
-    listen.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4zM15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14"/></svg>';
-    listen.disabled = !speech.available || !text;
-    listen.addEventListener('click', async () => {
-      if (inlineSpeechStopPending) return;
-      if (inlineSpeechButton === listen) {
-        const run = inlineSpeechRun;
-        inlineSpeechStopPending = true;
-        renderInlineSpeech(listen, true, true);
-        try {
-          await speech.stop();
-          if (run === inlineSpeechRun && inlineSpeechButton === listen) {
-            inlineSpeechRun++;
-            inlineSpeechButton = null;
-            renderInlineSpeech(listen, false);
-          }
-        } catch (error) {
-          if (run === inlineSpeechRun) { toast(`Could not stop audio: ${error.message}`); renderInlineSpeech(listen, true); }
-        } finally {
-          inlineSpeechStopPending = false;
-        }
-        return;
-      }
-      const run = ++inlineSpeechRun;
-      onStart?.();
-      const previous = inlineSpeechButton;
-      if (previous) {
-        inlineSpeechButton = null;
-        renderInlineSpeech(previous, false);
-        try { await speech.stop(); }
-        catch (error) {
-          if (run === inlineSpeechRun) toast(`Could not stop audio: ${error.message}`);
-          return;
-        }
-        if (run !== inlineSpeechRun) return;
-      }
-      inlineSpeechButton = listen;
-      renderInlineSpeech(listen, true);
-      try {
-        const { options } = await prepareSpeechOptions(speech, text, SPEECH_LANGUAGES[language]);
-        if (run !== inlineSpeechRun) return;
-        await speech.speak(options);
-      } catch (error) { if (run === inlineSpeechRun) toast(`Could not play audio: ${error.message}`); }
-      finally {
-        if (run === inlineSpeechRun) { inlineSpeechButton = null; renderInlineSpeech(listen, false); }
-      }
-    });
-    return listen;
-  }
-  function showWordNote(trigger, notes, surface = '', helpId = '') {
-    const popover = $('word-note-popover');
-    if (!popover.hidden && trigger.getAttribute('aria-expanded') === 'true') { closeWordNote(); return; }
-    closeWordNote(); popover.textContent = '';
-    const lookupInfo = glossaryForTrigger(trigger);
-    recordNoteLookup(notes, lookupInfo, 'note');
-    for (const note of notes) {
-      const item = document.createElement('p'); item.className = 'word-note-entry';
-      // Lead with the wording as it appears in the text, so Listen plays the real text; the dictionary form follows.
-      const shown = surface.trim() || note.word || '';
-      const russian = readerStory().language === 'ru';
-      const canonical = russian ? stripRussianStress(note.word || '') : note.word || '';
-      const bare = russian ? stripRussianStress(shown) : shown;
-      const sameForm = bare.toLowerCase() === canonical.trim().toLowerCase();
-      // Russian stress belongs on the wording from the text, never on the dictionary form line.
-      let display = shown;
-      if (russian) {
-        const forms = note.formStress || {};
-        const key = Object.hasOwn(forms, bare) ? bare : Object.keys(forms).find(form => form.toLowerCase() === bare.toLowerCase());
-        const positions = key ? forms[key] : sameForm ? note.stress : null;
-        if (positions) display = withRussianStress(bare, positions);
-      }
-      const word = document.createElement('strong'); word.textContent = display || 'Word note';
-      const meaning = document.createElement('span'); meaning.textContent = note.meaning;
-      const heading = document.createElement('span'); heading.className = 'word-note-heading';
-      const listen = createInlineListenButton(shown, readerStory().language, () => {
-        recordNoteLookup([note], lookupInfo, 'listen');
-      });
-      heading.append(word, listen); item.append(heading);
-      if (note.word && !sameForm) {
-        const form = document.createElement('span'); form.className = 'word-note-form'; form.textContent = `Dictionary form: ${canonical}`; item.append(form);
-      }
-      item.append(meaning); popover.append(item);
-    }
-    if (helpId) {
-      const view = document.createElement('button'); view.type = 'button'; view.className = 'word-note-view'; view.textContent = 'View saved explanation ↓';
-      view.addEventListener('click', () => { closeWordNote(); showExplanationForHelp(helpId); });
-      popover.append(view);
-    }
-    trigger.setAttribute('aria-expanded', 'true'); trigger.setAttribute('aria-controls', 'word-note-popover'); state.wordNoteTrigger = trigger; popover.hidden = false; popover.focus();
-    const rect = trigger.getBoundingClientRect();
-    const left = Math.max(12, Math.min(window.innerWidth - 292, rect.left));
-    popover.style.left = `${left}px`;
-    popover.style.top = `${Math.min(window.innerHeight - 20, rect.bottom + 8)}px`;
-    requestAnimationFrame(() => {
-      const box = popover.getBoundingClientRect();
-      if (box.bottom > window.innerHeight - 12) popover.style.top = `${Math.max(12, rect.top - box.height - 8)}px`;
-    });
-  }
-  function readerPanel() { return $('reader-dialog').querySelector('.reader-panel'); }
-  // The reading location is the story character at the middle of the visible reader. Canonical
-  // offsets exclude ruby readings, so the same passage can be centred again after wrapping changes.
-  function readerViewMiddle() {
-    const box = readerPanel().getBoundingClientRect();
-    return { x: (box.left + box.right) / 2, y: (Math.max(0, box.top) + Math.min(window.innerHeight, box.bottom)) / 2 };
-  }
-  // Line breaks and other unrendered characters have no box; measure the next visible one.
-  function storyCharRect(root, offset, length) {
-    for (let index = offset; index < Math.min(length, offset + 16); index++) {
-      const rect = canonicalRange(root, index, index + 1)?.getBoundingClientRect();
-      if (rect?.height > 0) return rect;
-    }
-    return null;
-  }
-  function readerTextAnchor() {
-    const root = $('reader-story'); if (!root.textContent) return {};
-    const text = activeVersion().story || ''; if (!text) return {};
-    const middle = readerViewMiddle();
-    // First character whose line reaches the middle of the view.
-    let low = 0, high = text.length;
-    while (low < high) {
-      const index = Math.floor((low + high) / 2), rect = storyCharRect(root, index, text.length);
-      if (!rect || rect.bottom <= middle.y) low = index + 1; else high = index;
-    }
-    const line = low < text.length && storyCharRect(root, low, text.length);
-    // With the title above or the explanations below the middle, keep the pixel offset alone.
-    if (!line || line.top - middle.y > line.height * 2) return {};
-    // Then the character on that line nearest the horizontal middle.
-    const sameLine = rect => rect && Math.abs(rect.top - line.top) < line.height / 2;
-    let left = low, right = Math.min(text.length, low + 400);
-    while (left < right) {
-      const index = Math.floor((left + right) / 2), rect = storyCharRect(root, index, text.length);
-      if (!sameLine(rect) || rect.right > middle.x) right = index; else left = index + 1;
-    }
-    const offset = left < text.length && sameLine(storyCharRect(root, left, text.length)) ? left : Math.max(low, left - 1);
-    return { textOffset: offset, versionId: activeVersion().id };
-  }
-  function restoreReaderPosition(position) {
-    const panel = readerPanel();
-    panel.scrollTop = position?.scrollTop || 0;
-    if (!Number.isInteger(position?.textOffset) || position.textOffset < 0) return;
-    const version = activeVersion(), text = version.story || '';
-    if (position.textOffset >= text.length || position.versionId !== version.id) return;
-    const rect = storyCharRect($('reader-story'), position.textOffset, text.length);
-    if (rect) panel.scrollTop += (rect.top + rect.bottom) / 2 - readerViewMiddle().y;
-    restoredScrollTop = panel.scrollTop;
-  }
-  // The offset a restore produced: its own scroll events must not pick a new anchor from the recentred view.
-  let restoredScrollTop = null;
-  function rememberReaderLocation() {
-    if (!$('reader-dialog').open) return;
-    const story = readerStory();
-    history.replaceState?.({ ...history.state, lingomageReader: story.id, lingomagePathId: selectedPath(story).id, lingomagePosition: state.readerPositions[`${story.id}:${selectedPath(story).id}`] }, '');
-  }
-  let resizingReader = false;
-  // The viewport the reader was laid out for; recorded when it opens and on every resize.
-  let readerViewport = { width: window.innerWidth, height: window.innerHeight };
-  function setReaderViewport(value) { readerViewport = value; }
-  function rememberReaderPosition() {
-    // A closed dialog is display:none and reports scrollTop 0; keep the position recorded while it was open.
-    const story = readerStory(); if (!story || !$('reader-dialog').open) return;
-    if (resizingReader || readerViewport.width !== window.innerWidth || readerViewport.height !== window.innerHeight) return;
-    if (restoredScrollTop !== null && readerPanel().scrollTop === restoredScrollTop) return;
-    restoredScrollTop = null;
-    state.readerPositions[`${story.id}:${selectedPath(story).id}`] = { chapterId: activeChapter(story).id, scrollTop: readerPanel().scrollTop, ...readerTextAnchor() };
-  }
-  // Rotation, text size and furigana reflow the story: the remembered middle passage is centred
-  // again, and the scrolls that reflow causes never replace it.
-  function keepReaderLocation(change = () => {}) {
-    change();
-    const story = readerStory(); if (!story || !$('reader-dialog').open) return;
-    const position = state.readerPositions[`${story.id}:${selectedPath(story).id}`];
-    if (position?.chapterId !== activeChapter(story).id) return;
-    resizingReader = true; restoreReaderPosition(position);
-    requestAnimationFrame(() => { resizingReader = false; });
-  }
-  // Positions live in memory while scrolling; they are saved with the story when the reader closes or the page is hidden.
-  function persistReaderPosition() {
-    rememberReaderLocation();
-    const story = readerStory(); if (!story || !state.stories.includes(story)) return;
-    const saved = {};
-    for (const path of story.paths || []) { const position = state.readerPositions[`${story.id}:${path.id}`]; if (position) saved[path.id] = position; }
-    if (JSON.stringify(saved) === JSON.stringify(story.readerPositions || {})) return;
-    const before = story.readerPositions;
-    story.readerPositions = saved;
-    try { persistStories(); } catch (error) { story.readerPositions = before; console.warn(error); }
-  }
-  function loadReaderPositions() {
-    for (const story of state.stories) for (const [pathId, value] of Object.entries(story?.readerPositions || {})) {
-      if (typeof value?.chapterId === 'string' && Number.isFinite(value.scrollTop)) state.readerPositions[`${story.id}:${pathId}`] = { ...value, chapterId: value.chapterId, scrollTop: Math.max(0, value.scrollTop) };
-    }
-  }
   function openReader(story) {
     closeStoryMenu();
     // An empty legacy chapters array must be replaced too, or synthesized paths would point at chapters that are not saved.
@@ -461,7 +242,7 @@ export function createReaderView({
     const entry = { ...(history.state && typeof history.state === 'object' ? history.state : {}), lingomageReader: story.id };
     if (state.readerHistoryEntry) history.replaceState(entry, ''); else history.pushState(entry, '');
     state.readerHistoryEntry = true;
-    selectionMenuRouter.reset(); $('reader-dialog').showModal(); usage.setReader({ storyId: story.id, language: story.language }); readerViewport = { width: window.innerWidth, height: window.innerHeight }; restoreReaderPosition(position); rememberReaderPosition(); rememberReaderLocation(); updateReaderNavigation(); renderGenerationRecovery(); if (typeof renderReaderGeneration === 'function') { renderReaderGeneration(); if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => renderReaderGeneration()); } settingsFeedback.sync();
+    selectionMenuRouter.reset(); $('reader-dialog').showModal(); usage.setReader({ storyId: story.id, language: story.language }); setReaderViewport({ width: window.innerWidth, height: window.innerHeight }); restoreReaderPosition(position); rememberReaderPosition(); rememberReaderLocation(); updateReaderNavigation(); renderGenerationRecovery(); if (typeof renderReaderGeneration === 'function') { renderReaderGeneration(); if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => renderReaderGeneration()); } settingsFeedback.sync();
   }
   $('reader-dialog').addEventListener('close', () => {
     usage.setReader(null); stopExposure();
@@ -485,7 +266,7 @@ export function createReaderView({
   });
   readerPanel().addEventListener('scroll', event => {
     if (event.target !== readerPanel()) return;
-    if (resizingReader || readerViewport.width !== window.innerWidth || readerViewport.height !== window.innerHeight) return;
+    if (readerPositionLocked()) return;
     // Resizing prose can emit scroll events through reflow/scroll anchoring.
     // Keep the native range mounted and still while its preferences panel is open.
     if (!restoringPathPosition && $('reader-preferences-panel').hidden) closeReaderPanels();
