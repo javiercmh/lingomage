@@ -6,12 +6,11 @@
 // every name the test does not give is a no-op function, so a test lists only what it exercises.
 import * as nodeModule from 'node:module';
 const fakeBridge = new URL('./fake-bridge.mjs', import.meta.url).href;
-// registerHooks (Node 22.15+) runs in-thread; older Node 22 releases use the off-thread bridge-loader.mjs.
-if (nodeModule.registerHooks) nodeModule.registerHooks({ resolve(specifier, context, next) {
+// Production imports of js/bridge.js get fake-bridge.mjs (module.registerHooks, Node 22.15+; check.py enforces it).
+nodeModule.registerHooks({ resolve(specifier, context, next) {
   const result = next(specifier, context);
   return result.url.endsWith('/js/bridge.js') ? { ...result, url: fakeBridge } : result;
 } });
-else nodeModule.register('./bridge-loader.mjs', import.meta.url);
 
 export const { bridge } = await import('./fake-bridge.mjs');
 

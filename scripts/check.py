@@ -11,10 +11,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def require_node():
-    """Some tests require() ES modules, which is unflagged from Node 22.12."""
+    """Tests require() ES modules (Node 22.12+) and the factory harness uses module.registerHooks (Node 22.15+)."""
     version = subprocess.run(['node', '--version'], text=True, stdout=subprocess.PIPE).stdout.strip()
     major, minor = (int(part) for part in version.lstrip('v').split('.')[:2])
-    assert (major, minor) >= (22, 12), 'Node 22.12 or newer is required (found ' + version + ')'
+    assert (major, minor) >= (22, 15), 'Node 22.15 or newer is required (found ' + version + ')'
     # `node` comes from PATH, so the version varies by machine; print it so every run records what it tested.
     print('Node ' + version)
 
