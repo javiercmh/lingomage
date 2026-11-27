@@ -1,14 +1,13 @@
-import readAppSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { loadFactory, deps, bridge as fakeBridge } from './support/factory-harness.mjs';
 import { createPipeline } from '../js/generation/generation-pipeline.js';
 import { createAiSession } from '../js/core/ai-session.js';
 import { readingPlan } from '../js/generation/learning-validation.js';
 import { createStoryMemory } from '../js/generation/story-memory.js';
-import { aiNotification } from '../js/core/ai-notification.js';
-import { saveBeforeAcknowledge } from '../js/core/request-lifecycle.js';
-import { failureInfo } from '../js/generation/generation-errors.js';
+
+const createReaderRequests = await loadFactory('js/reader/reader-requests.js', 'createReaderRequests');
 
 const source = fs.readFileSync('js/bridge.js', 'utf8');
 const realSetTimeout = globalThis.setTimeout;
@@ -230,8 +229,6 @@ try {
   // Story-memory summaries and compaction through the production readerAi, save and release code,
   // the session wrapper and the bridge, while the page is hidden.
   {
-    const appSource = readAppSource();
-    const section = (start, end) => appSource.slice(appSource.indexOf(start), appSource.indexOf(end, appSource.indexOf(start)));
     const events = [], requests = new Map();
     let active = null, durable = null, serial = 0;
     const b = bridge((action, message) => {
@@ -253,17 +250,17 @@ try {
       assert.equal(action, 'result');
       return null;
     });
+    Object.assign(fakeBridge.ai, b.ai);
     const session = createAiSession({ ai: b.ai, isVisible: () => false });
     const node = () => ({ textContent: '', children: [], append(...nodes) { this.children.push(...nodes); }, querySelector() { return this.strong ||= node(); }, addEventListener() {}, remove() {} });
-    const ctx = vm.createContext({
-      ai: b.ai, aiSession: session, aiNotification, saveBeforeAcknowledge, failureInfo, runtime: { readerGeneration: null, pipeline: null, backgroundRun: null },
-      state: { models: [{ id: 'm' }], providerId: 'p', model: 'm' }, workspaceStorage: { assertWritable() {} },
-      document: { createElement: node }, $: () => node(), toast() {}, renderReaderGeneration() {},
+    const state = { models: [{ id: 'm' }], providerId: 'p', model: 'm' };
+    const runtime = { readerGeneration: null, pipeline: null, backgroundRun: null };
+    const { readerAi, savePendingReaderResult, releaseInvalidReaderResponse } = createReaderRequests(deps({
+      aiSession: session, runtime, state, workspaceStorage: { assertWritable() {} }, $: () => node(),
       persistReaderStory(story) { durable = structuredClone(story); events.push('save'); },
-    });
-    vm.runInContext(section('async function readerAi(', 'function renderPendingReaderResult('), ctx);
-    const memory = createStoryMemory({ state: ctx.state, normalizeChapters: story => story.chapters, readerAi: (...a) => ctx.readerAi(...a),
-      savePendingReaderResult: () => ctx.savePendingReaderResult(), discardResponse: () => ctx.releaseInvalidReaderResponse() });
+    }));
+    const memory = createStoryMemory({ state, normalizeChapters: story => story.chapters, readerAi,
+      savePendingReaderResult, discardResponse: releaseInvalidReaderResponse });
     const story = { id: 's', language: 'de', memories: [], chapters: [
       { id: 'c1', versions: [{ id: 'v1', title: 'Eins', story: 'Mia wartet.' }] },
       { id: 'c2', versions: [{ id: 'v2', title: 'Zwei', story: 'Mia geht.' }] }] };
@@ -289,7 +286,7 @@ try {
     assert.deepEqual(events, ['start summary', 'save', 'ack summary', 'start summary', 'save', 'ack summary', 'start memory-compact', 'save', 'ack memory-compact', 'end session']);
     assert.equal(result.arcs.length, 1);
     assert.equal(durable.memories.length, 3);
-    assert.equal(ctx.state.pendingReaderResult, null); assert.equal(ctx.state.pendingReaderRequestId, null); assert.equal(ctx.state.requestId, null);
+    assert.equal(state.pendingReaderResult, null); assert.equal(state.pendingReaderRequestId, null); assert.equal(state.requestId, null);
   }
 } finally {
   globalThis.setTimeout = realSetTimeout;

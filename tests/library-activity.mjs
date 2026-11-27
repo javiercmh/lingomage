@@ -1,11 +1,11 @@
-import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import vm from 'node:vm';
 import { parseTime, storyActivity, markStoryActivity, planLibrary, SORTS, formatDay, formatDate, dateSegments, describeDates } from '../js/screens/library-activity.js';
 import { createStoryModel } from '../js/core/story-model.js';
 import { createGenerationController } from '../js/generation/generation-controller.js';
 import { createWorkspaceStorage } from '../js/core/workspace-storage.js';
+import { bridge, loadFactory, deps, stubDom } from './support/factory-harness.mjs';
+import { storyExportFile } from '../js/screens/story-share.js';
 
 // Library ordering, date copy and activity stamping. Pure functions and in-memory fixtures only: no learner data,
 // no network, no files written. Navigation only; nothing here measures progress or learning.
@@ -215,42 +215,270 @@ for (const kind of ['cont', 'rewrite', 'examples']) {
   assert.equal(storyActivity({ createdAt: at(10, 1), lastActivityAt: at(10, 5) }, NOW).updated, true, 'legacy stamp without kind still means Updated');
 }
 
-// Source contract: stamping happens only in the two content-saving paths, never in opens, positions or pre-request saves.
+// Activity-stamping paths: stamps happen only on saved explanation/detail results, saved Define notes and imported stories (with rollback on write failure),
+// never on reader opens, position tracking, or position persistence.
 {
-  const app = appSource();
-  assert.equal(app.match(/markStoryActivity\(/g).length, 3, 'app.js stamps only the saved explanation/detail result, a saved Define note and an imported story (the controller stamps the other content)');
-  const body = name => app.slice(app.indexOf(`function ${name}(`), app.indexOf('\n}\n', app.indexOf(`function ${name}(`)));
-  assert.match(body('importStoryFromFile'), /markStoryActivity\(story, new Date\(\), 'updated'\);/);
-  for (const name of ['persistReaderStory', 'openReader', 'rememberReaderPosition', 'persistReaderPosition']) assert.ok(!/markStoryActivity/.test(body(name)), `${name} does not stamp`);
-  assert.match(app, /const undoActivity = markStoryActivity\(story\);/);
+  const createReaderRequests = await loadFactory('js/reader/reader-requests.js', 'createReaderRequests');
+  const createDefineNote = await loadFactory('js/reader/define-note.js', 'createDefineNote');
+  const createShareDialog = await loadFactory('js/screens/share-dialog.js', 'createShareDialog');
+  const createReaderView = await loadFactory('js/reader/reader-view.js', 'createReaderView');
+
+  const savedGlobals = {
+    document: globalThis.document, window: globalThis.window, history: globalThis.history,
+    requestAnimationFrame: globalThis.requestAnimationFrame, getComputedStyle: globalThis.getComputedStyle,
+    matchMedia: globalThis.matchMedia, CSS: globalThis.CSS, NodeFilter: globalThis.NodeFilter
+  };
+  const origAi = { ...bridge.ai };
+  try {
+    const dom = stubDom();
+    dom.document.createTreeWalker = () => ({ nextNode: () => null });
+    dom.document.createRange = () => ({ setStart() {}, setEnd() {}, getBoundingClientRect: () => ({ top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 }) });
+    globalThis.NodeFilter = { SHOW_TEXT: 4, FILTER_ACCEPT: 1, FILTER_REJECT: 2 };
+    globalThis.document = dom.document;
+    globalThis.window = { innerWidth: 360, innerHeight: 800, addEventListener() {}, removeEventListener() {}, matchMedia: () => ({ matches: true }) };
+    globalThis.matchMedia = () => ({ matches: true });
+    globalThis.history = { state: null, pushState() {}, replaceState() {}, back() {} };
+    globalThis.requestAnimationFrame = () => 0;
+    globalThis.getComputedStyle = () => ({ top: '0', paddingTop: '0', paddingLeft: '0', paddingRight: '0', paddingBottom: '0' });
+    globalThis.CSS = { escape: value => value };
+
+    const readerPanel = dom.$('panel');
+    readerPanel.scrollTop = 0;
+    dom.$('reader-dialog').querySelector = selector => selector === '.reader-panel' ? readerPanel : null;
+    dom.$('word-note-popover').hidden = true;
+    dom.$('word-note-popover').prepend = (...nodes) => { dom.$('word-note-popover').children.unshift(...nodes); };
+
+    let failPersist = false;
+    let failOnWait = false;
+    let reply = JSON.stringify({ explanation: 'City house' });
+    bridge.ai.available = true;
+    bridge.ai.providers = async () => ({ providers: [{ id: 'p', connected: true }] });
+    bridge.ai.wait = async () => { if (failOnWait) failPersist = true; return reply; };
+    bridge.ai.acknowledge = async () => {};
+
+    const target = story('S', at(10, 1), {
+      chapters: [{ id: 'c1', activeVersionId: 'v1', versions: [{ id: 'v1', title: 'T', story: 'Stadt Haus', glossary: [] }], help: [] }],
+      paths: [{ id: 'original', name: 'Original', entries: [{ chapterId: 'c1', versionId: 'v1' }] }]
+    });
+    const state = {
+      stories: [target], readerId: 'S', readerChapter: 0, readerPositions: {},
+      providerId: 'p', model: 'm', models: [{ id: 'm' }],
+      standardizedLevels: {}, languageExpectations: {}
+    };
+    const runtime = { pipeline: null, readerGeneration: null, backgroundRun: null };
+    const model = createStoryModel({ state, readerStory: () => target });
+    const persistReaderStory = () => { if (failPersist) throw new Error('disk full'); };
+
+    const view = createReaderView(deps({
+      $: dom.$, state, LANGUAGES: { de: 'German' }, SPEECH_LANGUAGES: { de: 'de-DE' }, PROFILE_DEFINITIONS: { version: 1 },
+      persistReaderStory, persistStories() {}, selectionMenuRouter: { reset() {} },
+      usage: { setReader() {} }, settingsFeedback: { sync() {} }, pendingDeletionBlocked: () => false,
+      readingDescription: () => ''
+    }));
+    const requests = createReaderRequests(deps({
+      $: dom.$, state, runtime, LANGUAGES: { de: 'German' },
+      aiSession: { start: async () => 'req-1' },
+      activeChapter: model.activeChapter, activeVersion: model.activeVersion,
+      normalizeChapters: model.normalizeChapters, readerStory: () => target,
+      readerPanel: () => readerPanel,
+      workspaceStorage: { assertWritable() {} },
+      persistReaderStory,
+      createHelpLoading: () => dom.$('help-loading'),
+      helpContext: () => ({ sentence: 'Stadt Haus', selectionStart: 0, selectionEnd: 5 }),
+      resolvedHelpContext: () => ({ contextStart: 0, contextEnd: 10, contextTranslation: '' }),
+      overlappingHelp: () => [],
+      savedFollowUps: item => item.followUps || [],
+      validTextRange: (text, start, end) => Number.isInteger(start) && Number.isInteger(end) && start >= 0 && end > start && end <= text.length
+    }));
+    const defineNote = createDefineNote(deps({
+      $: dom.$, state, runtime, LANGUAGES: { de: 'German' },
+      activeChapter: model.activeChapter, activeVersion: model.activeVersion,
+      normalizeChapters: model.normalizeChapters, readerStory: () => target,
+      readerPanel: () => readerPanel, closeWordNote: view.closeWordNote,
+      persistReaderStory, readerAi: requests.readerAi,
+      releaseInvalidReaderResponse: requests.releaseInvalidReaderResponse,
+      releaseSavedInference: requests.releaseSavedInference,
+      savePendingReaderResult: requests.savePendingReaderResult,
+      validTextRange: (text, start, end) => Number.isInteger(start) && Number.isInteger(end) && start >= 0 && end > start && end <= text.length
+    }));
+
+    // Opening reader, remembering position and persisting position never stamp.
+    view.openReader(target);
+    view.rememberReaderPosition();
+    view.persistReaderPosition();
+    assert.ok(!('lastActivityAt' in target), 'openReader and position saves never stamp');
+
+    // Saved explanation stamps activity and rolls back on write failure.
+    const passage = { storyId: 'S', chapterId: 'c1', versionId: 'v1', start: 0, end: 5, text: 'Stadt', profile: {} };
+    await requests.explainSelection('explain', 'initial', '', passage);
+    assert.ok(Date.parse(target.lastActivityAt) > 0, 'saved explanation stamps activity');
+    assert.equal(target.lastActivityKind, 'updated');
+    assert.equal(target.chapters[0].help.length, 1);
+
+    target.lastActivityAt = at(10, 2);
+    failOnWait = true;
+    await requests.explainSelection('explain', 'detail', 'why?', { ...passage, helpId: target.chapters[0].help[0].id });
+    assert.ok(state.pendingReaderResult && !state.pendingReaderResult.saved);
+    assert.equal(target.lastActivityAt, at(10, 2), 'failed detail save rolls back activity stamp');
+    failOnWait = false; failPersist = false;
+    await requests.savePendingReaderResult();
+    assert.ok(Date.parse(target.lastActivityAt) > Date.parse(at(10, 2)), 'retrying pending detail save stamps activity');
+
+    // Saved Define note stamps activity and rolls back on write failure.
+    delete target.lastActivityAt; delete target.lastActivityKind;
+    reply = JSON.stringify({ glossary: [{ word: 'Stadt', meaning: 'city', forms: ['Stadt'] }] });
+    failOnWait = true;
+    await defineNote.defineSelection(passage);
+    assert.ok(state.pendingReaderResult && !state.pendingReaderResult.saved);
+    assert.ok(!('lastActivityAt' in target), 'failed Define save leaves no stamp');
+    failOnWait = false; failPersist = false;
+    await requests.savePendingReaderResult();
+    assert.ok(Date.parse(target.lastActivityAt) > 0, 'saved Define note stamps activity');
+    assert.equal(target.lastActivityKind, 'updated');
+
+    // Existing stamp is untouched by openReader, rememberReaderPosition and persistReaderPosition.
+    const stampedBefore = target.lastActivityAt;
+    view.openReader(target);
+    view.rememberReaderPosition();
+    view.persistReaderPosition();
+    assert.equal(target.lastActivityAt, stampedBefore, 'open/position paths never overwrite activity stamp');
+
+    // Importing a story stamps activity as updated.
+    const shareDialog = createShareDialog(deps({
+      $: dom.$, state,
+      activeVersion: model.activeVersion, normalizeChapters: model.normalizeChapters, pathChapters: model.pathChapters,
+      selectedPath: model.selectedPath, persistStories() {}, readJson: (_path, fallback) => fallback,
+      workspaceStorage: { assertWritable() {}, entries: new Map() }
+    }));
+    assert.ok(shareDialog);
+    const exported = storyExportFile(story('ext', at(10, 1)), { appVersion: '1.0' }).content;
+    dom.$('import-story-input').files = [{ size: exported.length, text: async () => exported }];
+    await dom.$('import-story-input').dispatch('change');
+    const imported = state.stories[0];
+    assert.notEqual(imported.id, 'S');
+    assert.ok(Date.parse(imported.lastActivityAt) > 0, 'imported story is stamped');
+    assert.equal(imported.lastActivityKind, 'updated');
+  } finally {
+    Object.assign(bridge.ai, origAi);
+    Object.assign(globalThis, savedGlobals);
+  }
 }
 
 // Deferred re-render: a result saved while the library is hidden, in selection, or showing a popover never reorders under the learner,
 // and Actions focus returns to the rebuilt button afterwards.
 {
-  const app = appSource();
-  const part = (from, to) => app.slice(app.indexOf(from), app.indexOf(to));
-  let active = true, renders = 0, removed = 0, focused = [];
-  const rebuilt = { focus() { focused.push('rebuilt'); } };
-  const trigger = { isConnected: true, setAttribute() {}, focus() { focused.push('old'); } };
-  const list = { querySelector: selector => (/data-story-id="S"/.test(selector) ? rebuilt : null) };
-  const context = { CSS: { escape: value => value }, state: { storySelectionMode: false, storyMenu: null, libraryStale: false }, $: id => (id === 'library-list' ? list : { classList: { contains: () => active } }),
-    renderLibrary() { renders++; context.state.libraryStale = false; trigger.isConnected = false; } };
-  vm.createContext(context); vm.runInContext(part('function libraryChanged(', 'function storyDateLine(') + part('function closeStoryMenu(', 'function openStoryMenu('), context);
-  context.libraryChanged(); assert.equal(renders, 1, 'visible and idle: re-render so the hero can change');
-  trigger.isConnected = true;
-  active = false; context.libraryChanged(); assert.equal(renders, 1, 'hidden library renders when next shown'); assert.equal(context.state.libraryStale, false);
-  active = true; context.state.storySelectionMode = true; context.libraryChanged(); context.libraryChanged();
-  assert.equal(renders, 1, 'no re-render under a selection'); assert.equal(context.state.libraryStale, true);
-  context.state.storySelectionMode = false; context.state.storyMenu = { id: 'S', trigger, popover: { remove() { removed++; } } };
-  context.libraryChanged(); assert.equal(renders, 1, 'no re-render under an open popover');
-  context.closeStoryMenu(true); assert.equal(removed, 1); assert.equal(renders, 2, 'the stale library renders once the popover closes');
-  assert.deepEqual(focused, ['rebuilt'], 'focus goes to the rebuilt Actions button, not the detached one');
-  context.state.shareDialog = {}; context.libraryChanged(); assert.equal(renders, 2, 'no re-render under Share dialog'); assert.equal(context.state.libraryStale, true); context.state.shareDialog = null; context.state.libraryStale = false;
-  // No deferred render: focus returns to the original trigger.
-  trigger.isConnected = true; focused = []; context.state.storyMenu = { id: 'S', trigger, popover: { remove() {} } }; context.closeStoryMenu(true);
-  assert.deepEqual(focused, ['old']); assert.equal(renders, 2);
-  assert.match(app, /state\.deleteTrigger = \{ id: story\.id, trigger \}/, 'the delete dialog restores focus by story id after a re-render');
+  const createLibraryView = await loadFactory('js/screens/library-view.js', 'createLibraryView');
+  const savedGlobals = {
+    document: globalThis.document, window: globalThis.window, CSS: globalThis.CSS
+  };
+  try {
+    const dom = stubDom();
+    const list = dom.$('library-list');
+    let renders = 0;
+    const origReplaceChildren = list.replaceChildren.bind(list);
+    list.replaceChildren = (...nodes) => { renders++; origReplaceChildren(...nodes); };
+
+    const findIn = (nodes, pred) => {
+      for (const node of nodes || []) {
+        if (pred(node)) return node;
+        const found = findIn(node.children, pred);
+        if (found) return found;
+      }
+      return null;
+    };
+    const hasClass = (node, cls) => typeof node?.className === 'string' && node.className.split(/\s+/).includes(cls);
+    const isConnectedNode = node => node === list || node === dom.document.body || Boolean(findIn(list.children, item => item === node)) || Boolean(findIn(dom.document.body.children, item => item === node));
+
+    const origCreateElement = dom.document.createElement.bind(dom.document);
+    dom.document.createElement = tag => {
+      const node = origCreateElement(tag);
+      Object.defineProperty(node, 'isConnected', { get() { return !this.removed && isConnectedNode(this); } });
+      node.focus = () => { dom.document.activeElement = node; };
+      return node;
+    };
+    list.querySelector = selector => {
+      const match = /\[data-story-id="([^"]+)"\] \.story-menu-toggle/.exec(selector);
+      if (match) {
+        const card = findIn(list.children, item => item.dataset?.storyId === match[1]);
+        return card ? findIn(card.children, item => hasClass(item, 'story-menu-toggle')) : null;
+      }
+      if (selector === '.story-open') return findIn(list.children, item => hasClass(item, 'story-open'));
+      return null;
+    };
+
+    const deleteDialog = dom.$('delete-stories-dialog');
+    deleteDialog.close = function () { if (!this.open) return; this.open = false; void this.dispatch('close'); };
+
+    globalThis.document = dom.document;
+    globalThis.window = { innerWidth: 360, innerHeight: 800, addEventListener() {}, removeEventListener() {} };
+    globalThis.CSS = { escape: value => value };
+
+    const state = {
+      stories: [story('S', at(10, 1))],
+      storySelectionMode: false, selectedStoryIds: new Set(),
+      storyMenu: null, libraryStale: false, libraryLanguage: 'all', librarySort: 'recent',
+      shareDialog: null, deleteTrigger: null, deleteStoryIds: new Set()
+    };
+    const libraryView = createLibraryView(deps({
+      $: dom.$, LANGUAGES: { de: 'German' }, state,
+      beginStorySelection() {}, finishDeletedStoryReader() {}, leaveStorySelection() {},
+      openReader() {}, openShareDialog() {}, pendingDeletionBlocked: () => false,
+      removeSelectedStories: () => true, syncStorySelection() {}, toast() {}, toggleStorySelection() {}
+    }));
+
+    dom.$('view-library').classList.add('active');
+    libraryView.libraryChanged();
+    assert.equal(renders, 1, 'visible and idle: re-render so the hero can change');
+
+    dom.$('view-library').classList.remove('active');
+    libraryView.libraryChanged();
+    assert.equal(renders, 1, 'hidden library renders when next shown'); assert.equal(state.libraryStale, false);
+
+    dom.$('view-library').classList.add('active');
+    state.storySelectionMode = true;
+    libraryView.libraryChanged(); libraryView.libraryChanged();
+    assert.equal(renders, 1, 'no re-render under a selection'); assert.equal(state.libraryStale, true);
+
+    state.storySelectionMode = false; state.libraryStale = false;
+    const oldTrigger = list.querySelector('[data-story-id="S"] .story-menu-toggle');
+    assert.ok(oldTrigger && oldTrigger.isConnected);
+    await oldTrigger.dispatch('click', { stopPropagation() {} });
+    assert.ok(state.storyMenu, 'clicking Actions opens story popover');
+    const popover = state.storyMenu.popover;
+    libraryView.libraryChanged();
+    assert.equal(renders, 1, 'no re-render under an open popover');
+    libraryView.closeStoryMenu(true);
+    assert.equal(popover.removed, true);
+    assert.equal(renders, 2, 'the stale library renders once the popover closes');
+    const rebuiltTrigger = list.querySelector('[data-story-id="S"] .story-menu-toggle');
+    assert.notEqual(rebuiltTrigger, oldTrigger);
+    assert.equal(dom.document.activeElement, rebuiltTrigger, 'focus goes to the rebuilt Actions button, not the detached one');
+
+    state.shareDialog = {};
+    libraryView.libraryChanged();
+    assert.equal(renders, 2, 'no re-render under Share dialog'); assert.equal(state.libraryStale, true);
+    state.shareDialog = null; state.libraryStale = false;
+
+    // No deferred render: focus returns to the original trigger.
+    await rebuiltTrigger.dispatch('click', { stopPropagation() {} });
+    libraryView.closeStoryMenu(true);
+    assert.equal(dom.document.activeElement, rebuiltTrigger);
+    assert.equal(renders, 2);
+
+    // Delete dialog restores focus by story id after a re-render.
+    await rebuiltTrigger.dispatch('click', { stopPropagation() {} });
+    const deleteButton = findIn(state.storyMenu.popover.children, node => hasClass(node, 'story-popover-delete'));
+    await deleteButton.dispatch('click');
+    assert.equal(deleteDialog.open, true);
+    libraryView.renderLibrary();
+    assert.equal(renders, 3);
+    const rebuiltAfterDelete = list.querySelector('[data-story-id="S"] .story-menu-toggle');
+    assert.notEqual(rebuiltAfterDelete, rebuiltTrigger);
+    deleteDialog.close();
+    assert.equal(dom.document.activeElement, rebuiltAfterDelete, 'the delete dialog restores focus by story id after a re-render');
+  } finally {
+    Object.assign(globalThis, savedGlobals);
+  }
 }
 
 // Storage: the field round-trips, a malformed value does not make the store unreadable, and an unreadable store is never overwritten.

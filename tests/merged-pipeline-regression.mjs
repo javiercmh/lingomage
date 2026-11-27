@@ -1,17 +1,19 @@
-import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {createPipeline} from '../js/generation/generation-pipeline.js';
 import {readingPlan, validateProse} from '../js/generation/learning-validation.js';
-const app=appSource();
+import {loadFactory, deps, stubDom} from './support/factory-harness.mjs';
+
+const createCreateFlow = await loadFactory('js/screens/create-flow.js', 'createCreateFlow');
 const prose={title:'今日',story:'今日は町へ行きます。町へ行きます。',glossary:[{word:'町',meaning:'town',forms:['町']}]};
 const plan={vocabulary:[{word:'町',meaning:'town'}],grammar:[],guidance:'Clear references.'};
 function harness({phase,language='ja',kind='create'}={}) {
-  const events=[],titles=[];let durable=[],cancelClick;const button={addEventListener(name,fn){cancelClick=fn;}};
-  let pipeline;const context={pipeline:null,get runtime(){return context;},$:()=>button,toast(message){throw Error(message);}};
-  vm.createContext(context);vm.runInContext(app.slice(app.indexOf("$('cancel-generation').addEventListener"),app.indexOf('function renderRecoveryPanel(')),context);
-  const click=async()=>{if(kind==='create') await cancelClick();else await pipeline.cancel();};
+  const events=[],titles=[];let durable=[];
+  const dom = stubDom();
+  const runtime = { pipeline: null };
+  createCreateFlow(deps({ $: dom.$, runtime, toast(message) { throw Error(message); } }, { strict: true }));
+  const click=async()=>{if(kind==='create') await dom.$('cancel-generation').dispatch('click');else await pipeline.cancel();};
   const ai={
     async start(args){const input=JSON.parse(args.input);events.push('start '+input.kind);titles.push(args.title);assert.ok(args.body&&Object.keys(args).every(key=>['providerId','model','reasoningEffort','instructions','input','title','body'].includes(key)));
       if((phase==='plan-start'&&input.kind==='language-plan')||(phase==='prose-start'&&input.kind===kind)||(phase==='notes-start'&&input.kind==='notes')||(phase==='readings-start'&&input.kind==='readings'))await click();
@@ -22,8 +24,8 @@ function harness({phase,language='ja',kind='create'}={}) {
     async acknowledge(id){events.push('ack '+id);if(durable[0]?.request?.invalid)return;if(id==='language-plan'){assert.deepEqual(durable[0].plan,plan);if(phase==='plan-ack')await click();if(phase==='plan-interrupt')throw Object.assign(Error('Session stopped'),{code:'session_idle'});}if(id===kind)assert.deepEqual(durable[0].prose,validateProse(prose,language));if(id==='notes')assert.deepEqual(durable[0].prose,prose);},
     async cancel(id){events.push('cancel '+id);}
   };
-  pipeline=createPipeline({records:[],persist(records){durable=structuredClone(records);},ai,apply(op){events.push('apply');assert.equal(op.result.story,prose.story);if(language==='ja')assert.equal(op.result.storySegments.map(p=>p.text).join(''),prose.story);}});
-  context.pipeline=pipeline;
+  const pipeline=createPipeline({records:[],persist(records){durable=structuredClone(records);},ai,apply(op){events.push('apply');assert.equal(op.result.story,prose.story);if(language==='ja')assert.equal(op.result.storySegments.map(p=>p.text).join(''),prose.story);}});
+  runtime.pipeline=pipeline;
   const op=pipeline.create({planned:true,kind,language,input:{difficulty:'N5',scope:'scene',topic:'Captured'},config:{providerId:'mock',model:'mock'},instructions:'Story instructions',promptVersion:'fixture'});
   return {pipeline,op,events,titles,get durable(){return durable;}};
 }
@@ -48,6 +50,7 @@ const resumed=createPipeline({records,persist(){},ai:{start:async args=>{calls.p
 records[0].language='de';await resumed.run(records[0]);assert.equal(calls.length,2);assert.equal(calls[0].kind,'create');assert.deepEqual(calls[0].languagePlan,plan);
 console.log('PASS merged plan/prose/readings ordering, durable reuse, actual Create cancel handler, and pending-stage/handoff cancellation across story kinds');
 let shareAction, shared;
+const appJs = fs.readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
 const shareContext={state:{readerChapter:0},readerStory:()=>({id:'saved'}),closeReaderActions(){},openShareDialog(story,options){shared={story,options};},$:()=>({addEventListener(name,fn){shareAction=fn;}})};
-vm.createContext(shareContext);vm.runInContext(app.slice(app.indexOf("$('reader-share').addEventListener"),app.indexOf('// Android\'s own selection menu')),shareContext);shareAction();assert.equal(shared.story.id,'saved');assert.equal(shared.options.chapterIndex,0);
+vm.createContext(shareContext);vm.runInContext(appJs.slice(appJs.indexOf("$('reader-share').addEventListener"),appJs.indexOf('// Android\'s own selection menu')),shareContext);shareAction();assert.equal(shared.story.id,'saved');assert.equal(shared.options.chapterIndex,0);
 console.log('PASS reader Share opens chapter dialog');

@@ -1,13 +1,14 @@
-import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
 import vm from 'node:vm';
 import { createAiSession } from '../js/core/ai-session.js';
 import { createPipeline } from '../js/generation/generation-pipeline.js';
 import { failureInfo, recoverySummary } from '../js/generation/generation-errors.js';
-import { readingPlan, validateProse } from '../js/generation/learning-validation.js';
+import { SAFEGUARD_VERSION, readingPlan, validateProse } from '../js/generation/learning-validation.js';
+import { PROMPT_VERSION } from '../js/generation/prompts.js';
+import { bridge as fakeBridge, deps, loadFactory, stubDom } from './support/factory-harness.mjs';
 
-const app = appSource();
 const bridgeSource = fs.readFileSync('js/bridge.js', 'utf8');
 const coded = (message, code) => Object.assign(new Error(message), { code });
 
@@ -231,18 +232,156 @@ for (const [kind, language, stages] of [
 }
 // The app itself keeps that split: sessions wrap generation, never cleanup.
 {
-  const between = (from, to) => app.slice(app.indexOf(from), app.indexOf(to, app.indexOf(from)));
-  const resume = between('async function resumeCheckpoint(', 'function revealRecovery(');
-  assert.ok(resume.indexOf('pipeline.finishRequest(op)') < resume.indexOf('aiSession.run('), 'Resume finishes a completed request before, and outside, any session');
-  const cont = between("$('reader-edit-submit').addEventListener", '// end of js/reader/continue-flow.js');
-  assert.ok(cont.indexOf('releaseSavedInference()') < cont.indexOf('aiSession.run('), 'Cleanup of earlier results happens before the session');
-  assert.ok(cont.indexOf('aiSession.run(') < cont.indexOf('prepareStoryMemory(') && cont.indexOf('prepareStoryMemory(') < cont.indexOf('runContentOperation('), 'Summary preparation is inside the Continue/Rewrite session');
-  assert.match(between('async function runContentOperation(', 'const { operationProvenance'), /aiSession\.run\(\(\) => runtime\.pipeline\.run\(op\)\)/);
-  for (const name of ['async function acknowledgeReaderResult(', 'async function releaseSavedInference(', 'async function releaseInvalidReaderResponse(', 'async function savePendingReaderResult(']) {
-    assert.ok(!/aiSession|ai\.start/.test(between(name, '\nasync function ') || between(name, '\nfunction ')), `${name} needs no session or inference`);
+  const createCheckpointRecovery = await loadFactory('js/generation/checkpoint-recovery.js', 'createCheckpointRecovery');
+  const createContinueFlow = await loadFactory('js/reader/continue-flow.js', 'createContinueFlow');
+  const createReaderRequests = await loadFactory('js/reader/reader-requests.js', 'createReaderRequests');
+  const createGenerationResults = await loadFactory('js/generation/generation-results.js', 'createGenerationResults');
+
+  // 1. resumeCheckpoint finishes a completed request before, and outside, any session; uncompleted work and runContentOperation run inside aiSession.run.
+  {
+    const dom = stubDom();
+    const events = [];
+    const opDone = { id: 'op-done', kind: 'create', stage: 'prose', promptVersion: PROMPT_VERSION, safeguardVersion: SAFEGUARD_VERSION, request: { id: 'r1', stage: 'prose', completed: true } };
+    const opNext = { id: 'op-next', kind: 'create', stage: 'prose', promptVersion: PROMPT_VERSION, safeguardVersion: SAFEGUARD_VERSION, config: { providerId: 'p', model: 'm' }, request: { id: 'r2', stage: 'prose', completed: false } };
+    const runtime = {
+      pipeline: {
+        records: [opDone, opNext],
+        busy: false,
+        create: spec => ({ id: 'op-created', ...spec }),
+        finishRequest: async op => { events.push(`finishRequest:${op.id}`); },
+        run: async op => { events.push(`pipeline.run:${op.id}`); }
+      }
+    };
+    const recovery = createCheckpointRecovery(deps({
+      $: dom.$, state: {}, runtime, PROFILE_DEFINITIONS: { version: 1 },
+      workspaceStorage: { assertWritable() {} },
+      aiSession: {
+        run: async fn => { events.push('session.run:enter'); const res = await fn(); events.push('session.run:exit'); return res; },
+        start: async () => { events.push('session.start'); return 's'; }
+      }
+    }));
+    await recovery.resumeCheckpoint(opDone);
+    assert.deepEqual(events, ['finishRequest:op-done'], 'Resume finishes a completed request before, and outside, any session');
+    events.length = 0;
+    await recovery.resumeCheckpoint(opNext);
+    assert.deepEqual(events, ['session.run:enter', 'pipeline.run:op-next', 'session.run:exit'], 'Resume of uncompleted work wraps pipeline.run in aiSession.run');
+    events.length = 0;
+    runtime.pipeline.records = [];
+    await recovery.runContentOperation({ kind: 'create', language: 'de', input: {}, config: { providerId: 'p', model: 'm' }, instructions: 'i' });
+    assert.deepEqual(events, ['session.run:enter', 'pipeline.run:op-created', 'session.run:exit'], 'runContentOperation wraps pipeline.run in aiSession.run');
   }
-  assert.ok(!/[^.]\bai\.start\(/.test(app), 'Every ai.start in the app goes through aiSession.start');
-  assert.match(app, /async function readerAi[\s\S]*aiSession\.start\(/);
+
+  // 2. Continue/Rewrite cleans up saved inference before aiSession.run and prepares story memory inside aiSession.run.
+  {
+    const dom = stubDom();
+    const order = [];
+    const story = { id: 'S', language: 'de', difficulty: 'A1', chapters: [{ id: 'c1', activeVersionId: 'v1', versions: [{ id: 'v1', story: 'Hallo.' }] }], paths: [{ id: 'p1', name: 'Original', entries: [{ chapterId: 'c1', versionId: 'v1' }] }] };
+    const state = { readerId: 'S', readerChapter: 0, stories: [story], providerId: 'p', model: 'm', models: [{ id: 'm', name: 'Mock' }], languageExpectations: {} };
+    const runtime = { pipeline: null, readerGeneration: null };
+    const origAvailable = fakeBridge.ai.available;
+    fakeBridge.ai.available = true;
+    try {
+      createContinueFlow(deps({
+        $: dom.$, state, runtime,
+        readerStory: () => story,
+        pathChapters: () => story.chapters,
+        activeVersion: () => story.chapters[0].versions[0],
+        selectedPath: () => story.paths[0],
+        normalizeChapters: s => s.chapters,
+        LANGUAGES: { de: 'German' }, LEVELS: { de: { framework: 'CEFR' } },
+        levelDefinition: () => ({ id: 'A1' }), guideFor: () => 'Simple', readingDescription: () => 'Simple',
+        profileSnapshot: () => ({}), estimateFor: () => null, operationPlan: () => ({}), pendingSummaryCount: () => 0, parallelLimitFor: () => 3,
+        createChapterLoading: () => dom.document.createElement('div'),
+        releaseSavedInference: async () => { order.push('releaseSavedInference'); },
+        aiSession: { run: async fn => { order.push('session.run:enter'); try { return await fn(); } finally { order.push('session.run:exit'); } } },
+        prepareStoryMemory: async () => { order.push('prepareStoryMemory'); return {}; },
+        recentProse: text => text,
+        runContentOperation: async spec => { order.push('runContentOperation'); return { id: 'op-1', ...spec }; }
+      }));
+      dom.$('reader-level').value = 'A1';
+      dom.$('reader-scope').value = 'scene';
+      dom.$('reader-edit-panel').dataset = { mode: 'continue', continueMode: 'append' };
+      dom.$('reader-prompt').value = '';
+      await dom.$('reader-edit-submit').dispatch('click');
+      assert.deepEqual(order, ['releaseSavedInference', 'session.run:enter', 'prepareStoryMemory', 'runContentOperation', 'session.run:exit'], 'Cleanup happens before the session and summary preparation runs inside it');
+    } finally {
+      fakeBridge.ai.available = origAvailable;
+    }
+  }
+
+  // 3. Reader cleanup helpers need no session or inference; readerAi routes ai.start through aiSession.start; pipeline routes ai.start through aiSession.start.
+  {
+    const dom = stubDom();
+    const state = { providerId: 'p', model: 'm', models: [{ id: 'm', name: 'Mock' }], pendingReaderRequestId: null, pendingReaderResult: null, pendingStoryRequestId: null, pendingGeneration: null };
+    const runtime = {};
+    const events = [];
+    const origAi = { ...fakeBridge.ai };
+    fakeBridge.ai.available = true;
+    fakeBridge.ai.providers = async () => ({ providers: [{ id: 'p', connected: true }] });
+    fakeBridge.ai.start = async () => { events.push('raw:bridge.ai.start'); return 'raw-id'; };
+    fakeBridge.ai.wait = async id => { events.push(`wait:${id}`); return 'ok'; };
+    fakeBridge.ai.acknowledge = async id => { events.push(`ack:${id}`); };
+    try {
+      const requests = createReaderRequests(deps({
+        $: dom.$, state, runtime,
+        persistReaderStory: () => { events.push('persist'); },
+        workspaceStorage: { assertWritable() {} },
+        aiSession: {
+          run: async () => { events.push('session.run'); },
+          start: async a => { events.push(`session.start:${JSON.parse(a.input).kind}`); return 'sess-id'; }
+        }
+      }));
+      // Saved pending reader result triggers acknowledgeReaderResult via releaseSavedInference without any session or start.
+      state.pendingReaderRequestId = 'r1'; state.pendingReaderResult = { saved: true };
+      await requests.releaseSavedInference();
+      state.pendingReaderRequestId = 'r2'; state.pendingReaderResult = null;
+      await requests.releaseInvalidReaderResponse();
+      state.pendingStoryRequestId = 's1'; state.pendingReaderRequestId = 'r3'; state.pendingReaderResult = { saved: true };
+      await requests.releaseSavedInference();
+      state.pendingReaderRequestId = 'r4'; state.pendingReaderResult = { story: { id: 'S' }, saved: false, apply() { return () => {}; } };
+      await requests.savePendingReaderResult();
+      assert.deepEqual(events.filter(e => e.startsWith('session') || e.startsWith('raw')), [], 'releaseSavedInference, releaseInvalidReaderResponse and savePendingReaderResult (and internal acknowledgeReaderResult) need no session or inference');
+
+      events.length = 0;
+      const result = await requests.readerAi('explain', { passage: 'x' }, 'inst');
+      assert.equal(result, 'ok');
+      assert.deepEqual(events, ['session.start:explain', 'wait:sess-id'], 'readerAi routes ai.start through aiSession.start');
+
+      // Generation pipeline created by initializePipeline also routes ai.start through aiSession.start.
+      events.length = 0;
+      const gRuntime = {};
+      const gStory = { id: 'S', language: 'de', chapters: [{ id: 'c1', activeVersionId: 'v1', versions: [{ id: 'v1', story: 'Brot.' }], help: [{ id: 'h1', versionId: 'v1' }] }], paths: [{ id: 'p1', name: 'Original', entries: [{ chapterId: 'c1', versionId: 'v1' }] }] };
+      const results = createGenerationResults(deps({
+        $: dom.$, state: { ...state, stories: [gStory] }, runtime: gRuntime,
+        normalizeChapters: s => s.chapters,
+        ensureStoryPaths: () => {},
+        persistReaderStory: () => {},
+        savedFollowUps: () => [],
+        workspaceStorage: { load: () => ({ status: 'ok', value: [] }), save() {}, assertWritable() {} },
+        aiSession: {
+          start: async a => { events.push(`session.start:${JSON.parse(a.input).kind}`); return 'pipe-id'; }
+        }
+      }));
+      results.initializePipeline();
+      const op = gRuntime.pipeline.create({ kind: 'examples', language: 'de', planned: false, input: { passage: 'Brot' }, config: { providerId: 'p', model: 'm' }, instructions: 'i', promptVersion: 't', target: { storyId: 'S', chapterId: 'c1', versionId: 'v1', helpId: 'h1', start: 0, end: 4, passage: 'Brot' } });
+      fakeBridge.ai.wait = async () => JSON.stringify(exampleSet('Brot'));
+      await gRuntime.pipeline.run(op);
+      assert.ok(events.includes('session.start:examples') && !events.includes('raw:bridge.ai.start'), 'initializePipeline routes pipeline ai.start through aiSession.start');
+    } finally {
+      Object.assign(fakeBridge.ai, origAi);
+    }
+  }
+
+  // 4. Whole-app invariant: no module calls raw ai.start( directly outside ai-session.js and the dependency-injected pipeline.
+  {
+    const jsRoot = path.resolve('js');
+    const allowed = new Set(['bridge.js', 'core/ai-session.js', 'generation/generation-pipeline.js']);
+    const files = fs.readdirSync(jsRoot, { recursive: true }).filter(f => f.endsWith('.js') && !allowed.has(f.replaceAll(path.sep, '/')));
+    for (const file of files) {
+      const content = fs.readFileSync(path.join(jsRoot, file), 'utf8');
+      assert.ok(!/[^.]\bai\.start\(/.test(content), `${file}: Every ai.start in the app goes through aiSession.start`);
+    }
+  }
 }
 
 // ---------- Hidden page without a session: checkpoint stays put, explicit Resume only ----------

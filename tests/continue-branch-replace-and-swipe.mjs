@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
 import { createGenerationController } from '../js/generation/generation-controller.js';
 import { createStoryModel } from '../js/core/story-model.js';
 import { operationLabel } from '../js/generation/generation-errors.js';
-import appSource from './support/app-source.cjs';
+import { bridge, loadFactory, deps, stubDom } from './support/factory-harness.mjs';
+
+const createGenerationBar = await loadFactory('js/generation/generation-bar.js', 'createGenerationBar');
 
 const ver = (id, text, extra = {}) => ({
   id, title: `Title ${id}`, story: text, glossary: [{ word: 'word', meaning: 'meaning', forms: ['word'] }],
@@ -129,10 +130,10 @@ function makeController(story, { failPersist = false } = {}) {
   const sent = [];
   const origDocument = globalThis.document;
   const origWindow = globalThis.window;
-  globalThis.window = {
-    addEventListener() {},
-    AndroidStorage: { hasNotificationPermission: () => true, showNotification(title, body) { sent.push({ title, body }); } }
-  };
+  const origNotify = bridge.notify, origPerm = bridge.hasNotificationPermission;
+  bridge.hasNotificationPermission = () => true;
+  bridge.notify = (title, body) => { sent.push({ title, body }); return true; };
+  globalThis.window = { addEventListener() {} };
   globalThis.document = { visibilityState: 'hidden', createElement: () => ({ hidden: false, className: '', append() {}, querySelector: () => ({ hidden: false, addEventListener() {} }) }), querySelectorAll: () => [] };
   try {
     const { createGenerationStatusUi } = await import('../js/generation/generation-status-ui.js');
@@ -143,6 +144,8 @@ function makeController(story, { failPersist = false } = {}) {
     assert.deepEqual(sent.map(item => item.title), ['Chapter 4 is ready', 'Parallel Chapter 2 is ready', 'Chapter 2 is ready']);
     assert.ok(sent.every(item => item.body === 'Start'));
   } finally {
+    bridge.notify = origNotify;
+    bridge.hasNotificationPermission = origPerm;
     globalThis.document = origDocument;
     globalThis.window = origWindow;
   }
@@ -150,8 +153,6 @@ function makeController(story, { failPersist = false } = {}) {
 
 // 4. Swipe-to-dismiss behavior on dismissible vs non-dismissible generation bars.
 {
-  const code = appSource();
-  const swipeSection = code.slice(code.indexOf('function attachSwipeDismiss('), code.indexOf('// Scroll the reader only'));
   const makeBar = dismissible => {
     const handlers = {}, classes = new Set(dismissible ? ['dismissible'] : []);
     return {
@@ -176,15 +177,21 @@ function makeController(story, { failPersist = false } = {}) {
   };
   const barA = makeBar(true), barB = makeBar(true);
   barA.style.parent = barA; barB.style.parent = barB;
+  // The production generation bar attaches its swipe handlers to these two stand-in bars when it is created.
+  const dom = stubDom();
+  dom.elements.set('reader-generation-bar', barA); dom.elements.set('generation-status-bar', barB);
   let dismissed = 0;
-  const ctx = {
-    $: id => id === 'reader-generation-bar' ? barA : barB,
-    window: { matchMedia: () => ({ matches: true }) },
-    setReaderGeneration(v) { if (v === null) dismissed++; },
-    setTimeout(fn) { fn(); return 1; }
-  };
-  vm.createContext(ctx);
-  vm.runInContext(swipeSection, ctx);
+  const runtime = { pipeline: null, readerGeneration: null, creatingStory: false, backgroundRun: null, playbackContext: null };
+  // A dismissal is setReaderGeneration(null); count the writes of null to the shared status.
+  let status = null;
+  Object.defineProperty(runtime, 'readerGeneration', { get: () => status, set(v) { status = v; if (v === null) dismissed++; } });
+  const origWindow = globalThis.window, origDocument = globalThis.document, origTimeout = globalThis.setTimeout;
+  globalThis.window = { ...origWindow, matchMedia: () => ({ matches: true }) };
+  globalThis.document = dom.document;
+  globalThis.setTimeout = fn => { fn(); return 1; };
+  try {
+  createGenerationBar(deps({ $: dom.$, runtime, state: {}, readerPanel: () => dom.$('reader-panel') }));
+  status = { storyId: 'S', phase: 'ready', message: 'Ready' };
 
   // Horizontal swipe past threshold dismisses dismissible pill.
   barA.fire('pointerdown', { clientX: 200, clientY: 700 });
@@ -204,6 +211,7 @@ function makeController(story, { failPersist = false } = {}) {
   barA.fire('pointermove', { clientX: 80, clientY: 700 });
   barA.fire('pointerup', { clientX: 80, clientY: 700 });
   assert.equal(dismissed, 1, 'non-dismissible pill ignores horizontal swipes');
+  } finally { globalThis.window = origWindow; globalThis.document = origDocument; globalThis.setTimeout = origTimeout; }
 }
 
 console.log('PASS branch & replace Continue (lineage, shared-chapter pruning, save rollback, staleness, labels) and swipe-to-dismiss');

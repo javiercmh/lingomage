@@ -1,7 +1,7 @@
-import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createTreeDom } from './support/tree-dom.mjs';
+import { loadFactory, deps } from './support/factory-harness.mjs';
 
 const dom = createTreeDom();
 Object.assign(globalThis, dom.globals);
@@ -213,16 +213,131 @@ const BREAD = [{ word: 'Brot', meaning: 'bread', forms: ['Brot'] }];
 {
   // The source chooser is gone; the note carries the only secondary action.
   const read = path => fs.readFileSync(new URL(path, import.meta.url), 'utf8');
-  const css = read('../css/style.css'), html = read('../index.html'), app = appSource();
-  assert.doesNotMatch(css + html + read('../js/reader/reader-activation.js') + app, /source-chooser|sourceChooser|createSourceChooser/, 'obsolete chooser markup, styles and wiring are removed');
+  const css = read('../css/style.css'), html = read('../index.html');
+  assert.doesNotMatch(css + html + read('../js/reader/reader-activation.js') + read('../js/app.js'), /source-chooser|sourceChooser|createSourceChooser/, 'obsolete chooser markup, styles and wiring are removed');
   assert.match(css, /\.word-note-view \{[^}]*width: 100%[^}]*min-height: 44px/, 'View saved explanation is a full-width 44px target');
   assert.match(css, /\.word-note-view \{[^}]*border-top: 1px solid/, 'a subtle divider separates it from the meanings');
   assert.match(css, /\.word-note-view:hover, \.word-note-view:focus-visible/, 'visible keyboard focus');
-  assert.match(app, /function closeWordNote\(restoreFocus = false\) \{\n  const popover/, 'note closing no longer touches a chooser');
-  assert.match(app, /if \(!\$\('word-note-popover'\)\.hidden\) \{\n    closeWordNote\(true\);\n    history\.pushState/, 'Back dismisses an open note before leaving the reader');
-  assert.match(app, /selectionMenuRouter\.reset\(\); \$\('reader-dialog'\)\.showModal\(\)/, 'reader entry re-asserts native menu suppression');
-  assert.match(app, /onNote: event => activateStoryText\(event\)/, 'trigger controls share the single dispatcher');
-  assert.match(app, /\$\('reader-story'\)\.addEventListener\('click', activateStoryText\)/, 'story taps go through the same note-dismissal gate');
+
+  const createReaderView = await loadFactory('js/reader/reader-view.js', 'createReaderView');
+  const createHelpCards = await loadFactory('js/reader/help-cards.js', 'createHelpCards');
+  const tree = createTreeDom();
+  Object.defineProperty(tree.Element.prototype, 'classList', {
+    get() {
+      const el = this;
+      const set = () => new Set(el.className.split(/\s+/).filter(Boolean));
+      const write = s => { el.className = [...s].join(' '); };
+      return {
+        add(...names) { const s = set(); names.forEach(n => s.add(n)); write(s); },
+        remove(...names) { const s = set(); names.forEach(n => s.delete(n)); write(s); },
+        toggle(name, force) { const s = set(), on = force ?? !s.has(name); if (on) s.add(name); else s.delete(name); write(s); return on; },
+        contains(name) { return set().has(name); }
+      };
+    }
+  });
+  tree.Element.prototype.replaceChildren = function (...nodes) { this.textContent = ''; this.append(...nodes); };
+  tree.Element.prototype.showModal = function () { this.open = true; };
+  tree.Element.prototype.close = function () { if (!this.open) return; this.open = false; tree.dispatch(this, 'close'); };
+
+  const savedGlobals = {
+    document: globalThis.document, window: globalThis.window, history: globalThis.history,
+    requestAnimationFrame: globalThis.requestAnimationFrame, getComputedStyle: globalThis.getComputedStyle
+  };
+  try {
+    const elements = new Map();
+    const $ = id => {
+      if (!elements.has(id)) {
+        const el = tree.document.createElement('div');
+        el.setAttribute('id', id); el.hidden = true; el.open = false; el.value = ''; el.disabled = false;
+        tree.document.body.append(el); elements.set(id, el);
+      }
+      return elements.get(id);
+    };
+    const dialog = $('reader-dialog'), panel = $('reader-panel'), readerStoryEl = $('reader-story');
+    panel.className = 'reader-panel'; panel.hidden = false; panel.scrollTop = 0;
+    readerStoryEl.hidden = false; $('reader-title').hidden = false; $('reader-help').hidden = false;
+    dialog.append(panel); panel.append($('reader-title'), readerStoryEl, $('reader-help-section'), $('word-note-popover'));
+    $('reader-help-section').append($('reader-help'));
+
+    const entryOrder = [], pushCalls = [], revealedCards = [];
+    const origShowModal = dialog.showModal.bind(dialog);
+    dialog.showModal = function () { entryOrder.push('showModal'); origShowModal(); };
+    const historyState = { state: null, pushState(entry) { pushCalls.push(entry); this.state = entry; }, replaceState(entry) { this.state = entry; }, back() {} };
+    Object.assign(tree.window, { matchMedia: () => ({ matches: false }), removeEventListener() {} });
+    tree.document.querySelectorAll = selector => tree.document.body.querySelectorAll(selector);
+    tree.document.querySelector = selector => tree.document.body.querySelector(selector);
+    tree.document.createRange = () => ({ setStart() {}, setEnd() {}, getBoundingClientRect: () => ({ top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 }) });
+    globalThis.document = tree.document; globalThis.window = tree.window; globalThis.history = historyState;
+    globalThis.requestAnimationFrame = () => 0; globalThis.getComputedStyle = () => ({ top: '0', paddingTop: '0', paddingLeft: '0', paddingRight: '0', paddingBottom: '0' });
+
+    const story = {
+      id: 's1', language: 'de', title: 'Titel', activePathId: 'p1',
+      chapters: [{ id: 'c1', activeVersionId: 'v1', versions: [{ id: 'v1', title: 'Titel', story: 'Ich esse Brot heute', glossary: BREAD }], help: [{ id: 'h1', versionId: 'v1', passage: 'esse Brot', start: 4, end: 13, text: 'eat bread' }] }],
+      paths: [{ id: 'p1', name: 'Original', entries: [{ chapterId: 'c1', versionId: 'v1' }] }]
+    };
+    const state = { stories: [story], readerPositions: {}, readerId: null, readerChapter: 0, readerFontSize: 19, furigana: true, standardizedLevels: {}, languageExpectations: {}, explanationSelectionMode: false, selectedExplanationIds: new Set() };
+    let helpCards, view;
+    view = createReaderView(deps({
+      $, state, LANGUAGES: { de: 'German' }, SPEECH_LANGUAGES: { de: 'de-DE' }, PROFILE_DEFINITIONS: { version: 1 },
+      activateStoryText: event => helpCards.activateStoryText(event),
+      clearExplanationSelection: () => {}, closeStoryMenu: () => {},
+      renderSavedHelp: (ch, ver) => helpCards.renderSavedHelp(ch, ver),
+      showExplanationForHelp: id => helpCards.showExplanationForHelp(id),
+      selectionMenuRouter: { reset() { entryOrder.push('reset'); } },
+      usage: { setReader() {} }, settingsFeedback: { sync() {} },
+      pendingDeletionBlocked: () => false, readingDescription: () => ''
+    }));
+    helpCards = createHelpCards(deps({
+      $, state, SPEECH_LANGUAGES: { de: 'de-DE' },
+      activeChapter: view.activeChapter, activeVersion: view.activeVersion, closeWordNote: view.closeWordNote,
+      createInlineListenButton: () => tree.document.createElement('button'),
+      readerPanel: view.readerPanel, readerStory: view.readerStory,
+      revealCard: card => revealedCards.push(card.dataset.helpId),
+      showWordNote: view.showWordNote, wireLongPress: () => {}
+    }));
+
+    view.openReader(story);
+    assert.deepEqual(entryOrder, ['reset', 'showModal'], 'reader entry re-asserts native menu suppression');
+
+    const trigger = readerStoryEl.querySelector('.gloss-note-trigger');
+    const nested = trigger.querySelector('mark.explained-expression');
+    const markOutside = readerStoryEl.querySelector('mark.explained-expression');
+    assert.ok(trigger && nested && markOutside);
+
+    // Trigger click shares activateStoryText; opening note has no chooser and exposes View saved explanation.
+    tree.dispatch(nested, 'pointerdown');
+    tree.dispatch(nested, 'click');
+    const popover = $('word-note-popover');
+    assert.equal(popover.hidden, false, 'clicking trigger opens word note');
+    assert.ok(popover.querySelector('.word-note-view'), 'View saved explanation button is rendered directly in the note');
+    assert.equal(popover.querySelector('.source-chooser'), null, 'no source chooser is rendered');
+
+    // Back (popstate) dismisses an open note before leaving the reader.
+    pushCalls.length = 0;
+    tree.window.fire('popstate');
+    assert.equal(popover.hidden, true, 'Back dismisses an open note before leaving the reader');
+    assert.equal(tree.document.activeElement, trigger, 'closing the note on Back restores focus to its trigger');
+    assert.equal(dialog.open, true, 'reader stays open after dismissing the note');
+    assert.equal(pushCalls.at(-1).lingomageReader, 's1', 'reader history entry is restored');
+    tree.window.fire('popstate');
+    assert.equal(dialog.open, false, 'a second Back leaves the reader');
+
+    // Story taps go through the same note-dismissal gate.
+    view.openReader(story);
+    tree.dispatch(readerStoryEl.querySelector('.gloss-note-trigger'), 'pointerdown');
+    tree.dispatch(readerStoryEl.querySelector('.gloss-note-trigger'), 'click');
+    assert.equal(popover.hidden, false);
+    const outsideMark = readerStoryEl.querySelector('mark.explained-expression');
+    tree.dispatch(outsideMark, 'pointerdown');
+    assert.equal(popover.hidden, true, 'pointerdown outside note closes it');
+    tree.dispatch(outsideMark, 'click');
+    assert.deepEqual(revealedCards, [], 'story tap that dismissed a note does not also open an explanation');
+    tree.dispatch(outsideMark, 'pointerdown');
+    tree.dispatch(outsideMark, 'click');
+    assert.deepEqual(revealedCards, ['h1'], 'subsequent tap on explanation mark jumps to saved card');
+  } finally {
+    Object.assign(globalThis, savedGlobals);
+  }
   console.log('PASS chooser removed; note action is 44px, divided, focus-visible; Back dismisses the note first');
 }
 

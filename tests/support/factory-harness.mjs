@@ -44,7 +44,9 @@ export function stubDom() {
       dispatch(type, event = {}) { return Promise.all((this.listeners[type] || []).map(fn => fn({ target: node, preventDefault() {}, stopPropagation() {}, ...event }))); },
       setAttribute(name, value) { this.attributes[name] = String(value); }, getAttribute(name) { return this.attributes[name] ?? null; },
       removeAttribute(name) { delete this.attributes[name]; },
-      append(...nodes) { this.children.push(...nodes); }, replaceChildren(...nodes) { this.children = nodes; }, remove() { this.removed = true; },
+      append(...nodes) { this.children.push(...nodes); }, appendChild(n) { this.children.push(n); return n; },
+      replaceChildren(...nodes) { this.children = nodes; }, remove() { this.removed = true; },
+      get childNodes() { return this.children; },
       querySelector: () => element(), querySelectorAll: () => [], closest: () => null, contains: () => false, matches: () => false,
       focus() { document.activeElement = node; }, scrollIntoView() {}, showModal() { this.open = true; }, close() { this.open = false; },
       dispatchEvent() { return true; }, getBoundingClientRect: () => ({ top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 }), getClientRects: () => []
@@ -54,6 +56,8 @@ export function stubDom() {
   const document = {
     activeElement: null, body: element('body'), visibilityState: 'visible',
     createElement: tag => Object.assign(element(), { tagName: String(tag).toUpperCase() }),
+    createTextNode: text => ({ nodeType: 3, nodeValue: String(text), textContent: String(text) }),
+    createDocumentFragment: () => ({ nodeType: 11, children: [], append(...nodes) { this.children.push(...nodes); }, appendChild(n) { this.children.push(n); return n; } }),
     getElementById: id => $(id), querySelector: () => null, querySelectorAll: () => [],
     addEventListener() {}, removeEventListener() {}
   };

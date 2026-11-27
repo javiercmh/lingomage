@@ -1,294 +1,343 @@
-const appSource = require('./support/app-source.cjs');
-const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
-const source = appSource();
-const BAR = ['reader-generation-bar', 'generation-status-bar'];
+const assert = require('node:assert/strict');
 
-function build(extra = {}) {
-  const elements = new Map(), classes = new Set();
-    const element = id => {
-    if (!elements.has(id)) elements.set(id, {id, hidden: false, disabled: false, open: false, textContent: '', writes: 0, parentNode: null, children: [], attributes: {},
-      classList: {toggle(name, on) { on ? classes.add(`${id}:${name}`) : classes.delete(`${id}:${name}`); }, contains: name => classes.has(`${id}:${name}`)},
-      setAttribute(name, value) { this.attributes[name] = value; },
-      append(node) { node.parentNode = this; }, scrollIntoView() {}, querySelectorAll: () => []});
-    return elements.get(id);
-  };
-  const body = element('body'), dialog = element('reader-dialog');
-  element('loading-card').hidden = true;
-  const closers = [];
-  dialog.addEventListener = (type, fn) => { if (type === 'close') closers.push(fn); };
-  dialog.close = () => { dialog.open = false; setTimeout(() => closers.splice(0).forEach(fn => fn()), 0); };
-  const context = {state: {readerId: null, stories: []}, $: element, readerPanel: () => element('reader-panel'), pipeline: null, toasts: [],
-    document: {body, querySelectorAll: () => dialog.open ? [dialog] : [], querySelector: () => null}, toast(message) { context.toasts.push(message); },
-    timers: [], setTimeout(fn, ms) { context.timers.push({fn, ms}); return context.timers.length; }, clearTimeout(id) { if (context.timers[id - 1]) context.timers[id - 1].cleared = true; }, ...extra};
-  Object.defineProperty(context, 'bodyClass', {get: () => body.classList.contains('x')});
-  context.runtime = context; context.maybeStartBackgroundContext ??= () => {}; // app.js's shared runtime bindings are plain context properties here
-  vm.createContext(context);
-  // The status core, then the View result handler; both are the production source.
-  vm.runInContext(source.slice(source.indexOf('function setReaderGeneration('), source.indexOf("for (const id of ['reader-generation-dismiss'")), context);
-  vm.runInContext(source.slice(source.indexOf('function closeReader('), source.indexOf("for (const id of ['reader-generation-action'")), context);
-  return {context, element, classes};
-}
-const visible = (t, id) => !t.element(id).hidden;
-
-// Review is unnecessary while the matching recovery card is in view, but returns elsewhere.
-{
-  const t=build({window:{innerWidth:360,innerHeight:800},pipeline:{records:[{target:{storyId:'story'}}],busy:false}}), {context}=t;
-  context.state.readerId='story';t.element('reader-dialog').open=true;
-  let top=300;
-  const card=t.element('checkpoint-recovery-reader');
-  card.getClientRects=()=>[{}];card.getBoundingClientRect=()=>({left:12,right:348,top,bottom:top+200,height:200});
-  t.element('reader-navigation-bar').getBoundingClientRect=()=>({bottom:80});
-  context.setReaderGeneration({storyId:'story',phase:'error',message:'Generation stopped.'});
-  assert.equal(visible(t,'reader-generation-bar'),false);assert.equal(visible(t,'generation-status-bar'),false);
-  top=900;context.renderReaderGeneration();assert.equal(visible(t,'reader-generation-bar'),true);
-  assert.equal(t.element('reader-generation-action').textContent,'Review');
-  top=-150;context.renderReaderGeneration();assert.equal(visible(t,'reader-generation-bar'),true,'a card covered by fixed navigation does not hide Review');
-  top=300;context.state.readerId='other';context.renderReaderGeneration();
-  assert.equal(visible(t,'generation-status-bar'),true,'a recovery card behind another reader does not hide Review');
-  context.state.readerId='story';context.renderReaderGeneration();assert.equal(visible(t,'reader-generation-bar'),false);
-}
-
-// Reader open on the status' own story: only the reader bar, with the phase's action.
-{
-  const t = build({pipeline: {busy: true}}), {context} = t;
-  t.element('reader-dialog').open = true; context.state.readerId = 'story';
-  context.setReaderGeneration({storyId: 'story', phase: 'working', message: 'Writing…'});
-  assert.equal(visible(t, 'reader-generation-bar'), true); assert.equal(visible(t, 'generation-status-bar'), false);
-  assert.equal(t.element('reader-generation-action').textContent, 'Cancel'); assert.ok(t.element('reader-generation-bar').classList.contains('working'), 'a spinner shows while work runs');
-  assert.equal(t.element('reader-generation-dismiss').hidden, true);
-  assert.ok(t.classes.has('reader-panel:has-generation-status'));
-  // Rendering unchanged text does not rewrite the live region.
-  const writes = () => t.element('reader-generation-message').textContent;
-  context.renderReaderGeneration(); assert.equal(writes(), 'Writing…');
-}
-
-// No false "working": once nothing is live (cancelled, failed, abandoned) the status is hidden everywhere.
-{
-  const t = build({pipeline: {busy: true}}), {context} = t;
-  context.setReaderGeneration({storyId: null, phase: 'working', message: 'Writing your story…'});
-  assert.equal(visible(t, 'generation-status-bar'), true, 'live Create request shows on any tab');
-  context.pipeline.busy = false; context.renderReaderGeneration();
-  assert.equal(visible(t, 'generation-status-bar'), false, 'settled request leaves no stale working status');
-  for (const flag of ['readerEditBusy', 'readerHelpBusy']) {
-    context.state[flag] = true; context.renderReaderGeneration(); assert.equal(visible(t, 'generation-status-bar'), true, `${flag} is a live signal`);
-    context.state[flag] = false; context.renderReaderGeneration(); assert.equal(visible(t, 'generation-status-bar'), false);
-  }
-  context.state.requestId = 'r'; context.renderReaderGeneration(); assert.equal(visible(t, 'generation-status-bar'), true); context.state.requestId = null;
-  context.renderReaderGeneration(); assert.equal(visible(t, 'generation-status-bar'), false);
-}
-
-// Placement: reader closed, another story's reader, and Create's own progress card.
-{
-  const t = build({pipeline: {busy: true}}), {context} = t;
-  context.state.readerId = 'other';
-  context.setReaderGeneration({storyId: 'story', phase: 'working', message: 'Writing the next chapter…'});
-  assert.equal(visible(t, 'generation-status-bar'), true, 'reader closed'); assert.equal(visible(t, 'reader-generation-bar'), false);
-  assert.equal(t.element('generation-status-bar').parentNode, t.element('body'));
-  assert.ok(t.classes.has('body:has-app-generation-status'));
-  assert.ok(!t.classes.has('reader-panel:has-generation-status'));
-  t.element('reader-dialog').open = true; context.renderReaderGeneration();
-  assert.ok(t.classes.has('reader-panel:has-generation-status'), "another story's reader reserves bottom space and notice offsets");
-  assert.ok(!t.classes.has('body:has-app-generation-status'), 'page padding is not used behind a modal reader');
-  assert.equal(visible(t, 'generation-status-bar'), true, "another story's reader"); assert.equal(visible(t, 'reader-generation-bar'), false);
-  assert.equal(t.element('generation-status-bar').parentNode, t.element('reader-dialog'), 'moved into the modal dialog so it is not inert');
-  t.element('reader-dialog').open = false;
-  context.state.readerId = 'story'; context.renderReaderGeneration();
-  assert.equal(visible(t, 'generation-status-bar'), true, 'closed reader of the same story still uses the page bar');
-  t.classes.add('view-create:active'); context.setReaderGeneration({storyId: null, phase: 'working', message: 'Writing your story…'});
-  assert.equal(visible(t, 'generation-status-bar'), true, 'a resumed Create has no progress card, so the bar is shown');
-  t.element('loading-card').hidden = false; context.renderReaderGeneration();
-  assert.equal(visible(t, 'generation-status-bar'), false, 'Create tab keeps its own visible progress card');
-  t.element('loading-card').hidden = true; context.renderReaderGeneration();
-  assert.equal(visible(t, 'generation-status-bar'), true, 'the bar returns as soon as the card is hidden');
-  context.setReaderGeneration({storyId: null, phase: 'error', message: 'Story generation stopped.'});
-  assert.equal(visible(t, 'generation-status-bar'), true); assert.equal(t.element('generation-status-action').textContent, 'Review');
-}
-
-// Saved-response recovery and terminal phases never claim to be working.
-{
-  const t = build({pipeline: {busy: false}}), {context} = t;
-  t.element('reader-dialog').open = true; context.state.readerId = 'story';
-  context.setReaderGeneration({storyId: 'story', phase: 'working', message: 'Writing…'});
-  assert.equal(visible(t, 'reader-generation-bar'), false);
-  context.state.pendingReaderResult = {story: {id: 'story'}, saved: false}; context.renderReaderGeneration();
-  assert.equal(t.element('reader-generation-action').textContent, 'Save response');
-  context.state.pendingReaderResult.saved = true; context.renderReaderGeneration();
-  assert.equal(t.element('reader-generation-action').textContent, 'Finish request');
-  context.state.pendingReaderResult = null;
-  for (const [phase, label] of [['ready', 'View result'], ['error', 'Review'], ['cleanup', 'Finish request']]) {
-    context.setReaderGeneration({storyId: 'story', phase, message: phase});
-    assert.equal(t.element('reader-generation-action').textContent, label); assert.equal(t.element('reader-generation-dismiss').hidden, false);
-  }
-  context.setReaderGeneration(null); assert.equal(visible(t, 'reader-generation-bar'), false);
-}
-
-// Ready hides itself after a timeout; a held or hidden bar postpones it; other phases never time out.
-{
-  const t = build(), {context} = t, live = () => context.timers.filter(timer => !timer.cleared && !timer.fired);
-  const fire = () => { const timer = live().at(-1); timer.fired = true; timer.fn(); };
-  const current = () => vm.runInContext('readerGeneration', context);
-  t.element('reader-dialog').open = true; context.state.readerId = 'story';
-  context.document.visibilityState = 'visible';
-  for (const phase of ['error', 'cleanup']) { context.setReaderGeneration({storyId: 'story', phase, message: phase}); assert.equal(live().length, 0, `${phase} stays`); }
-  context.state.pendingReaderResult = {story: {id: 'story'}, saved: true};
-  context.setReaderGeneration({storyId: 'story', phase: 'ready', message: 'Ready'}); assert.equal(live().length, 0, 'unreleased response stays');
-  context.state.pendingReaderResult = null;
-  const ready = {storyId: 'story', phase: 'ready', message: 'Ready'};
-  context.setReaderGeneration(ready); assert.equal(live().length, 1); assert.equal(live()[0].ms, 8000);
-  context.renderReaderGeneration(); assert.equal(live().length, 1, 're-rendering the same status keeps one countdown');
-  t.element('reader-generation-bar').matches = selector => selector === ':hover';
-  fire(); assert.equal(current(), ready, 'hovered bar stays'); assert.equal(live().length, 1);
-  t.element('reader-generation-bar').matches = () => false; context.document.visibilityState = 'hidden';
-  fire(); assert.equal(current(), ready, 'hidden page postpones'); assert.equal(live().length, 1);
-  // Returning to the page restarts the full countdown instead of keeping whatever was left.
-  context.document.visibilityState = 'visible'; const leftover = live().at(-1);
-  context.restartReadyCountdown(); assert.equal(leftover.cleared, true); assert.equal(live().length, 1); assert.equal(live()[0].ms, 8000);
-  fire(); assert.equal(current(), null); assert.equal(visible(t, 'reader-generation-bar'), false);
-  context.restartReadyCountdown(); assert.equal(live().length, 0, 'nothing to restart once Ready is gone');
-  // A newer status replaces the countdown; the old timer cannot dismiss it.
-  const first = {storyId: 'story', phase: 'ready', message: 'First'}; context.setReaderGeneration(first);
-  const stale = live().at(-1); context.setReaderGeneration({storyId: 'story', phase: 'error', message: 'Failed'});
-  assert.equal(stale.cleared, true); stale.fn(); assert.equal(current().phase, 'error');
-}
-
-// Cancel uses the pipeline directly, so it works from the page bar with the reader closed.
 (async () => {
-  let cancels = 0;
-  const t = build({pipeline: {busy: true, async cancel() { cancels++; }}}), {context} = t;
-  context.setReaderGeneration({storyId: 'story', phase: 'working', message: 'Writing…'});
-  assert.equal(t.element('generation-status-action').disabled, false);
-  context.state.stories = [{id: 'story', paths: [], activePathId: 'a'}];
-  await context.generationAction(); assert.equal(cancels, 1);
+  const { loadFactory, deps, stubDom } = await import('./support/factory-harness.mjs');
+  const createGenerationBar = await loadFactory('js/generation/generation-bar.js', 'createGenerationBar');
+  const realSetTimeout = globalThis.setTimeout, realClearTimeout = globalThis.clearTimeout;
 
-  // Saving a response acknowledges it, which clears state.pendingReaderResult: the owning reader is refreshed from the captured record.
-  for (const [readerId, expectUpdate] of [['story', true], ['other', false]]) {
-    const w = build({pipeline: null}), c = w.context, calls = [];
-    w.element('reader-dialog').open = true; c.state.readerId = readerId;
-    c.state.pendingReaderResult = {story: {id: 'story'}, saved: false};
-    c.updateReader = () => calls.push('updateReader');
-    c.savePendingReaderResult = async () => { c.state.pendingReaderResult = null; };
-    c.setReaderGeneration({storyId: 'story', phase: 'working', message: 'Writing…'});
-    await c.generationAction();
-    assert.deepEqual(calls, expectUpdate ? ['updateReader'] : [], `reader ${readerId} after saving a response for story`);
+  function build(extra = {}) {
+    const dom = stubDom(), classes = new Set();
+    const element = id => {
+      const created = !dom.elements.has(id);
+      const el = dom.$(id);
+      if (created) {
+        el.writes = 0;
+        el.parentNode = null;
+        el.classList = {
+          toggle(name, force) { const on = force ?? !classes.has(`${id}:${name}`); on ? classes.add(`${id}:${name}`) : classes.delete(`${id}:${name}`); return on; },
+          add(...names) { names.forEach(name => classes.add(`${id}:${name}`)); },
+          remove(...names) { names.forEach(name => classes.delete(`${id}:${name}`)); },
+          contains: name => classes.has(`${id}:${name}`)
+        };
+        el.append = (...nodes) => { nodes.forEach(node => { node.parentNode = el; el.children.push(node); }); };
+        el.querySelectorAll = () => [];
+      }
+      return el;
+    };
+    const body = element('body'), dialog = element('reader-dialog');
+    element('loading-card').hidden = true;
+    dialog.close = () => {
+      dialog.open = false;
+      realSetTimeout(() => (dialog.listeners.close || []).splice(0).forEach(fn => fn({})), 0);
+    };
+    dom.document.body = body;
+    dom.document.visibilityState = 'visible';
+    dom.document.querySelectorAll = sel => sel === 'dialog[open]' && dialog.open ? [dialog] : [];
+    dom.document.querySelector = () => null;
+    const context = {
+      state: { readerId: null, stories: [] }, $: element, readerPanel: () => element('reader-panel'),
+      pipeline: null, toasts: [], document: dom.document,
+      toast(message) { context.toasts.push(message); },
+      timers: [], ...extra
+    };
+    Object.defineProperty(context, 'bodyClass', { get: () => body.classList.contains('x') });
+    context.runtime = context;
+    context.maybeStartBackgroundContext ??= () => {};
+    globalThis.document = dom.document;
+    globalThis.window = extra.window ?? { innerWidth: 360, innerHeight: 800, matchMedia: () => ({ matches: false }) };
+    globalThis.requestAnimationFrame = () => {};
+    globalThis.setTimeout = (fn, ms) => { context.timers.push({ fn, ms }); return context.timers.length; };
+    globalThis.clearTimeout = id => { if (context.timers[id - 1]) context.timers[id - 1].cleared = true; };
+    const api = createGenerationBar(deps({
+      $: element,
+      runtime: context,
+      state: context.state,
+      readerPanel: () => context.readerPanel(),
+      toast: message => context.toast(message),
+      maybeStartBackgroundContext: (...args) => context.maybeStartBackgroundContext?.(...args),
+      updateReader: (...args) => context.updateReader?.(...args),
+      savePendingReaderResult: (...args) => context.savePendingReaderResult?.(...args),
+      setView: (...args) => context.setView?.(...args),
+      revealRecovery: (...args) => context.revealRecovery?.(...args),
+      openReader: (...args) => context.openReader?.(...args),
+      rememberReaderPosition: (...args) => context.rememberReaderPosition?.(...args),
+      persistReaderStory: (...args) => context.persistReaderStory?.(...args),
+      persistReaderPosition: (...args) => context.persistReaderPosition?.(...args),
+      releaseInvalidReaderResponse: (...args) => context.releaseInvalidReaderResponse?.(...args)
+    }));
+    Object.assign(context, api);
+    return { context, element, classes };
   }
+  const visible = (t, id) => !t.element(id).hidden;
 
-  // Create recovery from another story's modal reader: the reader is closed first, then Create is shown and revealed.
-  {
-    const order = [], op = {kind: 'create'};
-    const w = build({pipeline: {busy: false, records: [op]}}), c = w.context;
-    w.element('reader-dialog').open = true; c.state.readerId = 'other'; c.state.stories = [];
-    c.setView = name => order.push(`view:${name}:${w.element('reader-dialog').open ? 'open' : 'closed'}`);
-    c.revealRecovery = value => order.push(`reveal:${value === op}`);
-    c.setReaderGeneration({storyId: null, phase: 'error', message: 'Story generation stopped.'});
-    await c.generationAction();
-    assert.deepEqual(order, ['view:create:closed', 'reveal:true']);
-  }
+  try {
+    // Review is unnecessary while the matching recovery card is in view, but returns elsewhere.
+    {
+      const t = build({ window: { innerWidth: 360, innerHeight: 800 }, pipeline: { records: [{ target: { storyId: 'story' } }], busy: false } }), { context } = t;
+      context.state.readerId = 'story'; t.element('reader-dialog').open = true;
+      let top = 300;
+      const card = t.element('checkpoint-recovery-reader');
+      card.getClientRects = () => [{}]; card.getBoundingClientRect = () => ({ left: 12, right: 348, top, bottom: top + 200, height: 200 });
+      t.element('reader-navigation-bar').getBoundingClientRect = () => ({ bottom: 80 });
+      context.setReaderGeneration({ storyId: 'story', phase: 'error', message: 'Generation stopped.' });
+      assert.equal(visible(t, 'reader-generation-bar'), false); assert.equal(visible(t, 'generation-status-bar'), false);
+      top = 900; context.renderReaderGeneration(); assert.equal(visible(t, 'reader-generation-bar'), true);
+      assert.equal(t.element('reader-generation-action').textContent, 'Review');
+      top = -150; context.renderReaderGeneration(); assert.equal(visible(t, 'reader-generation-bar'), true, 'a card covered by fixed navigation does not hide Review');
+      top = 300; context.state.readerId = 'other'; context.renderReaderGeneration();
+      assert.equal(visible(t, 'generation-status-bar'), true, 'a recovery card behind another reader does not hide Review');
+      context.state.readerId = 'story'; context.renderReaderGeneration(); assert.equal(visible(t, 'reader-generation-bar'), false);
+    }
 
-  // View result targets the exact result path, also when the same chapter version is shared by two paths.
-  const makeStory = () => ({id: 'story', activePathId: 'original', paths: [
-    {id: 'original', name: 'Original', entries: [{chapterId: 'c1', versionId: 'v1'}, {chapterId: 'c2', versionId: 'v2'}]},
-    {id: 'alt', name: 'Alternate 1', entries: [{chapterId: 'c1', versionId: 'v1'}, {chapterId: 'c3', versionId: 'v3'}]}]});
-  const open = (story, extra = {}) => {
-    const w = build({pipeline: null, ...extra}), saved = [], calls = [];
-    Object.assign(w.context, {persisted: saved, calls, rememberReaderPosition: () => calls.push('remember'), persistReaderStory: s => { saved.push(s.activePathId); if (w.context.failSave) throw new Error('disk full'); },
-      persistReaderPosition: () => calls.push('position'), updateReader: () => calls.push('update'), revealCard() {}, setView() {}, revealRecovery() {}, openReader: s => { w.context.state.readerId = s.id; w.element('reader-dialog').open = true; }});
-    w.context.state.stories = [story]; w.context.state.readerPositions = {}; w.context.state.readerChapter = 0;
-    return w;
-  };
-  // Shared first chapter on both paths: the status names 'alt', so 'alt' wins over the first path containing it.
-  let story = makeStory(), w = open(story);
-  w.context.setReaderGeneration({storyId: 'story', phase: 'ready', message: 'ready', pathId: 'alt', chapterId: 'c1', versionId: 'v1'});
-  await w.context.generationAction();
-  assert.equal(story.activePathId, 'alt'); assert.deepEqual(w.context.persisted, ['alt'], 'selected path is saved');
-  assert.equal(w.context.state.readerChapter, 0);
-  assert.equal(JSON.stringify(w.context.state.readerPositions['story:alt']), '{"chapterId":"c1","scrollTop":0}');
-  assert.ok(w.context.calls.includes('remember') && w.context.calls.includes('update') && w.context.calls.includes('position'));
-  assert.equal(vm.runInContext('readerGeneration', w.context), null);
-  // Continue result on the path that is not the selected one.
-  story = makeStory(); w = open(story);
-  w.context.setReaderGeneration({storyId: 'story', phase: 'ready', message: 'ready', pathId: 'original', chapterId: 'c2', versionId: 'v2'});
-  story.activePathId = 'alt'; await w.context.generationAction();
-  assert.equal(story.activePathId, 'original'); assert.equal(w.context.state.readerChapter, 1);
-  // Already on that path: no redundant path write.
-  story = makeStory(); w = open(story);
-  w.context.setReaderGeneration({storyId: 'story', phase: 'ready', message: 'ready', pathId: 'original', chapterId: 'c2', versionId: 'v2'});
-  await w.context.generationAction(); assert.deepEqual(w.context.persisted, []); assert.equal(w.context.state.readerChapter, 1);
-  // A failed save restores the selection and does not navigate.
-  story = makeStory(); w = open(story); w.context.failSave = true;
-  w.context.setReaderGeneration({storyId: 'story', phase: 'ready', message: 'ready', pathId: 'alt', chapterId: 'c3', versionId: 'v3'});
-  await w.context.generationAction(); assert.equal(story.activePathId, 'original'); assert.deepEqual(w.context.toasts, ['disk full']); assert.ok(!w.context.calls.includes('update'));
-  // Deleted path and deleted story degrade without navigating.
-  story = makeStory(); w = open(story);
-  w.context.setReaderGeneration({storyId: 'story', phase: 'ready', message: 'ready', pathId: 'gone', chapterId: 'cX', versionId: 'vX'});
-  await w.context.generationAction(); assert.deepEqual(w.context.toasts, ['That result is no longer available.']); assert.equal(vm.runInContext('readerGeneration', w.context), null);
-  w = open(makeStory()); w.context.state.stories = [];
-  w.context.setReaderGeneration({storyId: 'story', phase: 'ready', message: 'ready', pathId: 'alt', chapterId: 'c1', versionId: 'v1'});
-  await w.context.generationAction(); assert.deepEqual(w.context.toasts, ['That story is no longer available.']);
-  console.log('PASS generation status: all task kinds across tabs/readers, no stale working after cancel/error, saved-response recovery, cancel from the page bar and exact-path View result with rollback');
+    // Reader open on the status' own story: only the reader bar, with the phase's action.
+    {
+      const t = build({ pipeline: { busy: true } }), { context } = t;
+      t.element('reader-dialog').open = true; context.state.readerId = 'story';
+      context.setReaderGeneration({ storyId: 'story', phase: 'working', message: 'Writing…' });
+      assert.equal(visible(t, 'reader-generation-bar'), true); assert.equal(visible(t, 'generation-status-bar'), false);
+      assert.equal(t.element('reader-generation-action').textContent, 'Cancel'); assert.ok(t.element('reader-generation-bar').classList.contains('working'), 'a spinner shows while work runs');
+      assert.equal(t.element('reader-generation-dismiss').hidden, true);
+      assert.ok(t.classes.has('reader-panel:has-generation-status'));
+      // Rendering unchanged text does not rewrite the live region.
+      const writes = () => t.element('reader-generation-message').textContent;
+      context.renderReaderGeneration(); assert.equal(writes(), 'Writing…');
+    }
 
-  // Working bottom pill hides whenever its inline chapter or help loading card is visibly in view, and returns when scrolled away.
-  {
-    const w = build({ window: { innerWidth: 360, innerHeight: 800 }, pipeline: { busy: true } });
-    const c = w.context;
-    w.element('reader-dialog').open = true; c.state.readerId = 'story';
-    c.state.activeChapterRequest = { storyId: 'story' };
-    let top = 300;
-    const statusCard = w.element('reader-chapter-status');
-    statusCard.hidden = false;
-    statusCard.getClientRects = () => [{}];
-    statusCard.getBoundingClientRect = () => ({ left: 12, right: 348, top, bottom: top + 180, height: 180 });
-    w.element('reader-navigation-bar').getBoundingClientRect = () => ({ bottom: 80 });
-    c.setReaderGeneration({ storyId: 'story', phase: 'working', message: 'Step 4 of 4 · Vocabulary notes' });
-    assert.equal(visible(w, 'reader-generation-bar'), false, 'pill hides while big chapter status card is visible');
-    assert.equal(visible(w, 'generation-status-bar'), false);
-    top = 900; c.renderReaderGeneration();
-    assert.equal(visible(w, 'reader-generation-bar'), true, 'pill appears when scrolled away from status card');
-    assert.equal(w.element('reader-generation-jump').disabled, false, 'scrolled-away working pill is tappable to jump');
-    assert.ok(w.classes.has('reader-generation-jump:can-jump'));
-    top = -150; c.renderReaderGeneration();
-    assert.equal(visible(w, 'reader-generation-bar'), true, 'card covered by sticky nav does not hide the pill');
+    // No false "working": once nothing is live (cancelled, failed, abandoned) the status is hidden everywhere.
+    {
+      const t = build({ pipeline: { busy: true } }), { context } = t;
+      context.setReaderGeneration({ storyId: null, phase: 'working', message: 'Writing your story…' });
+      assert.equal(visible(t, 'generation-status-bar'), true, 'live Create request shows on any tab');
+      context.pipeline.busy = false; context.renderReaderGeneration();
+      assert.equal(visible(t, 'generation-status-bar'), false, 'settled request leaves no stale working status');
+      for (const flag of ['readerEditBusy', 'readerHelpBusy']) {
+        context.state[flag] = true; context.renderReaderGeneration(); assert.equal(visible(t, 'generation-status-bar'), true, `${flag} is a live signal`);
+        context.state[flag] = false; context.renderReaderGeneration(); assert.equal(visible(t, 'generation-status-bar'), false);
+      }
+      context.state.requestId = 'r'; context.renderReaderGeneration(); assert.equal(visible(t, 'generation-status-bar'), true); context.state.requestId = null;
+      context.renderReaderGeneration(); assert.equal(visible(t, 'generation-status-bar'), false);
+    }
 
-    // Help loading card inside #reader-help also suppresses duplicate pill while in view.
-    c.state.activeChapterRequest = null;
-    statusCard.hidden = true;
-    let helpTop = 260;
-    const helpCard = { hidden: false, getClientRects: () => [{}], getBoundingClientRect: () => ({ left: 12, right: 348, top: helpTop, bottom: helpTop + 90, height: 90 }) };
-    c.document.querySelectorAll = sel => sel === '#reader-help .help-loading' ? [helpCard] : [];
-    c.document.querySelector = sel => sel === '#reader-help .help-loading' ? helpCard : null;
-    c.renderReaderGeneration();
-    assert.equal(visible(w, 'reader-generation-bar'), false, 'pill hides while explanation loading card is visible');
-    helpTop = 900; c.renderReaderGeneration();
-    assert.equal(visible(w, 'reader-generation-bar'), true, 'pill returns when explanation loading card scrolls out of view');
-    assert.equal(w.element('reader-generation-jump').disabled, false);
-  }
+    // Placement: reader closed, another story's reader, and Create's own progress card.
+    {
+      const t = build({ pipeline: { busy: true } }), { context } = t;
+      context.state.readerId = 'other';
+      context.setReaderGeneration({ storyId: 'story', phase: 'working', message: 'Writing the next chapter…' });
+      assert.equal(visible(t, 'generation-status-bar'), true, 'reader closed'); assert.equal(visible(t, 'reader-generation-bar'), false);
+      assert.equal(t.element('generation-status-bar').parentNode, t.element('body'));
+      assert.ok(t.classes.has('body:has-app-generation-status'));
+      assert.ok(!t.classes.has('reader-panel:has-generation-status'));
+      t.element('reader-dialog').open = true; context.renderReaderGeneration();
+      assert.ok(t.classes.has('reader-panel:has-generation-status'), "another story's reader reserves bottom space and notice offsets");
+      assert.ok(!t.classes.has('body:has-app-generation-status'), 'page padding is not used behind a modal reader');
+      assert.equal(visible(t, 'generation-status-bar'), true, "another story's reader"); assert.equal(visible(t, 'reader-generation-bar'), false);
+      assert.equal(t.element('generation-status-bar').parentNode, t.element('reader-dialog'), 'moved into the modal dialog so it is not inert');
+      t.element('reader-dialog').open = false;
+      context.state.readerId = 'story'; context.renderReaderGeneration();
+      assert.equal(visible(t, 'generation-status-bar'), true, 'closed reader of the same story still uses the page bar');
+      t.classes.add('view-create:active'); context.setReaderGeneration({ storyId: null, phase: 'working', message: 'Writing your story…' });
+      assert.equal(visible(t, 'generation-status-bar'), true, 'a resumed Create has no progress card, so the bar is shown');
+      t.element('loading-card').hidden = false; context.renderReaderGeneration();
+      assert.equal(visible(t, 'generation-status-bar'), false, 'Create tab keeps its own visible progress card');
+      t.element('loading-card').hidden = true; context.renderReaderGeneration();
+      assert.equal(visible(t, 'generation-status-bar'), true, 'the bar returns as soon as the card is hidden');
+      context.setReaderGeneration({ storyId: null, phase: 'error', message: 'Story generation stopped.' });
+      assert.equal(visible(t, 'generation-status-bar'), true); assert.equal(t.element('generation-status-action').textContent, 'Review');
+    }
 
-  // Persistent ready pills never auto-dismiss after 8s, and working readyTarget exposes Read Ch. N.
-  {
-    const w = build({ pipeline: { busy: true } }), c = w.context;
-    const live = () => c.timers.filter(timer => !timer.cleared && !timer.fired);
-    w.element('reader-dialog').open = true; c.state.readerId = 'story';
-    c.setReaderGeneration({ storyId: 'story', phase: 'ready', persistent: true, actionLabel: 'Read Ch. 3', message: 'Chapter 3 is ready' });
-    assert.equal(live().length, 0, 'persistent ready bar schedules no 8-second timer');
-    assert.equal(w.element('reader-generation-action').textContent, 'Read Ch. 3');
-    assert.ok(w.classes.has('reader-generation-bar:dismissible'));
+    // Saved-response recovery and terminal phases never claim to be working.
+    {
+      const t = build({ pipeline: { busy: false } }), { context } = t;
+      t.element('reader-dialog').open = true; context.state.readerId = 'story';
+      context.setReaderGeneration({ storyId: 'story', phase: 'working', message: 'Writing…' });
+      assert.equal(visible(t, 'reader-generation-bar'), false);
+      context.state.pendingReaderResult = { story: { id: 'story' }, saved: false }; context.renderReaderGeneration();
+      assert.equal(t.element('reader-generation-action').textContent, 'Save response');
+      context.state.pendingReaderResult.saved = true; context.renderReaderGeneration();
+      assert.equal(t.element('reader-generation-action').textContent, 'Finish request');
+      context.state.pendingReaderResult = null;
+      for (const [phase, label] of [['ready', 'View result'], ['error', 'Review'], ['cleanup', 'Finish request']]) {
+        context.setReaderGeneration({ storyId: 'story', phase, message: phase });
+        assert.equal(t.element('reader-generation-action').textContent, label); assert.equal(t.element('reader-generation-dismiss').hidden, false);
+      }
+      context.setReaderGeneration(null); assert.equal(visible(t, 'reader-generation-bar'), false);
+    }
 
-    const storyObj = makeStory();
-    w.context.state.stories = [storyObj];
-    w.context.state.readerPositions = {};
-    w.context.rememberReaderPosition = () => {};
-    w.context.persistReaderStory = () => {};
-    w.context.persistReaderPosition = () => {};
-    w.context.updateReader = () => {};
-    w.context.readerPanel = () => w.element('reader-panel');
-    w.context.setReaderGeneration({
-      storyId: 'story', phase: 'working', message: 'Chapter 2 ready · Notes 1 of 4',
-      readyTarget: { storyId: 'story', pathId: 'original', chapterId: 'c2', versionId: 'v2', chapterNumber: 2, isBranch: false }
-    });
-    assert.equal(w.element('reader-generation-action').textContent, 'Read Ch. 2');
-    assert.equal(w.element('reader-generation-action').disabled, false);
+    // Ready hides itself after a timeout; a held or hidden bar postpones it; other phases never time out.
+    {
+      const t = build(), { context } = t, live = () => context.timers.filter(timer => !timer.cleared && !timer.fired);
+      const fire = () => { const timer = live().at(-1); timer.fired = true; timer.fn(); };
+      const current = () => context.runtime.readerGeneration;
+      t.element('reader-dialog').open = true; context.state.readerId = 'story';
+      context.document.visibilityState = 'visible';
+      for (const phase of ['error', 'cleanup']) { context.setReaderGeneration({ storyId: 'story', phase, message: phase }); assert.equal(live().length, 0, `${phase} stays`); }
+      context.state.pendingReaderResult = { story: { id: 'story' }, saved: true };
+      context.setReaderGeneration({ storyId: 'story', phase: 'ready', message: 'Ready' }); assert.equal(live().length, 0, 'unreleased response stays');
+      context.state.pendingReaderResult = null;
+      const ready = { storyId: 'story', phase: 'ready', message: 'Ready' };
+      context.setReaderGeneration(ready); assert.equal(live().length, 1); assert.equal(live()[0].ms, 8000);
+      context.renderReaderGeneration(); assert.equal(live().length, 1, 're-rendering the same status keeps one countdown');
+      t.element('reader-generation-bar').matches = selector => selector === ':hover';
+      fire(); assert.equal(current(), ready, 'hovered bar stays'); assert.equal(live().length, 1);
+      t.element('reader-generation-bar').matches = () => false; context.document.visibilityState = 'hidden';
+      fire(); assert.equal(current(), ready, 'hidden page postpones'); assert.equal(live().length, 1);
+      // Returning to the page restarts the full countdown instead of keeping whatever was left.
+      context.document.visibilityState = 'visible'; const leftover = live().at(-1);
+      context.restartReadyCountdown(); assert.equal(leftover.cleared, true); assert.equal(live().length, 1); assert.equal(live()[0].ms, 8000);
+      fire(); assert.equal(current(), null); assert.equal(visible(t, 'reader-generation-bar'), false);
+      context.restartReadyCountdown(); assert.equal(live().length, 0, 'nothing to restart once Ready is gone');
+      // A newer status replaces the countdown; the old timer cannot dismiss it.
+      const first = { storyId: 'story', phase: 'ready', message: 'First' }; context.setReaderGeneration(first);
+      const stale = live().at(-1); context.setReaderGeneration({ storyId: 'story', phase: 'error', message: 'Failed' });
+      assert.equal(stale.cleared, true); stale.fn(); assert.equal(current().phase, 'error');
+    }
+
+    // Cancel uses the pipeline directly, so it works from the page bar with the reader closed.
+    let cancels = 0;
+    const t = build({ pipeline: { busy: true, async cancel() { cancels++; } } }), { context } = t;
+    context.setReaderGeneration({ storyId: 'story', phase: 'working', message: 'Writing…' });
+    assert.equal(t.element('generation-status-action').disabled, false);
+    context.state.stories = [{ id: 'story', paths: [], activePathId: 'a' }];
+    await context.generationAction(); assert.equal(cancels, 1);
+
+    // Saving a response acknowledges it, which clears state.pendingReaderResult: the owning reader is refreshed from the captured record.
+    for (const [readerId, expectUpdate] of [['story', true], ['other', false]]) {
+      const w = build({ pipeline: null }), c = w.context, calls = [];
+      w.element('reader-dialog').open = true; c.state.readerId = readerId;
+      c.state.pendingReaderResult = { story: { id: 'story' }, saved: false };
+      c.updateReader = () => calls.push('updateReader');
+      c.savePendingReaderResult = async () => { c.state.pendingReaderResult = null; };
+      c.setReaderGeneration({ storyId: 'story', phase: 'working', message: 'Writing…' });
+      await c.generationAction();
+      assert.deepEqual(calls, expectUpdate ? ['updateReader'] : [], `reader ${readerId} after saving a response for story`);
+    }
+
+    // Create recovery from another story's modal reader: the reader is closed first, then Create is shown and revealed.
+    {
+      const order = [], op = { kind: 'create' };
+      const w = build({ pipeline: { busy: false, records: [op] } }), c = w.context;
+      w.element('reader-dialog').open = true; c.state.readerId = 'other'; c.state.stories = [];
+      c.setView = name => order.push(`view:${name}:${w.element('reader-dialog').open ? 'open' : 'closed'}`);
+      c.revealRecovery = value => order.push(`reveal:${value === op}`);
+      c.setReaderGeneration({ storyId: null, phase: 'error', message: 'Story generation stopped.' });
+      await c.generationAction();
+      assert.deepEqual(order, ['view:create:closed', 'reveal:true']);
+    }
+
+    // View result targets the exact result path, also when the same chapter version is shared by two paths.
+    const makeStory = () => ({ id: 'story', activePathId: 'original', paths: [
+      { id: 'original', name: 'Original', entries: [{ chapterId: 'c1', versionId: 'v1' }, { chapterId: 'c2', versionId: 'v2' }] },
+      { id: 'alt', name: 'Alternate 1', entries: [{ chapterId: 'c1', versionId: 'v1' }, { chapterId: 'c3', versionId: 'v3' }] }] });
+    const open = (story, extra = {}) => {
+      const w = build({ pipeline: null, ...extra }), saved = [], calls = [];
+      Object.assign(w.context, {
+        persisted: saved, calls, rememberReaderPosition: () => calls.push('remember'),
+        persistReaderStory: s => { saved.push(s.activePathId); if (w.context.failSave) throw new Error('disk full'); },
+        persistReaderPosition: () => calls.push('position'), updateReader: () => calls.push('update'),
+        revealCard() {}, setView() {}, revealRecovery() {},
+        openReader: s => { w.context.state.readerId = s.id; w.element('reader-dialog').open = true; }
+      });
+      w.context.state.stories = [story]; w.context.state.readerPositions = {}; w.context.state.readerChapter = 0;
+      return w;
+    };
+    // Shared first chapter on both paths: the status names 'alt', so 'alt' wins over the first path containing it.
+    let story = makeStory(), w = open(story);
+    w.context.setReaderGeneration({ storyId: 'story', phase: 'ready', message: 'ready', pathId: 'alt', chapterId: 'c1', versionId: 'v1' });
     await w.context.generationAction();
-    assert.equal(w.context.state.readerChapter, 1);
-    assert.equal(w.element('reader-generation-action').textContent, 'Cancel');
-    console.log('PASS working card visibility dedup, tappable jump state, persistent ready bar, and Read Ch. N action');
+    assert.equal(story.activePathId, 'alt'); assert.deepEqual(w.context.persisted, ['alt'], 'selected path is saved');
+    assert.equal(w.context.state.readerChapter, 0);
+    assert.equal(JSON.stringify(w.context.state.readerPositions['story:alt']), '{"chapterId":"c1","scrollTop":0}');
+    assert.ok(w.context.calls.includes('remember') && w.context.calls.includes('update') && w.context.calls.includes('position'));
+    assert.equal(w.context.runtime.readerGeneration, null);
+    // Continue result on the path that is not the selected one.
+    story = makeStory(); w = open(story);
+    w.context.setReaderGeneration({ storyId: 'story', phase: 'ready', message: 'ready', pathId: 'original', chapterId: 'c2', versionId: 'v2' });
+    story.activePathId = 'alt'; await w.context.generationAction();
+    assert.equal(story.activePathId, 'original'); assert.equal(w.context.state.readerChapter, 1);
+    // Already on that path: no redundant path write.
+    story = makeStory(); w = open(story);
+    w.context.setReaderGeneration({ storyId: 'story', phase: 'ready', message: 'ready', pathId: 'original', chapterId: 'c2', versionId: 'v2' });
+    await w.context.generationAction(); assert.deepEqual(w.context.persisted, []); assert.equal(w.context.state.readerChapter, 1);
+    // A failed save restores the selection and does not navigate.
+    story = makeStory(); w = open(story); w.context.failSave = true;
+    w.context.setReaderGeneration({ storyId: 'story', phase: 'ready', message: 'ready', pathId: 'alt', chapterId: 'c3', versionId: 'v3' });
+    await w.context.generationAction(); assert.equal(story.activePathId, 'original'); assert.deepEqual(w.context.toasts, ['disk full']); assert.ok(!w.context.calls.includes('update'));
+    // Deleted path and deleted story degrade without navigating.
+    story = makeStory(); w = open(story);
+    w.context.setReaderGeneration({ storyId: 'story', phase: 'ready', message: 'ready', pathId: 'gone', chapterId: 'cX', versionId: 'vX' });
+    await w.context.generationAction(); assert.deepEqual(w.context.toasts, ['That result is no longer available.']); assert.equal(w.context.runtime.readerGeneration, null);
+    w = open(makeStory()); w.context.state.stories = [];
+    w.context.setReaderGeneration({ storyId: 'story', phase: 'ready', message: 'ready', pathId: 'alt', chapterId: 'c1', versionId: 'v1' });
+    await w.context.generationAction(); assert.deepEqual(w.context.toasts, ['That story is no longer available.']);
+    console.log('PASS generation status: all task kinds across tabs/readers, no stale working after cancel/error, saved-response recovery, cancel from the page bar and exact-path View result with rollback');
+
+    // Working bottom pill hides whenever its inline chapter or help loading card is visibly in view, and returns when scrolled away.
+    {
+      const w = build({ window: { innerWidth: 360, innerHeight: 800 }, pipeline: { busy: true } });
+      const c = w.context;
+      w.element('reader-dialog').open = true; c.state.readerId = 'story';
+      c.state.activeChapterRequest = { storyId: 'story' };
+      let top = 300;
+      const statusCard = w.element('reader-chapter-status');
+      statusCard.hidden = false;
+      statusCard.getClientRects = () => [{}];
+      statusCard.getBoundingClientRect = () => ({ left: 12, right: 348, top, bottom: top + 180, height: 180 });
+      w.element('reader-navigation-bar').getBoundingClientRect = () => ({ bottom: 80 });
+      c.setReaderGeneration({ storyId: 'story', phase: 'working', message: 'Step 4 of 4 · Vocabulary notes' });
+      assert.equal(visible(w, 'reader-generation-bar'), false, 'pill hides while big chapter status card is visible');
+      assert.equal(visible(w, 'generation-status-bar'), false);
+      top = 900; c.renderReaderGeneration();
+      assert.equal(visible(w, 'reader-generation-bar'), true, 'pill appears when scrolled away from status card');
+      assert.equal(w.element('reader-generation-jump').disabled, false, 'scrolled-away working pill is tappable to jump');
+      assert.ok(w.classes.has('reader-generation-jump:can-jump'));
+      top = -150; c.renderReaderGeneration();
+      assert.equal(visible(w, 'reader-generation-bar'), true, 'card covered by sticky nav does not hide the pill');
+
+      // Help loading card inside #reader-help also suppresses duplicate pill while in view.
+      c.state.activeChapterRequest = null;
+      statusCard.hidden = true;
+      let helpTop = 260;
+      const helpCard = { hidden: false, getClientRects: () => [{}], getBoundingClientRect: () => ({ left: 12, right: 348, top: helpTop, bottom: helpTop + 90, height: 90 }) };
+      c.document.querySelectorAll = sel => sel === '#reader-help .help-loading' ? [helpCard] : [];
+      c.document.querySelector = sel => sel === '#reader-help .help-loading' ? helpCard : null;
+      c.renderReaderGeneration();
+      assert.equal(visible(w, 'reader-generation-bar'), false, 'pill hides while explanation loading card is visible');
+      helpTop = 900; c.renderReaderGeneration();
+      assert.equal(visible(w, 'reader-generation-bar'), true, 'pill returns when explanation loading card scrolls out of view');
+      assert.equal(w.element('reader-generation-jump').disabled, false);
+    }
+
+    // Persistent ready pills never auto-dismiss after 8s, and working readyTarget exposes Read Ch. N.
+    {
+      const w = build({ pipeline: { busy: true } }), c = w.context;
+      const live = () => c.timers.filter(timer => !timer.cleared && !timer.fired);
+      w.element('reader-dialog').open = true; c.state.readerId = 'story';
+      c.setReaderGeneration({ storyId: 'story', phase: 'ready', persistent: true, actionLabel: 'Read Ch. 3', message: 'Chapter 3 is ready' });
+      assert.equal(live().length, 0, 'persistent ready bar schedules no 8-second timer');
+      assert.equal(w.element('reader-generation-action').textContent, 'Read Ch. 3');
+      assert.ok(w.classes.has('reader-generation-bar:dismissible'));
+
+      const storyObj = makeStory();
+      w.context.state.stories = [storyObj];
+      w.context.state.readerPositions = {};
+      w.context.rememberReaderPosition = () => {};
+      w.context.persistReaderStory = () => {};
+      w.context.persistReaderPosition = () => {};
+      w.context.updateReader = () => {};
+      w.context.readerPanel = () => w.element('reader-panel');
+      w.context.setReaderGeneration({
+        storyId: 'story', phase: 'working', message: 'Chapter 2 ready · Notes 1 of 4',
+        readyTarget: { storyId: 'story', pathId: 'original', chapterId: 'c2', versionId: 'v2', chapterNumber: 2, isBranch: false }
+      });
+      assert.equal(w.element('reader-generation-action').textContent, 'Read Ch. 2');
+      assert.equal(w.element('reader-generation-action').disabled, false);
+      await w.context.generationAction();
+      assert.equal(w.context.state.readerChapter, 1);
+      assert.equal(w.element('reader-generation-action').textContent, 'Cancel');
+      console.log('PASS working card visibility dedup, tappable jump state, persistent ready bar, and Read Ch. N action');
+    }
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+    globalThis.clearTimeout = realClearTimeout;
   }
-})();
+})().catch(error => { console.error(error); process.exitCode = 1; });

@@ -1,11 +1,10 @@
-import appSource from './support/app-source.cjs';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import vm from 'node:vm';
 import {storyExportFile, importStoryFile, STORY_IMPORT_MAX_BYTES} from '../js/screens/story-share.js';
 import {createStoryModel} from '../js/core/story-model.js';
 import {createWorkspaceStorage, validStories} from '../js/core/workspace-storage.js';
-import {markStoryActivity} from '../js/screens/library-activity.js';
+import {loadFactory, deps, stubDom} from './support/factory-harness.mjs';
+
+const createShareDialog = await loadFactory('js/screens/share-dialog.js', 'createShareDialog');
 
 const {normalizeChapters} = createStoryModel({state:{}, readerStory:() => null});
 const version = {id:'v', title:'買い物', story:'買います。', storySegments:[{text:'買', reading:'か'}, {text:'います。'}], glossary:[{word:'買う', meaning:'buy', forms:['買います']}]};
@@ -71,43 +70,49 @@ console.log('PASS story import rejects non-LingoMage, newer, malformed and inval
 
 // Real app wiring: the Library handler, the normal stories save, cancellation and rollback.
 {
-  const app = appSource();
-  const start = app.indexOf('// Library → Import story…'), end = app.indexOf('// end of js/screens/share-dialog.js');
-  assert.ok(start > 0 && end > start);
-  const persistStories = app.slice(app.indexOf('function persistStories()'), app.indexOf('function persistReaderStory('));
   const setup = (saved = [story], {write = () => true} = {}) => {
     const files = new Map([['data/stories.json', JSON.stringify(saved)]]), writes = [];
     const workspaceStorage = createWorkspaceStorage({read:path => files.get(path) ?? '', exists:path => files.has(path), write:(path, value) => { writes.push(path); if (!write()) return false; files.set(path, JSON.stringify(value)); return true; }});
-    const elements = new Map(), toasts = [];
-    const $ = id => { if (!elements.has(id)) elements.set(id, {value:'', files:null, disabled:false, addEventListener(name, fn) { this[name] = fn; }, click() { this.clicked = (this.clicked || 0) + 1; }, focus() { this.focused = true; }}); return elements.get(id); };
-    const context = {$, state:{}, workspaceStorage, normalizeChapters, importStoryFile, markStoryActivity, STORY_IMPORT_MAX_BYTES, libraryChanged() { context.changed = (context.changed || 0) + 1; }, toast:message => toasts.push(message), console:{warn() {}}, Date};
-    vm.createContext(context);
-    vm.runInContext(`${persistStories}\n${app.slice(start, end)}`, context);
-    context.state.stories = JSON.parse(JSON.stringify(workspaceStorage.load('data/stories.json').value));
-    return {context, $, files, writes, toasts};
+    const dom = stubDom(), toasts = [], state = {};
+    dom.$('import-story-input').files = null;
+    dom.$('import-story-input').click = function () { this.clicked = (this.clicked || 0) + 1; };
+    let changed = 0;
+    createShareDialog(deps({
+      $: dom.$,
+      state,
+      workspaceStorage,
+      normalizeChapters,
+      persistStories() { workspaceStorage.save('data/stories.json', state.stories); },
+      libraryChanged() { changed++; },
+      toast: message => toasts.push(message)
+    }, { strict: true }));
+    state.stories = JSON.parse(JSON.stringify(workspaceStorage.load('data/stories.json').value));
+    return {state, workspaceStorage, $: dom.$, document: dom.document, files, writes, toasts, get changed() { return changed; }};
   };
-  const choose = async (env, file) => { env.$('import-story').click(); env.$('import-story-input').files = file ? [file] : []; await env.$('import-story-input').change(); };
+  const choose = async (env, file) => { await env.$('import-story').dispatch('click'); env.$('import-story-input').files = file ? [file] : []; await env.$('import-story-input').dispatch('change'); };
   const fileOf = (text, size = text.length) => ({size, text:async () => text});
 
   let env = setup();
   env.$('import-story-input').value = 'C:\\fakepath\\old.json';
-  env.$('import-story').click();
+  await env.$('import-story').dispatch('click');
   assert.equal(env.$('import-story-input').clicked, 1, 'the button opens the picker inside its click');
   assert.equal(env.$('import-story-input').value, '', 'the same file can be chosen again');
   await choose(env, fileOf(exported));
   const saved = JSON.parse(env.files.get('data/stories.json'));
   assert.equal(saved.length, 2); assert.deepEqual(saved[1], story, 'the existing story is untouched');
   assert.notEqual(saved[0].id, 'S'); assert.equal(saved[0].title, story.title); assert.equal(saved[0].lastActivityKind, 'updated');
-  assert.deepEqual(env.context.state.stories, saved, 'runtime state matches the saved file');
-  assert.deepEqual(env.toasts, ['Imported “日本の話”']); assert.equal(env.context.changed, 1);
-  assert.equal(env.$('import-story').disabled, false); assert.equal(env.$('import-story').focused, true);
+  assert.deepEqual(env.state.stories, saved, 'runtime state matches the saved file');
+  assert.deepEqual(env.toasts, ['Imported “日本の話”']); assert.equal(env.changed, 1);
+  assert.equal(env.$('import-story').disabled, false); assert.equal(env.document.activeElement, env.$('import-story'));
   await choose(env, fileOf(exported));
   assert.equal(JSON.parse(env.files.get('data/stories.json')).length, 3, 'importing the same file twice adds a second copy');
 
   const unchanged = async (env, file, message) => {
-    const bytes = env.files.get('data/stories.json'), stories = JSON.stringify(env.context.state.stories), toasts = env.toasts.length;
-    await choose(env, file);
-    assert.equal(env.files.get('data/stories.json'), bytes); assert.equal(JSON.stringify(env.context.state.stories), stories);
+    const bytes = env.files.get('data/stories.json'), stories = JSON.stringify(env.state.stories), toasts = env.toasts.length;
+    const origWarn = console.warn; console.warn = () => {};
+    try { await choose(env, file); }
+    finally { console.warn = origWarn; }
+    assert.equal(env.files.get('data/stories.json'), bytes); assert.equal(JSON.stringify(env.state.stories), stories);
     if (message) assert.match(env.toasts.at(-1), message); else assert.equal(env.toasts.length, toasts, 'cancellation is silent');
   };
   env = setup();
@@ -120,9 +125,9 @@ console.log('PASS story import rejects non-LingoMage, newer, malformed and inval
 
   env = setup([story], {write:() => false});
   await unchanged(env, fileOf(exported), /Could not save data\/stories\.json/);
-  assert.equal(env.writes.length, 1); assert.equal(env.context.state.stories.length, 1, 'a failed save rolls back the in-memory Library');
+  assert.equal(env.writes.length, 1); assert.equal(env.state.stories.length, 1, 'a failed save rolls back the in-memory Library');
 
-  env = setup(); env.files.set('data/stories.json', '{broken'); env.context.workspaceStorage.load('data/stories.json'); env.writes.length = 0;
+  env = setup(); env.files.set('data/stories.json', '{broken'); env.workspaceStorage.load('data/stories.json'); env.writes.length = 0;
   await unchanged(env, fileOf(exported), /Could not load data\/stories\.json/);
   assert.equal(env.writes.length, 0, 'an unreadable stories file is never overwritten by an import');
 }

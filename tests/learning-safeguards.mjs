@@ -1,4 +1,3 @@
-import appSource from './support/app-source.cjs';
 import * as prompts from '../js/generation/prompts.js';
 const { PLAN_INSTRUCTIONS, NOTES_INSTRUCTIONS } = prompts;
 import { bindGeneration } from './support/controllers.mjs';
@@ -74,7 +73,6 @@ assert.throws(()=>validateExamples({examples:[example]},'ja'));assert.throws(()=
 assert.throws(()=>validateExamples({examples:Array(3).fill({...example,sentence:'𠮷へ',highlightEnd:1})},'ja'));tested('LANG-006');
 assert.deepEqual(japaneseSegments('行きます',[{text:'行きます',reading:'いきます'}]),[{text:'行',reading:'い'},{text:'きます'}]);
 const legacy=[{text:'食べ物',reading:'たべべもの'}];assert.deepEqual(japaneseSegments('食べ物',legacy),legacy);assert.equal(legacy[0].text,'食べ物');tested('LANG-007');
-const source=appSource();
 for (const language of ['German','Japanese','Russian','Spanish']) {
   const prompt=prompts.storyInstructions(language,'advanced','Nuanced usage.','long');
   for (const text of ['languagePlan','languageExpectations','no numerical length is enforced','not a claim of certified CEFR, JLPT or TORFL alignment','Do not impose a fixed beginner curriculum','unless explicitly requested','German preserves noun capitalization','Spanish preserves accents']) assert.ok(prompt.includes(text),text);

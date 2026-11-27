@@ -11,6 +11,9 @@ export const bridge = {
   selectionMenu: { available: false, set() {} },
   share: { available: false, text: async () => ({ launched: true }), file: async () => ({ launched: true }) },
   save: { available: false, text: async () => ({ saved: true }) },
+  notify: () => false,
+  hasNotificationPermission: () => false,
+  requestNotificationPermission: async () => false,
   files
 };
 export const isNative = false;
@@ -19,6 +22,6 @@ export const selectionMenu = bridge.selectionMenu, share = bridge.share, save = 
 export function readFile(path) { return files.get(path) ?? ''; }
 export function writeFile(path, text) { files.set(path, String(text)); return true; }
 export function listFiles() { return [...files.keys()].map(name => ({ name, size: files.get(name).length, lastModified: 0 })); }
-export function notify() { return false; }
-export function hasNotificationPermission() { return false; }
-export async function requestNotificationPermission() { return false; }
+export function notify(...args) { return bridge.notify(...args); }
+export function hasNotificationPermission(...args) { return bridge.hasNotificationPermission(...args); }
+export async function requestNotificationPermission(...args) { return bridge.requestNotificationPermission(...args); }

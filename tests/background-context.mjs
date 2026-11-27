@@ -1,10 +1,9 @@
-import appSource from './support/app-source.cjs';
 // Background story context: queueing, start conditions, stop/settle, quiet cancellation and the setting.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createStoryMemory } from '../js/generation/story-memory.js';
 
-const source = appSource();
+const source = fs.readFileSync('js/app.js', 'utf8');
 const { loadFactory, deps, bridge } = await import('./support/factory-harness.mjs');
 const createBackgroundContext = await loadFactory('js/generation/background-context.js', 'createBackgroundContext');
 const element = () => ({ children: [], hidden: false, append(...nodes) { this.children.push(...nodes); }, remove() { this.removed = true; },
